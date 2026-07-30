@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="JoeOS">
+  <defs>
+    <radialGradient id="bg" cx="36%" cy="24%" r="90%">
+      <stop offset="0" stop-color="#123b59"/>
+      <stop offset="0.5" stop-color="#071523"/>
+      <stop offset="1" stop-color="#03070d"/>
+    </radialGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#67f7ff"/>
+      <stop offset="0.52" stop-color="#18bfff"/>
+      <stop offset="1" stop-color="#5778ff"/>
+    </linearGradient>
+    <filter id="soft" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="146" fill="none" stroke="#23d8ff" stroke-opacity=".16" stroke-width="3"/>
+  <circle cx="256" cy="256" r="112" fill="#0a2438" fill-opacity=".72" stroke="url(#glow)" stroke-width="5"/>
+  <circle cx="256" cy="256" r="84" fill="#19d8ff" fill-opacity=".11" filter="url(#soft)"/>
+  <path d="M184 168h54v132c0 32 13 46 40 46 28 0 45-16 45-49V168h54v132c0 67-37 102-100 102-61 0-93-34-93-99V168z" fill="url(#glow)"/>
+  <circle cx="256" cy="81" r="11" fill="#7cfcff"/>
+  <circle cx="431" cy="256" r="8" fill="#36cfff"/>
+  <circle cx="81" cy="256" r="8" fill="#36cfff"/>
+</svg>

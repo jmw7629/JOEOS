@@ -1,0 +1,21 @@
+{
+  "id": "/",
+  "name": "JoeOS Command Center",
+  "short_name": "JoeOS",
+  "description": "Private mobile command center for a Ryzen AI Max+ Halo system and Lemonade Server.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#050810",
+  "theme_color": "#06111f",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/joeos-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

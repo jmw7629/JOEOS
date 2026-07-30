@@ -1,0 +1,3 @@
+# JoeOS now runs privately on the Halo. This intentionally provisions nothing.
+# Use start_joeos.sh (Halo/Linux) or start_joeos.command (macOS).
+services: []
