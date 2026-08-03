@@ -3526,6 +3526,7 @@
         { id: "security", label: "Security & Logs", short: "Security", icon: "fa-shield-halved" },
         { id: "plugins", label: "Plugin Manager", short: "Plugins", icon: "fa-puzzle-piece" },
         { id: "automation", label: "Automation", short: "Automation", icon: "fa-robot" },
+        { id: "communications", label: "Communications", short: "Inbox", icon: "fa-envelope" },
         { id: "bots", label: "Bot Fleet", short: "Bot Fleet", icon: "fa-robot" }
       ];
 
@@ -4479,6 +4480,41 @@
         );
       }
 
+      function CommunicationsSection(props) {
+        var unread = props.notifications.filter(function (item) { return item.read_state === "delivered" && !item.archive_state; }).length;
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "communications-title" },
+          h(SectionHeader, {
+            kicker: "Unified inbox",
+            title: h("span", { id: "communications-title" }, "Communications"),
+            description: "A local-first, provider-neutral hub. Notifications, internal messages, drafts, and approvals reflect real state; external sending always requires approval bound to content and recipients.",
+            actions: [
+              h("span", { className: "live-pill" + (unread ? " attention" : ""), key: "unread" }, h("span", { className: "live-dot" }), unread + " UNREAD")
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon success" }, icon("fa-envelope")), h("div", null, h("strong", null, String(unread)), h("span", null, "Unread"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-user-check")), h("div", null, h("strong", null, String(props.overview.pending_approvals)), h("span", null, "Pending approvals"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon purple" }, icon("fa-paper-plane")), h("div", null, h("strong", null, String(props.overview.outbox_count)), h("span", null, "Outbox")))
+          ),
+          props.notifications.length
+            ? h("div", { className: "bot-grid" }, props.notifications.map(function (item) {
+                var tone = item.severity === "critical" || item.severity === "security_critical" ? "attention" : item.severity === "error" ? "warn" : "";
+                return h(
+                  "article",
+                  { className: "glass-card panel-card", key: item.notification_id },
+                  h("div", { className: "plugin-header" }, icon("fa-bell"), h("div", null, h("strong", null, item.title), h("span", null, item.source + " · " + item.category))),
+                  h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, item.severity.toUpperCase()), h("span", null, "Priority: " + item.priority)),
+                  item.message ? h("p", { className: "plugin-description" }, item.message) : null
+                );
+              }))
+            : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-envelope"), h("strong", null, "No notifications"), h("p", null, "Notifications from JoeOS services, workflows, agents, and providers will appear here.")))
+        );
+      }
+
       function missionAttentionItems(metrics, runtime, security, bots) {
         var items = [];
         if (!runtime || !runtime.online) {
@@ -4949,6 +4985,12 @@
         var automationOverviewPair = useState({ workflows_total: 0, workflows_enabled: 0, running: 0, waiting: 0, failed_recently: 0, pending_approvals: 0, unhealthy_schedules: 0, next_scheduled_workflow: null });
         var automationOverview = automationOverviewPair[0];
         var setAutomationOverview = automationOverviewPair[1];
+        var notificationsPair = useState([]);
+        var notifications = notificationsPair[0];
+        var setNotifications = notificationsPair[1];
+        var communicationsOverviewPair = useState({ unread_focused: 0, pending_approvals: 0, agent_requests: 0, outbox_count: 0, failed_deliveries: 0, security_alerts_unacknowledged: 0, snoozed: 0, unhealthy_accounts: 0, unhealthy_providers: 0, quiet_hours_active: false, next_digest: null });
+        var communicationsOverview = communicationsOverviewPair[0];
+        var setCommunicationsOverview = communicationsOverviewPair[1];
         var toastPair = useState("");
         var toast = toastPair[0];
         var setToast = toastPair[1];
@@ -5098,6 +5140,17 @@
           }
         }
 
+        async function loadCommunicationsFromApi() {
+          try {
+            var notificationsPayload = await requestJson("/api/v1/communications/notifications", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (notificationsPayload && Array.isArray(notificationsPayload.notifications)) setNotifications(notificationsPayload.notifications);
+            var overviewPayload = await requestJson("/api/v1/communications/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (overviewPayload && typeof overviewPayload === "object") setCommunicationsOverview(overviewPayload);
+          } catch (error) {
+            setNotifications([]);
+          }
+        }
+
         function replaceLiveLogs(rows, activeProfiles) {
           var next = Array.isArray(rows) ? rows.slice(0, 40) : [];
           logsRef.current = next;
@@ -5165,7 +5218,7 @@
           if (remoteRefreshRef.current) return;
           remoteRefreshRef.current = true;
           try {
-            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi()]);
+            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi()]);
             var failures = results.filter(function (result) { return result.status === "rejected"; });
             if (failures.length) {
               if (results[0].status === "rejected") setRuntime({ online: false, status: "offline", model: null, version: null, message: "JoeOS telemetry API is unavailable" });
@@ -5698,6 +5751,8 @@
           section = h(PluginsSection, { plugins: plugins, safeMode: pluginSafeMode, onInspect: setSelectedPlugin });
         } else if (active === "automation") {
           section = h(AutomationSection, { workflows: workflows, overview: automationOverview, onInspect: setSelectedPlugin });
+        } else if (active === "communications") {
+          section = h(CommunicationsSection, { notifications: notifications, overview: communicationsOverview });
         } else {
           section = h(BotsSection, { bots: bots, pending: pendingBots, onToggle: toggleBot, onDeploy: function () { setDeployOpen(true); } });
         }

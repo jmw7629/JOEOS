@@ -26,6 +26,7 @@ from server.api.bootstrap import (
 )
 from server.automation import AutomationService, automation_router
 from server.command_center import CommandCenterService, command_center_router
+from server.communications import CommunicationsService, communications_router
 from server.engineering import EngineeringService, engineering_router
 from server.intelligence import IntelligenceService, intelligence_router
 from server.memory import MemoryService, memory_router
@@ -683,6 +684,7 @@ async def lifespan(app: FastAPI):
         workspace_ready=lambda: True,
         plugins_ready=lambda: getattr(app.state, "plugins_service", None) is not None,
         automation_ready=lambda: getattr(app.state, "automation_service", None) is not None,
+        communications_ready=lambda: getattr(app.state, "communications_service", None) is not None,
     )
     app.state.engineering_service = EngineeringService(
         connection_factory=lambda: _connect(db_path),
@@ -710,6 +712,13 @@ async def lifespan(app: FastAPI):
             db_path, level, source, message
         ),
     )
+    app.state.communications_service = CommunicationsService(
+        str(db_path.parent / "communications"),
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+    )
+    app.state.communications_service.prepare_defaults()
     app.state.thresholds = {}
     timeout = httpx.Timeout(
         connect=float(os.getenv("LEMONADE_CONNECT_TIMEOUT", "3")),
@@ -761,6 +770,7 @@ app.include_router(memory_router)
 app.include_router(agents_router)
 app.include_router(plugins_router)
 app.include_router(automation_router)
+app.include_router(communications_router)
 
 
 @app.middleware("http")

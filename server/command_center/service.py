@@ -62,6 +62,7 @@ class CommandCenterService:
         workspace_ready: Optional[Callable[[], bool]] = None,
         plugins_ready: Optional[Callable[[], bool]] = None,
         automation_ready: Optional[Callable[[], bool]] = None,
+        communications_ready: Optional[Callable[[], bool]] = None,
     ) -> None:
         self._connection_factory = connection_factory
         self._runtime_provider = runtime_provider
@@ -74,6 +75,7 @@ class CommandCenterService:
         self._workspace_ready = workspace_ready or (lambda: False)
         self._plugins_ready = plugins_ready or (lambda: False)
         self._automation_ready = automation_ready or (lambda: False)
+        self._communications_ready = communications_ready or (lambda: False)
 
     def overview(self) -> OverviewEnvelope:
         services = self.services().services
@@ -136,6 +138,12 @@ class CommandCenterService:
                 "Automation Engine",
                 self._automation_ready,
                 "Automation and Workflow Engine with the schedule service.",
+            ),
+            self._readiness_health(
+                "communications.hub",
+                "Communications Hub",
+                self._communications_ready,
+                "Communications, Inbox, and Notification Hub.",
             ),
         ]
         return ServicesEnvelope(generated_at=self._now_iso(), services=tuple(service_list))

@@ -94,3 +94,11 @@ test("ships an Automation workspace driven by real workflow state", () => {
   assert.match(html, /loadAutomationFromApi\(\)/);
   assert.match(html, /pending_approvals/);
 });
+
+test("ships a Communications workspace driven by real notification state", () => {
+  assert.match(html, /id: ["']communications["'], label: ["']Communications["']/);
+  assert.match(html, /function CommunicationsSection\(/);
+  assert.match(html, /\/api\/v1\/communications\/notifications/);
+  assert.match(html, /loadCommunicationsFromApi\(\)/);
+  assert.match(html, /external sending always requires approval/i);
+});

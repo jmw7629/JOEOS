@@ -4,7 +4,7 @@ Generated: 2026-08-03.
 
 ## Current phase
 
-Phase 11 — Automation and Workflow Engine (delivered).
+Phase 12 — Communications, Inbox, and Notification Hub (delivered).
 
 ## What works
 
@@ -15,11 +15,12 @@ Phase 11 — Automation and Workflow Engine (delivered).
 - Multi-agent collaboration and organizational intelligence: organization, units, roles and agents, charters, plans, task graphs with dependency enforcement, assignment with explanations, messaging, handoffs, artifacts, reviews and quality gates, disagreements and consensus, debates and consultations, escalations, interventions, approvals (no self-approval), budget governance, local-first model routing, deadlock/loop/stagnation detection, organizational health, performance telemetry, memory proposals.
 - Plugin and extension platform: versioned manifests, Plugin Registry, Publisher Registry, package integrity, ECDSA P-256 signature evaluation, granular permissions and Capability Broker, Contribution Registry, isolated Extension Host with typed JSON RPC, extension storage/settings/secrets, bounded events, resource governor, health/logs/diagnostics, quarantine, Safe Mode, update/rollback, uninstall, development host, plugin SDK, CLI, templates, first-party example plugin, and a Plugin Manager section in the Command Center UI.
 - Automation and Workflow Engine: versioned Workflow Registry, strict validation and compilation (no code execution, bounded loops, cycle detection), constrained expression language, timezone-aware scheduling with explicit DST/missed-run/overlap policies, Trigger Registry, Action Registry, Workflow Secret Broker, permission guard, idempotency/deduplication/concurrency/locks/rate limits, real execution state machine with branches, loops, parallel, retries, timeouts, approvals, user input, compensation, pause/resume/cancel, bounded run history and traces, health and stuck-run detection, safe templates, and an Automation section in the Command Center UI.
+- Communications, Inbox, and Notification Hub: provider-neutral Provider/Account/Identity/Contact registries, Recipient Resolver with ambiguity blocking, typed Message Store and Draft Store, authoritative Outbox with idempotent bounded delivery, external-send approval bound to content/recipient/attachment hashes, content sanitization, link safety, phishing and prompt-injection signals, Notification Center with routing rules, quiet hours, DND, snooze, digests, attachment validation, and a Communications section in the Command Center UI.
 
 ## Test status
 
-- Python: 281 passed, 61 subtests passed.
-- Frontend: 10/10 passed.
+- Python: 319 passed, 61 subtests passed.
+- Frontend: 11/11 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 
 ## Not yet built
@@ -29,7 +30,9 @@ Phase 11 — Automation and Workflow Engine (delivered).
 - Phase 3 authority: sessions, roles, approvals, execution.
 - Index-at-rest encryption, cross-project queries.
 - Plugin marketplace, public signing-key distribution, OS-level sandboxing, webhooks, and remote connectors (architecture documented; not implemented).
+- Real external provider adapters (email/chat), mobile push, smart-glasses delivery, and read receipts (architecture documented; not implemented).
 
-See `docs/architecture/AUTOMATION_PLATFORM.md` for the automation engine
-design, `docs/architecture/PLUGIN_PLATFORM.md` for the plugin platform, and
+See `docs/architecture/COMMUNICATIONS_PLATFORM.md` for the communications
+design, `docs/architecture/AUTOMATION_PLATFORM.md` for the automation engine,
+`docs/architecture/PLUGIN_PLATFORM.md` for the plugin platform, and
 `docs/architecture/IMPLEMENTATION_BACKLOG.md` for the dependency-ordered plan.

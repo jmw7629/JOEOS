@@ -972,12 +972,12 @@ class BootstrapService:
                 description="Resolve a detection event.",
             ),
             RouteDescriptor(
-                id="agents.performance.get",
-                path="/api/v1/agents/performance/{agent_id}",
+                id="communications.overview",
+                path="/api/v1/communications/overview",
                 protocol="http",
                 methods=("GET",),
                 access="read_only",
-                description="Aggregated performance snapshot for an agent.",
+                description="Communications and notification hub overview with real unread, approval, and health state.",
             ),
             RouteDescriptor(
                 id="agents.memory-proposals.create",
@@ -1282,7 +1282,6 @@ class BootstrapService:
                     "agents.missions.get",
                     "agents.missions.graph",
                     "agents.tasks.list",
-                    "agents.performance.get",
                 ),
                 description="Read the organization: overview, missions, tasks, and telemetry.",
             ),
@@ -1399,6 +1398,13 @@ class BootstrapService:
                 access="read_only",
                 route_ids=("automation.overview",),
                 description="Read the automation and workflow platform overview.",
+            ),
+            CapabilityDescriptor(
+                id="communications.platform.read",
+                status="available",
+                access="read_only",
+                route_ids=("communications.overview",),
+                description="Read the communications and notification hub overview.",
             ),
             CapabilityDescriptor(
                 id="assistant.local_analysis",
