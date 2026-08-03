@@ -26,6 +26,7 @@ from server.api.bootstrap import (
 from server.command_center import CommandCenterService, command_center_router
 from server.engineering import EngineeringService, engineering_router
 from server.intelligence import IntelligenceService, intelligence_router
+from server.memory import MemoryService, memory_router
 from server.identity import (
     DeviceEnrollmentService,
     PairingKeyProtector,
@@ -688,6 +689,7 @@ async def lifespan(app: FastAPI):
         project_service=app.state.engineering_service.projects,
         data_dir=str(db_path.parent / "intelligence"),
     )
+    app.state.memory_service = MemoryService(data_dir=str(db_path.parent / "memory"))
     app.state.thresholds = {}
     timeout = httpx.Timeout(
         connect=float(os.getenv("LEMONADE_CONNECT_TIMEOUT", "3")),
@@ -732,6 +734,7 @@ app.include_router(realtime_router)
 app.include_router(command_center_router)
 app.include_router(engineering_router)
 app.include_router(intelligence_router)
+app.include_router(memory_router)
 
 
 @app.middleware("http")

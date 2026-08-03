@@ -1,0 +1,91 @@
+"""Memory and Knowledge Platform.
+
+Local-first typed persistence and retrieval for memory records, entities,
+relationships, evidence, documents, notes, conflicts, and review items with
+provenance, authority, confidence, temporal validity, scope, privacy, and
+retention metadata. AI-extracted material is proposed until policy or user
+review promotes it to accepted. Nothing is fabricated, and hidden reasoning
+and secrets are never stored.
+"""
+
+from .models import (
+    ActivityEvent,
+    AuthorityLevel,
+    ConfidenceClass,
+    ConflictRecord,
+    ContextPack,
+    ContextPackItem,
+    DeletionState,
+    DocumentRecord,
+    DuplicateCandidate,
+    EntityRecord,
+    EntityType,
+    EvidenceRecord,
+    EvidenceSourceType,
+    ExportEnvelope,
+    HealthState,
+    ImportResult,
+    MemoryHealth,
+    MemoryHealthDiagnostics,
+    MemoryOverview,
+    MemoryRecord,
+    MemoryScope,
+    MemoryType,
+    MemoryVersion,
+    NoteRecord,
+    PrivacyClassification,
+    Provenance,
+    RelationshipRecord,
+    RelationshipType,
+    RetentionMode,
+    RetrievalEnvelope,
+    RetrievalResult,
+    ReviewEnvelope,
+    ReviewItem,
+    SemanticChunk,
+    TelemetrySample,
+)
+from .router import router as memory_router
+from .service import MemoryService
+from .storage import MemoryStorage
+
+__all__ = [
+    "MemoryService",
+    "MemoryStorage",
+    "memory_router",
+    "ActivityEvent",
+    "AuthorityLevel",
+    "ConfidenceClass",
+    "ConflictRecord",
+    "ContextPack",
+    "ContextPackItem",
+    "DeletionState",
+    "DocumentRecord",
+    "DuplicateCandidate",
+    "EntityRecord",
+    "EntityType",
+    "EvidenceRecord",
+    "EvidenceSourceType",
+    "ExportEnvelope",
+    "HealthState",
+    "ImportResult",
+    "MemoryHealth",
+    "MemoryHealthDiagnostics",
+    "MemoryOverview",
+    "MemoryRecord",
+    "MemoryScope",
+    "MemoryType",
+    "MemoryVersion",
+    "NoteRecord",
+    "PrivacyClassification",
+    "Provenance",
+    "RelationshipRecord",
+    "RelationshipType",
+    "RetentionMode",
+    "RetrievalEnvelope",
+    "RetrievalResult",
+    "ReviewEnvelope",
+    "ReviewItem",
+    "SemanticChunk",
+    "TelemetrySample",
+]
