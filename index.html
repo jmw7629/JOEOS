@@ -3527,6 +3527,7 @@
         { id: "plugins", label: "Plugin Manager", short: "Plugins", icon: "fa-puzzle-piece" },
         { id: "automation", label: "Automation", short: "Automation", icon: "fa-robot" },
         { id: "communications", label: "Communications", short: "Inbox", icon: "fa-envelope" },
+        { id: "wearables", label: "Device Manager", short: "Wearables", icon: "fa-glasses" },
         { id: "bots", label: "Bot Fleet", short: "Bot Fleet", icon: "fa-robot" }
       ];
 
@@ -4515,6 +4516,45 @@
         );
       }
 
+      function WearablesSection(props) {
+        var paired = props.devices.filter(function (device) { return device.paired_state === "paired"; }).length;
+        var connected = props.devices.filter(function (device) { return device.connection_state === "connected"; }).length;
+        var mic = props.devices.filter(function (device) { return device.mic_active; }).length;
+        var camera = props.devices.filter(function (device) { return device.camera_active; }).length;
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "wearables-title" },
+          h(SectionHeader, {
+            kicker: "Smart glasses",
+            title: h("span", { id: "wearables-title" }, "Device Manager"),
+            description: "A local-first wearable platform. Devices pair securely, trust is capability-scoped and revocable, and only the isolated simulator produces devices. Camera and microphone activity always shows an indicator.",
+            actions: [
+              h("span", { className: "live-pill" + (connected ? " attention" : ""), key: "conn" }, h("span", { className: "live-dot" }), connected + " CONNECTED")
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon success" }, icon("fa-glasses")), h("div", null, h("strong", null, String(paired)), h("span", null, "Paired devices"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-microphone")), h("div", null, h("strong", null, String(mic)), h("span", null, "Microphone active"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon purple" }, icon("fa-camera")), h("div", null, h("strong", null, String(camera)), h("span", null, "Camera active")))
+          ),
+          props.devices.length
+            ? h("div", { className: "bot-grid" }, props.devices.map(function (device) {
+                var tone = device.thermal_state === "warning" || device.battery_state === "low" ? "attention" : "";
+                return h(
+                  "article",
+                  { className: "glass-card panel-card " + tone, key: device.device_id },
+                  h("div", { className: "plugin-header" }, icon("fa-glasses"), h("div", null, h("strong", null, device.display_name), h("span", null, device.device_id + " · " + device.device_type))),
+                  h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, device.connection_state.toUpperCase()), h("span", null, "Trust: " + device.trusted_state)),
+                  h("div", { className: "plugin-meta" }, h("span", null, "Battery: " + device.battery_state + " · Thermal: " + device.thermal_state + (device.mic_active ? " · MIC" : "") + (device.camera_active ? " · CAM" : ""))),
+                  h("div", { className: "plugin-actions" }, h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(device); } }, "Inspect"))
+                );
+              }))
+            : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-glasses"), h("strong", null, "No paired devices"), h("p", null, "Create a device in the isolated Wearable Simulator, pair it securely, and it will appear here.")))
+        );
+      }
+
       function missionAttentionItems(metrics, runtime, security, bots) {
         var items = [];
         if (!runtime || !runtime.online) {
@@ -4991,6 +5031,9 @@
         var communicationsOverviewPair = useState({ unread_focused: 0, pending_approvals: 0, agent_requests: 0, outbox_count: 0, failed_deliveries: 0, security_alerts_unacknowledged: 0, snoozed: 0, unhealthy_accounts: 0, unhealthy_providers: 0, quiet_hours_active: false, next_digest: null });
         var communicationsOverview = communicationsOverviewPair[0];
         var setCommunicationsOverview = communicationsOverviewPair[1];
+        var wearableDevicesPair = useState([]);
+        var wearableDevices = wearableDevicesPair[0];
+        var setWearableDevices = wearableDevicesPair[1];
         var toastPair = useState("");
         var toast = toastPair[0];
         var setToast = toastPair[1];
@@ -5151,6 +5194,15 @@
           }
         }
 
+        async function loadWearablesFromApi() {
+          try {
+            var devicesPayload = await requestJson("/api/v1/wearables/devices", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (devicesPayload && Array.isArray(devicesPayload.devices)) setWearableDevices(devicesPayload.devices);
+          } catch (error) {
+            setWearableDevices([]);
+          }
+        }
+
         function replaceLiveLogs(rows, activeProfiles) {
           var next = Array.isArray(rows) ? rows.slice(0, 40) : [];
           logsRef.current = next;
@@ -5218,7 +5270,7 @@
           if (remoteRefreshRef.current) return;
           remoteRefreshRef.current = true;
           try {
-            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi()]);
+            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi()]);
             var failures = results.filter(function (result) { return result.status === "rejected"; });
             if (failures.length) {
               if (results[0].status === "rejected") setRuntime({ online: false, status: "offline", model: null, version: null, message: "JoeOS telemetry API is unavailable" });
@@ -5753,6 +5805,8 @@
           section = h(AutomationSection, { workflows: workflows, overview: automationOverview, onInspect: setSelectedPlugin });
         } else if (active === "communications") {
           section = h(CommunicationsSection, { notifications: notifications, overview: communicationsOverview });
+        } else if (active === "wearables") {
+          section = h(WearablesSection, { devices: wearableDevices, onInspect: setSelectedPlugin });
         } else {
           section = h(BotsSection, { bots: bots, pending: pendingBots, onToggle: toggleBot, onDeploy: function () { setDeployOpen(true); } });
         }

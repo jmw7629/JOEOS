@@ -956,12 +956,12 @@ class BootstrapService:
                 description="Scan a mission for deadlocks, loops, and stagnation.",
             ),
             RouteDescriptor(
-                id="agents.detections.list",
-                path="/api/v1/agents/detections",
+                id="wearables.overview",
+                path="/api/v1/wearables/overview",
                 protocol="http",
                 methods=("GET",),
                 access="read_only",
-                description="List detection events.",
+                description="Smart glasses and wearable platform overview with real device, session, and capability state.",
             ),
             RouteDescriptor(
                 id="agents.detections.resolve",
@@ -1299,7 +1299,6 @@ class BootstrapService:
                     "agents.interventions.list",
                     "agents.approvals.list",
                     "agents.routes.list",
-                    "agents.detections.list",
                 ),
                 description="Read collaboration, governance, routing, and detection records.",
             ),
@@ -1405,6 +1404,13 @@ class BootstrapService:
                 access="read_only",
                 route_ids=("communications.overview",),
                 description="Read the communications and notification hub overview.",
+            ),
+            CapabilityDescriptor(
+                id="wearables.platform.read",
+                status="available",
+                access="read_only",
+                route_ids=("wearables.overview",),
+                description="Read the smart glasses and wearable platform overview.",
             ),
             CapabilityDescriptor(
                 id="assistant.local_analysis",

@@ -102,3 +102,11 @@ test("ships a Communications workspace driven by real notification state", () =>
   assert.match(html, /loadCommunicationsFromApi\(\)/);
   assert.match(html, /external sending always requires approval/i);
 });
+
+test("ships a Device Manager driven by real wearable state", () => {
+  assert.match(html, /id: ["']wearables["'], label: ["']Device Manager["']/);
+  assert.match(html, /function WearablesSection\(/);
+  assert.match(html, /\/api\/v1\/wearables\/devices/);
+  assert.match(html, /loadWearablesFromApi\(\)/);
+  assert.match(html, /Camera and microphone activity always shows an indicator/i);
+});

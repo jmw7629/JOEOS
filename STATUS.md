@@ -4,7 +4,7 @@ Generated: 2026-08-03.
 
 ## Current phase
 
-Phase 12 — Communications, Inbox, and Notification Hub (delivered).
+Phase 13 — Smart Glasses, Wearable Display, and Ambient Computing Platform (delivered).
 
 ## What works
 
@@ -16,11 +16,12 @@ Phase 12 — Communications, Inbox, and Notification Hub (delivered).
 - Plugin and extension platform: versioned manifests, Plugin Registry, Publisher Registry, package integrity, ECDSA P-256 signature evaluation, granular permissions and Capability Broker, Contribution Registry, isolated Extension Host with typed JSON RPC, extension storage/settings/secrets, bounded events, resource governor, health/logs/diagnostics, quarantine, Safe Mode, update/rollback, uninstall, development host, plugin SDK, CLI, templates, first-party example plugin, and a Plugin Manager section in the Command Center UI.
 - Automation and Workflow Engine: versioned Workflow Registry, strict validation and compilation (no code execution, bounded loops, cycle detection), constrained expression language, timezone-aware scheduling with explicit DST/missed-run/overlap policies, Trigger Registry, Action Registry, Workflow Secret Broker, permission guard, idempotency/deduplication/concurrency/locks/rate limits, real execution state machine with branches, loops, parallel, retries, timeouts, approvals, user input, compensation, pause/resume/cancel, bounded run history and traces, health and stuck-run detection, safe templates, and an Automation section in the Command Center UI.
 - Communications, Inbox, and Notification Hub: provider-neutral Provider/Account/Identity/Contact registries, Recipient Resolver with ambiguity blocking, typed Message Store and Draft Store, authoritative Outbox with idempotent bounded delivery, external-send approval bound to content/recipient/attachment hashes, content sanitization, link safety, phishing and prompt-injection signals, Notification Center with routing rules, quiet hours, DND, snooze, digests, attachment validation, and a Communications section in the Command Center UI.
+- Smart Glasses and Wearable Platform: authoritative Device Registry, Device Type Registry, Capability Registry, plugin-based Adapter Registry, controlled discovery, secure pairing (single-use expiring codes), capability-scoped revocable trust, authenticated expiring sessions, Connection Manager with bounded backoff, granular device permissions (camera/microphone/location never default), Glance Card system with privacy modes, allowlisted wearable command gateway with confirmation levels, push-to-talk local-first voice with enforced recording indicators, explicit camera/vision gateways, checklists with required-step enforcement, trusted handoff, idempotent offline queue, battery/thermal resource governor, an isolated Wearable Simulator (no fabricated production hardware), and a Device Manager section in the Command Center UI.
 
 ## Test status
 
-- Python: 319 passed, 61 subtests passed.
-- Frontend: 11/11 passed.
+- Python: 364 passed, 61 subtests passed.
+- Frontend: 12/12 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 
 ## Not yet built
@@ -31,8 +32,10 @@ Phase 12 — Communications, Inbox, and Notification Hub (delivered).
 - Index-at-rest encryption, cross-project queries.
 - Plugin marketplace, public signing-key distribution, OS-level sandboxing, webhooks, and remote connectors (architecture documented; not implemented).
 - Real external provider adapters (email/chat), mobile push, smart-glasses delivery, and read receipts (architecture documented; not implemented).
+- Real wearable manufacturer adapters (Bluetooth/USB/gaze/gesture), OS-level device pairing, and real camera/microphone capture (architecture documented; only an isolated simulator produces devices).
 
-See `docs/architecture/COMMUNICATIONS_PLATFORM.md` for the communications
-design, `docs/architecture/AUTOMATION_PLATFORM.md` for the automation engine,
+See `docs/architecture/WEARABLES_PLATFORM.md` for the wearable design,
+`docs/architecture/COMMUNICATIONS_PLATFORM.md` for the communications design,
+`docs/architecture/AUTOMATION_PLATFORM.md` for the automation engine,
 `docs/architecture/PLUGIN_PLATFORM.md` for the plugin platform, and
 `docs/architecture/IMPLEMENTATION_BACKLOG.md` for the dependency-ordered plan.
