@@ -18,6 +18,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
+from server.agents import AgentsService, agents_router
 from server.api.bootstrap import (
     BootstrapService,
     SQLiteServerIdentityRepository,
@@ -690,6 +691,7 @@ async def lifespan(app: FastAPI):
         data_dir=str(db_path.parent / "intelligence"),
     )
     app.state.memory_service = MemoryService(data_dir=str(db_path.parent / "memory"))
+    app.state.agents_service = AgentsService(data_dir=str(db_path.parent / "agents"))
     app.state.thresholds = {}
     timeout = httpx.Timeout(
         connect=float(os.getenv("LEMONADE_CONNECT_TIMEOUT", "3")),
@@ -735,6 +737,7 @@ app.include_router(command_center_router)
 app.include_router(engineering_router)
 app.include_router(intelligence_router)
 app.include_router(memory_router)
+app.include_router(agents_router)
 
 
 @app.middleware("http")
