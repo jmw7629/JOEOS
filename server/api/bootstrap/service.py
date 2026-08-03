@@ -108,6 +108,30 @@ class BootstrapService:
                 description="Bounded host telemetry sample.",
             ),
             RouteDescriptor(
+                id="command_center.overview",
+                path="/api/v1/command-center/overview",
+                protocol="http",
+                methods=("GET",),
+                access="read_only",
+                description="Executive overview aggregated from live subsystem health.",
+            ),
+            RouteDescriptor(
+                id="command_center.services",
+                path="/api/v1/command-center/services",
+                protocol="http",
+                methods=("GET",),
+                access="read_only",
+                description="Typed service-health contract for registered JoeOS services.",
+            ),
+            RouteDescriptor(
+                id="command_center.activity",
+                path="/api/v1/command-center/activity",
+                protocol="http",
+                methods=("GET",),
+                access="read_only",
+                description="Filterable, paginated activity timeline.",
+            ),
+            RouteDescriptor(
                 id="health.liveness",
                 path="/healthz",
                 protocol="http",
@@ -177,6 +201,17 @@ class BootstrapService:
                 access="read_only",
                 route_ids=("telemetry.sample", "health.liveness"),
                 description="Bounded local telemetry and liveness.",
+            ),
+            CapabilityDescriptor(
+                id="command_center.overview",
+                status="available",
+                access="read_only",
+                route_ids=(
+                    "command_center.overview",
+                    "command_center.services",
+                    "command_center.activity",
+                ),
+                description="Executive Command Center aggregation.",
             ),
             CapabilityDescriptor(
                 id="assistant.local_analysis",

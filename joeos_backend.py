@@ -23,6 +23,7 @@ from server.api.bootstrap import (
     SQLiteServerIdentityRepository,
     bootstrap_router,
 )
+from server.command_center import CommandCenterService, command_center_router
 from server.identity import (
     DeviceEnrollmentService,
     PairingKeyProtector,
@@ -615,6 +616,7 @@ async def lifespan(app: FastAPI):
     db_path = _database_path()
     _prepare_database(db_path)
     app.state.db_path = db_path
+    app.state.started_at = _utc_now()
     app.state.runtime = {}
     app.state.http_boundary = HttpRequestBoundary.from_environment()
     server_identity_repository = SQLiteServerIdentityRepository(lambda: _connect(db_path))
@@ -664,6 +666,16 @@ async def lifespan(app: FastAPI):
         max_payload_bytes=_environment_integer("JOEOS_WS_MAX_PAYLOAD_BYTES", 262_144),
         max_inbound_bytes=_environment_integer("JOEOS_WS_MAX_INBOUND_BYTES", 4_096),
     )
+    app.state.command_center_service = CommandCenterService(
+        connection_factory=lambda: _connect(db_path),
+        runtime_provider=lambda: app.state.runtime,
+        version=JOEOS_VERSION,
+        started_at=app.state.started_at,
+        sample_interval_seconds=SAMPLE_INTERVAL_SECONDS,
+        realtime_ready=lambda: True,
+        identity_ready=lambda: True,
+        workspace_ready=lambda: True,
+    )
     app.state.thresholds = {}
     timeout = httpx.Timeout(
         connect=float(os.getenv("LEMONADE_CONNECT_TIMEOUT", "3")),
@@ -705,6 +717,7 @@ app.include_router(bootstrap_router)
 app.include_router(device_enrollment_router)
 app.include_router(workspace_router)
 app.include_router(realtime_router)
+app.include_router(command_center_router)
 
 
 @app.middleware("http")
