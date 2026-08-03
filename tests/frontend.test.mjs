@@ -86,3 +86,11 @@ test("ships a Plugin Manager driven by real plugin state", () => {
   assert.match(html, /quarantined/);
   assert.match(html, /isolated Extension Host/i);
 });
+
+test("ships an Automation workspace driven by real workflow state", () => {
+  assert.match(html, /id: ["']automation["'], label: ["']Automation["']/);
+  assert.match(html, /function AutomationSection\(/);
+  assert.match(html, /\/api\/v1\/automation\/workflows/);
+  assert.match(html, /loadAutomationFromApi\(\)/);
+  assert.match(html, /pending_approvals/);
+});

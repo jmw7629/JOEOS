@@ -3525,6 +3525,7 @@
         { id: "infrastructure", label: "Infrastructure Health", short: "Infrastructure", icon: "fa-server" },
         { id: "security", label: "Security & Logs", short: "Security", icon: "fa-shield-halved" },
         { id: "plugins", label: "Plugin Manager", short: "Plugins", icon: "fa-puzzle-piece" },
+        { id: "automation", label: "Automation", short: "Automation", icon: "fa-robot" },
         { id: "bots", label: "Bot Fleet", short: "Bot Fleet", icon: "fa-robot" }
       ];
 
@@ -4444,6 +4445,40 @@
         );
       }
 
+      function AutomationSection(props) {
+        var enabled = props.workflows.filter(function (workflow) { return workflow.enabled; }).length;
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "automation-title" },
+          h(SectionHeader, {
+            kicker: "Workflow orchestration",
+            title: h("span", { id: "automation-title" }, "Automation"),
+            description: "Versioned, validated workflows executed by the Automation Engine. Runs, schedules, approvals, and traces reflect real authoritative state; a workflow never gains authority merely because it exists.",
+            actions: [
+              h("span", { className: "live-pill", key: "live" }, h("span", { className: "live-dot" }), props.overview.running + " RUNNING")
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon success" }, icon("fa-diagram-project")), h("div", null, h("strong", null, String(props.workflows.length)), h("span", null, "Workflows"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-play")), h("div", null, h("strong", null, String(enabled)), h("span", null, "Enabled"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon purple" }, icon("fa-circle-check")), h("div", null, h("strong", null, String(props.overview.pending_approvals)), h("span", null, "Pending approvals")))
+          ),
+          props.workflows.length
+            ? h("div", { className: "bot-grid" }, props.workflows.map(function (workflow) {
+                return h(
+                  "article",
+                  { className: "glass-card panel-card", key: workflow.workflow_id },
+                  h("div", { className: "plugin-header" }, icon("fa-diagram-project"), h("div", null, h("strong", null, workflow.name), h("span", null, workflow.workflow_id + " v" + workflow.current_version))),
+                  h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, workflow.enabled ? "ENABLED" : workflow.status.toUpperCase()), h("span", null, "Health: " + workflow.health_state)),
+                  h("div", { className: "plugin-actions" }, h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(workflow); } }, "Inspect"))
+                );
+              }))
+            : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-diagram-project"), h("strong", null, "No workflows defined"), h("p", null, "Create a workflow from a safe template or a validated definition through the API.")))
+        );
+      }
+
       function missionAttentionItems(metrics, runtime, security, bots) {
         var items = [];
         if (!runtime || !runtime.online) {
@@ -4908,6 +4943,12 @@
         var selectedPluginPair = useState(null);
         var selectedPlugin = selectedPluginPair[0];
         var setSelectedPlugin = selectedPluginPair[1];
+        var workflowsPair = useState([]);
+        var workflows = workflowsPair[0];
+        var setWorkflows = workflowsPair[1];
+        var automationOverviewPair = useState({ workflows_total: 0, workflows_enabled: 0, running: 0, waiting: 0, failed_recently: 0, pending_approvals: 0, unhealthy_schedules: 0, next_scheduled_workflow: null });
+        var automationOverview = automationOverviewPair[0];
+        var setAutomationOverview = automationOverviewPair[1];
         var toastPair = useState("");
         var toast = toastPair[0];
         var setToast = toastPair[1];
@@ -5046,6 +5087,17 @@
           }
         }
 
+        async function loadAutomationFromApi() {
+          try {
+            var workflowsPayload = await requestJson("/api/v1/automation/workflows", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (Array.isArray(workflowsPayload)) setWorkflows(workflowsPayload);
+            var overviewPayload = await requestJson("/api/v1/automation/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (overviewPayload && typeof overviewPayload === "object") setAutomationOverview(overviewPayload);
+          } catch (error) {
+            setWorkflows([]);
+          }
+        }
+
         function replaceLiveLogs(rows, activeProfiles) {
           var next = Array.isArray(rows) ? rows.slice(0, 40) : [];
           logsRef.current = next;
@@ -5113,7 +5165,7 @@
           if (remoteRefreshRef.current) return;
           remoteRefreshRef.current = true;
           try {
-            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi()]);
+            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi()]);
             var failures = results.filter(function (result) { return result.status === "rejected"; });
             if (failures.length) {
               if (results[0].status === "rejected") setRuntime({ online: false, status: "offline", model: null, version: null, message: "JoeOS telemetry API is unavailable" });
@@ -5644,6 +5696,8 @@
           section = h(SecuritySection, { security: security, logs: logs, streamStatus: streamStatus, paused: logsPaused, logFilter: logFilter, onLogFilter: setLogFilter, onPause: toggleLogs, onClear: clearVisibleLogs, onExport: exportLogs, logRef: logRef });
         } else if (active === "plugins") {
           section = h(PluginsSection, { plugins: plugins, safeMode: pluginSafeMode, onInspect: setSelectedPlugin });
+        } else if (active === "automation") {
+          section = h(AutomationSection, { workflows: workflows, overview: automationOverview, onInspect: setSelectedPlugin });
         } else {
           section = h(BotsSection, { bots: bots, pending: pendingBots, onToggle: toggleBot, onDeploy: function () { setDeployOpen(true); } });
         }

@@ -24,6 +24,7 @@ from server.api.bootstrap import (
     SQLiteServerIdentityRepository,
     bootstrap_router,
 )
+from server.automation import AutomationService, automation_router
 from server.command_center import CommandCenterService, command_center_router
 from server.engineering import EngineeringService, engineering_router
 from server.intelligence import IntelligenceService, intelligence_router
@@ -681,6 +682,7 @@ async def lifespan(app: FastAPI):
         identity_ready=lambda: True,
         workspace_ready=lambda: True,
         plugins_ready=lambda: getattr(app.state, "plugins_service", None) is not None,
+        automation_ready=lambda: getattr(app.state, "automation_service", None) is not None,
     )
     app.state.engineering_service = EngineeringService(
         connection_factory=lambda: _connect(db_path),
@@ -699,6 +701,14 @@ async def lifespan(app: FastAPI):
         master_key=load_or_create_identity_master_key(db_path),
         joeos_version=JOEOS_VERSION,
         first_party_publishers=["joeos"],
+    )
+    app.state.automation_service = AutomationService(
+        str(db_path.parent / "automation"),
+        master_key=load_or_create_identity_master_key(db_path),
+        joeos_version=JOEOS_VERSION,
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
     )
     app.state.thresholds = {}
     timeout = httpx.Timeout(
@@ -750,6 +760,7 @@ app.include_router(intelligence_router)
 app.include_router(memory_router)
 app.include_router(agents_router)
 app.include_router(plugins_router)
+app.include_router(automation_router)
 
 
 @app.middleware("http")

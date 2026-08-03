@@ -1044,6 +1044,14 @@ class BootstrapService:
                 description="Read a single installed plugin record.",
             ),
             RouteDescriptor(
+                id="automation.overview",
+                path="/api/v1/automation/overview",
+                protocol="http",
+                methods=("GET",),
+                access="read_only",
+                description="Automation and workflow platform overview with real run and schedule state.",
+            ),
+            RouteDescriptor(
                 id="health.liveness",
                 path="/healthz",
                 protocol="http",
@@ -1384,6 +1392,13 @@ class BootstrapService:
                 access="read_write",
                 route_ids=("plugins.install",),
                 description="Install validated plugin packages and development plugins.",
+            ),
+            CapabilityDescriptor(
+                id="automation.platform.read",
+                status="available",
+                access="read_only",
+                route_ids=("automation.overview",),
+                description="Read the automation and workflow platform overview.",
             ),
             CapabilityDescriptor(
                 id="assistant.local_analysis",
