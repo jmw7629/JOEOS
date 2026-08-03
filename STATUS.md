@@ -4,7 +4,7 @@ Generated: 2026-08-03.
 
 ## Current phase
 
-Phase 14 — Mobile Companion and Secure Remote Operations Platform (delivered).
+Phase 15 — Security, Permissions, Secrets, and Zero-Trust Boundary Hardening (delivered).
 
 ## What works
 
@@ -18,11 +18,12 @@ Phase 14 — Mobile Companion and Secure Remote Operations Platform (delivered).
 - Communications, Inbox, and Notification Hub: provider-neutral Provider/Account/Identity/Contact registries, Recipient Resolver with ambiguity blocking, typed Message Store and Draft Store, authoritative Outbox with idempotent bounded delivery, external-send approval bound to content/recipient/attachment hashes, content sanitization, link safety, phishing and prompt-injection signals, Notification Center with routing rules, quiet hours, DND, snooze, digests, attachment validation, and a Communications section in the Command Center UI.
 - Smart Glasses and Wearable Platform: authoritative Device Registry, Device Type Registry, Capability Registry, plugin-based Adapter Registry, controlled discovery, secure pairing (single-use expiring codes), capability-scoped revocable trust, authenticated expiring sessions, Connection Manager with bounded backoff, granular device permissions (camera/microphone/location never default), Glance Card system with privacy modes, allowlisted wearable command gateway with confirmation levels, push-to-talk local-first voice with enforced recording indicators, explicit camera/vision gateways, checklists with required-step enforcement, trusted handoff, idempotent offline queue, battery/thermal resource governor, an isolated Wearable Simulator (no fabricated production hardware), and a Device Manager section in the Command Center UI.
 - Mobile Companion and Secure Remote Operations Platform: authoritative Mobile Client Registry, Host Registry with explicit discovery, two-party secure pairing (short-lived single-use hashed codes, host + client confirmation), short-lived revocable sessions with rotating hashed refresh credentials, allowlisted Remote Command Gateway (prohibited operations rejected, raw AI never executed), Scoped Remote API backed by real authoritative state providers, safe-only idempotent offline action queue revalidated against base versions (conflicts preserve authoritative state), handoff coordinator, opaque single-use user-bound deep links, privacy-safe provider-neutral push contracts with an isolated test fixture (production APNs/FCM not claimed), immediate server-side revocation and honest lost-device mode, an extended native SwiftUI iOS policy module (`MobileCompanionPolicy`), and a Mobile Companion section in the Command Center UI.
+- Security Platform and zero-trust hardening: deny-by-default Policy Registry and Evaluation Engine (typed structured rules, never eval), Identity Registry with no cross-type impersonation, Scope Resolver with explicit path containment (traversal/symlink/NUL rejection), exact-bound Approvals with risk-based strength levels (0-5) and separation of duties, authoritative Secret Broker (AES-256-GCM at rest, rotation, revocation, destination policy, masked secret detection), hash-chained Audit Log with tamper verification, Security Events, Incident Registry, Lockdown (reauthentication to exit), Emergency Stop (honest incomplete cancellation), Quarantine, per-target Circuit Breakers, Data Classification (model can never lower), Privacy Policy Engine (cloud blocked for restricted classes), Threat Model Registry for critical boundaries, and a Security Center section in the Command Center UI. No fabricated vulnerability counts, malware results, compliance claims, or security scores are produced.
 
 ## Test status
 
-- Python: 401 passed, 61 subtests passed.
-- Frontend: 13/13 passed.
+- Python: 447 passed, 61 subtests passed.
+- Frontend: 14/14 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 
 ## Not yet built
@@ -35,11 +36,13 @@ Phase 14 — Mobile Companion and Secure Remote Operations Platform (delivered).
 - Real external provider adapters (email/chat), mobile push, smart-glasses delivery, and read receipts (architecture documented; not implemented).
 - Real wearable manufacturer adapters (Bluetooth/USB/gaze/gesture), OS-level device pairing, and real camera/microphone capture (architecture documented; only an isolated simulator produces devices).
 - Native iOS build/sign/simulator (requires Xcode, not installed on this machine), production APNs/FCM push, background-execution guarantees, biometric security, universal links, and App Store distribution (contracts documented; not claimed as implemented).
+- OS keychain/hardware-backed secret storage, immutable audit logs, and full OS-level sandboxing (documented limitations; AES-GCM vault, hash-chain tamper evidence, and subprocess isolation are the honest current guarantees).
 
-See `docs/architecture/MOBILE_COMPANION.md` for the mobile companion design
-and platform strategy, `docs/architecture/WEARABLES_PLATFORM.md` for the
-wearable design, `docs/architecture/COMMUNICATIONS_PLATFORM.md` for the
-communications design, `docs/architecture/AUTOMATION_PLATFORM.md` for the
-automation engine, `docs/architecture/PLUGIN_PLATFORM.md` for the plugin
-platform, and `docs/architecture/IMPLEMENTATION_BACKLOG.md` for the
-dependency-ordered plan.
+See `docs/architecture/SECURITY_PLATFORM.md` for the security platform
+design and honest guarantees, `docs/architecture/MOBILE_COMPANION.md` for the
+mobile companion design and platform strategy,
+`docs/architecture/WEARABLES_PLATFORM.md` for the wearable design,
+`docs/architecture/COMMUNICATIONS_PLATFORM.md` for the communications design,
+`docs/architecture/AUTOMATION_PLATFORM.md` for the automation engine,
+`docs/architecture/PLUGIN_PLATFORM.md` for the plugin platform, and
+`docs/architecture/IMPLEMENTATION_BACKLOG.md` for the dependency-ordered plan.

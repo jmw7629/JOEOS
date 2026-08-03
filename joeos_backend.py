@@ -41,7 +41,12 @@ from server.identity import (
 from server.plugins import PluginService, plugins_router
 from server.realtime import RealtimeService, SQLiteEventRepository, realtime_router
 from server.wearables import WearableService, wearables_router
-from server.security import EnrollmentRequestGuardMiddleware, HttpRequestBoundary
+from server.security import (
+    EnrollmentRequestGuardMiddleware,
+    HttpRequestBoundary,
+    SecurityService,
+    security_router,
+)
 from server.workspace import WorkspaceService, workspace_router
 
 try:
@@ -769,6 +774,7 @@ async def lifespan(app: FastAPI):
         communications_ready=lambda: getattr(app.state, "communications_service", None) is not None,
         wearables_ready=lambda: getattr(app.state, "wearables_service", None) is not None,
         mobile_ready=lambda: getattr(app.state, "mobile_service", None) is not None,
+        security_ready=lambda: getattr(app.state, "security_service", None) is not None,
     )
     app.state.engineering_service = EngineeringService(
         connection_factory=lambda: _connect(db_path),
@@ -819,6 +825,14 @@ async def lifespan(app: FastAPI):
     )
     app.state.mobile_service.prepare_defaults()
     _wire_mobile_scopes(app)
+    app.state.security_service = SecurityService(
+        str(db_path.parent / "security"),
+        master_key=load_or_create_identity_master_key(db_path),
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+    )
+    app.state.security_service.prepare_defaults()
     app.state.thresholds = {}
     timeout = httpx.Timeout(
         connect=float(os.getenv("LEMONADE_CONNECT_TIMEOUT", "3")),
@@ -873,6 +887,7 @@ app.include_router(automation_router)
 app.include_router(communications_router)
 app.include_router(wearables_router)
 app.include_router(mobile_router)
+app.include_router(security_router)
 
 
 @app.middleware("http")

@@ -932,12 +932,12 @@ class BootstrapService:
                 description="List approvals.",
             ),
             RouteDescriptor(
-                id="agents.routes.select",
-                path="/api/v1/agents/routes",
+                id="security.overview",
+                path="/api/v1/security/overview",
                 protocol="http",
-                methods=("POST",),
-                access="read_write",
-                description="Select a local-first model route with disclosure.",
+                methods=("GET",),
+                access="read_only",
+                description="Security platform overview with real policy, approval, secret, audit, and incident state.",
             ),
             RouteDescriptor(
                 id="agents.routes.list",
@@ -1351,11 +1351,10 @@ class BootstrapService:
                 route_ids=(
                     "agents.interventions.open",
                     "agents.approvals.request",
-                    "agents.routes.select",
                     "agents.detections.resolve",
                     "agents.memory-proposals.create",
                 ),
-                description="Open interventions and approvals, select routes, resolve detections, and propose memory.",
+                description="Open interventions and approvals, resolve detections, and propose memory.",
             ),
             CapabilityDescriptor(
                 id="agents.organization.approval",
@@ -1417,6 +1416,13 @@ class BootstrapService:
                 access="read_only",
                 route_ids=("mobile.overview",),
                 description="Read the Mobile Companion platform overview.",
+            ),
+            CapabilityDescriptor(
+                id="security.platform.read",
+                status="available",
+                access="read_only",
+                route_ids=("security.overview",),
+                description="Read the security platform overview.",
             ),
             CapabilityDescriptor(
                 id="assistant.local_analysis",

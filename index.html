@@ -3529,6 +3529,7 @@
         { id: "communications", label: "Communications", short: "Inbox", icon: "fa-envelope" },
         { id: "wearables", label: "Device Manager", short: "Wearables", icon: "fa-glasses" },
         { id: "mobile", label: "Mobile Companion", short: "Mobile", icon: "fa-mobile-screen" },
+        { id: "security-center", label: "Security Center", short: "Security", icon: "fa-user-shield" },
         { id: "bots", label: "Bot Fleet", short: "Bot Fleet", icon: "fa-robot" }
       ];
 
@@ -4594,6 +4595,41 @@
         );
       }
 
+      function SecurityCenterSection(props) {
+        var overview = props.overview || { security_events_open: 0, incidents_open: 0, pending_approvals: 0, secrets_requiring_rotation: 0, audit_integrity_verified: true, lockdown_active: false };
+        var events = props.events || [];
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "security-center-title" },
+          h(SectionHeader, {
+            kicker: "Zero-trust boundaries",
+            title: h("span", { id: "security-center-title" }, "Security Center"),
+            description: "Deny-by-default policy, exact-bound approvals, AES-GCM secret broker, and hash-chained audit enforced in authoritative services. No fabricated vulnerability scores or compliance claims are shown.",
+            actions: [
+              h("span", { className: "live-pill" + (overview.lockdown_active ? " attention" : ""), key: "lock" }, h("span", { className: "live-dot" }), overview.lockdown_active ? "LOCKDOWN" : "PROTECTED")
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon success" }, icon("fa-shield-halved")), h("div", null, h("strong", null, overview.audit_integrity_verified ? "OK" : "FAIL"), h("span", null, "Audit integrity"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-triangle-exclamation")), h("div", null, h("strong", null, String(overview.security_events_open)), h("span", null, "Security events"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon purple" }, icon("fa-key")), h("div", null, h("strong", null, String(overview.secrets_requiring_rotation)), h("span", null, "Secrets to rotate")))
+          ),
+          events.length
+            ? h("div", { className: "bot-grid" }, events.map(function (event) {
+                return h(
+                  "article",
+                  { className: "glass-card panel-card", key: event.event_id },
+                  h("div", { className: "plugin-header" }, icon("fa-triangle-exclamation"), h("div", null, h("strong", null, event.category), h("span", null, event.severity + " · " + event.confidence))),
+                  h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, event.status.toUpperCase()), h("span", null, event.affected_service || "system")),
+                  event.evidence ? h("p", { className: "plugin-description" }, event.evidence) : null
+                );
+              }))
+            : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-shield-halved"), h("strong", null, "No open security events"), h("p", null, "Security events from policy denials, secret access, and suspicious activity will appear here with real evidence.")))
+        );
+      }
+
       function missionAttentionItems(metrics, runtime, security, bots) {
         var items = [];
         if (!runtime || !runtime.online) {
@@ -5079,6 +5115,12 @@
         var mobileOverviewPair = useState({ paired_clients: 0, connected_clients: 0, active_sessions: 0, revoked_clients: 0, pending_pairings: 0, sync_failures: 0, stale_offline_actions: 0, push_registration_failures: 0, incompatible_versions: 0, lost_devices: 0 });
         var mobileOverview = mobileOverviewPair[0];
         var setMobileOverview = mobileOverviewPair[1];
+        var securityEventsPair = useState([]);
+        var securityEvents = securityEventsPair[0];
+        var setSecurityEvents = securityEventsPair[1];
+        var securityOverviewPair = useState({ security_events_open: 0, incidents_open: 0, pending_approvals: 0, secrets_requiring_rotation: 0, audit_integrity_verified: true, lockdown_active: false });
+        var securityOverview = securityOverviewPair[0];
+        var setSecurityOverview = securityOverviewPair[1];
         var toastPair = useState("");
         var toast = toastPair[0];
         var setToast = toastPair[1];
@@ -5259,6 +5301,17 @@
           }
         }
 
+        async function loadSecurityFromApi() {
+          try {
+            var eventsPayload = await requestJson("/api/v1/security/security-events", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (eventsPayload && Array.isArray(eventsPayload.events)) setSecurityEvents(eventsPayload.events);
+            var overviewPayload = await requestJson("/api/v1/security/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (overviewPayload && typeof overviewPayload === "object") setSecurityOverview(overviewPayload);
+          } catch (error) {
+            setSecurityEvents([]);
+          }
+        }
+
         function replaceLiveLogs(rows, activeProfiles) {
           var next = Array.isArray(rows) ? rows.slice(0, 40) : [];
           logsRef.current = next;
@@ -5326,7 +5379,7 @@
           if (remoteRefreshRef.current) return;
           remoteRefreshRef.current = true;
           try {
-            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi()]);
+            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi(), loadSecurityFromApi()]);
             var failures = results.filter(function (result) { return result.status === "rejected"; });
             if (failures.length) {
               if (results[0].status === "rejected") setRuntime({ online: false, status: "offline", model: null, version: null, message: "JoeOS telemetry API is unavailable" });
@@ -5865,6 +5918,8 @@
           section = h(WearablesSection, { devices: wearableDevices, onInspect: setSelectedPlugin });
         } else if (active === "mobile") {
           section = h(MobileSection, { clients: mobileClients, overview: mobileOverview, onInspect: setSelectedPlugin });
+        } else if (active === "security-center") {
+          section = h(SecurityCenterSection, { overview: securityOverview, events: securityEvents });
         } else {
           section = h(BotsSection, { bots: bots, pending: pendingBots, onToggle: toggleBot, onDeploy: function () { setDeployOpen(true); } });
         }

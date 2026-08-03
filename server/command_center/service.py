@@ -65,6 +65,7 @@ class CommandCenterService:
         communications_ready: Optional[Callable[[], bool]] = None,
         wearables_ready: Optional[Callable[[], bool]] = None,
         mobile_ready: Optional[Callable[[], bool]] = None,
+        security_ready: Optional[Callable[[], bool]] = None,
     ) -> None:
         self._connection_factory = connection_factory
         self._runtime_provider = runtime_provider
@@ -80,6 +81,7 @@ class CommandCenterService:
         self._communications_ready = communications_ready or (lambda: False)
         self._wearables_ready = wearables_ready or (lambda: False)
         self._mobile_ready = mobile_ready or (lambda: False)
+        self._security_ready = security_ready or (lambda: False)
 
     def overview(self) -> OverviewEnvelope:
         services = self.services().services
@@ -160,6 +162,12 @@ class CommandCenterService:
                 "Mobile Companion",
                 self._mobile_ready,
                 "Mobile Companion and Secure Remote Operations Platform.",
+            ),
+            self._readiness_health(
+                "security.platform",
+                "Security Platform",
+                self._security_ready,
+                "Security, Policy, Secrets, Audit, and Zero-Trust boundaries.",
             ),
         ]
         return ServicesEnvelope(generated_at=self._now_iso(), services=tuple(service_list))

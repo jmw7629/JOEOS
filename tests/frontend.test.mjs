@@ -118,3 +118,11 @@ test("ships a Mobile Companion driven by real client state", () => {
   assert.match(html, /loadMobileFromApi\(\)/);
   assert.match(html, /No fake hosts, connections, or push deliveries are shown/i);
 });
+
+test("ships a Security Center driven by real security state", () => {
+  assert.match(html, /id: ["']security-center["'], label: ["']Security Center["']/);
+  assert.match(html, /function SecurityCenterSection\(/);
+  assert.match(html, /\/api\/v1\/security\/security-events/);
+  assert.match(html, /loadSecurityFromApi\(\)/);
+  assert.match(html, /No fabricated vulnerability scores or compliance claims are shown/i);
+});
