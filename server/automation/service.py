@@ -57,6 +57,7 @@ class AutomationService:
         memory_proposer=None,
         agent_api=None,
         git_reader=None,
+        communications=None,
         approval_resolver=None,
         input_resolver=None,
     ) -> None:
@@ -65,6 +66,7 @@ class AutomationService:
         self._data_dir = Path(data_dir)
         self._joeos_version = joeos_version
         self._event_sink = event_sink
+        self.communications = communications
 
         self.workflows = WorkflowRegistry(self._connection_factory)
         self.permissions = WorkflowPermissionGuard(self._connection_factory)
@@ -84,6 +86,7 @@ class AutomationService:
                 memory_proposer=memory_proposer,
                 agent_api=agent_api,
                 git_reader=git_reader,
+                communications=communications,
             )
         )
         trace_sink = _InjectedTraceSink(self.history)

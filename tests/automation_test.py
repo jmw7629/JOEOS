@@ -353,5 +353,67 @@ class OverviewTests(AutomationFixture):
         self.assertEqual(stuck[0]["run_id"], "run_stuck")
 
 
+class CommunicationsIntegrationTests(unittest.TestCase):
+    """Workflows route communications through the authoritative platform."""
+
+    def setUp(self):
+        import tempfile as _tempfile
+        from server.communications import CommunicationsService
+        self.tempdir = _tempfile.TemporaryDirectory()
+        self.root = Path(self.tempdir.name)
+        self.comms = CommunicationsService(str(self.root / "comms"))
+        self.comms.prepare_defaults()
+        from server.automation import AutomationService
+        self.service = AutomationService(
+            str(self.root / "automation"), master_key=MASTER_KEY, communications=self.comms
+        )
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+
+    def _comms_definition(self) -> WorkflowDefinition:
+        return WorkflowDefinition.model_validate(
+            _notify_definition("acme.comms")
+            .model_dump()
+            | {
+                "nodes": (
+                    NodeConfig(id="start", type="start"),
+                    NodeConfig(id="notify", type="action", action="joeos.comms.notification", params={"title": "Alert", "message": "Build failed", "severity": "error", "category": "workflow_failed"}),
+                    NodeConfig(id="msg", type="action", action="joeos.comms.internal_message", params={"message": "Internal", "recipients": ["identity.user"]}),
+                    NodeConfig(id="draft", type="action", action="joeos.comms.draft", params={"subject": "Draft", "body": "Body"}),
+                    NodeConfig(id="end", type="end"),
+                ),
+                "edges": (
+                    EdgeConfig(source="start", target="notify"),
+                    EdgeConfig(source="notify", target="msg"),
+                    EdgeConfig(source="msg", target="draft"),
+                    EdgeConfig(source="draft", target="end"),
+                ),
+            }
+        )
+
+    def test_workflow_routes_communications(self):
+        definition = self._comms_definition()
+        self.service.create_workflow(definition)
+        self.service.grant_permission("acme.comms", "notification.publish")
+        self.service.enable_workflow("acme.comms")
+        run = self.service.run_workflow("acme.comms")
+        self.assertEqual(run.state, "succeeded")
+        self.assertEqual(len(self.comms.list_notifications()), 1)
+        self.assertEqual(len(self.comms.list_messages()), 1)
+        self.assertEqual(len(self.comms.list_drafts()), 1)
+
+    def test_workflow_does_not_call_provider_directly(self):
+        # The draft action never sends automatically; it stays a draft.
+        definition = self._comms_definition()
+        self.service.create_workflow(definition)
+        self.service.grant_permission("acme.comms", "notification.publish")
+        self.service.enable_workflow("acme.comms")
+        self.service.run_workflow("acme.comms")
+        drafts = self.comms.list_drafts()
+        self.assertEqual(len(drafts), 1)
+        self.assertFalse(drafts[0].model_dump().get("approval_state") == "approved")
+
+
 if __name__ == "__main__":
     unittest.main()

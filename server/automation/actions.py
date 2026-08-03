@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Optional, Tuple
 
@@ -22,7 +23,37 @@ ACTION_CATALOG: Dict[str, Dict[str, Any]] = {
         "permission": "notification.publish",
         "side_effects": ("notification",),
         "risk": "low",
-        "description": "Publish a notification.",
+        "description": "Publish a notification (through the Communications Platform when available).",
+    },
+    "joeos.comms.notification": {
+        "permission": "notification.publish",
+        "side_effects": ("notification",),
+        "risk": "low",
+        "description": "Create a notification through the authoritative Communications Platform.",
+    },
+    "joeos.comms.internal_message": {
+        "permission": "notification.publish",
+        "side_effects": ("message",),
+        "risk": "low",
+        "description": "Send an internal message through the Communications Platform.",
+    },
+    "joeos.comms.draft": {
+        "permission": "notification.publish",
+        "side_effects": ("draft",),
+        "risk": "low",
+        "description": "Create an external message draft; never sends automatically.",
+    },
+    "joeos.comms.digest": {
+        "permission": "notification.publish",
+        "side_effects": ("digest",),
+        "risk": "low",
+        "description": "Build a communications digest.",
+    },
+    "joeos.comms.request_send_approval": {
+        "permission": "notification.publish",
+        "side_effects": ("approval",),
+        "risk": "medium",
+        "description": "Request external-send approval for a draft.",
     },
     "joeos.memory.propose": {
         "permission": "memory.propose_memory",
@@ -142,8 +173,14 @@ class ActionRegistry:
         )
 
 
-def default_handlers(*, event_sink=None, memory_proposer=None, agent_api=None, git_reader=None) -> Dict[str, Callable]:
-    """Wire core action handlers to authoritative JoeOS services."""
+def default_handlers(*, event_sink=None, memory_proposer=None, agent_api=None, git_reader=None, communications=None) -> Dict[str, Callable]:
+    """Wire core action handlers to authoritative JoeOS services.
+
+    ``communications`` is an optional facade into the Communications Platform
+    (``server.communications``). When provided, workflows route notifications,
+    internal messages, drafts, digests, and send approvals through the
+    authoritative CommunicationsService instead of calling providers directly.
+    """
 
     def _subworkflow(params, context, variables, trace):
         runner = (context or {}).get("_subworkflow_runner")
@@ -156,9 +193,87 @@ def default_handlers(*, event_sink=None, memory_proposer=None, agent_api=None, g
         if not message:
             raise ActionError("notification action requires a message.")
         safe_message = message[:500]
+        if communications is not None:
+            notification = communications.create_notification(
+                source=str(params.get("source") or "automation"),
+                source_type="workflow",
+                category=str(params.get("category") or "workflow_notification"),
+                title=str(params.get("title") or "Workflow notification"),
+                message=safe_message,
+                severity=str(params.get("severity") or "informational"),
+                priority=str(params.get("priority") or "normal"),
+                workflow=context.get("workflow_id") if isinstance(context, dict) else "",
+            )
+            return {"published": True, "message": safe_message, "notification_id": notification.notification_id}
         if event_sink:
             event_sink("info", "workflow", safe_message)
         return {"published": True, "message": safe_message}
+
+    def _comms_internal_message(params, context, variables, trace):
+        if communications is None:
+            return {"sent": False, "reason": "communications platform unavailable"}
+        from server.communications.models import Origin
+        message = str(params.get("message") or "")
+        if not message:
+            raise ActionError("internal message action requires a message.")
+        recipients = params.get("recipients") or ("identity.user",)
+        record = communications.send_internal(
+            communication_type=str(params.get("communication_type") or "internal_direct_message"),
+            recipients=tuple(recipients),
+            subject=str(params.get("subject") or "Workflow message"),
+            body=message,
+            origin=Origin(
+                origin_type="workflow",
+                label="Workflow",
+                source_workflow=context.get("workflow_id") if isinstance(context, dict) else "",
+            ),
+            priority=str(params.get("priority") or "normal"),
+        )
+        return {"sent": True, "message_id": record.message_id}
+
+    def _comms_draft(params, context, variables, trace):
+        if communications is None:
+            return {"drafted": False, "reason": "communications platform unavailable"}
+        from server.communications.models import DraftRecord
+        draft = communications.save_draft(
+            DraftRecord(
+                draft_id="draft_wf_" + uuid_hex(),
+                author=str(params.get("author") or "user"),
+                proposed_sender=str(params.get("proposed_sender") or "identity.user"),
+                recipients=tuple(params.get("recipients") or ()),
+                provider=str(params.get("provider") or "test.isolated"),
+                account=str(params.get("account") or ""),
+                subject=str(params.get("subject") or ""),
+                body=str(params.get("body") or ""),
+                source="workflow",
+                source_workflow=context.get("workflow_id") if isinstance(context, dict) else "",
+            )
+        )
+        # A draft is never sent automatically; it requires review/approval.
+        return {"drafted": True, "draft_id": draft.draft_id, "sent": False}
+
+    def _comms_digest(params, context, variables, trace):
+        if communications is None:
+            return {"built": False, "reason": "communications platform unavailable"}
+        digest = communications.build_digest(window_hours=int(params.get("window_hours") or 24))
+        return {"built": True, "digest_id": digest.digest_id}
+
+    def _comms_request_send_approval(params, context, variables, trace):
+        if communications is None:
+            return {"requested": False, "reason": "communications platform unavailable"}
+        draft = communications.get_draft(str(params.get("draft_id") or ""))
+        if draft is None:
+            return {"requested": False, "reason": "draft not found"}
+        approval = communications.request_external_send(
+            draft=draft,
+            subject=str(params.get("subject") or draft.subject),
+            body=str(params.get("body") or draft.body),
+            recipients=tuple(params.get("recipients") or draft.recipients),
+            provider=str(params.get("provider") or draft.provider or "test.isolated"),
+            account=str(params.get("account") or draft.account),
+            privacy=str(params.get("privacy") or draft.privacy or "private"),
+        )
+        return {"requested": True, "approval_id": approval["approval_id"]}
 
     def _memory_propose(params, context, variables, trace):
         if memory_proposer is None:
@@ -193,6 +308,11 @@ def default_handlers(*, event_sink=None, memory_proposer=None, agent_api=None, g
 
     return {
         "joeos.notification": _notification,
+        "joeos.comms.notification": _notification,
+        "joeos.comms.internal_message": _comms_internal_message,
+        "joeos.comms.draft": _comms_draft,
+        "joeos.comms.digest": _comms_digest,
+        "joeos.comms.request_send_approval": _comms_request_send_approval,
         "joeos.memory.propose": _memory_propose,
         "joeos.git.status": _git_status,
         "joeos.delay": _delay,
@@ -200,3 +320,7 @@ def default_handlers(*, event_sink=None, memory_proposer=None, agent_api=None, g
         "joeos.audit_marker": _audit_marker,
         "joeos.subworkflow": _subworkflow,
     }
+
+
+def uuid_hex() -> str:
+    return uuid.uuid4().hex[:16]

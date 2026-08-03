@@ -747,14 +747,6 @@ async def lifespan(app: FastAPI):
         joeos_version=JOEOS_VERSION,
         first_party_publishers=["joeos"],
     )
-    app.state.automation_service = AutomationService(
-        str(db_path.parent / "automation"),
-        master_key=load_or_create_identity_master_key(db_path),
-        joeos_version=JOEOS_VERSION,
-        event_sink=lambda level, source, message: _record_event(
-            db_path, level, source, message
-        ),
-    )
     app.state.communications_service = CommunicationsService(
         str(db_path.parent / "communications"),
         event_sink=lambda level, source, message: _record_event(
@@ -762,6 +754,15 @@ async def lifespan(app: FastAPI):
         ),
     )
     app.state.communications_service.prepare_defaults()
+    app.state.automation_service = AutomationService(
+        str(db_path.parent / "automation"),
+        master_key=load_or_create_identity_master_key(db_path),
+        joeos_version=JOEOS_VERSION,
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+        communications=app.state.communications_service,
+    )
     app.state.wearables_service = WearableService(
         str(db_path.parent / "wearables"),
         event_sink=lambda level, source, message: _record_event(

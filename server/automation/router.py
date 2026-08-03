@@ -14,7 +14,6 @@ from .models import (
     Recurrence,
     RunRecord,
     ScheduleRecord,
-    WorkflowDefinition,
     WorkflowOverview,
     WorkflowRecord,
 )
@@ -59,19 +58,20 @@ def get_workflow(workflow_id: str, service: AutomationService = Depends(get_auto
 
 
 @router.post("/workflows", status_code=status.HTTP_201_CREATED, response_model=WorkflowRecord)
-def create_workflow(payload: WorkflowDefinition, service: AutomationService = Depends(get_automation_service)) -> WorkflowRecord:
+def create_workflow(payload: dict, service: AutomationService = Depends(get_automation_service)) -> WorkflowRecord:
     try:
-        return service.create_workflow(payload)
+        return service.create_workflow(parse_definition(payload))
     except WorkflowError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.put("/workflows/{workflow_id}", response_model=WorkflowRecord)
-def update_workflow(workflow_id: str, payload: WorkflowDefinition, service: AutomationService = Depends(get_automation_service)) -> WorkflowRecord:
-    if payload.workflow_id != workflow_id:
+def update_workflow(workflow_id: str, payload: dict, service: AutomationService = Depends(get_automation_service)) -> WorkflowRecord:
+    definition = parse_definition(payload)
+    if definition.workflow_id != workflow_id:
         raise HTTPException(status_code=422, detail="workflow_id in body must match the URL.")
     try:
-        return service.update_workflow(payload)
+        return service.update_workflow(definition)
     except WorkflowError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
