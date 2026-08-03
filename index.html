@@ -3524,6 +3524,7 @@
         { id: "pipeline", label: "CI/CD Pipeline", short: "Pipeline", icon: "fa-code-branch" },
         { id: "infrastructure", label: "Infrastructure Health", short: "Infrastructure", icon: "fa-server" },
         { id: "security", label: "Security & Logs", short: "Security", icon: "fa-shield-halved" },
+        { id: "plugins", label: "Plugin Manager", short: "Plugins", icon: "fa-puzzle-piece" },
         { id: "bots", label: "Bot Fleet", short: "Bot Fleet", icon: "fa-robot" }
       ];
 
@@ -4402,6 +4403,47 @@
         );
       }
 
+      function PluginsSection(props) {
+        var installed = props.plugins.length;
+        var active = props.plugins.filter(function (plugin) { return plugin.lifecycle_state === "active"; }).length;
+        var quarantined = props.plugins.filter(function (plugin) { return plugin.lifecycle_state === "quarantined"; }).length;
+        var pending = props.plugins.filter(function (plugin) { return plugin.lifecycle_state === "pending_permissions"; }).length;
+        var safe = props.safeMode;
+        function permissionLabel(plugin) {
+          return plugin.lifecycle_state === "active" ? "ACTIVE" : plugin.lifecycle_state === "quarantined" ? "QUARANTINED" : plugin.enabled_state === "enabled" ? "ENABLED" : "DISABLED";
+        }
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "plugins-title" },
+          h(SectionHeader, {
+            kicker: "Secure extension platform",
+            title: h("span", { id: "plugins-title" }, "Plugin Manager"),
+            description: "Installed plugins are versioned, permission-based, integrity-checked, and executed in an isolated Extension Host. A plugin is never trusted merely because it is installed.",
+            actions: [
+              h("span", { className: "live-pill" + (safe ? " attention" : ""), key: "safe" }, h("span", { className: "live-dot" }), safe ? "SAFE MODE" : installed + " INSTALLED")
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon success" }, icon("fa-puzzle-piece")), h("div", null, h("strong", null, String(installed)), h("span", null, "Plugins installed"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-play")), h("div", null, h("strong", null, String(active)), h("span", null, "Active"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon purple" }, icon("fa-shield-halved")), h("div", null, h("strong", null, String(quarantined)), h("span", null, "Quarantined")))
+          ),
+          installed
+            ? h("div", { className: "bot-grid" }, props.plugins.map(function (plugin) {
+                return h(
+                  "article",
+                  { className: "glass-card panel-card", key: plugin.plugin_id },
+                  h("div", { className: "plugin-header" }, icon("fa-puzzle-piece"), h("div", null, h("strong", null, plugin.display_name), h("span", null, plugin.plugin_id + " v" + plugin.version))),
+                  h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, permissionLabel(plugin)), h("span", null, "Publisher: " + plugin.publisher_id)),
+                  h("div", { className: "plugin-actions" }, h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(plugin); } }, "Inspect"))
+                );
+              }))
+            : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-puzzle-piece"), h("strong", null, "No plugins installed"), h("p", null, "Install a validated plugin package or a development plugin through the API to see it here.")))
+        );
+      }
+
       function missionAttentionItems(metrics, runtime, security, bots) {
         var items = [];
         if (!runtime || !runtime.online) {
@@ -4857,6 +4899,15 @@
         var pendingBotsPair = useState([]);
         var pendingBots = pendingBotsPair[0];
         var setPendingBots = pendingBotsPair[1];
+        var pluginsPair = useState([]);
+        var plugins = pluginsPair[0];
+        var setPlugins = pluginsPair[1];
+        var pluginSafeModePair = useState(false);
+        var pluginSafeMode = pluginSafeModePair[0];
+        var setPluginSafeMode = pluginSafeModePair[1];
+        var selectedPluginPair = useState(null);
+        var selectedPlugin = selectedPluginPair[0];
+        var setSelectedPlugin = selectedPluginPair[1];
         var toastPair = useState("");
         var toast = toastPair[0];
         var setToast = toastPair[1];
@@ -4983,6 +5034,18 @@
           });
         }
 
+        async function loadPluginsFromApi() {
+          var payload = await requestJson("/api/v1/plugins", { cache: "no-store", headers: { Accept: "application/json" } });
+          if (!Array.isArray(payload)) throw new Error("The plugin API returned an invalid response.");
+          setPlugins(payload);
+          try {
+            var overview = await requestJson("/api/v1/plugins/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            setPluginSafeMode(Boolean(overview && overview.safe_mode));
+          } catch (error) {
+            setPluginSafeMode(false);
+          }
+        }
+
         function replaceLiveLogs(rows, activeProfiles) {
           var next = Array.isArray(rows) ? rows.slice(0, 40) : [];
           logsRef.current = next;
@@ -5050,7 +5113,7 @@
           if (remoteRefreshRef.current) return;
           remoteRefreshRef.current = true;
           try {
-            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi()]);
+            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi()]);
             var failures = results.filter(function (result) { return result.status === "rejected"; });
             if (failures.length) {
               if (results[0].status === "rejected") setRuntime({ online: false, status: "offline", model: null, version: null, message: "JoeOS telemetry API is unavailable" });
@@ -5579,6 +5642,8 @@
           section = h(InfrastructureSection, { nodes: nodes, onInspect: setSelectedNode, onRefresh: refreshFleet });
         } else if (active === "security") {
           section = h(SecuritySection, { security: security, logs: logs, streamStatus: streamStatus, paused: logsPaused, logFilter: logFilter, onLogFilter: setLogFilter, onPause: toggleLogs, onClear: clearVisibleLogs, onExport: exportLogs, logRef: logRef });
+        } else if (active === "plugins") {
+          section = h(PluginsSection, { plugins: plugins, safeMode: pluginSafeMode, onInspect: setSelectedPlugin });
         } else {
           section = h(BotsSection, { bots: bots, pending: pendingBots, onToggle: toggleBot, onDeploy: function () { setDeployOpen(true); } });
         }

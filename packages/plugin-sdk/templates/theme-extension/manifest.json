@@ -1,0 +1,35 @@
+{
+  "manifest_schema_version": 1,
+  "id": "publisher.theme-demo",
+  "name": "theme Demo",
+  "version": "1.0.0",
+  "description": "A minimal theme extension.",
+  "publisher": {
+    "id": "publisher",
+    "name": "Publisher"
+  },
+  "api_version": 1,
+  "min_joeos_version": "0.0.0",
+  "entry_point": {
+    "runtime": "python",
+    "module": "hello_plugin",
+    "function": "handle"
+  },
+  "contributions": [
+    {
+      "type": "theme",
+      "id": "main",
+      "title": "Theme",
+      "description": "A minimal theme extension.",
+      "requires_permissions": ["ui.register_theme"]
+    }
+  ],
+  "required_permissions": [
+    {
+      "permission": "ui.register_theme",
+      "purpose": "Provide the theme contribution."
+    }
+  ],
+  "optional_permissions": [],
+  "development": true
+}

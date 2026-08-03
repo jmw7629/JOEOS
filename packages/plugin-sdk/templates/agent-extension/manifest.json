@@ -1,0 +1,35 @@
+{
+  "manifest_schema_version": 1,
+  "id": "publisher.agent-demo",
+  "name": "agent Demo",
+  "version": "1.0.0",
+  "description": "A minimal agent-role extension.",
+  "publisher": {
+    "id": "publisher",
+    "name": "Publisher"
+  },
+  "api_version": 1,
+  "min_joeos_version": "0.0.0",
+  "entry_point": {
+    "runtime": "python",
+    "module": "hello_plugin",
+    "function": "handle"
+  },
+  "contributions": [
+    {
+      "type": "agent_role",
+      "id": "main",
+      "title": "Agent Role",
+      "description": "A minimal agent-role extension.",
+      "requires_permissions": ["memory.read_task_memory"]
+    }
+  ],
+  "required_permissions": [
+    {
+      "permission": "memory.read_task_memory",
+      "purpose": "Provide the agent contribution."
+    }
+  ],
+  "optional_permissions": [],
+  "development": true
+}

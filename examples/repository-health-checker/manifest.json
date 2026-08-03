@@ -1,0 +1,49 @@
+{
+  "manifest_schema_version": 1,
+  "id": "joeos.repository-health",
+  "name": "Repository Health Checker",
+  "version": "1.0.0",
+  "description": "First-party example plugin: checks repository working-tree state and produces a health summary.",
+  "publisher": {
+    "id": "joeos",
+    "name": "JoeOS"
+  },
+  "api_version": 1,
+  "min_joeos_version": "2.0.0",
+  "entry_point": {
+    "runtime": "python",
+    "module": "repository_health",
+    "function": "handle"
+  },
+  "contributions": [
+    {
+      "type": "repository_analyzer",
+      "id": "health",
+      "title": "Repository Health",
+      "description": "Reports uncommitted changes and a health summary for an approved project.",
+      "commands": ["joeos.repository-health.check"],
+      "requires_permissions": ["intelligence.inspect_git_history"]
+    }
+  ],
+  "required_permissions": [
+    {
+      "permission": "intelligence.inspect_git_history",
+      "purpose": "Inspect the approved project working tree."
+    }
+  ],
+  "optional_permissions": [
+    {
+      "permission": "notification.publish",
+      "purpose": "Publish a notification when the check completes."
+    }
+  ],
+  "settings": [
+    {
+      "key": "default_message",
+      "type": "string",
+      "default": "Working tree is clean.",
+      "scope": "global"
+    }
+  ],
+  "development": true
+}

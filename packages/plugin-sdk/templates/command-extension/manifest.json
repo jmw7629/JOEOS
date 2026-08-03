@@ -1,0 +1,37 @@
+{
+  "manifest_schema_version": 1,
+  "id": "publisher.command-demo",
+  "name": "Command Demo",
+  "version": "1.0.0",
+  "description": "A minimal command extension that registers a typed command contribution.",
+  "publisher": {
+    "id": "publisher",
+    "name": "Publisher"
+  },
+  "api_version": 1,
+  "min_joeos_version": "0.0.0",
+  "entry_point": {
+    "runtime": "python",
+    "module": "hello_plugin",
+    "function": "handle"
+  },
+  "activation_events": [],
+  "contributions": [
+    {
+      "type": "command",
+      "id": "hello",
+      "title": "Hello",
+      "description": "Greets the operator.",
+      "commands": ["publisher.command-demo.hello"],
+      "requires_permissions": ["notification.publish"]
+    }
+  ],
+  "required_permissions": [
+    {
+      "permission": "notification.publish",
+      "purpose": "Send a greeting notification."
+    }
+  ],
+  "optional_permissions": [],
+  "development": true
+}

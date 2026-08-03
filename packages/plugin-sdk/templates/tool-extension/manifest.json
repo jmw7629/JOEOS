@@ -1,0 +1,35 @@
+{
+  "manifest_schema_version": 1,
+  "id": "publisher.tool-demo",
+  "name": "Tool Demo",
+  "version": "1.0.0",
+  "description": "A minimal tool extension. Tool execution remains controlled by the Tool Broker.",
+  "publisher": {
+    "id": "publisher",
+    "name": "Publisher"
+  },
+  "api_version": 1,
+  "min_joeos_version": "0.0.0",
+  "entry_point": {
+    "runtime": "python",
+    "module": "hello_plugin",
+    "function": "handle"
+  },
+  "contributions": [
+    {
+      "type": "tool",
+      "id": "summarize",
+      "title": "Summarize",
+      "description": "A placeholder summarization tool.",
+      "requires_permissions": ["storage.extension_data"]
+    }
+  ],
+  "required_permissions": [
+    {
+      "permission": "storage.extension_data",
+      "purpose": "Store tool state."
+    }
+  ],
+  "optional_permissions": [],
+  "development": true
+}

@@ -1,0 +1,35 @@
+{
+  "manifest_schema_version": 1,
+  "id": "publisher.panel-demo",
+  "name": "Panel Demo",
+  "version": "1.0.0",
+  "description": "A minimal panel extension that registers a panel contribution.",
+  "publisher": {
+    "id": "publisher",
+    "name": "Publisher"
+  },
+  "api_version": 1,
+  "min_joeos_version": "0.0.0",
+  "entry_point": {
+    "runtime": "python",
+    "module": "hello_plugin",
+    "function": "handle"
+  },
+  "contributions": [
+    {
+      "type": "panel",
+      "id": "status",
+      "title": "Status Panel",
+      "description": "A small status panel.",
+      "requires_permissions": ["ui.register_panel"]
+    }
+  ],
+  "required_permissions": [
+    {
+      "permission": "ui.register_panel",
+      "purpose": "Register a panel contribution."
+    }
+  ],
+  "optional_permissions": [],
+  "development": true
+}

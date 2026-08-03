@@ -1,0 +1,35 @@
+{
+  "manifest_schema_version": 1,
+  "id": "publisher.provider-demo",
+  "name": "provider Demo",
+  "version": "1.0.0",
+  "description": "A minimal AI provider adapter.",
+  "publisher": {
+    "id": "publisher",
+    "name": "Publisher"
+  },
+  "api_version": 1,
+  "min_joeos_version": "0.0.0",
+  "entry_point": {
+    "runtime": "python",
+    "module": "hello_plugin",
+    "function": "handle"
+  },
+  "contributions": [
+    {
+      "type": "provider",
+      "id": "main",
+      "title": "Provider",
+      "description": "A minimal AI provider adapter.",
+      "requires_permissions": ["ai.register_provider"]
+    }
+  ],
+  "required_permissions": [
+    {
+      "permission": "ai.register_provider",
+      "purpose": "Provide the provider contribution."
+    }
+  ],
+  "optional_permissions": [],
+  "development": true
+}

@@ -35,6 +35,7 @@ from server.identity import (
     device_enrollment_router,
     load_or_create_identity_master_key,
 )
+from server.plugins import PluginService, plugins_router
 from server.realtime import RealtimeService, SQLiteEventRepository, realtime_router
 from server.security import EnrollmentRequestGuardMiddleware, HttpRequestBoundary
 from server.workspace import WorkspaceService, workspace_router
@@ -679,6 +680,7 @@ async def lifespan(app: FastAPI):
         realtime_ready=lambda: True,
         identity_ready=lambda: True,
         workspace_ready=lambda: True,
+        plugins_ready=lambda: getattr(app.state, "plugins_service", None) is not None,
     )
     app.state.engineering_service = EngineeringService(
         connection_factory=lambda: _connect(db_path),
@@ -692,6 +694,12 @@ async def lifespan(app: FastAPI):
     )
     app.state.memory_service = MemoryService(data_dir=str(db_path.parent / "memory"))
     app.state.agents_service = AgentsService(data_dir=str(db_path.parent / "agents"))
+    app.state.plugins_service = PluginService(
+        str(db_path.parent / "plugins"),
+        master_key=load_or_create_identity_master_key(db_path),
+        joeos_version=JOEOS_VERSION,
+        first_party_publishers=["joeos"],
+    )
     app.state.thresholds = {}
     timeout = httpx.Timeout(
         connect=float(os.getenv("LEMONADE_CONNECT_TIMEOUT", "3")),
@@ -718,6 +726,9 @@ async def lifespan(app: FastAPI):
         with suppress(asyncio.CancelledError):
             await identity_maintenance
         await app.state.http.aclose()
+        plugins_service = getattr(app.state, "plugins_service", None)
+        if plugins_service is not None:
+            plugins_service.shutdown()
 
 
 app = FastAPI(
@@ -738,6 +749,7 @@ app.include_router(engineering_router)
 app.include_router(intelligence_router)
 app.include_router(memory_router)
 app.include_router(agents_router)
+app.include_router(plugins_router)
 
 
 @app.middleware("http")

@@ -1,0 +1,35 @@
+{
+  "manifest_schema_version": 1,
+  "id": "publisher.importer-demo",
+  "name": "importer Demo",
+  "version": "1.0.0",
+  "description": "A minimal document importer.",
+  "publisher": {
+    "id": "publisher",
+    "name": "Publisher"
+  },
+  "api_version": 1,
+  "min_joeos_version": "0.0.0",
+  "entry_point": {
+    "runtime": "python",
+    "module": "hello_plugin",
+    "function": "handle"
+  },
+  "contributions": [
+    {
+      "type": "document_importer",
+      "id": "main",
+      "title": "Importer",
+      "description": "A minimal document importer.",
+      "requires_permissions": ["storage.extension_data"]
+    }
+  ],
+  "required_permissions": [
+    {
+      "permission": "storage.extension_data",
+      "purpose": "Provide the importer contribution."
+    }
+  ],
+  "optional_permissions": [],
+  "development": true
+}

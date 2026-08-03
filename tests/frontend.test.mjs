@@ -77,3 +77,12 @@ test("provides non-drag layout controls and honest integration states", () => {
   assert.match(html, /INTEGRATION REQUIRED/);
   assert.match(html, /browser chat never launches a shell/i);
 });
+
+test("ships a Plugin Manager driven by real plugin state", () => {
+  assert.match(html, /id: ["']plugins["'], label: ["']Plugin Manager["']/);
+  assert.match(html, /function PluginsSection\(/);
+  assert.match(html, /\/api\/v1\/plugins/);
+  assert.match(html, /loadPluginsFromApi\(\)/);
+  assert.match(html, /quarantined/);
+  assert.match(html, /isolated Extension Host/i);
+});

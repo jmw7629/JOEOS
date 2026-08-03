@@ -1,0 +1,35 @@
+{
+  "manifest_schema_version": 1,
+  "id": "publisher.parser-demo",
+  "name": "parser Demo",
+  "version": "1.0.0",
+  "description": "A minimal parser adapter.",
+  "publisher": {
+    "id": "publisher",
+    "name": "Publisher"
+  },
+  "api_version": 1,
+  "min_joeos_version": "0.0.0",
+  "entry_point": {
+    "runtime": "python",
+    "module": "hello_plugin",
+    "function": "handle"
+  },
+  "contributions": [
+    {
+      "type": "parser",
+      "id": "main",
+      "title": "Parser",
+      "description": "A minimal parser adapter.",
+      "requires_permissions": ["storage.extension_data"]
+    }
+  ],
+  "required_permissions": [
+    {
+      "permission": "storage.extension_data",
+      "purpose": "Provide the parser contribution."
+    }
+  ],
+  "optional_permissions": [],
+  "development": true
+}
