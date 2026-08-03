@@ -24,6 +24,7 @@ from server.api.bootstrap import (
     bootstrap_router,
 )
 from server.command_center import CommandCenterService, command_center_router
+from server.engineering import EngineeringService, engineering_router
 from server.identity import (
     DeviceEnrollmentService,
     PairingKeyProtector,
@@ -676,6 +677,12 @@ async def lifespan(app: FastAPI):
         identity_ready=lambda: True,
         workspace_ready=lambda: True,
     )
+    app.state.engineering_service = EngineeringService(
+        connection_factory=lambda: _connect(db_path),
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+    )
     app.state.thresholds = {}
     timeout = httpx.Timeout(
         connect=float(os.getenv("LEMONADE_CONNECT_TIMEOUT", "3")),
@@ -718,6 +725,7 @@ app.include_router(device_enrollment_router)
 app.include_router(workspace_router)
 app.include_router(realtime_router)
 app.include_router(command_center_router)
+app.include_router(engineering_router)
 
 
 @app.middleware("http")

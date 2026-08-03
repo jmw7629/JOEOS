@@ -10,9 +10,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 HttpRouteMethod = Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
 RouteProtocol = Literal["http", "websocket"]
-RouteAccess = Literal["read_only", "configuration", "stream", "local_analysis", "enrollment"]
+RouteAccess = Literal[
+    "read_only", "configuration", "stream", "local_analysis", "enrollment", "read_write", "approval"
+]
 CapabilityAccess = Literal[
-    "read_only", "configuration", "stream", "local_analysis", "enrollment", "unavailable"
+    "read_only", "configuration", "stream", "local_analysis", "enrollment", "read_write", "approval", "unavailable"
 ]
 CapabilityStatus = Literal["available", "unavailable"]
 
