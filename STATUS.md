@@ -4,7 +4,7 @@ Generated: 2026-08-03.
 
 ## Current phase
 
-Phase 13 — Smart Glasses, Wearable Display, and Ambient Computing Platform (delivered).
+Phase 14 — Mobile Companion and Secure Remote Operations Platform (delivered).
 
 ## What works
 
@@ -17,11 +17,12 @@ Phase 13 — Smart Glasses, Wearable Display, and Ambient Computing Platform (de
 - Automation and Workflow Engine: versioned Workflow Registry, strict validation and compilation (no code execution, bounded loops, cycle detection), constrained expression language, timezone-aware scheduling with explicit DST/missed-run/overlap policies, Trigger Registry, Action Registry, Workflow Secret Broker, permission guard, idempotency/deduplication/concurrency/locks/rate limits, real execution state machine with branches, loops, parallel, retries, timeouts, approvals, user input, compensation, pause/resume/cancel, bounded run history and traces, health and stuck-run detection, safe templates, and an Automation section in the Command Center UI.
 - Communications, Inbox, and Notification Hub: provider-neutral Provider/Account/Identity/Contact registries, Recipient Resolver with ambiguity blocking, typed Message Store and Draft Store, authoritative Outbox with idempotent bounded delivery, external-send approval bound to content/recipient/attachment hashes, content sanitization, link safety, phishing and prompt-injection signals, Notification Center with routing rules, quiet hours, DND, snooze, digests, attachment validation, and a Communications section in the Command Center UI.
 - Smart Glasses and Wearable Platform: authoritative Device Registry, Device Type Registry, Capability Registry, plugin-based Adapter Registry, controlled discovery, secure pairing (single-use expiring codes), capability-scoped revocable trust, authenticated expiring sessions, Connection Manager with bounded backoff, granular device permissions (camera/microphone/location never default), Glance Card system with privacy modes, allowlisted wearable command gateway with confirmation levels, push-to-talk local-first voice with enforced recording indicators, explicit camera/vision gateways, checklists with required-step enforcement, trusted handoff, idempotent offline queue, battery/thermal resource governor, an isolated Wearable Simulator (no fabricated production hardware), and a Device Manager section in the Command Center UI.
+- Mobile Companion and Secure Remote Operations Platform: authoritative Mobile Client Registry, Host Registry with explicit discovery, two-party secure pairing (short-lived single-use hashed codes, host + client confirmation), short-lived revocable sessions with rotating hashed refresh credentials, allowlisted Remote Command Gateway (prohibited operations rejected, raw AI never executed), Scoped Remote API backed by real authoritative state providers, safe-only idempotent offline action queue revalidated against base versions (conflicts preserve authoritative state), handoff coordinator, opaque single-use user-bound deep links, privacy-safe provider-neutral push contracts with an isolated test fixture (production APNs/FCM not claimed), immediate server-side revocation and honest lost-device mode, an extended native SwiftUI iOS policy module (`MobileCompanionPolicy`), and a Mobile Companion section in the Command Center UI.
 
 ## Test status
 
-- Python: 364 passed, 61 subtests passed.
-- Frontend: 12/12 passed.
+- Python: 401 passed, 61 subtests passed.
+- Frontend: 13/13 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 
 ## Not yet built
@@ -33,9 +34,12 @@ Phase 13 — Smart Glasses, Wearable Display, and Ambient Computing Platform (de
 - Plugin marketplace, public signing-key distribution, OS-level sandboxing, webhooks, and remote connectors (architecture documented; not implemented).
 - Real external provider adapters (email/chat), mobile push, smart-glasses delivery, and read receipts (architecture documented; not implemented).
 - Real wearable manufacturer adapters (Bluetooth/USB/gaze/gesture), OS-level device pairing, and real camera/microphone capture (architecture documented; only an isolated simulator produces devices).
+- Native iOS build/sign/simulator (requires Xcode, not installed on this machine), production APNs/FCM push, background-execution guarantees, biometric security, universal links, and App Store distribution (contracts documented; not claimed as implemented).
 
-See `docs/architecture/WEARABLES_PLATFORM.md` for the wearable design,
-`docs/architecture/COMMUNICATIONS_PLATFORM.md` for the communications design,
-`docs/architecture/AUTOMATION_PLATFORM.md` for the automation engine,
-`docs/architecture/PLUGIN_PLATFORM.md` for the plugin platform, and
-`docs/architecture/IMPLEMENTATION_BACKLOG.md` for the dependency-ordered plan.
+See `docs/architecture/MOBILE_COMPANION.md` for the mobile companion design
+and platform strategy, `docs/architecture/WEARABLES_PLATFORM.md` for the
+wearable design, `docs/architecture/COMMUNICATIONS_PLATFORM.md` for the
+communications design, `docs/architecture/AUTOMATION_PLATFORM.md` for the
+automation engine, `docs/architecture/PLUGIN_PLATFORM.md` for the plugin
+platform, and `docs/architecture/IMPLEMENTATION_BACKLOG.md` for the
+dependency-ordered plan.

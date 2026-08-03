@@ -110,3 +110,11 @@ test("ships a Device Manager driven by real wearable state", () => {
   assert.match(html, /loadWearablesFromApi\(\)/);
   assert.match(html, /Camera and microphone activity always shows an indicator/i);
 });
+
+test("ships a Mobile Companion driven by real client state", () => {
+  assert.match(html, /id: ["']mobile["'], label: ["']Mobile Companion["']/);
+  assert.match(html, /function MobileSection\(/);
+  assert.match(html, /\/api\/v1\/mobile\/clients/);
+  assert.match(html, /loadMobileFromApi\(\)/);
+  assert.match(html, /No fake hosts, connections, or push deliveries are shown/i);
+});

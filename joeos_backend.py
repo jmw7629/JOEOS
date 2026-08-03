@@ -30,6 +30,7 @@ from server.communications import CommunicationsService, communications_router
 from server.engineering import EngineeringService, engineering_router
 from server.intelligence import IntelligenceService, intelligence_router
 from server.memory import MemoryService, memory_router
+from server.mobile import MobileService, mobile_router
 from server.identity import (
     DeviceEnrollmentService,
     PairingKeyProtector,
@@ -619,6 +620,45 @@ async def _identity_maintenance_loop(app: FastAPI) -> None:
         await asyncio.sleep(5)
 
 
+def _wire_mobile_scopes(app: FastAPI) -> None:
+    """Register scoped remote queries that read real authoritative state."""
+    mobile = app.state.mobile_service
+
+    def _command_center(session, scope):
+        service = getattr(app.state, "command_center_service", None)
+        if service is None:
+            return {"available": False, "reason": "command center unavailable"}
+        overview = service.overview()
+        return {
+            "available": True,
+            "overall": overview.overall,
+            "services": [s.service_id for s in overview.services],
+            "runtime_online": bool((app.state.runtime or {}).get("online")),
+        }
+
+    def _projects(session, scope):
+        service = getattr(app.state, "engineering_service", None)
+        if service is None:
+            return {"projects": []}
+        projects = service.projects.list_projects()
+        return {"projects": [{"id": p.project_id, "name": p.name, "trust": p.trust} for p in projects]}
+
+    def _missions(session, scope):
+        service = getattr(app.state, "agents_service", None)
+        if service is None:
+            return {"missions": []}
+        missions = service.missions.missions(limit=16)
+        return {"missions": [{"mission_id": m.mission_id, "title": m.title, "status": m.status} for m in missions]}
+
+    def _runtime(session, scope):
+        return {"runtime": app.state.runtime or {}, "model": (app.state.runtime or {}).get("model")}
+
+    mobile.register_scoped_provider("command_center", _command_center)
+    mobile.register_scoped_provider("projects", _projects)
+    mobile.register_scoped_provider("missions", _missions)
+    mobile.register_scoped_provider("runtime", _runtime)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db_path = _database_path()
@@ -687,6 +727,7 @@ async def lifespan(app: FastAPI):
         automation_ready=lambda: getattr(app.state, "automation_service", None) is not None,
         communications_ready=lambda: getattr(app.state, "communications_service", None) is not None,
         wearables_ready=lambda: getattr(app.state, "wearables_service", None) is not None,
+        mobile_ready=lambda: getattr(app.state, "mobile_service", None) is not None,
     )
     app.state.engineering_service = EngineeringService(
         connection_factory=lambda: _connect(db_path),
@@ -727,6 +768,15 @@ async def lifespan(app: FastAPI):
             db_path, level, source, message
         ),
     )
+    app.state.mobile_service = MobileService(
+        str(db_path.parent / "mobile"),
+        server_version=JOEOS_VERSION,
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+    )
+    app.state.mobile_service.prepare_defaults()
+    _wire_mobile_scopes(app)
     app.state.thresholds = {}
     timeout = httpx.Timeout(
         connect=float(os.getenv("LEMONADE_CONNECT_TIMEOUT", "3")),
@@ -780,6 +830,7 @@ app.include_router(plugins_router)
 app.include_router(automation_router)
 app.include_router(communications_router)
 app.include_router(wearables_router)
+app.include_router(mobile_router)
 
 
 @app.middleware("http")
