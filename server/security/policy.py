@@ -287,6 +287,20 @@ class PolicyEvaluationEngine:
                 priority=90,
                 authority="joeos_security",
             ),
+            # Core automation actions that are already permission-gated by the
+            # workflow permission system remain allowed; everything else
+            # (shell, git mutation, deployment, ...) is denied by default.
+            SecurityPolicy(
+                policy_id="policy.allow_core_workflow_actions",
+                title="Allow core permission-gated workflow actions",
+                description="Safe core automation actions already gated by workflow permissions.",
+                scope="all",
+                action="joeos.core_automation",
+                resource="*",
+                effect="allow",
+                priority=10,
+                authority="joeos_security",
+            ),
         ]
         for policy in defaults:
             if self._registry.get(policy.policy_id) is None:

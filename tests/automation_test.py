@@ -415,5 +415,75 @@ class CommunicationsIntegrationTests(unittest.TestCase):
         self.assertFalse(drafts[0].model_dump().get("approval_state") == "approved")
 
 
+class SecurityGateIntegrationTests(unittest.TestCase):
+    """The Security Platform mediates every workflow action."""
+
+    def setUp(self):
+        import tempfile as _tempfile
+        from server.security import SecurityService
+        from server.automation.security_gate import AutomationSecurityGate
+        self.tempdir = _tempfile.TemporaryDirectory()
+        self.root = Path(self.tempdir.name)
+        self.security = SecurityService(str(self.root / "security"), master_key=MASTER_KEY)
+        self.security.prepare_defaults()
+        self.gate = AutomationSecurityGate(
+            policy_evaluate=self.security.evaluate,
+            audit_record=lambda **kw: self.security.audit_record(**kw),
+            secret_broker=self.security.secrets,
+        )
+        from server.automation import AutomationService
+        self.service = AutomationService(
+            str(self.root / "automation"), master_key=MASTER_KEY, security_gate=self.gate
+        )
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+
+    def _gated_definition(self, action, wfid, trig) -> WorkflowDefinition:
+        return WorkflowDefinition.model_validate(
+            _notify_definition(wfid).model_dump()
+            | {
+                "triggers": (TriggerConfig(trigger_id=trig, type="manual"),),
+                "nodes": (
+                    NodeConfig(id="start", type="start"),
+                    NodeConfig(id="act", type="action", action=action, params={"message": "hi"}),
+                    NodeConfig(id="end", type="end"),
+                ),
+                "edges": (
+                    EdgeConfig(source="start", target="act"),
+                    EdgeConfig(source="act", target="end"),
+                ),
+            }
+        )
+
+    def test_safe_core_action_allowed_and_audited(self):
+        definition = self._gated_definition("joeos.notification", "acme.gated_ok", "manual_ok")
+        self.service.create_workflow(definition)
+        self.service.grant_permission("acme.gated_ok", "notification.publish")
+        self.service.enable_workflow("acme.gated_ok")
+        run = self.service.run_workflow("acme.gated_ok")
+        self.assertEqual(run.state, "succeeded")
+        audits = [e for e in self.security.audit_list() if e.actor == "acme.gated_ok"]
+        self.assertEqual(len(audits), 1)
+        self.assertEqual(audits[0].result, "allowed")
+
+    def test_privileged_action_denied_and_audited(self):
+        self.service.actions.register(
+            "joeos.export_secret",
+            lambda params, context, variables, trace: {"exported": True},
+            permission="", side_effects=("export",),
+        )
+        definition = self._gated_definition("joeos.export_secret", "acme.gated_deny", "manual_deny")
+        self.service.create_workflow(definition)
+        self.service.grant_permission("acme.gated_deny", "notification.publish")
+        self.service.enable_workflow("acme.gated_deny")
+        run = self.service.run_workflow("acme.gated_deny")
+        self.assertEqual(run.state, "failed")
+        self.assertEqual(run.error_code, "permission_denied")
+        denied = [e for e in self.security.audit_list() if e.actor == "acme.gated_deny" and e.result == "denied"]
+        self.assertEqual(len(denied), 1)
+        self.assertEqual(denied[0].action, "joeos.export_secret")
+
+
 if __name__ == "__main__":
     unittest.main()

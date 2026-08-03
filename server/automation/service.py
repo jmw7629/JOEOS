@@ -58,6 +58,7 @@ class AutomationService:
         agent_api=None,
         git_reader=None,
         communications=None,
+        security_gate=None,
         approval_resolver=None,
         input_resolver=None,
     ) -> None:
@@ -67,6 +68,7 @@ class AutomationService:
         self._joeos_version = joeos_version
         self._event_sink = event_sink
         self.communications = communications
+        self.security_gate = security_gate
 
         self.workflows = WorkflowRegistry(self._connection_factory)
         self.permissions = WorkflowPermissionGuard(self._connection_factory)
@@ -99,6 +101,7 @@ class AutomationService:
             trace_sink=trace_sink,
             approval_resolver=approval_resolver,
             input_resolver=input_resolver,
+            security_gate=security_gate,
         )
 
     def _connection_factory(self):

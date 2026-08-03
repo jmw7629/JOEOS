@@ -30,6 +30,7 @@ from .models import (
     WorkflowDefinition,
 )
 from .permissions import WorkflowPermissionGuard
+from .security_gate import PermissionDeniedError
 
 MAX_RETRY_ATTEMPTS = 20
 MAX_LOOP_ITERATIONS = 1000
@@ -75,6 +76,7 @@ class ExecutionEngine:
         input_resolver=None,
         subworkflow_runner=None,
         now_provider=None,
+        security_gate=None,
     ) -> None:
         self._connection_factory = connection_factory
         self._actions = actions
@@ -87,6 +89,7 @@ class ExecutionEngine:
         self._subworkflow_runner = subworkflow_runner
         self._now = now_provider or (lambda: datetime.now(timezone.utc))
         self._lock = threading.RLock()
+        self._security_gate = security_gate
 
     # ------------------------------------------------------------------
     # Run lifecycle
@@ -147,6 +150,8 @@ class ExecutionEngine:
             self._finish_run(context, "cancelled", error="cancelled by request")
         except ExecutionError as exc:
             self._finish_run(context, "failed", error=str(exc), error_code=type(exc).__name__)
+        except PermissionDeniedError as exc:
+            self._finish_run(context, "failed", error=str(exc), error_code="permission_denied")
         return self.get_run(run_id)
 
     def _dispatch_node(
@@ -368,6 +373,15 @@ class ExecutionEngine:
             workflow_id=definition.workflow_id, permission=permission, project=definition.project
         ):
             raise ExecutionError("permission_denied: workflow lacks %s." % permission)
+        if self._security_gate is not None:
+            self._security_gate.check_action(
+                workflow_id=definition.workflow_id,
+                workflow_version=definition.version,
+                project=definition.project,
+                action=action_id,
+                risk=self._actions.risk(action_id),
+                target=node.title or node.id,
+            )
         if self._secrets is not None:
             for secret in definition.secrets:
                 availability = self._secrets.availability(

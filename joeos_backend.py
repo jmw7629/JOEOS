@@ -625,6 +625,19 @@ async def _identity_maintenance_loop(app: FastAPI) -> None:
         await asyncio.sleep(5)
 
 
+def _automation_security_gate(app: FastAPI):
+    """Wire the Security Platform into the Automation Engine as the policy +
+    audit gate for every workflow action."""
+    from server.automation.security_gate import AutomationSecurityGate
+
+    security = app.state.security_service
+    return AutomationSecurityGate(
+        policy_evaluate=security.evaluate,
+        audit_record=lambda **kwargs: security.audit_record(**kwargs),
+        secret_broker=security.secrets,
+    )
+
+
 def _wire_mobile_scopes(app: FastAPI) -> None:
     """Register scoped remote queries that read real authoritative state."""
     mobile = app.state.mobile_service
@@ -801,6 +814,14 @@ async def lifespan(app: FastAPI):
         ),
     )
     app.state.communications_service.prepare_defaults()
+    app.state.security_service = SecurityService(
+        str(db_path.parent / "security"),
+        master_key=load_or_create_identity_master_key(db_path),
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+    )
+    app.state.security_service.prepare_defaults()
     app.state.automation_service = AutomationService(
         str(db_path.parent / "automation"),
         master_key=load_or_create_identity_master_key(db_path),
@@ -809,6 +830,7 @@ async def lifespan(app: FastAPI):
             db_path, level, source, message
         ),
         communications=app.state.communications_service,
+        security_gate=_automation_security_gate(app),
     )
     app.state.wearables_service = WearableService(
         str(db_path.parent / "wearables"),
@@ -825,14 +847,6 @@ async def lifespan(app: FastAPI):
     )
     app.state.mobile_service.prepare_defaults()
     _wire_mobile_scopes(app)
-    app.state.security_service = SecurityService(
-        str(db_path.parent / "security"),
-        master_key=load_or_create_identity_master_key(db_path),
-        event_sink=lambda level, source, message: _record_event(
-            db_path, level, source, message
-        ),
-    )
-    app.state.security_service.prepare_defaults()
     app.state.thresholds = {}
     timeout = httpx.Timeout(
         connect=float(os.getenv("LEMONADE_CONNECT_TIMEOUT", "3")),
