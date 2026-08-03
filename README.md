@@ -13,6 +13,8 @@ JoeOS is a local-first executive command center for the AMD Ryzen AI Max+ 395 Ha
 - Private Lemonade chat through FastAPI; the browser cannot execute a shell or access model ports directly.
 - Installable mobile PWA plus a native SwiftUI iPhone client with strict private-origin discovery and device-key pairing.
 - Server-side local-console device pairing with two distinct P-256 keys, encrypted pending-key storage, expiry/replay controls, local revocation, and an explicit no-authority `active_unassigned` state.
+- Engineering workspace with a project registry, root-bounded file access, Git status/diff and approval-gated stage/commit, secret scanning, command validation, and repository search.
+- Project and repository intelligence: stable repository fingerprints, incremental file inventory and classification, language/framework/build detection, symbol/reference extraction for ten languages, dependency and architecture graphs, change-impact estimation, explainable risk findings, ADR/convention ingestion, project memory, hybrid structured retrieval, context packs, and a cancellable background index with health diagnostics.
 
 Start the current local release with `start_joeos.sh` on the Halo or `start_joeos.command` on macOS. For the recommended private HTTPS iPhone/PWA route, use `start_joeos_secure.sh` or double-click `start_joeos_secure.command`. See `DEPLOYMENT.md` for details.
 
@@ -22,4 +24,6 @@ The modular native iPhone source now runs the reviewed pairing ceremony with ser
 
 The complete audit, target topology, feature graph, security boundaries, and dependency-ordered backlog are in `docs/architecture/`. Existing root entry points remain supported while domain modules move under `server/`, shared clients and contracts move under `packages/`, and the nested Sites application is migrated without losing its Git history.
 
-Unconnected calendar, email, weather, markets, manufacturing, social, documents, automation, Git, terminal, voice, vision, and Even Reality G2 modules are deliberately labeled as integration-required. JoeOS never substitutes fabricated production data.
+Unconnected calendar, email, weather, markets, manufacturing, social, documents, automation, voice, vision, and Even Reality G2 modules are deliberately labeled as integration-required. JoeOS never substitutes fabricated production data.
+
+Current project and repository intelligence status is tracked in `STATUS.md` and the [Project and Repository Intelligence architecture](docs/architecture/PROJECT_INTELLIGENCE.md).

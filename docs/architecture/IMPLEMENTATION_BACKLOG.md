@@ -107,6 +107,8 @@ Acceptance:
 
 ## P6 — Knowledge and work surfaces
 
+Implementation status: **project and repository intelligence foundation delivered**. The `server/intelligence/` platform provides stable repository fingerprints, incremental file inventory with classification, language/framework/package/build/test detection, symbol/reference extraction for ten languages, dependency and architecture graphs, change-impact estimation, explainable risk findings, ADR/convention ingestion, project memory, hybrid structured retrieval, context packs, and a cancellable background index with health diagnostics. See [Project and Repository Intelligence](PROJECT_INTELLIGENCE.md). Remaining P6 work is global cross-project search, semantic embeddings behind the existing retrieval envelope, documents/OCR, and the full Coding Studio surface.
+
 - Documents, OCR, embeddings, semantic retrieval, and Q&A.
 - Global search across authorized sources.
 - Projects, Kanban, timeline, milestones, dependencies, risk, and roadmap.
