@@ -653,10 +653,51 @@ def _wire_mobile_scopes(app: FastAPI) -> None:
     def _runtime(session, scope):
         return {"runtime": app.state.runtime or {}, "model": (app.state.runtime or {}).get("model")}
 
+    def _workflows(session, scope):
+        service = getattr(app.state, "automation_service", None)
+        if service is None:
+            return {"workflows": [], "runs": []}
+        workflows = service.list_workflows()
+        runs = service.list_runs(limit=10)
+        return {
+            "workflows": [{"workflow_id": w.workflow_id, "name": w.name, "enabled": w.enabled, "health": w.health_state} for w in workflows],
+            "runs": [{"run_id": r.run_id, "state": r.state, "workflow_id": r.workflow_id} for r in runs],
+        }
+
+    def _communications(session, scope):
+        service = getattr(app.state, "communications_service", None)
+        if service is None:
+            return {"inbox": [], "unread": 0}
+        notifications = service.list_notifications(limit=20)
+        return {
+            "inbox": [{"notification_id": n.notification_id, "source": n.source, "category": n.category, "title": n.title, "severity": n.severity} for n in notifications],
+            "unread": service.unread_notifications(),
+        }
+
+    def _devices(session, scope):
+        service = getattr(app.state, "wearables_service", None)
+        if service is None:
+            return {"devices": []}
+        devices = service.list_devices()
+        return {
+            "devices": [
+                {"device_id": d.device_id, "display_name": d.display_name, "device_type": d.device_type, "connection_state": d.connection_state}
+                for d in devices
+                if d.revocation_state == "active"
+            ]
+        }
+
+    def _mobile(session, scope):
+        return {"overview": mobile.overview().model_dump()}
+
     mobile.register_scoped_provider("command_center", _command_center)
     mobile.register_scoped_provider("projects", _projects)
     mobile.register_scoped_provider("missions", _missions)
     mobile.register_scoped_provider("runtime", _runtime)
+    mobile.register_scoped_provider("workflows", _workflows)
+    mobile.register_scoped_provider("communications", _communications)
+    mobile.register_scoped_provider("devices", _devices)
+    mobile.register_scoped_provider("mobile", _mobile)
 
 
 @asynccontextmanager

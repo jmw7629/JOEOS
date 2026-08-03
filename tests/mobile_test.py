@@ -154,6 +154,16 @@ class ScopedQueryTests(MobileFixture):
         with self.assertRaises(MobileError):
             self.service.scoped_query(client_id=self.client.client_id, session_id=session.session_id, resource="raw_database")
 
+    def test_all_scoped_resources_available(self):
+        # The remote API exposes typed scoped resources, never arbitrary
+        # service methods or raw databases.
+        self._pair()
+        session = self._auth()
+        for resource in ("command_center", "projects", "missions", "runtime", "workflows", "communications", "devices", "mobile"):
+            self.service.register_scoped_provider(resource, lambda session, scope, r=resource: {"resource": r})
+            result = self.service.scoped_query(client_id=self.client.client_id, session_id=session.session_id, resource=resource)
+            self.assertEqual(result["resource"], resource)
+
 
 class OfflineQueueTests(MobileFixture):
     def test_safe_action_queued(self):
