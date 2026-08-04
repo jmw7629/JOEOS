@@ -1624,6 +1624,34 @@
       gap: 12px;
     }
 
+    .perf-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .perf-grid .panel-card {
+      min-width: 0;
+    }
+
+    .perf-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .perf-actions .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .warning-text {
+      color: #ffd166 !important;
+    }
+
     .fleet-stat {
       display: flex;
       min-height: 84px;
@@ -3222,7 +3250,8 @@
 
       .main-shell.ai-open .node-grid,
       .main-shell.ai-open .bot-grid,
-      .main-shell.ai-open .timeline {
+      .main-shell.ai-open .timeline,
+      .main-shell.ai-open .perf-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
@@ -3234,7 +3263,8 @@
       }
 
       .node-grid,
-      .bot-grid {
+      .bot-grid,
+      .perf-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
@@ -3353,6 +3383,7 @@
       .fleet-strip,
       .node-grid,
       .bot-grid,
+      .perf-grid,
       .timeline {
         grid-template-columns: 1fr;
       }
@@ -3530,6 +3561,7 @@
         { id: "wearables", label: "Device Manager", short: "Wearables", icon: "fa-glasses" },
         { id: "mobile", label: "Mobile Companion", short: "Mobile", icon: "fa-mobile-screen" },
         { id: "security-center", label: "Security Center", short: "Security", icon: "fa-user-shield" },
+        { id: "performance", label: "Performance Center", short: "Performance", icon: "fa-gauge-high" },
         { id: "bots", label: "Bot Fleet", short: "Bot Fleet", icon: "fa-robot" }
       ];
 
@@ -3680,16 +3712,18 @@
 
       function normalizeMetric(row) {
         var fallback = METRIC_DEFINITIONS.find(function (definition) { return definition.id === row.id; }) || METRIC_DEFINITIONS[0];
-        var history = Array.isArray(row.history) ? row.history.map(function (value) { return safeNumber(value, 0, 100); }) : [];
+        var unmeasured = row.measured === false || row.value == null;
+        var history = Array.isArray(row.history) ? row.history.map(function (value) { return value == null ? 0 : safeNumber(value, 0, 100); }) : [];
         return {
           id: String(row.id || fallback.id),
           label: row.label || fallback.label,
-          value: safeNumber(row.value, 0, 100),
-          previous: safeNumber(row.previous, 0, 100),
+          value: unmeasured ? 0 : safeNumber(row.value, 0, 100),
+          previous: unmeasured ? 0 : safeNumber(row.previous, 0, 100),
           unit: row.unit || fallback.unit,
           icon: row.icon || fallback.icon,
-          detail: row.detail || "Live Halo telemetry",
+          detail: unmeasured ? (row.detail || "No measurement available") + " · unmeasured" : (row.detail || "Live Halo telemetry"),
           loading: false,
+          unmeasured: unmeasured,
           history: history.length ? history : [0, 0]
         };
       }
@@ -3882,8 +3916,8 @@
       function MetricCard(props) {
         var metric = props.metric;
         var delta = metric.value - metric.previous;
-        var warning = metric.value >= (metric.id === "disk" ? 80 : 78);
-        var stateLabel = metric.loading ? "Waiting" : warning ? "Attention" : "Nominal";
+        var warning = !metric.unmeasured && metric.value >= (metric.id === "disk" ? 80 : 78);
+        var stateLabel = metric.loading ? "Waiting" : metric.unmeasured ? "Unmeasured" : warning ? "Attention" : "Nominal";
         return h(
           "article",
           { className: "glass-card interactive-card metric-card" },
@@ -3891,15 +3925,15 @@
             "div",
             { className: "metric-top" },
             h("div", { className: "metric-icon" }, icon(metric.icon)),
-            h("span", { className: "metric-state " + (warning || metric.loading ? "warning" : "") }, icon(metric.loading ? "fa-hourglass-half" : warning ? "fa-triangle-exclamation" : "fa-check"), stateLabel)
+            h("span", { className: "metric-state " + (warning || metric.loading || metric.unmeasured ? "warning" : "") }, icon(metric.loading ? "fa-hourglass-half" : metric.unmeasured ? "fa-circle-question" : warning ? "fa-triangle-exclamation" : "fa-check"), stateLabel)
           ),
           h("div", { className: "metric-label" }, metric.label),
           h(
             "div",
             { className: "metric-value-row" },
-            h("span", { className: "metric-value" }, metric.value.toFixed(1)),
-            h("span", { className: "metric-unit" }, metric.unit),
-            h("span", { className: "metric-delta " + (delta > 0 ? "up" : "") }, icon(delta > 0 ? "fa-arrow-trend-up" : "fa-arrow-trend-down"), " ", Math.abs(delta).toFixed(1))
+            metric.unmeasured ? h("span", { className: "metric-value" }, "—") : h("span", { className: "metric-value" }, metric.value.toFixed(1)),
+            h("span", { className: "metric-unit" }, metric.unmeasured ? "no measurement" : metric.unit),
+            metric.unmeasured ? null : h("span", { className: "metric-delta " + (delta > 0 ? "up" : "") }, icon(delta > 0 ? "fa-arrow-trend-up" : "fa-arrow-trend-down"), " ", Math.abs(delta).toFixed(1))
           ),
           h("div", { className: "metric-detail" }, metric.detail),
           h(SparkBars, { id: metric.id, values: metric.history })
@@ -4630,6 +4664,187 @@
         );
       }
 
+      function pressureLabel(pressure) {
+        var value = (pressure && pressure.pressure) || "unknown";
+        return value.toUpperCase();
+      }
+
+      function pressureClass(pressure) {
+        var value = (pressure && pressure.pressure) || "unknown";
+        if (value === "critical") return "danger";
+        if (value === "high" || value === "warning") return "warning";
+        if (value === "elevated") return "warning";
+        return "neutral";
+      }
+
+      function PerformanceSection(props) {
+        var overview = props.overview || {};
+        var resources = props.resources || {};
+        var queues = props.queues || [];
+        var caches = props.caches || [];
+        var models = props.models || [];
+        var leaks = props.leaks || [];
+        var benchmarks = props.benchmarks || [];
+        var budgets = props.budgets || [];
+        var regressions = props.regressions || [];
+        var traces = props.traces || [];
+        var settings = props.settings || {};
+        var memoryPressure = overview.memory_pressure || { pressure: "unknown" };
+        var diskPressure = overview.disk_pressure || { pressure: "unknown" };
+        var gpuPressure = overview.gpu_pressure || { pressure: "unknown" };
+        var cpuShown = resources.cpu_percent == null ? "unmeasured" : resources.cpu_percent.toFixed(1) + "%";
+        var memoryShown = resources.memory_percent == null ? "unmeasured" : resources.memory_percent.toFixed(1) + "%";
+        var diskShown = resources.disk_percent == null ? "unmeasured" : resources.disk_percent.toFixed(1) + "%";
+        var gpuShown = resources.gpu_available && resources.gpu_percent != null ? resources.gpu_percent.toFixed(1) + "%" : "unknown";
+        var leakIndicators = leaks.filter(function (item) { return item.state === "leak"; });
+        var budgetRows = budgets.slice(0, 8);
+        var regressionRows = regressions.filter(function (item) { return item.classification === "warning_regression" || item.classification === "budget_failure"; }).slice(0, 8);
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "performance-title" },
+          h(SectionHeader, {
+            kicker: "Measured, not marketed",
+            title: h("span", { id: "performance-title" }, "Performance Center"),
+            description: "Real measured load, pressure, queues, caches, model resources, benchmarks, and budgets from authoritative JoeOS services. Unknown metrics stay unknown. No fabricated FPS, latency, or hardware utilization values are shown.",
+            actions: [
+              h("span", { className: "live-pill" + (overview.load_shedding_active ? " attention" : ""), key: "shed" }, h("span", { className: "live-dot" }), overview.load_shedding_active ? "SHEDDING" : (overview.overall || "unknown").toUpperCase())
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-microchip")), h("div", null, h("strong", null, cpuShown), h("span", null, "CPU"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon " + pressureClass(memoryPressure) }, icon("fa-memory")), h("div", null, h("strong", null, memoryShown), h("span", null, "Memory · " + pressureLabel(memoryPressure)))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-hard-drive")), h("div", null, h("strong", null, diskShown), h("span", null, "Disk · " + pressureLabel(diskPressure)))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-bolt")), h("div", null, h("strong", null, gpuShown), h("span", null, "GPU · " + pressureLabel(gpuPressure))))
+          ),
+          h(
+            "div",
+            { className: "perf-grid" },
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-gauge-high"), h("strong", null, "Resource pressure")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, (overview.load || "unknown").toUpperCase()), h("span", null, "load")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge " + pressureClass(memoryPressure) }, pressureLabel(memoryPressure)), h("span", null, "memory pressure")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge " + pressureClass(diskPressure) }, pressureLabel(diskPressure)), h("span", null, "disk pressure")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, pressureLabel(gpuPressure)), h("span", null, "GPU pressure (unmeasured stays unknown)")),
+              overview.load_shedding_active ? h("p", { className: "plugin-description warning-text" }, "Load shedding is active: " + ((overview.load_shedding_reasons || []).join(", ") || "critical load")) : null,
+              h("p", { className: "plugin-description" }, "Source: telemetry.collector · measured when available.")
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-list-check"), h("strong", null, "Governed workloads")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.active_agents || 0)), h("span", null, "active agents")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.active_workflows || 0)), h("span", null, "active workflows")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.models_loaded || 0)), h("span", null, "models loaded" + (overview.models_blocked ? " · " + overview.models_blocked + " blocked" : ""))),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.plugins_violating || 0)), h("span", null, "plugins over budget")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.queue_count || 0)), h("span", null, "bounded queues")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.cache_count || 0)), h("span", null, "registered caches"))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-heart-circle-exclamation"), h("strong", null, "Leaks and regressions")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.leak_indicators || 0)), h("span", null, "leak indicators")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.regressions || 0)), h("span", null, "regressions")),
+              leakIndicators.length ? leakIndicators.slice(0, 3).map(function (indicator) {
+                return h("p", { className: "plugin-description warning-text", key: indicator.indicator_id }, indicator.kind + " · " + indicator.owner + ": " + indicator.message);
+              }) : h("p", { className: "plugin-description" }, "No leak indicators flagged from sustained growth trends."),
+              regressionRows.length ? regressionRows.slice(0, 3).map(function (regression) {
+                return h("p", { className: "plugin-description warning-text", key: regression.regression_id }, regression.benchmark_id + " " + regression.classification);
+              }) : h("p", { className: "plugin-description" }, "No significant regressions beyond measurement noise.")
+            )
+          ),
+          h(
+            "div",
+            { className: "perf-actions" },
+            h("button", { type: "button", className: "btn btn-ghost", onClick: function () { runPerformanceAction("unload-idle-models"); } }, icon("fa-circle-down"), "Unload idle models"),
+            h("button", { type: "button", className: "btn btn-ghost", onClick: function () { runPerformanceAction("clear-safe-caches"); } }, icon("fa-eraser"), "Clear safe caches"),
+            h("button", { type: "button", className: "btn btn-ghost", onClick: function () { runPerformanceAction(overview.low_power_mode ? "exit-low-resource-mode" : "enter-low-resource-mode"); } }, icon("fa-battery-half"), overview.low_power_mode ? "Exit low-resource mode" : "Enter low-resource mode"),
+            h("button", { type: "button", className: "btn btn-ghost", onClick: function () { runPerformanceAction(settings.indexing_paused ? "resume-indexing" : "pause-indexing"); } }, icon("fa-pause"), settings.indexing_paused ? "Resume indexing" : "Pause indexing")
+          ),
+          h(
+            "div",
+            { className: "perf-grid" },
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-layer-group"), h("strong", null, "Queues")),
+              queues.length ? queues.slice(0, 8).map(function (queue) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: queue.queue_id },
+                  h("span", { className: "plugin-badge " + (queue.backpressure === "none" ? "" : "warning") }, queue.backpressure.toUpperCase()),
+                  h("span", null, queue.queue_id + " · " + queue.depth + "/" + queue.limit + " · wait " + queue.oldest_wait_ms.toFixed(0) + "ms" + (queue.preserved ? " · preserved" : ""))
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-layer-group"), h("strong", null, "No queue data yet"), h("p", null, "Bound queues with backpressure protect the system from storms."))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-database"), h("strong", null, "Caches")),
+              caches.length ? caches.slice(0, 8).map(function (cache) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: cache.cache_id },
+                  h("span", { className: "plugin-badge" }, cache.entries + "/" + cache.maximum_entries),
+                  h("span", null, cache.cache_id + " · " + Math.round(cache.hits / Math.max(1, cache.hits + cache.misses) * 100) + "% hit · evicted " + cache.evictions)
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-database"), h("strong", null, "No caches registered"), h("p", null, "Caches declare explicit bounds and invalidation."))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-robot"), h("strong", null, "Models")),
+              models.length ? models.slice(0, 6).map(function (model) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: model.model_id },
+                  h("span", { className: "plugin-badge " + (model.state === "resource_blocked" ? "warning" : "") }, model.state.toUpperCase()),
+                  h("span", null, model.model_id + (model.pinned ? " · pinned" : "") + (model.actual_memory_mb != null ? " · " + model.actual_memory_mb.toFixed(0) + "MB measured" : " · footprint " + model.footprint_source))
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-robot"), h("strong", null, "No models discovered"), h("p", null, "Models appear when the local AI runtime reports them."))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-chart-simple"), h("strong", null, "Benchmarks and budgets")),
+              benchmarks.length ? benchmarks.slice(0, 4).map(function (benchmark) {
+                return h("div", { className: "plugin-meta", key: benchmark.benchmark_id }, h("span", { className: "plugin-badge" }, benchmark.median.toFixed(1) + "ms"), h("span", null, benchmark.benchmark_id + " · median of " + benchmark.iterations + " runs · ±" + benchmark.variance.toFixed(1) + "ms"));
+              }) : h("div", { className: "empty-state" }, icon("fa-chart-simple"), h("strong", null, "No benchmarks run yet"), h("p", null, "Run the performance baseline to see median and variance.")),
+              budgetRows.length ? budgetRows.map(function (budget) {
+                return h("div", { className: "plugin-meta", key: budget.budget_id }, h("span", { className: "plugin-badge" }, budget.metric), h("span", null, budget.budget_id + " · target " + budget.target + " · " + budget.hardware_profile));
+              }) : null
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-list-check"), h("strong", null, "Traces")),
+              traces.length ? traces.slice(0, 6).map(function (trace) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: trace.trace_id + ":" + trace.parent_trace_id },
+                  h("span", { className: "plugin-badge " + (trace.status === "cancelled" ? "warning" : "") }, trace.status.toUpperCase()),
+                  h("span", null, trace.service + " · " + trace.operation + " · " + trace.duration_ms.toFixed(1) + "ms (queue " + trace.queue_ms.toFixed(1) + "ms)" + (trace.cancelled ? " · cancelled" : ""))
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-list-check"), h("strong", null, "No traces yet"), h("p", null, "Redacted spans record queue time, execution time, and cancellation."))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-sliders"), h("strong", null, "Settings")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, settings.profile || "balanced"), h("span", null, "performance profile")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, settings.hardware_profile || "unknown"), h("span", null, "hardware profile")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(settings.max_resident_models || 0)), h("span", null, "max resident models")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(settings.model_idle_unload_seconds || 0) + "s"), h("span", null, "idle model unload")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(settings.concurrency_limits ? settings.concurrency_limits.model : "?" )), h("span", null, "model concurrency limit"))
+            )
+          )
+        );
+      }
+
       function missionAttentionItems(metrics, runtime, security, bots) {
         var items = [];
         if (!runtime || !runtime.online) {
@@ -4722,7 +4937,7 @@
 
       function MetricsWidget(props) {
         return h("div", { className: "mini-metric-list" }, props.metrics.map(function (metric) {
-          return h("div", { className: "mini-metric-row", key: metric.id }, h("span", null, metric.label), h(ProgressBar, { value: metric.value, label: metric.label + " utilization" }), h("strong", null, metric.loading ? "—" : metric.value.toFixed(1) + "%"));
+          return h("div", { className: "mini-metric-row", key: metric.id }, h("span", null, metric.label), h(ProgressBar, { value: metric.value, label: metric.label + " utilization" }), h("strong", null, metric.loading ? "—" : metric.unmeasured ? "—" : metric.value.toFixed(1) + "%"));
         }));
       }
 
@@ -5121,6 +5336,39 @@
         var securityOverviewPair = useState({ security_events_open: 0, incidents_open: 0, pending_approvals: 0, secrets_requiring_rotation: 0, audit_integrity_verified: true, lockdown_active: false });
         var securityOverview = securityOverviewPair[0];
         var setSecurityOverview = securityOverviewPair[1];
+        var performanceOverviewPair = useState({ overall: "unknown", load: "unknown", memory_pressure: { pressure: "unknown" }, disk_pressure: { pressure: "unknown" }, gpu_pressure: { pressure: "unknown" }, load_shedding_active: false, queue_count: 0, cache_count: 0, models_loaded: 0, models_blocked: 0, active_agents: 0, active_workflows: 0, plugins_violating: 0, leak_indicators: 0, regressions: 0, low_power_mode: false, metered_network: false, metrics: {} });
+        var performanceOverview = performanceOverviewPair[0];
+        var setPerformanceOverview = performanceOverviewPair[1];
+        var performanceResourcesPair = useState({ cpu_percent: null, memory_percent: null, gpu_percent: null, gpu_available: false, disk_percent: null, load: "unknown" });
+        var performanceResources = performanceResourcesPair[0];
+        var setPerformanceResources = performanceResourcesPair[1];
+        var performanceQueuesPair = useState([]);
+        var performanceQueues = performanceQueuesPair[0];
+        var setPerformanceQueues = performanceQueuesPair[1];
+        var performanceCachesPair = useState([]);
+        var performanceCaches = performanceCachesPair[0];
+        var setPerformanceCaches = performanceCachesPair[1];
+        var performanceModelsPair = useState([]);
+        var performanceModels = performanceModelsPair[0];
+        var setPerformanceModels = performanceModelsPair[1];
+        var performanceLeaksPair = useState([]);
+        var performanceLeaks = performanceLeaksPair[0];
+        var setPerformanceLeaks = performanceLeaksPair[1];
+        var performanceBenchmarksPair = useState([]);
+        var performanceBenchmarks = performanceBenchmarksPair[0];
+        var setPerformanceBenchmarks = performanceBenchmarksPair[1];
+        var performanceBudgetsPair = useState([]);
+        var performanceBudgets = performanceBudgetsPair[0];
+        var setPerformanceBudgets = performanceBudgetsPair[1];
+        var performanceRegressionsPair = useState([]);
+        var performanceRegressions = performanceRegressionsPair[0];
+        var setPerformanceRegressions = performanceRegressionsPair[1];
+        var performanceTracesPair = useState([]);
+        var performanceTraces = performanceTracesPair[0];
+        var setPerformanceTraces = performanceTracesPair[1];
+        var performanceSettingsPair = useState({});
+        var performanceSettings = performanceSettingsPair[0];
+        var setPerformanceSettings = performanceSettingsPair[1];
         var toastPair = useState("");
         var toast = toastPair[0];
         var setToast = toastPair[1];
@@ -5312,6 +5560,50 @@
           }
         }
 
+        async function loadPerformanceFromApi() {
+          try {
+            var overviewPayload = await requestJson("/api/v1/performance/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (overviewPayload && typeof overviewPayload === "object") setPerformanceOverview(overviewPayload);
+            var resourcesPayload = await requestJson("/api/v1/performance/resources", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (resourcesPayload && typeof resourcesPayload === "object") setPerformanceResources(resourcesPayload);
+            var queuesPayload = await requestJson("/api/v1/performance/queues", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (queuesPayload && Array.isArray(queuesPayload.queues)) setPerformanceQueues(queuesPayload.queues);
+            var cachesPayload = await requestJson("/api/v1/performance/caches", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (cachesPayload && Array.isArray(cachesPayload.caches)) setPerformanceCaches(cachesPayload.caches);
+            var modelsPayload = await requestJson("/api/v1/performance/models", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (modelsPayload && Array.isArray(modelsPayload.models)) setPerformanceModels(modelsPayload.models);
+            var leaksPayload = await requestJson("/api/v1/performance/leaks", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (leaksPayload && Array.isArray(leaksPayload.indicators)) setPerformanceLeaks(leaksPayload.indicators);
+            var budgetsPayload = await requestJson("/api/v1/performance/budgets", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (budgetsPayload && Array.isArray(budgetsPayload.budgets)) setPerformanceBudgets(budgetsPayload.budgets);
+            var regressionsPayload = await requestJson("/api/v1/performance/regressions", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (regressionsPayload && Array.isArray(regressionsPayload.regressions)) setPerformanceRegressions(regressionsPayload.regressions);
+            var tracesPayload = await requestJson("/api/v1/performance/traces", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (tracesPayload && Array.isArray(tracesPayload.traces)) setPerformanceTraces(tracesPayload.traces);
+            var settingsPayload = await requestJson("/api/v1/performance/settings", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (settingsPayload && settingsPayload.settings) setPerformanceSettings(settingsPayload.settings);
+            var benchmarksPayload = await requestJson("/api/v1/performance/benchmarks", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (benchmarksPayload && Array.isArray(benchmarksPayload.benchmarks)) setPerformanceBenchmarks(benchmarksPayload.benchmarks);
+          } catch (error) {
+            setPerformanceOverview({ overall: "unknown", load: "unknown", memory_pressure: { pressure: "unknown" }, disk_pressure: { pressure: "unknown" }, gpu_pressure: { pressure: "unknown" }, load_shedding_active: false, queue_count: 0, cache_count: 0, models_loaded: 0, models_blocked: 0, active_agents: 0, active_workflows: 0, plugins_violating: 0, leak_indicators: 0, regressions: 0, low_power_mode: false, metered_network: false, metrics: {} });
+          }
+        }
+
+        async function runPerformanceAction(action) {
+          try {
+            var payload = await requestJson("/api/v1/performance/actions", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ action: action }) });
+            if (action === "unload-idle-models") notify("Idle models unloaded: " + ((payload && payload.unloaded_models) || []).length);
+            if (action === "clear-safe-caches") notify("Safe caches cleared: " + (payload && payload.cleared_caches || 0));
+            if (action === "enter-low-resource-mode") notify("Low-resource mode enabled.");
+            if (action === "exit-low-resource-mode") notify("Low-resource mode disabled.");
+            if (action === "pause-indexing") notify("Background indexing paused.");
+            if (action === "resume-indexing") notify("Background indexing resumed.");
+            loadPerformanceFromApi();
+          } catch (error) {
+            notify("Performance action failed: " + error.message);
+          }
+        }
+
         function replaceLiveLogs(rows, activeProfiles) {
           var next = Array.isArray(rows) ? rows.slice(0, 40) : [];
           logsRef.current = next;
@@ -5379,7 +5671,7 @@
           if (remoteRefreshRef.current) return;
           remoteRefreshRef.current = true;
           try {
-            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi(), loadSecurityFromApi()]);
+            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi(), loadSecurityFromApi(), loadPerformanceFromApi()]);
             var failures = results.filter(function (result) { return result.status === "rejected"; });
             if (failures.length) {
               if (results[0].status === "rejected") setRuntime({ online: false, status: "offline", model: null, version: null, message: "JoeOS telemetry API is unavailable" });
@@ -5920,6 +6212,8 @@
           section = h(MobileSection, { clients: mobileClients, overview: mobileOverview, onInspect: setSelectedPlugin });
         } else if (active === "security-center") {
           section = h(SecurityCenterSection, { overview: securityOverview, events: securityEvents });
+        } else if (active === "performance") {
+          section = h(PerformanceSection, { overview: performanceOverview, resources: performanceResources, queues: performanceQueues, caches: performanceCaches, models: performanceModels, leaks: performanceLeaks, benchmarks: performanceBenchmarks, budgets: performanceBudgets, regressions: performanceRegressions, traces: performanceTraces, settings: performanceSettings });
         } else {
           section = h(BotsSection, { bots: bots, pending: pendingBots, onToggle: toggleBot, onDeploy: function () { setDeployOpen(true); } });
         }

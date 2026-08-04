@@ -39,6 +39,7 @@ from server.identity import (
     load_or_create_identity_master_key,
 )
 from server.plugins import PluginService, plugins_router
+from server.performance import PerformanceService, performance_router
 from server.realtime import RealtimeService, SQLiteEventRepository, realtime_router
 from server.wearables import WearableService, wearables_router
 from server.security import (
@@ -513,7 +514,7 @@ def _host_sample(runtime: Dict[str, Any]) -> Dict[str, Any]:
         )
 
     gpu = runtime.get("gpu_percent")
-    gpu_percent = _bounded_number(gpu) if gpu is not None else 0.0
+    gpu_percent = round(_bounded_number(gpu), 1) if gpu is not None else None
     vram = runtime.get("vram_gb")
     gpu_detail = (
         "%.1f GiB shared GPU memory · Lemonade" % float(vram)
@@ -524,7 +525,7 @@ def _host_sample(runtime: Dict[str, Any]) -> Dict[str, Any]:
         "recorded_at": _utc_now(),
         "cpu_percent": round(cpu, 1),
         "ram_percent": round(ram_percent, 1),
-        "gpu_percent": round(gpu_percent, 1),
+        "gpu_percent": round(gpu_percent, 1) if gpu_percent is not None else None,
         "disk_percent": round(disk_percent, 1),
         "uptime_seconds": uptime,
         "cpu_detail": cpu_detail,
@@ -585,6 +586,9 @@ async def _collector_loop(app: FastAPI) -> None:
             await asyncio.to_thread(app.state.device_enrollment_service.expire_pending)
             runtime = await _refresh_runtime(app)
             sample = await asyncio.to_thread(_record_metric, app.state.db_path, runtime)
+            performance = getattr(app.state, "performance_service", None)
+            if performance is not None:
+                await asyncio.to_thread(performance.ingest_telemetry, sample, runtime)
             cycle += 1
             if cycle % 12 == 0:
                 await asyncio.to_thread(
@@ -592,8 +596,12 @@ async def _collector_loop(app: FastAPI) -> None:
                     app.state.db_path,
                     "info",
                     "telemetry",
-                    "Halo telemetry captured · CPU %.1f%% · RAM %.1f%% · GPU %.1f%%"
-                    % (sample["cpu_percent"], sample["ram_percent"], sample["gpu_percent"]),
+                    "Halo telemetry captured · CPU %.1f%% · RAM %.1f%% · GPU %s"
+                    % (
+                        sample["cpu_percent"],
+                        sample["ram_percent"],
+                        ("%.1f%%" % sample["gpu_percent"]) if sample["gpu_percent"] is not None else "unmeasured",
+                    ),
                 )
             for key, label in (("cpu_percent", "CPU"), ("ram_percent", "memory"), ("disk_percent", "disk")):
                 active = sample[key] >= 85
@@ -632,6 +640,43 @@ def _emergency_stop_workflows(app: FastAPI) -> dict:
         return {"workflows": 0, "incomplete": ["automation service unavailable"]}
     cancelled = automation.cancel_active_runs_all()
     return {"workflows": cancelled, "incomplete": []}
+
+
+def _emergency_stop_performance(app: FastAPI) -> dict:
+    """Cancel queued low-priority performance workloads on Emergency Stop."""
+    performance = getattr(app.state, "performance_service", None)
+    if performance is None:
+        return {"queued_workloads": 0, "incomplete": ["performance service unavailable"]}
+    queued = performance.scheduler.depth()
+    for item in performance.scheduler.snapshot():
+        performance.scheduler.cancel(item["workload_id"])
+    return {"queued_workloads": queued, "incomplete": []}
+
+
+def _performance_payload(app: FastAPI) -> dict:
+    """Redacted performance summary for the realtime snapshot."""
+    service = getattr(app.state, "performance_service", None)
+    if service is None:
+        return {"available": False, "reason": "performance platform unavailable"}
+    overview = service.overview()
+    return {
+        "available": True,
+        "overall": overview.overall,
+        "load": overview.load,
+        "memory_pressure": overview.memory_pressure.pressure,
+        "disk_pressure": overview.disk_pressure.pressure,
+        "gpu_pressure": overview.gpu_pressure.pressure,
+        "load_shedding_active": overview.load_shedding_active,
+        "models_loaded": overview.models_loaded,
+        "models_blocked": overview.models_blocked,
+        "active_agents": overview.active_agents,
+        "active_workflows": overview.active_workflows,
+        "plugins_violating": overview.plugins_violating,
+        "queues": overview.queue_count,
+        "caches": overview.cache_count,
+        "leak_indicators": overview.leak_indicators,
+        "regressions": overview.regressions,
+    }
 
 
 def _automation_security_gate(app: FastAPI):
@@ -717,6 +762,27 @@ def _wire_mobile_scopes(app: FastAPI) -> None:
     def _mobile(session, scope):
         return {"overview": mobile.overview().model_dump()}
 
+    def _performance(session, scope):
+        service = getattr(app.state, "performance_service", None)
+        if service is None:
+            return {"available": False, "reason": "performance platform unavailable"}
+        overview = service.overview()
+        return {
+            "available": True,
+            "overall": overview.overall,
+            "load": overview.load,
+            "memory_pressure": overview.memory_pressure.pressure,
+            "disk_pressure": overview.disk_pressure.pressure,
+            "load_shedding_active": overview.load_shedding_active,
+            "models_loaded": overview.models_loaded,
+            "active_agents": overview.active_agents,
+            "active_workflows": overview.active_workflows,
+            "queues": overview.queue_count,
+            "caches": overview.cache_count,
+            "leak_indicators": overview.leak_indicators,
+            "regressions": overview.regressions,
+        }
+
     mobile.register_scoped_provider("command_center", _command_center)
     mobile.register_scoped_provider("projects", _projects)
     mobile.register_scoped_provider("missions", _missions)
@@ -725,6 +791,7 @@ def _wire_mobile_scopes(app: FastAPI) -> None:
     mobile.register_scoped_provider("communications", _communications)
     mobile.register_scoped_provider("devices", _devices)
     mobile.register_scoped_provider("mobile", _mobile)
+    mobile.register_scoped_provider("performance", _performance)
 
 
 @asynccontextmanager
@@ -774,6 +841,7 @@ async def lifespan(app: FastAPI):
             "metrics": _metric_payload(db_path, app.state.runtime),
             "bots": _bots_payload(db_path),
             "events": _events_payload(db_path)["summary"],
+            "performance": _performance_payload(app),
         },
         allowed_origins=allowed_origins,
         batch_size=_environment_integer("JOEOS_WS_BATCH_SIZE", 40),
@@ -797,6 +865,7 @@ async def lifespan(app: FastAPI):
         wearables_ready=lambda: getattr(app.state, "wearables_service", None) is not None,
         mobile_ready=lambda: getattr(app.state, "mobile_service", None) is not None,
         security_ready=lambda: getattr(app.state, "security_service", None) is not None,
+        performance_ready=lambda: getattr(app.state, "performance_service", None) is not None,
     )
     app.state.engineering_service = EngineeringService(
         connection_factory=lambda: _connect(db_path),
@@ -848,9 +917,12 @@ async def lifespan(app: FastAPI):
         security_gate=_automation_security_gate(app),
         governance_blocked=_governance_probe,
     )
-    # Emergency Stop actually cancels active workflow runs.
+    # Emergency Stop actually cancels active workflow runs and queued workloads.
     app.state.security_service.governance.register_cancellation_handler(
         lambda: _emergency_stop_workflows(app)
+    )
+    app.state.security_service.governance.register_cancellation_handler(
+        lambda: _emergency_stop_performance(app)
     )
     app.state.wearables_service = WearableService(
         str(db_path.parent / "wearables"),
@@ -869,6 +941,15 @@ async def lifespan(app: FastAPI):
     )
     app.state.mobile_service.prepare_defaults()
     _wire_mobile_scopes(app)
+    app.state.performance_service = PerformanceService(
+        str(db_path.parent / "performance"),
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+        governance_blocked=_governance_probe,
+        hardware_profile=os.getenv("JOEOS_HARDWARE_PROFILE", "development-workstation"),
+        version=JOEOS_VERSION,
+    )
     app.state.thresholds = {}
     timeout = httpx.Timeout(
         connect=float(os.getenv("LEMONADE_CONNECT_TIMEOUT", "3")),
@@ -924,6 +1005,7 @@ app.include_router(communications_router)
 app.include_router(wearables_router)
 app.include_router(mobile_router)
 app.include_router(security_router)
+app.include_router(performance_router)
 
 
 @app.middleware("http")
@@ -1012,16 +1094,20 @@ def _metric_payload(db_path: Path, runtime: Dict[str, Any]) -> Dict[str, Any]:
     )
     metrics = []
     for metric_id, label, value_column, detail_column, icon in definitions:
+        latest_value = latest[value_column]
+        previous_value = previous[value_column]
+        measured = latest_value is not None
         metrics.append(
             {
                 "id": metric_id,
                 "label": label,
-                "value": _bounded_number(latest[value_column]),
-                "previous": _bounded_number(previous[value_column]),
+                "value": _bounded_number(latest_value) if latest_value is not None else None,
+                "previous": _bounded_number(previous_value) if previous_value is not None else None,
                 "unit": "%",
                 "icon": icon,
                 "detail": latest[detail_column],
-                "history": [_bounded_number(row[value_column]) for row in chronological],
+                "history": [_bounded_number(row[value_column]) if row[value_column] is not None else None for row in chronological],
+                "measured": measured,
             }
         )
 

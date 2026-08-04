@@ -940,12 +940,12 @@ class BootstrapService:
                 description="Security platform overview with real policy, approval, secret, audit, and incident state.",
             ),
             RouteDescriptor(
-                id="agents.routes.list",
-                path="/api/v1/agents/routes",
+                id="performance.overview",
+                path="/api/v1/performance/overview",
                 protocol="http",
                 methods=("GET",),
                 access="read_only",
-                description="List model routes.",
+                description="Performance and resource governance overview with real measured load, pressure, queues, models, and budgets.",
             ),
             RouteDescriptor(
                 id="mobile.overview",
@@ -1298,7 +1298,6 @@ class BootstrapService:
                     "agents.escalations.list",
                     "agents.interventions.list",
                     "agents.approvals.list",
-                    "agents.routes.list",
                 ),
                 description="Read collaboration, governance, routing, and detection records.",
             ),
@@ -1423,6 +1422,13 @@ class BootstrapService:
                 access="read_only",
                 route_ids=("security.overview",),
                 description="Read the security platform overview.",
+            ),
+            CapabilityDescriptor(
+                id="performance.platform.read",
+                status="available",
+                access="read_only",
+                route_ids=("performance.overview",),
+                description="Read the performance and resource governance overview.",
             ),
             CapabilityDescriptor(
                 id="assistant.local_analysis",

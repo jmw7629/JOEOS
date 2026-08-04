@@ -159,7 +159,7 @@ class ScopedQueryTests(MobileFixture):
         # service methods or raw databases.
         self._pair()
         session = self._auth()
-        for resource in ("command_center", "projects", "missions", "runtime", "workflows", "communications", "devices", "mobile"):
+        for resource in ("command_center", "projects", "missions", "runtime", "workflows", "communications", "devices", "mobile", "performance"):
             self.service.register_scoped_provider(resource, lambda session, scope, r=resource: {"resource": r})
             result = self.service.scoped_query(client_id=self.client.client_id, session_id=session.session_id, resource=resource)
             self.assertEqual(result["resource"], resource)

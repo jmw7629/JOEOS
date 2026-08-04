@@ -66,6 +66,7 @@ class CommandCenterService:
         wearables_ready: Optional[Callable[[], bool]] = None,
         mobile_ready: Optional[Callable[[], bool]] = None,
         security_ready: Optional[Callable[[], bool]] = None,
+        performance_ready: Optional[Callable[[], bool]] = None,
     ) -> None:
         self._connection_factory = connection_factory
         self._runtime_provider = runtime_provider
@@ -82,6 +83,7 @@ class CommandCenterService:
         self._wearables_ready = wearables_ready or (lambda: False)
         self._mobile_ready = mobile_ready or (lambda: False)
         self._security_ready = security_ready or (lambda: False)
+        self._performance_ready = performance_ready or (lambda: False)
 
     def overview(self) -> OverviewEnvelope:
         services = self.services().services
@@ -134,10 +136,16 @@ class CommandCenterService:
                 "Persistent Mission Control layout and theme.",
             ),
             self._readiness_health(
-                "plugins.platform",
-                "Plugin Platform",
-                self._plugins_ready,
-                "Plugin and Extension Platform with the Extension Host.",
+                "security.platform",
+                "Security Platform",
+                self._security_ready,
+                "Security Platform with zero-trust hardening.",
+            ),
+            self._readiness_health(
+                "performance.platform",
+                "Performance Platform",
+                self._performance_ready,
+                "Performance and Resource Governance Platform.",
             ),
             self._readiness_health(
                 "automation.engine",

@@ -1,10 +1,10 @@
 # JoeOS Status
 
-Generated: 2026-08-03.
+Generated: 2026-08-04.
 
 ## Current phase
 
-Phase 15 — Security, Permissions, Secrets, and Zero-Trust Boundary Hardening (delivered).
+Phase 16 — Performance Optimization and Resource Governance (delivered).
 
 ## What works
 
@@ -19,11 +19,12 @@ Phase 15 — Security, Permissions, Secrets, and Zero-Trust Boundary Hardening (
 - Smart Glasses and Wearable Platform: authoritative Device Registry, Device Type Registry, Capability Registry, plugin-based Adapter Registry, controlled discovery, secure pairing (single-use expiring codes), capability-scoped revocable trust, authenticated expiring sessions, Connection Manager with bounded backoff, granular device permissions (camera/microphone/location never default), Glance Card system with privacy modes, allowlisted wearable command gateway with confirmation levels, push-to-talk local-first voice with enforced recording indicators, explicit camera/vision gateways, checklists with required-step enforcement, trusted handoff, idempotent offline queue, battery/thermal resource governor, an isolated Wearable Simulator (no fabricated production hardware), and a Device Manager section in the Command Center UI.
 - Mobile Companion and Secure Remote Operations Platform: authoritative Mobile Client Registry, Host Registry with explicit discovery, two-party secure pairing (short-lived single-use hashed codes, host + client confirmation), short-lived revocable sessions with rotating hashed refresh credentials, allowlisted Remote Command Gateway (prohibited operations rejected, raw AI never executed), Scoped Remote API backed by real authoritative state providers, safe-only idempotent offline action queue revalidated against base versions (conflicts preserve authoritative state), handoff coordinator, opaque single-use user-bound deep links, privacy-safe provider-neutral push contracts with an isolated test fixture (production APNs/FCM not claimed), immediate server-side revocation and honest lost-device mode, an extended native SwiftUI iOS policy module (`MobileCompanionPolicy`), and a Mobile Companion section in the Command Center UI.
 - Security Platform and zero-trust hardening: deny-by-default Policy Registry and Evaluation Engine (typed structured rules, never eval), Identity Registry with no cross-type impersonation, Scope Resolver with explicit path containment (traversal/symlink/NUL rejection), exact-bound Approvals with risk-based strength levels (0-5) and separation of duties, authoritative Secret Broker (AES-256-GCM at rest, rotation, revocation, destination policy, masked secret detection), hash-chained Audit Log with tamper verification, Security Events, Incident Registry, Lockdown (reauthentication to exit), Emergency Stop (honest incomplete cancellation), Quarantine, per-target Circuit Breakers, Data Classification (model can never lower), Privacy Policy Engine (cloud blocked for restricted classes), Threat Model Registry for critical boundaries, and a Security Center section in the Command Center UI. No fabricated vulnerability counts, malware results, compliance claims, or security scores are produced.
+- Performance and Resource Governance Platform: an authoritative, measurement-driven layer that reuses the existing telemetry/health architecture (never a second telemetry source). Provides a Performance Metrics Registry (bounded, source/availability-typed), typed Workload Classification (callers cannot self-declare critical), a 16-lane Priority Scheduler with fairness, aging, deadlines, cancellation, and queue visibility, Admission Control over real measured CPU/memory/disk/battery/thermal/model state (capacity is never fabricated), a per-scope Concurrency Governor (subsystems cannot raise their own limits), a Resource Governor with honest pressure states (GPU/VRAM/battery/thermal stay unknown until actually measurable), ordered visible Load Shedding that never sheds security/cancellation/approvals/foreground, bounded Backpressure queues that preserve security-critical and final-state events, a Cache Registry with explicit invalidation that refuses security-sensitive state and invalidates immediately on permission/session/secret changes, a Model Resource Manager (max resident models, idle unload, OOM marks resource_blocked with no endless retry, never unloads during an active request), long-session Leak Detection (single high samples are never flagged), a Benchmark Registry running real isolated fixtures with median/variance (never fastest-run cherry-pick), a versioned Performance Budget Registry scoped by hardware profile, a Regression Analyzer that only flags regressions beyond measured noise, redacted Performance Tracing (no secrets/prompts/paths/raw values), GPU honesty fixed at the telemetry source (unmeasured GPU is no longer reported as 0%), and a Performance Center section in the Command Center UI. No fabricated FPS, latency, throughput, memory, GPU, VRAM, battery, or thermal numbers are shown; unknown stays unknown.
 
 ## Test status
 
-- Python: 447 passed, 61 subtests passed.
-- Frontend: 14/14 passed.
+- Python: 532 passed, 61 subtests passed.
+- Frontend: 15/15 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 
 ## Not yet built
@@ -38,7 +39,9 @@ Phase 15 — Security, Permissions, Secrets, and Zero-Trust Boundary Hardening (
 - Native iOS build/sign/simulator (requires Xcode, not installed on this machine), production APNs/FCM push, background-execution guarantees, biometric security, universal links, and App Store distribution (contracts documented; not claimed as implemented).
 - OS keychain/hardware-backed secret storage, immutable audit logs, and full OS-level sandboxing (documented limitations; AES-GCM vault, hash-chain tamper evidence, and subprocess isolation are the honest current guarantees).
 
-See `docs/architecture/SECURITY_PLATFORM.md` for the security platform
+See `docs/architecture/PERFORMANCE_PLATFORM.md` for the performance and
+resource governance design and honest guarantees,
+`docs/architecture/SECURITY_PLATFORM.md` for the security platform
 design and honest guarantees, `docs/architecture/MOBILE_COMPANION.md` for the
 mobile companion design and platform strategy,
 `docs/architecture/WEARABLES_PLATFORM.md` for the wearable design,

@@ -126,3 +126,12 @@ test("ships a Security Center driven by real security state", () => {
   assert.match(html, /loadSecurityFromApi\(\)/);
   assert.match(html, /No fabricated vulnerability scores or compliance claims are shown/i);
 });
+
+test("ships a Performance Center driven by real measured state", () => {
+  assert.match(html, /id: ["']performance["'], label: ["']Performance Center["']/);
+  assert.match(html, /function PerformanceSection\(/);
+  assert.match(html, /\/api\/v1\/performance\/overview/);
+  assert.match(html, /loadPerformanceFromApi\(\)/);
+  assert.match(html, /Unknown metrics stay unknown/i);
+  assert.match(html, /No fabricated FPS, latency, or hardware utilization values are shown/i);
+});
