@@ -6,10 +6,13 @@ backend is authoritative for conversation history and message state.
 
 from __future__ import annotations
 
+import asyncio
+import json
 from typing import Dict
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 
 from server.identity.authority_router import (
     require_application_session,
@@ -106,6 +109,47 @@ async def submit_message(
     except ConversationError as error:
         _raise_conversation_error(error)
     return ConversationPayload(**result)
+
+
+@router.post(
+    "/{conversation_id}/stream",
+    responses={200: {"content": {"text/event-stream": {}}}},
+)
+async def stream_message(
+    conversation_id: UUID,
+    payload: ConversationMessageRequest,
+    principal: Dict = Depends(require_application_session),
+    service: ConversationService = Depends(get_conversation_service),
+) -> StreamingResponse:
+    """Server-sent events for one message and its response. Partial `message.delta`
+    events are emitted only when the selected provider genuinely streams;
+    otherwise a single completed delta is emitted with honest non-streaming
+    semantics. `run.completed`, `run.cancelled`, and `run.failed` are terminal
+    events; `done` closes the stream."""
+
+    async def events() -> None:
+        try:
+            yield "event: conversation.opened\ndata: {}\n\n"
+            async for item in service.stream_message(principal, conversation_id, payload.content):
+                event = str(item["event"])
+                data = json.dumps(item, separators=(",", ":"))
+                yield "event: %s\ndata: %s\n\n" % (event, data)
+            yield "event: done\ndata: {}\n\n"
+        except asyncio.CancelledError:
+            yield "event: done\ndata: {\"cancelled\":true}\n\n"
+            raise
+        except ConversationError as error:
+            yield (
+                "event: error\ndata: %s\n\n"
+                % json.dumps({"code": error.code, "message": error.public_message}, separators=(",", ":"))
+            )
+            yield "event: done\ndata: {}\n\n"
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/{conversation_id}/retry", response_model=ConversationPayload)

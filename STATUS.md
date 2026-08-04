@@ -26,14 +26,14 @@ Phase 19 — Self-Maintenance and Continuous Improvement (delivered).
 
 ## Test status
 
-- Python: 602 passed, 61 subtests passed.
+- Python: 642 passed, 61 subtests passed.
 - Frontend: 27/27 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 
 ## Not yet built
 
 - Phase 4 local-first data platform (PostgreSQL/pgvector, Redis, outbox).
-- Phase 3 authority: sessions, roles, approvals, execution.
+- Phase 3 privileged runner: shell execution, deployments, Git mutation, external sending, secret access, remote control, and application-level privileged approvals (identity, sessions, device-key application authentication, principal/capability lookup, and canonical conversations ARE delivered; privileged capabilities are defined but never granted).
 - Index-at-rest encryption, cross-project queries.
 - Plugin marketplace, public signing-key distribution, OS-level sandboxing, webhooks, and remote connectors (architecture documented; not implemented).
 - Real external provider adapters (email/chat), mobile push, smart-glasses delivery, and read receipts (architecture documented; not implemented).

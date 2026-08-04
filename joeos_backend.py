@@ -1197,15 +1197,21 @@ async def lifespan(app: FastAPI):
         return {
             "available": view.provider_available,
             "reason": view.provider_reason,
-            # The local Lemonade provider performs non-streaming inference. No
-            # partial events are fabricated.
-            "streaming": False,
+            # Streaming is reported only when the selected provider genuinely
+            # advertises it. Partial events are never fabricated.
+            "streaming": ai.provider_streaming_supported(),
+            "provider_id": "lemonade" if view.provider_available else None,
+            "model": view.model,
         }
 
     app.state.conversation_service = ConversationService(
         SQLiteConversationRepository(lambda: _connect(db_path)),
         infer=lambda messages: app.state.ai_service.infer(messages),
         availability=_ai_availability,
+        stream_infer=lambda messages: app.state.ai_service.stream_infer(messages),
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
         now_provider=lambda: int(time.time()),
     )
     app.state.conversation_service.prepare()

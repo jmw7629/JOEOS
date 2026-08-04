@@ -12,7 +12,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 import httpx
 
@@ -26,6 +26,7 @@ from .models import (
     InferenceResult,
     InterpretationRecord,
     ProviderRecord,
+    StreamDelta,
 )
 from .providers import LocalLemonadeProvider, ProviderRegistry
 from .storage import AIStorage
@@ -80,6 +81,14 @@ class AIService:
     def providers_records(self) -> List[ProviderRecord]:
         return self.providers.records()
 
+    def provider_streaming_supported(self) -> bool:
+        """True only when the default provider genuinely advertises streaming."""
+        provider = self.providers.default()
+        if provider is None:
+            return False
+        record = provider.availability()
+        return record.available and record.supports_streaming
+
     def overview(self) -> AIOverview:
         default = self.providers.default()
         record = default.availability() if default else ProviderRecord(
@@ -110,6 +119,54 @@ class AIService:
         if self._event_sink is not None:
             self._event_sink("info", "ai", "Local inference completed with %s." % chosen)
         return result
+
+    async def stream_infer(
+        self,
+        messages: List[dict],
+        *,
+        model: str = "",
+        temperature: float = 0.25,
+        max_tokens: int = 1200,
+    ) -> AsyncIterator[StreamDelta]:
+        """Yields genuine partial deltas when the provider truly streams, or a
+        single completed delta when it does not. Never fabricates partials."""
+        provider = self.providers.default()
+        if provider is None:
+            raise RuntimeError("No inference provider is registered.")
+        record = provider.availability()
+        if not record.available:
+            raise RuntimeError(record.reason)
+        chosen = model or record.model or ""
+        if record.supports_streaming:
+            async for delta in provider.stream_infer(
+                messages, model=chosen, temperature=temperature, max_tokens=max_tokens
+            ):
+                yield StreamDelta(
+                    content=delta,
+                    provider=record.provider_id,
+                    model=chosen,
+                    finish_reason="streaming",
+                )
+            yield StreamDelta(
+                content="",
+                provider=record.provider_id,
+                model=chosen,
+                finish_reason="completed",
+                done=True,
+            )
+            return
+        # Honest non-streaming: the provider returns the whole reply at once.
+        result = await provider.infer(
+            messages, model=chosen, temperature=temperature, max_tokens=max_tokens
+        )
+        yield StreamDelta(
+            content=result.reply,
+            provider=record.provider_id,
+            model=result.model or chosen,
+            finish_reason=result.finish_reason,
+            tokens_used=result.tokens_used,
+            done=True,
+        )
 
     async def embed(self, texts: List[str], *, project: str = "", source_refs: Optional[List[str]] = None, privacy_class: str = "restricted") -> EmbeddingResult:
         if not self.embeddings.available():

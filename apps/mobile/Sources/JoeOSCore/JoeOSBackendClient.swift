@@ -98,6 +98,44 @@ private final class BackendNoRedirectDelegate: NSObject, URLSessionTaskDelegate,
     }
 }
 
+/// Streaming transport for server-sent events (conversation streaming).
+public protocol BackendHTTPStreaming: Sendable {
+    func stream(request: URLRequest) throws -> AsyncThrowingStream<Data, Error>
+}
+
+extension URLSessionBackendTransport: BackendHTTPStreaming {
+    public func stream(request: URLRequest) throws -> AsyncThrowingStream<Data, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    let (bytes, response) = try await session.bytes(for: request)
+                    guard let http = response as? HTTPURLResponse else {
+                        throw BackendClientError.invalidResponse
+                    }
+                    guard http.statusCode == 200 else {
+                        throw BackendClientError.unexpectedStatus(http.statusCode)
+                    }
+                    var buffer = Data()
+                    for try await byte in bytes {
+                        buffer.append(byte)
+                        if buffer.count >= 8_192 {
+                            continuation.yield(buffer)
+                            buffer.removeAll(keepingCapacity: true)
+                        }
+                    }
+                    if !buffer.isEmpty {
+                        continuation.yield(buffer)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+}
+
 /// The one backend client contract used by the connection layer, the stores,
 /// the intelligence layer, and every future JoeOS client. It only ever talks
 /// to the selected JoeOS origin.
@@ -142,7 +180,8 @@ public struct JoeOSBackendClient: Sendable {
     public func get<Response: Decodable & Sendable>(
         _ type: Response.Type,
         path: String,
-        endpoint: ValidatedEndpoint
+        endpoint: ValidatedEndpoint,
+        headers: [String: String] = [:]
     ) async throws -> Response {
         var request = URLRequest(
             url: try url(endpoint: endpoint, path: path),
@@ -152,13 +191,17 @@ public struct JoeOSBackendClient: Sendable {
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        for (name, value) in headers {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
         return try await perform(request)
     }
 
     public func post<Body: Encodable & Sendable, Response: Decodable & Sendable>(
         body: Body,
         to path: String,
-        endpoint: ValidatedEndpoint
+        endpoint: ValidatedEndpoint,
+        headers: [String: String] = [:]
     ) async throws -> Response {
         var request = URLRequest(
             url: try url(endpoint: endpoint, path: path),
@@ -169,13 +212,17 @@ public struct JoeOSBackendClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpBody = try JSONEncoder().encode(body)
+        for (name, value) in headers {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
         return try await perform(request)
     }
 
     public func put<Body: Encodable & Sendable, Response: Decodable & Sendable>(
         body: Body,
         to path: String,
-        endpoint: ValidatedEndpoint
+        endpoint: ValidatedEndpoint,
+        headers: [String: String] = [:]
     ) async throws -> Response {
         var request = URLRequest(
             url: try url(endpoint: endpoint, path: path),
@@ -186,6 +233,9 @@ public struct JoeOSBackendClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpBody = try JSONEncoder().encode(body)
+        for (name, value) in headers {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
         return try await perform(request)
     }
 

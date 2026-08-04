@@ -196,6 +196,19 @@ class EndToEndAuthorityTests(AuthorityHTTPFixture):
         self.assertEqual(self.client.get("/api/v1/principal").status_code, 401)
         self.assertEqual(self.client.get("/api/v1/conversations").status_code, 401)
 
+    def test_browser_request_without_session_is_gated(self):
+        browser_headers = {"Origin": "https://joeos.example"}
+        self.assertEqual(
+            self.client.post(
+                "/api/v1/conversations", headers=browser_headers, json={"title": "Gated"}
+            ).status_code,
+            401,
+        )
+        self.assertEqual(
+            self.client.get("/api/v1/principal", headers=browser_headers).status_code,
+            401,
+        )
+
     def test_device_key_authentication_establishes_session(self):
         result = self._authenticate()
         session_id = result["session"]["session_id"]

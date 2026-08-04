@@ -25,6 +25,20 @@ class ProviderRecord:
     base_url: str = "loopback"  # never a private host identifier
     privacy_class: str = "restricted"
     cloud_approved: bool = False
+    supports_streaming: bool = False
+
+
+@dataclass(frozen=True)
+class StreamDelta:
+    """One genuine provider stream event. Partial content only when the provider
+    truly streams; otherwise a single completed delta with finish_reason."""
+    content: str
+    provider: str
+    model: str
+    finish_reason: str = "completed"
+    tokens_used: Optional[int] = None
+    done: bool = False
+    cancelled: bool = False
 
 
 @dataclass(frozen=True)

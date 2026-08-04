@@ -51,8 +51,33 @@ capability:
 
 - Provider/Model registries are populated only from authoritative backend
   state (`/api/v1/ai/overview`, `/api/v1/ai/providers`).
-- The backend inference endpoint is currently non-streaming; the client
-  delivers the full response and does not simulate streaming.
+- Streaming (`POST /api/v1/conversations/{id}/stream`, server-sent events) is
+  genuine only when the selected provider advertises streaming
+  (`supports_streaming`). Otherwise the endpoint returns a single completed
+  `message.delta` with honest non-streaming semantics; no partial events are
+  fabricated.
 - Cloud routing is blocked by local-only mode unless the provider is
   explicitly cloud-approved by the backend.
 - Diagnostics never fabricate latency, tokens, queue depth, or health.
+
+## Phase P3A application sessions and conversations
+
+The native Swift client (`JoeOSCore`) integrates the authoritative backend
+application identity and conversation contracts:
+
+- `ApplicationSessionClient` — requests a device-key authentication challenge,
+  signs it with the enrolled P-256 device-authentication key, establishes a
+  short-lived revocable application session, rotates refresh credentials, and
+  retrieves the authenticated principal. `KeychainSessionStore` persists the
+  single-use refresh credential; the backend remains authoritative.
+- `ConversationClient` — creates, reopens, lists, submits, retries, cancels,
+  and streams canonical conversations with the session id presented on every
+  request. Conversation history, message state, and run status are
+  backend-authoritative.
+- Conversation lifecycle events (`conversation.created`, `message.appended`,
+  `run.started`, `run.completed`, `run.cancelled`, `run.failed`) are published
+  through the existing realtime event stream with cursor-based reconnect
+  (`/ws/events?after=<cursor>`); event payloads never contain message content.
+- Browser access to authority-protected endpoints is gated by the same
+  application-session requirement; requests without a session are rejected
+  with 401 by default.

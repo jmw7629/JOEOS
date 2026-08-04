@@ -9,7 +9,8 @@ provider. Availability is reported honestly from runtime state.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Protocol
+import json
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol
 
 import httpx
 
@@ -21,6 +22,12 @@ class InferenceProvider(Protocol):
 
     async def infer(self, messages: List[dict], *, model: str, temperature: float = 0.25, max_tokens: int = 1200) -> InferenceResult:
         ...
+
+    async def stream_infer(self, messages: List[dict], *, model: str, temperature: float = 0.25, max_tokens: int = 1200) -> AsyncIterator[str]:
+        """Yields genuine partial content deltas when the provider streams."""
+        ...
+        if False:
+            yield ""
 
     async def embed(self, texts: List[str], *, model: str) -> List[List[float]]:
         ...
@@ -82,6 +89,7 @@ class LocalLemonadeProvider:
             base_url="loopback",
             privacy_class=self._privacy_class,
             cloud_approved=False,
+            supports_streaming=bool(runtime.get("streaming")),
         )
 
     async def infer(self, messages: List[dict], *, model: str, temperature: float = 0.25, max_tokens: int = 1200) -> InferenceResult:
@@ -109,6 +117,40 @@ class LocalLemonadeProvider:
             tokens_used=int(usage.get("total_tokens")) if isinstance(usage, dict) and usage.get("total_tokens") else None,
             latency_ms=latency_ms,
         )
+
+    async def stream_infer(self, messages: List[dict], *, model: str, temperature: float = 0.25, max_tokens: int = 1200) -> AsyncIterator[str]:
+        """Genuine OpenAI-compatible SSE streaming from the provider.
+
+        Only invoked when the provider advertises streaming support; otherwise
+        the conversation layer reports honest non-streaming single events.
+        """
+        async with self._http.stream(
+            "POST",
+            self._api_base + "/chat/completions",
+            headers=self._headers,
+            json={
+                "model": model,
+                "messages": messages,
+                "stream": True,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            },
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if not line.startswith("data:"):
+                    continue
+                payload = line[len("data:"):].strip()
+                if payload == "[DONE]":
+                    return
+                try:
+                    chunk = json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+                choices = chunk.get("choices") or []
+                delta = (choices[0].get("delta") or {}).get("content") if choices else None
+                if isinstance(delta, str) and delta:
+                    yield delta
 
     async def embed(self, texts: List[str], *, model: str) -> List[List[float]]:
         response = await self._http.post(
@@ -146,6 +188,9 @@ class ProviderRegistry:
 
     def _register(self, provider: InferenceProvider) -> None:
         self._providers[provider.provider_id] = provider
+
+    def register_local(self, provider: InferenceProvider) -> None:
+        self._register(provider)
 
     def register_cloud(self, provider: InferenceProvider, *, approved: bool = False) -> None:
         if not approved:
