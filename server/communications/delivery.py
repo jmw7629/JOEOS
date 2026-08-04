@@ -169,6 +169,7 @@ class DeliveryService:
         approvals: ExternalSendApprovalCoordinator,
         provider_dispatch=None,
         event_sink=None,
+        governance_blocked=None,
     ) -> None:
         self._connection_factory = connection_factory
         self._messages = messages
@@ -176,6 +177,7 @@ class DeliveryService:
         self._approvals = approvals
         self._provider_dispatch = provider_dispatch or (lambda provider, account, message: {"sent": True, "provider_message_id": "test-" + message.message_id})
         self._event_sink = event_sink or (lambda level, source, message: None)
+        self._governance_blocked = governance_blocked or (lambda: (False, ""))
         self._lock = threading.RLock()
 
     def validate_external(
@@ -206,6 +208,9 @@ class DeliveryService:
         return bool(row and row["state"] == "approved")
 
     def send(self, *, message: MessageRecord, approval_id: str = "", scheduled: str = "", idempotency_key: str = "") -> OutboxItem:
+        blocked, reason = self._governance_blocked()
+        if blocked:
+            raise ExternalSendError("governance: %s" % reason)
         if message.external and not approval_id:
             raise ExternalSendError("external messages require a granted approval.")
         item = self._outbox.enqueue(

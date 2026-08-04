@@ -236,6 +236,7 @@ class ExtensionLifecycleManager:
         signed_permission: Optional[str] = None,
         dev: Optional[DevelopmentHost] = None,
         safe_mode: Optional[SafeModeState] = None,
+        governance_blocked=None,
     ) -> None:
         self._connection_factory = connection_factory
         self._install_root = Path(install_root)
@@ -257,6 +258,7 @@ class ExtensionLifecycleManager:
         self._joeos_version = joeos_version
         self._signed_permission = signed_permission
         self._dev = dev or DevelopmentHost(self._install_root)
+        self._governance_blocked = governance_blocked or (lambda: (False, ""))
         self._safe_mode = safe_mode or SafeModeState()
         self._lock = threading.RLock()
         self._install_root.mkdir(parents=True, exist_ok=True)
@@ -599,6 +601,9 @@ class ExtensionLifecycleManager:
         self._health.record_activity(plugin_id=plugin_id, kind="permission_changed", message="Granted %s." % permission, level="success")
 
     def enable(self, plugin_id: str, *, scope: str = "global", workspace: str = "", project: str = "") -> PluginRecord:
+        blocked, reason = self._governance_blocked()
+        if blocked:
+            raise PluginLifecycleError("governance: %s" % reason)
         if self._safe_mode.active and not self._is_first_party(plugin_id):
             raise PluginLifecycleError("Safe Mode is active; third-party plugins are disabled.")
         record = self.require_record(plugin_id)

@@ -63,11 +63,13 @@ class WearableService:
         command_executor=None,
         transcription=None,
         vision=None,
+        governance_blocked=None,
     ) -> None:
         self.storage = WearablesStorage(data_dir)
         self.storage.prepare()
         self._data_dir = Path(data_dir)
         self._event_sink = event_sink or (lambda level, source, message: None)
+        self._governance_blocked = governance_blocked or (lambda: (False, ""))
 
         self.devices = DeviceRegistry(self._connection_factory)
         self.adapters = AdapterRegistry(self._connection_factory)
@@ -94,6 +96,7 @@ class WearableService:
             permissions=self.permissions,
             command_executor=command_executor,
             event_sink=self._event_sink,
+            governance_blocked=self._governance_blocked,
         )
         self.voice = VoiceGateway(
             connection_factory=self._connection_factory,

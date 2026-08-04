@@ -59,6 +59,7 @@ class AutomationService:
         git_reader=None,
         communications=None,
         security_gate=None,
+        governance_blocked=None,
         approval_resolver=None,
         input_resolver=None,
     ) -> None:
@@ -69,6 +70,7 @@ class AutomationService:
         self._event_sink = event_sink
         self.communications = communications
         self.security_gate = security_gate
+        self._governance_blocked = governance_blocked or (lambda: (False, ""))
 
         self.workflows = WorkflowRegistry(self._connection_factory)
         self.permissions = WorkflowPermissionGuard(self._connection_factory)
@@ -134,6 +136,9 @@ class AutomationService:
         return self.workflows.list_records()
 
     def enable_workflow(self, workflow_id: str) -> WorkflowRecord:
+        blocked, reason = self._governance_blocked()
+        if blocked:
+            raise WorkflowError("governance: %s" % reason)
         record = self.require_workflow(workflow_id)
         if record.definition.status in {"invalid", "quarantined"}:
             raise WorkflowError("cannot enable a %s workflow." % record.definition.status)
@@ -268,6 +273,9 @@ class AutomationService:
         inputs: Optional[dict] = None,
         idempotency_key: str = "",
     ) -> RunRecord:
+        blocked, reason = self._governance_blocked()
+        if blocked:
+            raise WorkflowError("governance: %s" % reason)
         record = self.require_workflow(workflow_id)
         if not record.enabled:
             raise WorkflowError("workflow is not enabled.")

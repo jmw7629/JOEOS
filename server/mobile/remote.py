@@ -76,12 +76,14 @@ class RemoteCommandGateway:
         sessions: MobileSessionManager,
         command_executor=None,
         event_sink=None,
+        governance_blocked=None,
     ) -> None:
         self._connection_factory = connection_factory
         self._clients = clients
         self._sessions = sessions
         self._command_executor = command_executor or (lambda command, params, context: {"executed": True, "command": command})
         self._event_sink = event_sink or (lambda level, source, message: None)
+        self._governance_blocked = governance_blocked or (lambda: (False, ""))
         self._lock = threading.RLock()
 
     def execute(
@@ -93,6 +95,9 @@ class RemoteCommandGateway:
         params: Optional[dict] = None,
         project: str = "",
     ) -> dict:
+        blocked, reason = self._governance_blocked()
+        if blocked:
+            raise MobileError("governance: %s" % reason)
         if command not in ALLOWED_REMOTE_COMMANDS:
             if command in PROHIBITED_REMOTE_COMMANDS:
                 raise MobileError("command %r is prohibited for mobile clients." % command)

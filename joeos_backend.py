@@ -801,19 +801,6 @@ async def lifespan(app: FastAPI):
     )
     app.state.memory_service = MemoryService(data_dir=str(db_path.parent / "memory"))
     app.state.agents_service = AgentsService(data_dir=str(db_path.parent / "agents"))
-    app.state.plugins_service = PluginService(
-        str(db_path.parent / "plugins"),
-        master_key=load_or_create_identity_master_key(db_path),
-        joeos_version=JOEOS_VERSION,
-        first_party_publishers=["joeos"],
-    )
-    app.state.communications_service = CommunicationsService(
-        str(db_path.parent / "communications"),
-        event_sink=lambda level, source, message: _record_event(
-            db_path, level, source, message
-        ),
-    )
-    app.state.communications_service.prepare_defaults()
     app.state.security_service = SecurityService(
         str(db_path.parent / "security"),
         master_key=load_or_create_identity_master_key(db_path),
@@ -822,6 +809,22 @@ async def lifespan(app: FastAPI):
         ),
     )
     app.state.security_service.prepare_defaults()
+    _governance_probe = app.state.security_service.governance_blocked
+    app.state.plugins_service = PluginService(
+        str(db_path.parent / "plugins"),
+        master_key=load_or_create_identity_master_key(db_path),
+        joeos_version=JOEOS_VERSION,
+        first_party_publishers=["joeos"],
+        governance_blocked=_governance_probe,
+    )
+    app.state.communications_service = CommunicationsService(
+        str(db_path.parent / "communications"),
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+        governance_blocked=_governance_probe,
+    )
+    app.state.communications_service.prepare_defaults()
     app.state.automation_service = AutomationService(
         str(db_path.parent / "automation"),
         master_key=load_or_create_identity_master_key(db_path),
@@ -831,12 +834,14 @@ async def lifespan(app: FastAPI):
         ),
         communications=app.state.communications_service,
         security_gate=_automation_security_gate(app),
+        governance_blocked=_governance_probe,
     )
     app.state.wearables_service = WearableService(
         str(db_path.parent / "wearables"),
         event_sink=lambda level, source, message: _record_event(
             db_path, level, source, message
         ),
+        governance_blocked=_governance_probe,
     )
     app.state.mobile_service = MobileService(
         str(db_path.parent / "mobile"),
@@ -844,6 +849,7 @@ async def lifespan(app: FastAPI):
         event_sink=lambda level, source, message: _record_event(
             db_path, level, source, message
         ),
+        governance_blocked=_governance_probe,
     )
     app.state.mobile_service.prepare_defaults()
     _wire_mobile_scopes(app)

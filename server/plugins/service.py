@@ -65,12 +65,14 @@ class PluginService:
         development_mode: bool = False,
         python: Optional[str] = None,
         rpc_timeout: float = 30.0,
+        governance_blocked=None,
     ) -> None:
         self.storage = PluginRegistryStorage(data_dir)
         self.storage.prepare()
         self._data_dir = Path(data_dir)
         self._joeos_version = joeos_version
         self._first_party = set(first_party_publishers or ())
+        self._governance_blocked = governance_blocked or (lambda: (False, ""))
 
         self.permissions = PermissionManager(self._connection_factory)
         self.publishers = PublisherService(self._connection_factory)
@@ -113,6 +115,7 @@ class PluginService:
             joeos_version=self._joeos_version,
             dev=self.dev,
             safe_mode=self.safe_mode,
+            governance_blocked=self._governance_blocked,
         )
 
     def _connection_factory(self):

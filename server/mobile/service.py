@@ -55,11 +55,13 @@ class MobileService:
         command_executor=None,
         scoped_providers=None,
         push_provider=None,
+        governance_blocked=None,
     ) -> None:
         self.storage = MobileStorage(data_dir)
         self.storage.prepare()
         self._data_dir = Path(data_dir)
         self._event_sink = event_sink or (lambda level, source, message: None)
+        self._governance_blocked = governance_blocked or (lambda: (False, ""))
 
         self.clients = MobileClientRegistry(self._connection_factory)
         self.hosts = HostRegistry(self._connection_factory, server_version=server_version)
@@ -72,6 +74,7 @@ class MobileService:
             sessions=self.sessions,
             command_executor=command_executor,
             event_sink=self._event_sink,
+            governance_blocked=self._governance_blocked,
         )
         self.remote_api = ScopedRemoteAPI(sessions=self.sessions, clients=self.clients, providers=scoped_providers)
         self.offline = OfflineActionQueue(self._connection_factory, self.clients, self.sessions)

@@ -18,6 +18,7 @@ from .delivery import (
     AttachmentService,
     DeliveryService,
     ExternalSendApprovalCoordinator,
+    ExternalSendError,
 )
 from .messages import DraftStore, MessageStore, OutboxService
 from .models import (
@@ -69,11 +70,13 @@ class CommunicationsService:
         event_sink=None,
         provider_dispatch=None,
         attachment_roots: Sequence[str] = (),
+        governance_blocked=None,
     ) -> None:
         self.storage = CommunicationsStorage(data_dir)
         self.storage.prepare()
         self._data_dir = Path(data_dir)
         self._event_sink = event_sink or (lambda level, source, message: None)
+        self._governance_blocked = governance_blocked or (lambda: (False, ""))
 
         self.providers = ProviderRegistry(self._connection_factory)
         self.accounts = AccountRegistry(self._connection_factory)
@@ -91,6 +94,7 @@ class CommunicationsService:
             approvals=self.approvals,
             provider_dispatch=provider_dispatch,
             event_sink=self._event_sink,
+            governance_blocked=self._governance_blocked,
         )
         self.notifications = NotificationCenter(self._connection_factory)
         self.attachments = AttachmentService(self._connection_factory, attachment_roots)
@@ -465,10 +469,6 @@ def _caps(send=False, receive=False, attachments=False, delivery_receipts=False,
 def _uuid16() -> str:
     import uuid
     return uuid.uuid4().hex[:16]
-
-
-class ExternalSendError(RuntimeError):
-    pass
 
 
 class _BorrowedConnection:

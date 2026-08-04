@@ -263,6 +263,20 @@ class SecurityService:
         return self.governance.quarantine(**kwargs)
 
     # ------------------------------------------------------------------
+    # Governance probe for platform propagation
+    # ------------------------------------------------------------------
+
+    def governance_blocked(self) -> Tuple[bool, str]:
+        """Return (blocked, reason). Privileged platforms consult this before
+        starting new autonomous or remote work. During Lockdown or Emergency
+        Stop, new privileged work is denied; recovery is separate."""
+        if self.governance.emergency_stop_active():
+            return True, "emergency stop is active; new privileged work is denied"
+        if self.governance.lockdown_active():
+            return True, "lockdown is active; new privileged work is denied"
+        return False, ""
+
+    # ------------------------------------------------------------------
     # Circuit breakers
     # ------------------------------------------------------------------
 
