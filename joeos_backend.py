@@ -116,6 +116,21 @@ def _connect(db_path: Path) -> sqlite3.Connection:
     return connection
 
 
+def _verify_writable_data_dir(db_path: Path) -> None:
+    """Probe that the data directory is actually writable at startup.
+
+    Opening the SQLite database proves the file is writable, but WAL and
+    per-platform directories can still fail on read-only mounts. A failed probe
+    records a clear error event instead of failing silently later.
+    """
+    probe = db_path.parent / ".joeos-write-probe"
+    try:
+        probe.write_text(_utc_now(), encoding="utf-8")
+        probe.unlink(missing_ok=True)
+    except OSError as exc:
+        _record_event(db_path, "error", "joeos", "Data directory is not writable: %s" % type(exc).__name__)
+
+
 def _prepare_database(db_path: Path) -> None:
     created_parent = not db_path.parent.exists()
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -283,6 +298,53 @@ def _record_event(db_path: Path, level: str, source: str, message: str) -> None:
             """,
             (MAX_EVENT_ROWS,),
         )
+
+
+def _storage_sizes(db_path: Path) -> Dict[str, Any]:
+    """Bounded storage accounting keyed by store name — never raw paths.
+
+    Reports on-disk size in bytes for the main database (plus WAL) and each
+    per-platform data directory. Values that cannot be read are omitted rather
+    than estimated.
+    """
+    sizes: Dict[str, Any] = {}
+
+    def add_bytes(key: str, paths: List[Path]) -> None:
+        total = 0
+        for path in paths:
+            try:
+                total += path.stat().st_size if path.is_file() else sum(
+                    p.stat().st_size for p in path.rglob("*") if p.is_file()
+                )
+            except OSError:
+                continue
+        if total > 0:
+            sizes[key] = total
+
+    add_bytes("main_database", [db_path, Path(str(db_path) + "-wal"), Path(str(db_path) + "-shm")])
+    platform_names = (
+        "agents", "plugins", "automation", "communications", "wearables",
+        "mobile", "security", "memory", "intelligence", "performance", "workspace",
+    )
+    for name in platform_names:
+        add_bytes(name, [db_path.parent / name])
+    return sizes
+
+
+def _diagnostic_counts(db_path: Path) -> Dict[str, int]:
+    counts: Dict[str, int] = {}
+    for label, sql in (
+        ("bots", "SELECT COUNT(*) FROM bots"),
+        ("events", "SELECT COUNT(*) FROM events"),
+        ("metric_samples", "SELECT COUNT(*) FROM system_metrics"),
+    ):
+        try:
+            with _connect(db_path) as connection:
+                row = connection.execute(sql).fetchone()
+            counts[label] = int(row[0] if row else 0)
+        except sqlite3.Error:
+            continue
+    return counts
 
 
 def _lemonade_api_base() -> str:
@@ -799,6 +861,7 @@ async def lifespan(app: FastAPI):
     db_path = _database_path()
     _prepare_database(db_path)
     app.state.db_path = db_path
+    _verify_writable_data_dir(db_path)
     app.state.started_at = _utc_now()
     app.state.runtime = {}
     app.state.http_boundary = HttpRequestBoundary.from_environment()
@@ -979,6 +1042,7 @@ async def lifespan(app: FastAPI):
         plugins_service = getattr(app.state, "plugins_service", None)
         if plugins_service is not None:
             plugins_service.shutdown()
+        await asyncio.to_thread(_record_event, db_path, "info", "joeos", "JoeOS local command center shut down gracefully.")
 
 
 app = FastAPI(
@@ -1235,6 +1299,61 @@ def healthz(request: Request) -> Dict[str, Any]:
         "lemonade": "online" if runtime.get("online") else "offline",
         "model": runtime.get("model"),
     }
+
+
+@app.get("/_internal/diagnostics")
+def diagnostics(request: Request) -> Dict[str, Any]:
+    """A redacted diagnostics bundle for production troubleshooting.
+
+    Contains versions, service states, bounded counts, and storage sizes.
+    It never includes secrets, prompts, source code, private messages, raw
+    logs, audit content, or filesystem paths.
+    """
+    app = request.app
+    db_path = app.state.db_path
+    services = []
+    command_center = getattr(app.state, "command_center_service", None)
+    if command_center is not None:
+        try:
+            services = [
+                {"service_id": service.service_id, "state": service.state, "available": service.available}
+                for service in command_center.services().services
+            ]
+        except Exception:  # Diagnostics must never fail because a service is unhealthy.
+            services = []
+    runtime = app.state.runtime or {}
+    started_at = getattr(app.state, "started_at", None)
+    uptime = 0
+    try:
+        uptime = max(0, int(time.time() - float(runtime.get("uptime_seconds") or 0)))
+    except (TypeError, ValueError):
+        uptime = max(0, int(time.monotonic()))
+    return {
+        "generated_at": _utc_now(),
+        "joeos_version": JOEOS_VERSION,
+        "python_version": _python_version(),
+        "runtime": {
+            "online": bool(runtime.get("online")),
+            "model": runtime.get("model"),
+            "gpu_available": runtime.get("gpu_percent") is not None,
+            "tokens_per_second": runtime.get("tokens_per_second"),
+            "time_to_first_token_ms": runtime.get("time_to_first_token"),
+        },
+        "services": services,
+        "counts": _diagnostic_counts(db_path),
+        "storage_bytes": _storage_sizes(db_path),
+        "started_at": started_at,
+        "uptime_seconds": uptime,
+        "redaction": "No secrets, prompts, source code, messages, raw logs, audit content, or paths are included.",
+    }
+
+
+def _python_version() -> str:
+    try:
+        import platform
+        return platform.python_version()
+    except Exception:
+        return ""
 
 
 @app.get("/api/status")

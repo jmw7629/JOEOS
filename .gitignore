@@ -5,3 +5,5 @@ data/
 .pytest_cache/
 .DS_Store
 examples/inventory.json
+dist/
+release/

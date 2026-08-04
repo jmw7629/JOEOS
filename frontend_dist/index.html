@@ -47,6 +47,164 @@
       --workspace-radius: 16px;
       --workspace-gap: 14px;
       --workspace-font: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+      /* Semantic design tokens — one authoritative registry. */
+      --color-background-canvas: var(--canvas);
+      --color-background-surface: var(--surface);
+      --color-background-elevated: var(--surface-strong);
+      --color-background-overlay: rgba(2, 6, 12, 0.72);
+      --color-text-primary: var(--text);
+      --color-text-secondary: var(--muted);
+      --color-text-muted: var(--faint);
+      --color-border-subtle: var(--line);
+      --color-border-strong: var(--line-strong);
+      --color-focus-ring: var(--cyan);
+      --color-status-info: var(--cyan);
+      --color-status-success: var(--success);
+      --color-status-warning: var(--warning);
+      --color-status-error: var(--danger);
+      --color-status-critical: #ff3b5c;
+      --color-status-security: var(--purple);
+      --color-action-primary: var(--cyan);
+      --color-action-destructive: var(--danger);
+      --color-selection: rgba(49, 215, 255, 0.22);
+      --color-code-added: var(--success);
+      --color-code-removed: var(--danger);
+      --spacing-control-inline: 12px;
+      --spacing-panel: 16px;
+      --radius-control: 10px;
+      --radius-panel: 16px;
+      --elevation-popover: 0 12px 32px rgba(0, 4, 12, 0.4);
+      --elevation-dialog: 0 28px 80px rgba(0, 4, 12, 0.5);
+      --duration-fast: 140ms;
+      --duration-standard: 240ms;
+      --duration-slow: 420ms;
+      --motion-ease: var(--ease);
+      --z-dock: 100;
+      --z-topbar: 120;
+      --z-popover: 300;
+      --z-dialog: 400;
+      --z-toast: 500;
+      --z-skip-link: 600;
+      --touch-target: 44px;
+      --ui-density: 0px;
+      --surface-blur: blur(18px);
+      --surface-blur-strong: blur(26px);
+    }
+
+    /* Light theme — a functional, contrast-checked presentation. */
+    html[data-theme="light"] {
+      color-scheme: light;
+      --canvas: #eef4fb;
+      --canvas-2: #e3ecf7;
+      --surface: rgba(255, 255, 255, 0.82);
+      --surface-strong: rgba(255, 255, 255, 0.96);
+      --surface-soft: rgba(255, 255, 255, 0.68);
+      --line: rgba(30, 64, 96, 0.16);
+      --line-strong: rgba(24, 96, 140, 0.42);
+      --text: #10232f;
+      --muted: #3d5a70;
+      --faint: #5d7489;
+      --cyan: #0778a8;
+      --cyan-soft: #0a8fc4;
+      --blue: #3347c8;
+      --success: #0e7a55;
+      --warning: #9a5b00;
+      --danger: #c2263f;
+      --purple: #6d4bd0;
+      --shadow: 0 18px 50px rgba(30, 58, 90, 0.16);
+      --color-background-overlay: rgba(16, 35, 47, 0.4);
+      --color-selection: rgba(7, 120, 168, 0.18);
+      --color-status-critical: #b31232;
+    }
+
+    /* High-contrast presentation — status never depends on color alone. */
+    html[data-contrast="high"] {
+      --text: #ffffff;
+      --muted: #c8d8e6;
+      --faint: #9fb4c6;
+      --line: rgba(139, 212, 255, 0.32);
+      --line-strong: rgba(71, 211, 255, 0.6);
+      --color-text-primary: #ffffff;
+      --color-text-secondary: #d6e4f0;
+      --color-text-muted: #aebfce;
+      --color-border-subtle: rgba(139, 212, 255, 0.32);
+      --color-border-strong: rgba(71, 211, 255, 0.6);
+      --color-focus-ring: #7df0ff;
+    }
+    html[data-contrast="high"][data-theme="light"] {
+      --text: #07131c;
+      --muted: #1f3a4d;
+      --faint: #2f4d63;
+      --line: rgba(10, 60, 96, 0.5);
+      --line-strong: rgba(6, 52, 88, 0.72);
+      --color-text-primary: #07131c;
+      --color-text-secondary: #173247;
+      --color-text-muted: #27455b;
+      --color-focus-ring: #004f8a;
+    }
+
+    /* Reduced-effects presentation — blur/glow removed while readability holds. */
+    html[data-effects="reduced"] {
+      --surface-blur: none;
+      --surface-blur-strong: none;
+    }
+    html[data-effects="reduced"] .glass-card,
+    html[data-effects="reduced"] .modal,
+    html[data-effects="reduced"] .command-palette,
+    html[data-effects="reduced"] .assistant-panel,
+    html[data-effects="reduced"] .sidebar,
+    html[data-effects="reduced"] .toast {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      background: var(--surface-strong);
+    }
+
+    /* Density modes — compact tightens rows; comfortable relaxes them. */
+    html[data-density="compact"] {
+      --ui-density: -4px;
+    }
+    html[data-density="comfortable"] {
+      --ui-density: 6px;
+    }
+
+    /* Reduced motion — media preference and the explicit setting. */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+    html[data-motion="reduced"] *,
+    html[data-motion="reduced"] *::before,
+    html[data-motion="reduced"] *::after {
+      scroll-behavior: auto !important;
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+    }
+
+    /* Skip link for keyboard users — first focusable element in the document. */
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      z-index: var(--z-skip-link);
+      padding: 12px 18px;
+      border-radius: 0 0 var(--radius-control) 0;
+      background: var(--color-background-elevated);
+      color: var(--color-text-primary);
+      border: 1px solid var(--color-border-strong);
+      font-weight: 700;
+    }
+    .skip-link:focus-visible {
+      left: 0;
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 2px;
     }
 
     * {
@@ -133,6 +291,31 @@
       border-radius: 999px;
       background: rgba(127, 179, 210, 0.26);
       background-clip: padding-box;
+    }
+
+    /* Coarse-pointer devices get larger, unambiguous touch targets. */
+    @media (pointer: coarse) {
+      .icon-button,
+      .nav-button,
+      .palette-item,
+      .quick-command,
+      .widget-tool,
+      .row-action {
+        min-height: 44px;
+      }
+      .icon-button {
+        width: 44px;
+        height: 44px;
+      }
+    }
+
+    /* Text-only buttons keep a visible focus ring. */
+    .text-button:focus-visible,
+    .secondary-button:focus-visible,
+    .primary-button:focus-visible,
+    .compact-button:focus-visible {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 2px;
     }
 
     .sr-only {
@@ -1624,6 +1807,34 @@
       gap: 12px;
     }
 
+    .perf-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .perf-grid .panel-card {
+      min-width: 0;
+    }
+
+    .perf-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .perf-actions .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .warning-text {
+      color: #ffd166 !important;
+    }
+
     .fleet-stat {
       display: flex;
       min-height: 84px;
@@ -2411,6 +2622,189 @@
       background: rgba(8, 23, 40, .98);
       box-shadow: 0 30px 100px rgba(0, 3, 10, .7);
       animation: modalIn .28s var(--ease);
+      max-height: min(86vh, 720px);
+      overflow-y: auto;
+    }
+
+    .modal-body {
+      padding: 2px 0 8px;
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .settings-grid .panel-card {
+      min-width: 0;
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--color-border-subtle);
+    }
+
+    .settings-row:last-child {
+      border-bottom: 0;
+    }
+
+    .settings-label {
+      color: var(--color-text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .settings-label strong {
+      color: var(--color-text-primary);
+      font-size: 12px;
+    }
+
+    .settings-help {
+      margin: 10px 0 0;
+      color: var(--color-text-muted);
+      font-size: 9px;
+      line-height: 1.5;
+    }
+
+    .settings-checkbox {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--color-action-primary);
+    }
+
+    .settings-row select,
+    .settings-row .form-control {
+      width: auto;
+      min-width: 130px;
+    }
+
+    .shortcut-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .shortcut-key {
+      padding: 3px 8px;
+      border: 1px solid var(--color-border-strong);
+      border-radius: 6px;
+      background: var(--color-background-surface);
+      color: var(--color-text-primary);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    /* Status badge — text + shape always present; color is supplemental. */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--color-border-subtle);
+      background: var(--color-background-surface);
+      color: var(--color-text-secondary);
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      line-height: 1;
+    }
+    .status-badge i {
+      font-size: 7px;
+    }
+    .status-badge.status-running,
+    .status-badge.status-active,
+    .status-badge.status-connected,
+    .status-badge.status-healthy,
+    .status-badge.status-completed,
+    .status-badge.status-success {
+      color: var(--color-status-success);
+      border-color: rgba(61, 227, 164, .35);
+    }
+    .status-badge.status-waiting,
+    .status-badge.status-queued,
+    .status-badge.status-idle,
+    .status-badge.status-starting,
+    .status-badge.status-paused {
+      color: var(--color-status-info);
+      border-color: rgba(49, 215, 255, .35);
+    }
+    .status-badge.status-blocked,
+    .status-badge.status-warning,
+    .status-badge.status-degraded,
+    .status-badge.status-stale,
+    .status-badge.status-reconnecting {
+      color: var(--color-status-warning);
+      border-color: rgba(255, 180, 92, .4);
+    }
+    .status-badge.status-failed,
+    .status-badge.status-cancelled,
+    .status-badge.status-error,
+    .status-badge.status-critical,
+    .status-badge.status-security-critical {
+      color: var(--color-status-critical);
+      border-color: rgba(255, 59, 92, .4);
+    }
+    .status-badge.status-unavailable,
+    .status-badge.status-unsupported,
+    .status-badge.status-offline,
+    .status-badge.status-unknown,
+    .status-badge.status-restricted,
+    .status-badge.status-quarantined,
+    .status-badge.status-revoked {
+      color: var(--color-text-muted);
+      border-color: var(--color-border-subtle);
+    }
+    html[data-contrast="high"] .status-badge {
+      border-width: 1px;
+      font-weight: 800;
+    }
+
+    /* Persistent condition banners. */
+    .banner-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 0 18px 8px;
+    }
+    .system-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 14px;
+      border-radius: var(--radius-control);
+      border: 1px solid var(--color-border-strong);
+      background: var(--color-background-surface);
+      color: var(--color-text-primary);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .system-banner .banner-icon {
+      color: var(--color-status-warning);
+      font-size: 13px;
+    }
+    .system-banner.security .banner-icon {
+      color: var(--color-status-critical);
+    }
+    .system-banner.info .banner-icon {
+      color: var(--color-status-info);
+    }
+    .system-banner .banner-action {
+      margin-left: auto;
+      flex: 0 0 auto;
+    }
+    html[data-theme="light"] .system-banner {
+      border-color: var(--color-border-strong);
     }
 
     .modal-header {
@@ -3084,9 +3478,42 @@
     }
 
     .palette-item:hover,
-    .palette-item:focus-visible {
+    .palette-item:focus-visible,
+    .palette-item.active {
       background: rgba(49, 215, 255, .08);
       color: #e1f6ff;
+    }
+
+    .palette-caption {
+      padding: 6px 10px 4px;
+      color: var(--color-text-muted);
+      font-size: 8px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .palette-risk {
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      flex: 0 0 auto;
+    }
+    .palette-risk.security {
+      color: var(--color-status-security);
+      border: 1px solid rgba(167, 139, 250, .4);
+    }
+    .palette-risk.destructive {
+      color: var(--color-status-critical);
+      border: 1px solid rgba(255, 59, 92, .45);
+    }
+    html[data-contrast="high"] .palette-item.active,
+    html[data-contrast="high"] .palette-item:focus-visible {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 1px;
     }
 
     .palette-item > span:first-of-type {
@@ -3222,7 +3649,9 @@
 
       .main-shell.ai-open .node-grid,
       .main-shell.ai-open .bot-grid,
-      .main-shell.ai-open .timeline {
+      .main-shell.ai-open .timeline,
+      .main-shell.ai-open .perf-grid,
+      .main-shell.ai-open .settings-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
@@ -3234,7 +3663,9 @@
       }
 
       .node-grid,
-      .bot-grid {
+      .bot-grid,
+      .perf-grid,
+      .settings-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
@@ -3353,6 +3784,8 @@
       .fleet-strip,
       .node-grid,
       .bot-grid,
+      .perf-grid,
+      .settings-grid,
       .timeline {
         grid-template-columns: 1fr;
       }
@@ -3485,15 +3918,14 @@
       }
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      *,
-      *::before,
-      *::after {
-        scroll-behavior: auto !important;
-        animation-duration: .01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: .01ms !important;
-      }
+    /* Reassert visible focus on inputs that previously suppressed outlines.
+       Placed last so it wins the specificity/source-order tie. */
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    [contenteditable]:focus-visible {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 2px;
     }
   </style>
 </head>
@@ -3524,6 +3956,14 @@
         { id: "pipeline", label: "CI/CD Pipeline", short: "Pipeline", icon: "fa-code-branch" },
         { id: "infrastructure", label: "Infrastructure Health", short: "Infrastructure", icon: "fa-server" },
         { id: "security", label: "Security & Logs", short: "Security", icon: "fa-shield-halved" },
+        { id: "plugins", label: "Plugin Manager", short: "Plugins", icon: "fa-puzzle-piece" },
+        { id: "automation", label: "Automation", short: "Automation", icon: "fa-robot" },
+        { id: "communications", label: "Communications", short: "Inbox", icon: "fa-envelope" },
+        { id: "wearables", label: "Device Manager", short: "Wearables", icon: "fa-glasses" },
+        { id: "mobile", label: "Mobile Companion", short: "Mobile", icon: "fa-mobile-screen" },
+        { id: "security-center", label: "Security Center", short: "Security", icon: "fa-user-shield" },
+        { id: "performance", label: "Performance Center", short: "Performance", icon: "fa-gauge-high" },
+        { id: "settings", label: "Settings", short: "Settings", icon: "fa-sliders" },
         { id: "bots", label: "Bot Fleet", short: "Bot Fleet", icon: "fa-robot" }
       ];
 
@@ -3644,9 +4084,13 @@
         var requestOptions = Object.assign({}, options || {});
         var timeoutMs = Number(requestOptions.timeoutMs) || 12000;
         delete requestOptions.timeoutMs;
+        var externalSignal = requestOptions.signal || null;
         var controller = new AbortController();
         var timer = window.setTimeout(function () { controller.abort(); }, timeoutMs);
-        requestOptions.signal = controller.signal;
+        requestOptions.signal = externalSignal || controller.signal;
+        if (externalSignal && typeof externalSignal.addEventListener === "function") {
+          externalSignal.addEventListener("abort", function () { controller.abort(); });
+        }
         try {
           var response = await window.fetch(url, requestOptions);
           var payload = null;
@@ -3665,6 +4109,7 @@
           }
           return payload;
         } catch (error) {
+          if (externalSignal && externalSignal.aborted) throw error;
           if (error && error.name === "AbortError") throw new Error("The local service did not respond in time.");
           throw error;
         } finally {
@@ -3674,16 +4119,18 @@
 
       function normalizeMetric(row) {
         var fallback = METRIC_DEFINITIONS.find(function (definition) { return definition.id === row.id; }) || METRIC_DEFINITIONS[0];
-        var history = Array.isArray(row.history) ? row.history.map(function (value) { return safeNumber(value, 0, 100); }) : [];
+        var unmeasured = row.measured === false || row.value == null;
+        var history = Array.isArray(row.history) ? row.history.map(function (value) { return value == null ? 0 : safeNumber(value, 0, 100); }) : [];
         return {
           id: String(row.id || fallback.id),
           label: row.label || fallback.label,
-          value: safeNumber(row.value, 0, 100),
-          previous: safeNumber(row.previous, 0, 100),
+          value: unmeasured ? 0 : safeNumber(row.value, 0, 100),
+          previous: unmeasured ? 0 : safeNumber(row.previous, 0, 100),
           unit: row.unit || fallback.unit,
           icon: row.icon || fallback.icon,
-          detail: row.detail || "Live Halo telemetry",
+          detail: unmeasured ? (row.detail || "No measurement available") + " · unmeasured" : (row.detail || "Live Halo telemetry"),
           loading: false,
+          unmeasured: unmeasured,
           history: history.length ? history : [0, 0]
         };
       }
@@ -3751,6 +4198,95 @@
           radius: Math.round(safeNumber(source.radius == null ? 18 : source.radius, 8, 28)),
           glass_opacity: safeNumber(source.glass_opacity == null ? .72 : source.glass_opacity, .5, .94)
         };
+      }
+
+      // ---- UI preferences (appearance, accessibility) — persisted locally. ----
+      function defaultUiPrefs() {
+        return { theme: "system", density: "balanced", effects: "full", motion: "standard", contrast: "normal", large_text: false };
+      }
+
+      function loadUiPrefs() {
+        try {
+          var raw = window.localStorage.getItem("joeos:ui-prefs");
+          if (!raw) return defaultUiPrefs();
+          var parsed = JSON.parse(raw);
+          var prefs = defaultUiPrefs();
+          if (parsed && typeof parsed === "object") {
+            if (["system", "dark", "light"].indexOf(parsed.theme) >= 0) prefs.theme = parsed.theme;
+            if (["compact", "balanced", "comfortable"].indexOf(parsed.density) >= 0) prefs.density = parsed.density;
+            if (["full", "reduced"].indexOf(parsed.effects) >= 0) prefs.effects = parsed.effects;
+            if (["standard", "reduced"].indexOf(parsed.motion) >= 0) prefs.motion = parsed.motion;
+            if (["normal", "high"].indexOf(parsed.contrast) >= 0) prefs.contrast = parsed.contrast;
+            if (typeof parsed.large_text === "boolean") prefs.large_text = parsed.large_text;
+          }
+          return prefs;
+        } catch (error) {
+          return defaultUiPrefs();
+        }
+      }
+
+      function saveUiPrefs(prefs) {
+        try { window.localStorage.setItem("joeos:ui-prefs", JSON.stringify(prefs)); } catch (error) {}
+      }
+
+      function systemPrefersDark() {
+        return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      }
+
+      // ---- Keyboard Shortcut Registry — one authoritative source. ----
+      var KEYBOARD_SHORTCUTS = [
+        { id: "palette", command: "Open Command Palette", keys: "Ctrl+K", context: "Global" },
+        { id: "assistant", command: "Ask JoeOS AI", keys: "Ctrl+Shift+K", context: "Global" },
+        { id: "shortcuts", command: "Open keyboard shortcuts", keys: "?", context: "Global" },
+        { id: "stop", command: "Stop current operation", keys: "Esc", context: "AI assistant" },
+        { id: "nav", command: "Switch workspace (1-12)", keys: "Alt+1..0", context: "Global" },
+        { id: "search", command: "Open global search", keys: "Ctrl+F", context: "Global" },
+        { id: "notifications", command: "Toggle notifications", keys: "Ctrl+Shift+N", context: "Global" },
+        { id: "settings", command: "Open settings", keys: "Ctrl+,", context: "Global" }
+      ];
+
+      // ---- Focus trap utility for dialogs and overlays. ----
+      function useFocusTrap(open, containerRef, fallbackRef) {
+        var restoredRef = useRef(null);
+        useEffect(function () {
+          if (!open) return;
+          var container = containerRef && containerRef.current;
+          restoredRef.current = document.activeElement;
+          if (container) {
+            var focusables = container.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
+            var target = focusables[0] || (fallbackRef && fallbackRef.current) || container;
+            if (typeof target.focus === "function") window.setTimeout(function () { if (document.contains(target)) target.focus(); }, 0);
+          }
+          function onKeyDown(event) {
+            if (event.key !== "Tab" || !container) return;
+            var focusables = Array.prototype.slice.call(container.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"));
+            if (!focusables.length) { event.preventDefault(); return; }
+            var first = focusables[0];
+            var last = focusables[focusables.length - 1];
+            var current = document.activeElement;
+            if (event.shiftKey && (current === first || current === container)) {
+              event.preventDefault();
+              last.focus();
+            } else if (!event.shiftKey && current === last) {
+              event.preventDefault();
+              first.focus();
+            }
+          }
+          document.addEventListener("keydown", onKeyDown);
+          return function () {
+            document.removeEventListener("keydown", onKeyDown);
+            if (restoredRef.current && document.contains(restoredRef.current)) restoredRef.current.focus();
+          };
+        }, [open, containerRef]);
+      }
+
+      // ---- Status badge — text + shape always, color supplemental. ----
+      function StatusBadge(props) {
+        var state = String(props.state || "unknown").toLowerCase();
+        var label = props.label || state;
+        var toneClass = "status-" + state;
+        var shape = props.icon || "fa-circle";
+        return h("span", { className: "status-badge " + toneClass + (props.className ? " " + props.className : ""), "aria-label": label, title: label }, h("i", { className: "fa-solid " + shape, "aria-hidden": "true" }), h("span", { className: "status-badge-text" }, label));
       }
 
       function normalizeWidget(row, index) {
@@ -3876,8 +4412,8 @@
       function MetricCard(props) {
         var metric = props.metric;
         var delta = metric.value - metric.previous;
-        var warning = metric.value >= (metric.id === "disk" ? 80 : 78);
-        var stateLabel = metric.loading ? "Waiting" : warning ? "Attention" : "Nominal";
+        var warning = !metric.unmeasured && metric.value >= (metric.id === "disk" ? 80 : 78);
+        var stateLabel = metric.loading ? "Waiting" : metric.unmeasured ? "Unmeasured" : warning ? "Attention" : "Nominal";
         return h(
           "article",
           { className: "glass-card interactive-card metric-card" },
@@ -3885,15 +4421,15 @@
             "div",
             { className: "metric-top" },
             h("div", { className: "metric-icon" }, icon(metric.icon)),
-            h("span", { className: "metric-state " + (warning || metric.loading ? "warning" : "") }, icon(metric.loading ? "fa-hourglass-half" : warning ? "fa-triangle-exclamation" : "fa-check"), stateLabel)
+            h("span", { className: "metric-state " + (warning || metric.loading || metric.unmeasured ? "warning" : "") }, icon(metric.loading ? "fa-hourglass-half" : metric.unmeasured ? "fa-circle-question" : warning ? "fa-triangle-exclamation" : "fa-check"), stateLabel)
           ),
           h("div", { className: "metric-label" }, metric.label),
           h(
             "div",
             { className: "metric-value-row" },
-            h("span", { className: "metric-value" }, metric.value.toFixed(1)),
-            h("span", { className: "metric-unit" }, metric.unit),
-            h("span", { className: "metric-delta " + (delta > 0 ? "up" : "") }, icon(delta > 0 ? "fa-arrow-trend-up" : "fa-arrow-trend-down"), " ", Math.abs(delta).toFixed(1))
+            metric.unmeasured ? h("span", { className: "metric-value" }, "—") : h("span", { className: "metric-value" }, metric.value.toFixed(1)),
+            h("span", { className: "metric-unit" }, metric.unmeasured ? "no measurement" : metric.unit),
+            metric.unmeasured ? null : h("span", { className: "metric-delta " + (delta > 0 ? "up" : "") }, icon(delta > 0 ? "fa-arrow-trend-up" : "fa-arrow-trend-down"), " ", Math.abs(delta).toFixed(1))
           ),
           h("div", { className: "metric-detail" }, metric.detail),
           h(SparkBars, { id: metric.id, values: metric.history })
@@ -4402,6 +4938,493 @@
         );
       }
 
+      function PluginsSection(props) {
+        var installed = props.plugins.length;
+        var active = props.plugins.filter(function (plugin) { return plugin.lifecycle_state === "active"; }).length;
+        var quarantined = props.plugins.filter(function (plugin) { return plugin.lifecycle_state === "quarantined"; }).length;
+        var pending = props.plugins.filter(function (plugin) { return plugin.lifecycle_state === "pending_permissions"; }).length;
+        var safe = props.safeMode;
+        function permissionLabel(plugin) {
+          return plugin.lifecycle_state === "active" ? "ACTIVE" : plugin.lifecycle_state === "quarantined" ? "QUARANTINED" : plugin.enabled_state === "enabled" ? "ENABLED" : "DISABLED";
+        }
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "plugins-title" },
+          h(SectionHeader, {
+            kicker: "Secure extension platform",
+            title: h("span", { id: "plugins-title" }, "Plugin Manager"),
+            description: "Installed plugins are versioned, permission-based, integrity-checked, and executed in an isolated Extension Host. A plugin is never trusted merely because it is installed.",
+            actions: [
+              h("span", { className: "live-pill" + (safe ? " attention" : ""), key: "safe" }, h("span", { className: "live-dot" }), safe ? "SAFE MODE" : installed + " INSTALLED")
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon success" }, icon("fa-puzzle-piece")), h("div", null, h("strong", null, String(installed)), h("span", null, "Plugins installed"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-play")), h("div", null, h("strong", null, String(active)), h("span", null, "Active"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon purple" }, icon("fa-shield-halved")), h("div", null, h("strong", null, String(quarantined)), h("span", null, "Quarantined")))
+          ),
+          installed
+            ? h("div", { className: "bot-grid" }, props.plugins.map(function (plugin) {
+                return h(
+                  "article",
+                  { className: "glass-card panel-card", key: plugin.plugin_id },
+                  h("div", { className: "plugin-header" }, icon("fa-puzzle-piece"), h("div", null, h("strong", null, plugin.display_name), h("span", null, plugin.plugin_id + " v" + plugin.version))),
+                  h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, permissionLabel(plugin)), h("span", null, "Publisher: " + plugin.publisher_id)),
+                  h("div", { className: "plugin-actions" }, h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(plugin); } }, "Inspect"))
+                );
+              }))
+            : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-puzzle-piece"), h("strong", null, "No plugins installed"), h("p", null, "Install a validated plugin package or a development plugin through the API to see it here.")))
+        );
+      }
+
+      function AutomationSection(props) {
+        var enabled = props.workflows.filter(function (workflow) { return workflow.enabled; }).length;
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "automation-title" },
+          h(SectionHeader, {
+            kicker: "Workflow orchestration",
+            title: h("span", { id: "automation-title" }, "Automation"),
+            description: "Versioned, validated workflows executed by the Automation Engine. Runs, schedules, approvals, and traces reflect real authoritative state; a workflow never gains authority merely because it exists.",
+            actions: [
+              h("span", { className: "live-pill", key: "live" }, h("span", { className: "live-dot" }), props.overview.running + " RUNNING")
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon success" }, icon("fa-diagram-project")), h("div", null, h("strong", null, String(props.workflows.length)), h("span", null, "Workflows"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-play")), h("div", null, h("strong", null, String(enabled)), h("span", null, "Enabled"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon purple" }, icon("fa-circle-check")), h("div", null, h("strong", null, String(props.overview.pending_approvals)), h("span", null, "Pending approvals")))
+          ),
+          props.workflows.length
+            ? h("div", { className: "bot-grid" }, props.workflows.map(function (workflow) {
+                return h(
+                  "article",
+                  { className: "glass-card panel-card", key: workflow.workflow_id },
+                  h("div", { className: "plugin-header" }, icon("fa-diagram-project"), h("div", null, h("strong", null, workflow.name), h("span", null, workflow.workflow_id + " v" + workflow.current_version))),
+                  h("div", { className: "plugin-meta" }, workflow.enabled ? h(StatusBadge, { state: "running", label: "Enabled", icon: "fa-play" }) : h(StatusBadge, { state: workflow.health_state === "healthy" ? "idle" : "paused", label: workflow.status.toUpperCase(), icon: "fa-pause" }), h("span", null, "Health: " + workflow.health_state)),
+                  h("div", { className: "plugin-actions" }, h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(workflow); } }, "Inspect"))
+                );
+              }))
+            : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-diagram-project"), h("strong", null, "No workflows defined"), h("p", null, "Create a workflow from a safe template or a validated definition through the API.")))
+        );
+      }
+
+      function CommunicationsSection(props) {
+        var unread = props.notifications.filter(function (item) { return item.read_state === "delivered" && !item.archive_state; }).length;
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "communications-title" },
+          h(SectionHeader, {
+            kicker: "Unified inbox",
+            title: h("span", { id: "communications-title" }, "Communications"),
+            description: "A local-first, provider-neutral hub. Notifications, internal messages, drafts, and approvals reflect real state; external sending always requires approval bound to content and recipients.",
+            actions: [
+              h("span", { className: "live-pill" + (unread ? " attention" : ""), key: "unread" }, h("span", { className: "live-dot" }), unread + " UNREAD")
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon success" }, icon("fa-envelope")), h("div", null, h("strong", null, String(unread)), h("span", null, "Unread"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-user-check")), h("div", null, h("strong", null, String(props.overview.pending_approvals)), h("span", null, "Pending approvals"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon purple" }, icon("fa-paper-plane")), h("div", null, h("strong", null, String(props.overview.outbox_count)), h("span", null, "Outbox")))
+          ),
+          props.notifications.length
+            ? h("div", { className: "bot-grid" }, props.notifications.map(function (item) {
+                var tone = item.severity === "critical" || item.severity === "security_critical" ? "attention" : item.severity === "error" ? "warn" : "";
+                return h(
+                  "article",
+                  { className: "glass-card panel-card", key: item.notification_id },
+                  h("div", { className: "plugin-header" }, icon("fa-bell"), h("div", null, h("strong", null, item.title), h("span", null, item.source + " · " + item.category))),
+                  h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, item.severity.toUpperCase()), h("span", null, "Priority: " + item.priority)),
+                  item.message ? h("p", { className: "plugin-description" }, item.message) : null
+                );
+              }))
+            : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-envelope"), h("strong", null, "No notifications"), h("p", null, "Notifications from JoeOS services, workflows, agents, and providers will appear here.")))
+        );
+      }
+
+      function WearablesSection(props) {
+        var paired = props.devices.filter(function (device) { return device.paired_state === "paired"; }).length;
+        var connected = props.devices.filter(function (device) { return device.connection_state === "connected"; }).length;
+        var mic = props.devices.filter(function (device) { return device.mic_active; }).length;
+        var camera = props.devices.filter(function (device) { return device.camera_active; }).length;
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "wearables-title" },
+          h(SectionHeader, {
+            kicker: "Smart glasses",
+            title: h("span", { id: "wearables-title" }, "Device Manager"),
+            description: "A local-first wearable platform. Devices pair securely, trust is capability-scoped and revocable, and only the isolated simulator produces devices. Camera and microphone activity always shows an indicator.",
+            actions: [
+              h("span", { className: "live-pill" + (connected ? " attention" : ""), key: "conn" }, h("span", { className: "live-dot" }), connected + " CONNECTED")
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon success" }, icon("fa-glasses")), h("div", null, h("strong", null, String(paired)), h("span", null, "Paired devices"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-microphone")), h("div", null, h("strong", null, String(mic)), h("span", null, "Microphone active"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon purple" }, icon("fa-camera")), h("div", null, h("strong", null, String(camera)), h("span", null, "Camera active")))
+          ),
+          props.devices.length
+            ? h("div", { className: "bot-grid" }, props.devices.map(function (device) {
+                var tone = device.thermal_state === "warning" || device.battery_state === "low" ? "attention" : "";
+                return h(
+                  "article",
+                  { className: "glass-card panel-card " + tone, key: device.device_id },
+                  h("div", { className: "plugin-header" }, icon("fa-glasses"), h("div", null, h("strong", null, device.display_name), h("span", null, device.device_id + " · " + device.device_type))),
+                  h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, device.connection_state.toUpperCase()), h("span", null, "Trust: " + device.trusted_state)),
+                  h("div", { className: "plugin-meta" }, h("span", null, "Battery: " + device.battery_state + " · Thermal: " + device.thermal_state + (device.mic_active ? " · MIC" : "") + (device.camera_active ? " · CAM" : ""))),
+                  h("div", { className: "plugin-actions" }, h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(device); } }, "Inspect"))
+                );
+              }))
+            : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-glasses"), h("strong", null, "No paired devices"), h("p", null, "Create a device in the isolated Wearable Simulator, pair it securely, and it will appear here.")))
+        );
+      }
+
+      function MobileSection(props) {
+        var paired = props.clients.filter(function (client) { return client.pairing_state === "paired"; }).length;
+        var connected = props.clients.filter(function (client) { return client.authentication_state === "authenticated" && client.revocation_state === "active"; }).length;
+        var revoked = props.clients.filter(function (client) { return client.revocation_state === "revoked"; }).length;
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "mobile-title" },
+          h(SectionHeader, {
+            kicker: "Secure remote operations",
+            title: h("span", { id: "mobile-title" }, "Mobile Companion"),
+            description: "The iOS companion is a secure client of authoritative JoeOS state. Devices pair deliberately, sessions are short-lived and revocable, remote commands are allowlisted, and offline actions are revalidated. No fake hosts, connections, or push deliveries are shown.",
+            actions: [
+              h("span", { className: "live-pill" + (connected ? " attention" : ""), key: "conn" }, h("span", { className: "live-dot" }), connected + " CONNECTED")
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon success" }, icon("fa-mobile-screen")), h("div", null, h("strong", null, String(paired)), h("span", null, "Paired clients"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-plug")), h("div", null, h("strong", null, String(props.overview.active_sessions)), h("span", null, "Active sessions"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon purple" }, icon("fa-shield-halved")), h("div", null, h("strong", null, String(revoked)), h("span", null, "Revoked")))
+          ),
+          props.clients.length
+            ? h("div", { className: "bot-grid" }, props.clients.map(function (client) {
+                var tone = client.revocation_state === "revoked" ? "attention" : "";
+                return h(
+                  "article",
+                  { className: "glass-card panel-card " + tone, key: client.client_id },
+                  h("div", { className: "plugin-header" }, icon("fa-mobile-screen"), h("div", null, h("strong", null, client.client_id), h("span", null, client.platform + " v" + client.app_version + " · " + client.installation_identity))),
+                  h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, client.revocation_state === "revoked" ? "REVOKED" : client.authentication_state.toUpperCase()), h("span", null, "Trust: " + client.trust_state)),
+                  h("div", { className: "plugin-meta" }, h("span", null, "Host: " + (client.paired_host || "unpaired") + " · Push: " + client.push_registration_state)),
+                  h("div", { className: "plugin-actions" }, h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(client); } }, "Inspect"))
+                );
+              }))
+            : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-mobile-screen"), h("strong", null, "No mobile clients paired"), h("p", null, "Pair the iOS companion through a deliberate two-party pairing flow; it will appear here with real state.")))
+        );
+      }
+
+      function SecurityCenterSection(props) {
+        var overview = props.overview || { security_events_open: 0, incidents_open: 0, pending_approvals: 0, secrets_requiring_rotation: 0, audit_integrity_verified: true, lockdown_active: false };
+        var events = props.events || [];
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "security-center-title" },
+          h(SectionHeader, {
+            kicker: "Zero-trust boundaries",
+            title: h("span", { id: "security-center-title" }, "Security Center"),
+            description: "Deny-by-default policy, exact-bound approvals, AES-GCM secret broker, and hash-chained audit enforced in authoritative services. No fabricated vulnerability scores or compliance claims are shown.",
+            actions: [
+              h("span", { className: "live-pill" + (overview.lockdown_active ? " attention" : ""), key: "lock" }, h("span", { className: "live-dot" }), overview.lockdown_active ? "LOCKDOWN" : "PROTECTED")
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon success" }, icon("fa-shield-halved")), h("div", null, h("strong", null, overview.audit_integrity_verified ? "OK" : "FAIL"), h("span", null, "Audit integrity"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-triangle-exclamation")), h("div", null, h("strong", null, String(overview.security_events_open)), h("span", null, "Security events"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon purple" }, icon("fa-key")), h("div", null, h("strong", null, String(overview.secrets_requiring_rotation)), h("span", null, "Secrets to rotate")))
+          ),
+          events.length
+            ? h("div", { className: "bot-grid" }, events.map(function (event) {
+                return h(
+                  "article",
+                  { className: "glass-card panel-card", key: event.event_id },
+                  h("div", { className: "plugin-header" }, icon("fa-triangle-exclamation"), h("div", null, h("strong", null, event.category), h("span", null, event.severity + " · " + event.confidence))),
+                  h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, event.status.toUpperCase()), h("span", null, event.affected_service || "system")),
+                  event.evidence ? h("p", { className: "plugin-description" }, event.evidence) : null
+                );
+              }))
+            : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-shield-halved"), h("strong", null, "No open security events"), h("p", null, "Security events from policy denials, secret access, and suspicious activity will appear here with real evidence.")))
+        );
+      }
+
+      function pressureLabel(pressure) {
+        var value = (pressure && pressure.pressure) || "unknown";
+        return value.toUpperCase();
+      }
+
+      function pressureClass(pressure) {
+        var value = (pressure && pressure.pressure) || "unknown";
+        if (value === "critical") return "danger";
+        if (value === "high" || value === "warning") return "warning";
+        if (value === "elevated") return "warning";
+        return "neutral";
+      }
+
+      function PerformanceSection(props) {
+        var overview = props.overview || {};
+        var resources = props.resources || {};
+        var queues = props.queues || [];
+        var caches = props.caches || [];
+        var models = props.models || [];
+        var leaks = props.leaks || [];
+        var benchmarks = props.benchmarks || [];
+        var budgets = props.budgets || [];
+        var regressions = props.regressions || [];
+        var traces = props.traces || [];
+        var settings = props.settings || {};
+        var memoryPressure = overview.memory_pressure || { pressure: "unknown" };
+        var diskPressure = overview.disk_pressure || { pressure: "unknown" };
+        var gpuPressure = overview.gpu_pressure || { pressure: "unknown" };
+        var cpuShown = resources.cpu_percent == null ? "unmeasured" : resources.cpu_percent.toFixed(1) + "%";
+        var memoryShown = resources.memory_percent == null ? "unmeasured" : resources.memory_percent.toFixed(1) + "%";
+        var diskShown = resources.disk_percent == null ? "unmeasured" : resources.disk_percent.toFixed(1) + "%";
+        var gpuShown = resources.gpu_available && resources.gpu_percent != null ? resources.gpu_percent.toFixed(1) + "%" : "unknown";
+        var leakIndicators = leaks.filter(function (item) { return item.state === "leak"; });
+        var budgetRows = budgets.slice(0, 8);
+        var regressionRows = regressions.filter(function (item) { return item.classification === "warning_regression" || item.classification === "budget_failure"; }).slice(0, 8);
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "performance-title" },
+          h(SectionHeader, {
+            kicker: "Measured, not marketed",
+            title: h("span", { id: "performance-title" }, "Performance Center"),
+            description: "Real measured load, pressure, queues, caches, model resources, benchmarks, and budgets from authoritative JoeOS services. Unknown metrics stay unknown. No fabricated FPS, latency, or hardware utilization values are shown.",
+            actions: [
+              h("span", { className: "live-pill" + (overview.load_shedding_active ? " attention" : ""), key: "shed" }, h("span", { className: "live-dot" }), overview.load_shedding_active ? "SHEDDING" : (overview.overall || "unknown").toUpperCase())
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-microchip")), h("div", null, h("strong", null, cpuShown), h("span", null, "CPU"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon " + pressureClass(memoryPressure) }, icon("fa-memory")), h("div", null, h("strong", null, memoryShown), h("span", null, "Memory · " + pressureLabel(memoryPressure)))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-hard-drive")), h("div", null, h("strong", null, diskShown), h("span", null, "Disk · " + pressureLabel(diskPressure)))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-bolt")), h("div", null, h("strong", null, gpuShown), h("span", null, "GPU · " + pressureLabel(gpuPressure))))
+          ),
+          h(
+            "div",
+            { className: "perf-grid" },
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-gauge-high"), h("strong", null, "Resource pressure")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, (overview.load || "unknown").toUpperCase()), h("span", null, "load")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge " + pressureClass(memoryPressure) }, pressureLabel(memoryPressure)), h("span", null, "memory pressure")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge " + pressureClass(diskPressure) }, pressureLabel(diskPressure)), h("span", null, "disk pressure")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, pressureLabel(gpuPressure)), h("span", null, "GPU pressure (unmeasured stays unknown)")),
+              overview.load_shedding_active ? h("p", { className: "plugin-description warning-text" }, "Load shedding is active: " + ((overview.load_shedding_reasons || []).join(", ") || "critical load")) : null,
+              h("p", { className: "plugin-description" }, "Source: telemetry.collector · measured when available.")
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-list-check"), h("strong", null, "Governed workloads")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.active_agents || 0)), h("span", null, "active agents")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.active_workflows || 0)), h("span", null, "active workflows")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.models_loaded || 0)), h("span", null, "models loaded" + (overview.models_blocked ? " · " + overview.models_blocked + " blocked" : ""))),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.plugins_violating || 0)), h("span", null, "plugins over budget")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.queue_count || 0)), h("span", null, "bounded queues")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.cache_count || 0)), h("span", null, "registered caches"))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-heart-circle-exclamation"), h("strong", null, "Leaks and regressions")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.leak_indicators || 0)), h("span", null, "leak indicators")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(overview.regressions || 0)), h("span", null, "regressions")),
+              leakIndicators.length ? leakIndicators.slice(0, 3).map(function (indicator) {
+                return h("p", { className: "plugin-description warning-text", key: indicator.indicator_id }, indicator.kind + " · " + indicator.owner + ": " + indicator.message);
+              }) : h("p", { className: "plugin-description" }, "No leak indicators flagged from sustained growth trends."),
+              regressionRows.length ? regressionRows.slice(0, 3).map(function (regression) {
+                return h("p", { className: "plugin-description warning-text", key: regression.regression_id }, regression.benchmark_id + " " + regression.classification);
+              }) : h("p", { className: "plugin-description" }, "No significant regressions beyond measurement noise.")
+            )
+          ),
+          h(
+            "div",
+            { className: "perf-actions" },
+            h("button", { type: "button", className: "btn btn-ghost", onClick: function () { runPerformanceAction("unload-idle-models"); } }, icon("fa-circle-down"), "Unload idle models"),
+            h("button", { type: "button", className: "btn btn-ghost", onClick: function () { runPerformanceAction("clear-safe-caches"); } }, icon("fa-eraser"), "Clear safe caches"),
+            h("button", { type: "button", className: "btn btn-ghost", onClick: function () { runPerformanceAction(overview.low_power_mode ? "exit-low-resource-mode" : "enter-low-resource-mode"); } }, icon("fa-battery-half"), overview.low_power_mode ? "Exit low-resource mode" : "Enter low-resource mode"),
+            h("button", { type: "button", className: "btn btn-ghost", onClick: function () { runPerformanceAction(settings.indexing_paused ? "resume-indexing" : "pause-indexing"); } }, icon("fa-pause"), settings.indexing_paused ? "Resume indexing" : "Pause indexing")
+          ),
+          h(
+            "div",
+            { className: "perf-grid" },
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-layer-group"), h("strong", null, "Queues")),
+              queues.length ? queues.slice(0, 8).map(function (queue) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: queue.queue_id },
+                  h("span", { className: "plugin-badge " + (queue.backpressure === "none" ? "" : "warning") }, queue.backpressure.toUpperCase()),
+                  h("span", null, queue.queue_id + " · " + queue.depth + "/" + queue.limit + " · wait " + queue.oldest_wait_ms.toFixed(0) + "ms" + (queue.preserved ? " · preserved" : ""))
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-layer-group"), h("strong", null, "No queue data yet"), h("p", null, "Bound queues with backpressure protect the system from storms."))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-database"), h("strong", null, "Caches")),
+              caches.length ? caches.slice(0, 8).map(function (cache) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: cache.cache_id },
+                  h("span", { className: "plugin-badge" }, cache.entries + "/" + cache.maximum_entries),
+                  h("span", null, cache.cache_id + " · " + Math.round(cache.hits / Math.max(1, cache.hits + cache.misses) * 100) + "% hit · evicted " + cache.evictions)
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-database"), h("strong", null, "No caches registered"), h("p", null, "Caches declare explicit bounds and invalidation."))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-robot"), h("strong", null, "Models")),
+              models.length ? models.slice(0, 6).map(function (model) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: model.model_id },
+                  h("span", { className: "plugin-badge " + (model.state === "resource_blocked" ? "warning" : "") }, model.state.toUpperCase()),
+                  h("span", null, model.model_id + (model.pinned ? " · pinned" : "") + (model.actual_memory_mb != null ? " · " + model.actual_memory_mb.toFixed(0) + "MB measured" : " · footprint " + model.footprint_source))
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-robot"), h("strong", null, "No models discovered"), h("p", null, "Models appear when the local AI runtime reports them."))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-chart-simple"), h("strong", null, "Benchmarks and budgets")),
+              benchmarks.length ? benchmarks.slice(0, 4).map(function (benchmark) {
+                return h("div", { className: "plugin-meta", key: benchmark.benchmark_id }, h("span", { className: "plugin-badge" }, benchmark.median.toFixed(1) + "ms"), h("span", null, benchmark.benchmark_id + " · median of " + benchmark.iterations + " runs · ±" + benchmark.variance.toFixed(1) + "ms"));
+              }) : h("div", { className: "empty-state" }, icon("fa-chart-simple"), h("strong", null, "No benchmarks run yet"), h("p", null, "Run the performance baseline to see median and variance.")),
+              budgetRows.length ? budgetRows.map(function (budget) {
+                return h("div", { className: "plugin-meta", key: budget.budget_id }, h("span", { className: "plugin-badge" }, budget.metric), h("span", null, budget.budget_id + " · target " + budget.target + " · " + budget.hardware_profile));
+              }) : null
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-list-check"), h("strong", null, "Traces")),
+              traces.length ? traces.slice(0, 6).map(function (trace) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: trace.trace_id + ":" + trace.parent_trace_id },
+                  h("span", { className: "plugin-badge " + (trace.status === "cancelled" ? "warning" : "") }, trace.status.toUpperCase()),
+                  h("span", null, trace.service + " · " + trace.operation + " · " + trace.duration_ms.toFixed(1) + "ms (queue " + trace.queue_ms.toFixed(1) + "ms)" + (trace.cancelled ? " · cancelled" : ""))
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-list-check"), h("strong", null, "No traces yet"), h("p", null, "Redacted spans record queue time, execution time, and cancellation."))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-sliders"), h("strong", null, "Settings")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, settings.profile || "balanced"), h("span", null, "performance profile")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, settings.hardware_profile || "unknown"), h("span", null, "hardware profile")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(settings.max_resident_models || 0)), h("span", null, "max resident models")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(settings.model_idle_unload_seconds || 0) + "s"), h("span", null, "idle model unload")),
+              h("div", { className: "plugin-meta" }, h("strong", null, String(settings.concurrency_limits ? settings.concurrency_limits.model : "?" )), h("span", null, "model concurrency limit"))
+            )
+          )
+        );
+      }
+
+      function SettingsSection(props) {
+        var prefs = props.prefs;
+        function update(field, value) {
+          var next = Object.assign({}, prefs, { [field]: value });
+          props.onChange(next);
+        }
+        var effectiveTheme = prefs.theme === "system" ? (systemPrefersDark() ? "dark" : "light") : prefs.theme;
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "settings-title" },
+          h(SectionHeader, {
+            kicker: "Personalization and access",
+            title: h("span", { id: "settings-title" }, "Settings"),
+            description: "Appearance, accessibility, and interface behavior. Preferences are saved on this device and applied immediately; they never reduce security, approval, or cancellation clarity."
+          }),
+          h(
+            "div",
+            { className: "settings-grid" },
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-palette"), h("strong", null, "Appearance")),
+              h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-theme" }, "Theme"), h("select", { id: "ui-theme", className: "form-control", value: prefs.theme, onChange: function (event) { update("theme", event.target.value); } }, h("option", { value: "system" }, "System (" + effectiveTheme + ")"), h("option", { value: "dark" }, "Dark"), h("option", { value: "light" }, "Light"))),
+              h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-density" }, "Density"), h("select", { id: "ui-density", className: "form-control", value: prefs.density, onChange: function (event) { update("density", event.target.value); } }, h("option", { value: "compact" }, "Compact"), h("option", { value: "balanced" }, "Balanced"), h("option", { value: "comfortable" }, "Comfortable"))),
+              h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-effects" }, "Visual effects"), h("select", { id: "ui-effects", className: "form-control", value: prefs.effects, onChange: function (event) { update("effects", event.target.value); } }, h("option", { value: "full" }, "Full"), h("option", { value: "reduced" }, "Reduced (flat surfaces)"))),
+              h("p", { className: "settings-help" }, "Reduced effects removes blur and glow while preserving contrast and readability.")
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-universal-access"), h("strong", null, "Accessibility")),
+              h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-motion" }, "Motion"), h("select", { id: "ui-motion", className: "form-control", value: prefs.motion, onChange: function (event) { update("motion", event.target.value); } }, h("option", { value: "standard" }, "Standard"), h("option", { value: "reduced" }, "Reduced"))),
+              h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-contrast" }, "Contrast"), h("select", { id: "ui-contrast", className: "form-control", value: prefs.contrast, onChange: function (event) { update("contrast", event.target.value); } }, h("option", { value: "normal" }, "Normal"), h("option", { value: "high" }, "High contrast"))),
+              h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-large-text" }, "Larger interface text"), h("input", { id: "ui-large-text", type: "checkbox", className: "settings-checkbox", checked: prefs.large_text, onChange: function (event) { update("large_text", event.target.checked); } })),
+              h("p", { className: "settings-help" }, "Reduced motion and high contrast respect your system preference when left at the default presentation, and can be forced here.")
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-keyboard"), h("strong", null, "Keyboard shortcuts")),
+              h(
+                "div",
+                { className: "shortcut-list" },
+                KEYBOARD_SHORTCUTS.map(function (shortcut) {
+                  return h("div", { className: "settings-row shortcut-row", key: shortcut.id }, h("span", { className: "settings-label" }, shortcut.command), h("kbd", { className: "shortcut-key" }, shortcut.keys));
+                })
+              ),
+              h("button", { type: "button", className: "secondary-button", onClick: function () { props.onShortcuts(); } }, icon("fa-keyboard"), "Open shortcut reference")
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-circle-info"), h("strong", null, "About")),
+              h("div", { className: "settings-row" }, h("span", { className: "settings-label" }, "Version"), h("strong", null, props.version || "2.0.0")),
+              h("div", { className: "settings-row" }, h("span", { className: "settings-label" }, "Hardware profile"), h("strong", null, (props.performanceSettings && props.performanceSettings.hardware_profile) || "development-workstation")),
+              h("p", { className: "settings-help" }, "All telemetry, prompts, models, and layouts stay on this device. Nothing is sent externally.")
+            )
+          )
+        );
+      }
+
+      function ShortcutsDialog(props) {
+        var containerRef = useRef(null);
+        useFocusTrap(props.open, containerRef);
+        if (!props.open) return null;
+        return h(
+          "div",
+          { className: "modal-overlay", role: "presentation", onMouseDown: function (event) { if (event.target === event.currentTarget) props.onClose(); } },
+          h(
+            "div",
+            { className: "modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "shortcuts-title", ref: containerRef },
+            h("div", { className: "modal-header" }, h("div", null, h("h2", { id: "shortcuts-title" }, "Keyboard shortcuts"), h("p", null, "Registered JoeOS experience commands")), h("button", { type: "button", className: "icon-button", onClick: props.onClose, "aria-label": "Close shortcut reference" }, icon("fa-xmark"))),
+            h(
+              "div",
+              { className: "modal-body shortcut-list" },
+              KEYBOARD_SHORTCUTS.map(function (shortcut) {
+                return h("div", { className: "settings-row shortcut-row", key: shortcut.id }, h("span", { className: "settings-label" }, h("strong", null, shortcut.command), h("span", null, shortcut.context)), h("kbd", { className: "shortcut-key" }, shortcut.keys));
+              })
+            ),
+            h("div", { className: "modal-actions" }, h("button", { type: "button", className: "primary-button", onClick: props.onClose }, "Close"))
+          )
+        );
+      }
+
       function missionAttentionItems(metrics, runtime, security, bots) {
         var items = [];
         if (!runtime || !runtime.online) {
@@ -4494,7 +5517,7 @@
 
       function MetricsWidget(props) {
         return h("div", { className: "mini-metric-list" }, props.metrics.map(function (metric) {
-          return h("div", { className: "mini-metric-row", key: metric.id }, h("span", null, metric.label), h(ProgressBar, { value: metric.value, label: metric.label + " utilization" }), h("strong", null, metric.loading ? "—" : metric.value.toFixed(1) + "%"));
+          return h("div", { className: "mini-metric-row", key: metric.id }, h("span", null, metric.label), h(ProgressBar, { value: metric.value, label: metric.label + " utilization" }), h("strong", null, metric.loading ? "—" : metric.unmeasured ? "—" : metric.value.toFixed(1) + "%"));
         }));
       }
 
@@ -4566,7 +5589,9 @@
       function WidgetCatalogModal(props) {
         var existing = {};
         props.workspace.widgets.forEach(function (widget) { existing[widget.widget_id] = widget; });
-        return h("div", { className: "modal-overlay", role: "presentation", onMouseDown: function (event) { if (event.target === event.currentTarget) props.onClose(); } }, h("div", { className: "modal catalog-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "catalog-title" }, h("div", { className: "modal-header" }, h("div", null, h("h2", { id: "catalog-title" }, "Widget catalog"), h("p", null, "Core modules are live. Future modules remain honest integration placeholders until a source and permission scope are configured.")), h("button", { type: "button", className: "icon-button", onClick: props.onClose, "aria-label": "Close widget catalog" }, icon("fa-xmark"))), h("div", { className: "catalog-grid" }, props.catalog.map(function (definition) {
+        var catalogRef = useRef(null);
+        useFocusTrap(true, catalogRef);
+        return h("div", { className: "modal-overlay", role: "presentation", onMouseDown: function (event) { if (event.target === event.currentTarget) props.onClose(); } }, h("div", { className: "modal catalog-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "catalog-title", ref: catalogRef }, h("div", { className: "modal-header" }, h("div", null, h("h2", { id: "catalog-title" }, "Widget catalog"), h("p", null, "Core modules are live. Future modules remain honest integration placeholders until a source and permission scope are configured.")), h("button", { type: "button", className: "icon-button", onClick: props.onClose, "aria-label": "Close widget catalog" }, icon("fa-xmark"))), h("div", { className: "catalog-grid" }, props.catalog.map(function (definition) {
           var current = existing[definition.id];
           var visible = current && current.visible;
           return h("article", { className: "catalog-item", key: definition.id }, h("span", { className: "catalog-category" }, definition.category || "module"), h("h3", null, icon(definition.icon || "fa-puzzle-piece"), " ", definition.name), h("p", null, definition.description), h("div", { className: "catalog-foot" }, h("span", { className: "integration-badge" }, definition.state === "ready" ? "READY" : "INTEGRATION REQUIRED"), h("button", { type: "button", className: visible ? "compact-button" : "primary-button", disabled: visible, onClick: function () { props.onAdd(definition); } }, icon(visible ? "fa-check" : current ? "fa-eye" : "fa-plus"), visible ? "Added" : current ? "Show" : "Add")));
@@ -4595,9 +5620,11 @@
         }
 
         var resultText = result && (result.summary || result.message || result.explanation || (result.proposal && result.proposal.summary));
+        var customizerRef = useRef(null);
+        useFocusTrap(true, customizerRef);
         return h(
           "div",
-          { className: "customizer-panel", role: "dialog", "aria-modal": "true", "aria-labelledby": "customizer-title" },
+          { className: "customizer-panel", role: "dialog", "aria-modal": "true", "aria-labelledby": "customizer-title", ref: customizerRef },
           h(
             "div",
             { className: "modal-header" },
@@ -4676,14 +5703,102 @@
         );
       }
 
+      function paletteScore(command, query) {
+        if (!query) return 100;
+        var haystack = (command.label + " " + command.detail).toLowerCase();
+        var needle = query.toLowerCase();
+        if (haystack.indexOf(needle) === 0) return 90 - needle.length;
+        if (haystack.indexOf(needle) >= 0) return 70 - needle.length;
+        var i = 0;
+        for (var j = 0; j < haystack.length && i < needle.length; j++) {
+          if (haystack[j] === needle[i]) i++;
+        }
+        if (i === needle.length) return 40 - needle.length;
+        return -1;
+      }
+
       function CommandPalette(props) {
         var queryPair = useState("");
         var query = queryPair[0];
         var setQuery = queryPair[1];
+        var activePair = useState(0);
+        var activeIndex = activePair[0];
+        var setActiveIndex = activePair[1];
         var inputRef = useRef(null);
+        var listRef = useRef(null);
+        var containerRef = useRef(null);
+        useFocusTrap(true, containerRef);
         useEffect(function () { if (inputRef.current) inputRef.current.focus(); }, []);
-        var commands = props.commands.filter(function (command) { return !query.trim() || (command.label + " " + command.detail).toLowerCase().indexOf(query.toLowerCase()) >= 0; });
-        return h("div", { className: "palette-overlay", role: "presentation", onMouseDown: function (event) { if (event.target === event.currentTarget) props.onClose(); } }, h("div", { className: "command-palette", role: "dialog", "aria-modal": "true", "aria-label": "JoeOS command palette" }, h("div", { className: "palette-search" }, icon("fa-magnifying-glass"), h("input", { ref: inputRef, value: query, onChange: function (event) { setQuery(event.target.value); }, placeholder: "Search commands and sections…", "aria-label": "Search commands" }), h("span", { className: "palette-shortcut" }, "ESC")), h("div", { className: "palette-results" }, commands.length ? commands.map(function (command) { return h("button", { type: "button", className: "palette-item", onClick: function () { command.run(); props.onClose(); }, key: command.id }, h("span", null, icon(command.icon)), h("span", { className: "palette-copy" }, h("strong", null, command.label), h("small", null, command.detail)), command.shortcut ? h("span", { className: "palette-shortcut" }, command.shortcut) : null); }) : h("div", { className: "empty-widget" }, "No command matches that search."))));
+        var scored = (props.commands || [])
+          .map(function (command) { return { command: command, score: paletteScore(command, query) }; })
+          .filter(function (item) { return item.score >= 0; })
+          .sort(function (a, b) { return b.score - a.score || (a.command.label < b.command.label ? -1 : 1); })
+          .slice(0, 24);
+        useEffect(function () { setActiveIndex(0); }, [query]);
+        function activate(item) {
+          item.command.run();
+          props.onClose();
+        }
+        function onKeyDown(event) {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setActiveIndex(function (current) { return Math.min(current + 1, scored.length - 1); });
+          } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setActiveIndex(function (current) { return Math.max(current - 1, 0); });
+          } else if (event.key === "Enter" && scored[activeIndex]) {
+            event.preventDefault();
+            activate(scored[activeIndex].command);
+          }
+        }
+        var groups = {};
+        (scored).forEach(function (item) {
+          var category = item.command.category || "Commands";
+          (groups[category] = groups[category] || []).push(item);
+        });
+        var groupKeys = Object.keys(groups);
+        var flatIndex = 0;
+        return h(
+          "div",
+          { className: "palette-overlay", role: "presentation", onMouseDown: function (event) { if (event.target === event.currentTarget) props.onClose(); } },
+          h(
+            "div",
+            { className: "command-palette", role: "dialog", "aria-modal": "true", "aria-label": "JoeOS command palette", ref: containerRef, onKeyDown: onKeyDown },
+            h("div", { className: "palette-search" }, icon("fa-magnifying-glass"), h("input", { ref: inputRef, value: query, onChange: function (event) { setQuery(event.target.value); }, placeholder: "Search commands and sections…", "aria-label": "Search commands" }), h("span", { className: "palette-shortcut" }, "ESC")),
+            h(
+              "div",
+              { className: "palette-results", ref: listRef, role: "listbox", "aria-label": "Command results" },
+              scored.length ? groupKeys.map(function (category) {
+                var items = groups[category];
+                return h(
+                  "div",
+                  { className: "palette-group", key: category },
+                  h("div", { className: "palette-caption" }, category),
+                  items.map(function (item) {
+                    var current = flatIndex++;
+                    var risk = item.command.risk;
+                    return h(
+                      "button",
+                      {
+                        type: "button",
+                        className: "palette-item" + (current === activeIndex ? " active" : "") + (risk ? " risk-" + risk : ""),
+                        onClick: function () { activate(item.command); },
+                        onMouseEnter: function () { setActiveIndex(current); },
+                        key: item.command.id,
+                        role: "option",
+                        "aria-selected": current === activeIndex
+                      },
+                      h("span", null, icon(item.command.icon)),
+                      h("span", { className: "palette-copy" }, h("strong", null, item.command.label), h("small", null, item.command.detail)),
+                      risk ? h("span", { className: "palette-risk " + risk }, risk.toUpperCase()) : null,
+                      item.command.shortcut ? h("span", { className: "palette-shortcut" }, item.command.shortcut) : null
+                    );
+                  })
+                );
+              }) : h("div", { className: "empty-widget" }, "No command matches that search.")
+            )
+          )
+        );
       }
 
       function AssistantPanel(props) {
@@ -4752,12 +5867,14 @@
       }
 
       function DeployModal(props) {
+        var containerRef = useRef(null);
+        useFocusTrap(true, containerRef);
         return h(
           "div",
           { className: "modal-overlay", role: "presentation", onMouseDown: function (event) { if (event.target === event.currentTarget) props.onClose(); } },
           h(
             "div",
-            { className: "modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "deploy-title" },
+            { className: "modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "deploy-title", ref: containerRef },
             h("div", { className: "modal-header" }, h("div", null, h("h2", { id: "deploy-title" }, "Add local agent profile"), h("p", null, "Create a routing and tracking profile. This does not grant browser chat shell access.")), h("button", { type: "button", className: "icon-button", onClick: props.onClose, "aria-label": "Close profile dialog" }, icon("fa-xmark"))),
             h(
               "form",
@@ -4772,12 +5889,14 @@
 
       function NodeModal(props) {
         var node = props.node;
+        var containerRef = useRef(null);
+        useFocusTrap(true, containerRef);
         return h(
           "div",
           { className: "modal-overlay", role: "presentation", onMouseDown: function (event) { if (event.target === event.currentTarget) props.onClose(); } },
           h(
             "div",
-            { className: "modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "node-detail-title" },
+            { className: "modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "node-detail-title", ref: containerRef },
             h("div", { className: "modal-header" }, h("div", null, h("h2", { id: "node-detail-title" }, node.name), h("p", null, node.role + " · " + node.region)), h("button", { type: "button", className: "icon-button", onClick: props.onClose, "aria-label": "Close node details" }, icon("fa-xmark"))),
             h(
               "div",
@@ -4857,6 +5976,81 @@
         var pendingBotsPair = useState([]);
         var pendingBots = pendingBotsPair[0];
         var setPendingBots = pendingBotsPair[1];
+        var pluginsPair = useState([]);
+        var plugins = pluginsPair[0];
+        var setPlugins = pluginsPair[1];
+        var pluginSafeModePair = useState(false);
+        var pluginSafeMode = pluginSafeModePair[0];
+        var setPluginSafeMode = pluginSafeModePair[1];
+        var selectedPluginPair = useState(null);
+        var selectedPlugin = selectedPluginPair[0];
+        var setSelectedPlugin = selectedPluginPair[1];
+        var workflowsPair = useState([]);
+        var workflows = workflowsPair[0];
+        var setWorkflows = workflowsPair[1];
+        var automationOverviewPair = useState({ workflows_total: 0, workflows_enabled: 0, running: 0, waiting: 0, failed_recently: 0, pending_approvals: 0, unhealthy_schedules: 0, next_scheduled_workflow: null });
+        var automationOverview = automationOverviewPair[0];
+        var setAutomationOverview = automationOverviewPair[1];
+        var notificationsPair = useState([]);
+        var notifications = notificationsPair[0];
+        var setNotifications = notificationsPair[1];
+        var communicationsOverviewPair = useState({ unread_focused: 0, pending_approvals: 0, agent_requests: 0, outbox_count: 0, failed_deliveries: 0, security_alerts_unacknowledged: 0, snoozed: 0, unhealthy_accounts: 0, unhealthy_providers: 0, quiet_hours_active: false, next_digest: null });
+        var communicationsOverview = communicationsOverviewPair[0];
+        var setCommunicationsOverview = communicationsOverviewPair[1];
+        var wearableDevicesPair = useState([]);
+        var wearableDevices = wearableDevicesPair[0];
+        var setWearableDevices = wearableDevicesPair[1];
+        var mobileClientsPair = useState([]);
+        var mobileClients = mobileClientsPair[0];
+        var setMobileClients = mobileClientsPair[1];
+        var mobileOverviewPair = useState({ paired_clients: 0, connected_clients: 0, active_sessions: 0, revoked_clients: 0, pending_pairings: 0, sync_failures: 0, stale_offline_actions: 0, push_registration_failures: 0, incompatible_versions: 0, lost_devices: 0 });
+        var mobileOverview = mobileOverviewPair[0];
+        var setMobileOverview = mobileOverviewPair[1];
+        var securityEventsPair = useState([]);
+        var securityEvents = securityEventsPair[0];
+        var setSecurityEvents = securityEventsPair[1];
+        var securityOverviewPair = useState({ security_events_open: 0, incidents_open: 0, pending_approvals: 0, secrets_requiring_rotation: 0, audit_integrity_verified: true, lockdown_active: false });
+        var securityOverview = securityOverviewPair[0];
+        var setSecurityOverview = securityOverviewPair[1];
+        var performanceOverviewPair = useState({ overall: "unknown", load: "unknown", memory_pressure: { pressure: "unknown" }, disk_pressure: { pressure: "unknown" }, gpu_pressure: { pressure: "unknown" }, load_shedding_active: false, queue_count: 0, cache_count: 0, models_loaded: 0, models_blocked: 0, active_agents: 0, active_workflows: 0, plugins_violating: 0, leak_indicators: 0, regressions: 0, low_power_mode: false, metered_network: false, metrics: {} });
+        var performanceOverview = performanceOverviewPair[0];
+        var setPerformanceOverview = performanceOverviewPair[1];
+        var performanceResourcesPair = useState({ cpu_percent: null, memory_percent: null, gpu_percent: null, gpu_available: false, disk_percent: null, load: "unknown" });
+        var performanceResources = performanceResourcesPair[0];
+        var setPerformanceResources = performanceResourcesPair[1];
+        var performanceQueuesPair = useState([]);
+        var performanceQueues = performanceQueuesPair[0];
+        var setPerformanceQueues = performanceQueuesPair[1];
+        var performanceCachesPair = useState([]);
+        var performanceCaches = performanceCachesPair[0];
+        var setPerformanceCaches = performanceCachesPair[1];
+        var performanceModelsPair = useState([]);
+        var performanceModels = performanceModelsPair[0];
+        var setPerformanceModels = performanceModelsPair[1];
+        var performanceLeaksPair = useState([]);
+        var performanceLeaks = performanceLeaksPair[0];
+        var setPerformanceLeaks = performanceLeaksPair[1];
+        var performanceBenchmarksPair = useState([]);
+        var performanceBenchmarks = performanceBenchmarksPair[0];
+        var setPerformanceBenchmarks = performanceBenchmarksPair[1];
+        var performanceBudgetsPair = useState([]);
+        var performanceBudgets = performanceBudgetsPair[0];
+        var setPerformanceBudgets = performanceBudgetsPair[1];
+        var performanceRegressionsPair = useState([]);
+        var performanceRegressions = performanceRegressionsPair[0];
+        var setPerformanceRegressions = performanceRegressionsPair[1];
+        var performanceTracesPair = useState([]);
+        var performanceTraces = performanceTracesPair[0];
+        var setPerformanceTraces = performanceTracesPair[1];
+        var performanceSettingsPair = useState({});
+        var performanceSettings = performanceSettingsPair[0];
+        var setPerformanceSettings = performanceSettingsPair[1];
+        var uiPrefsPair = useState(loadUiPrefs);
+        var uiPrefs = uiPrefsPair[0];
+        var setUiPrefs = uiPrefsPair[1];
+        var shortcutsOpenPair = useState(false);
+        var shortcutsOpen = shortcutsOpenPair[0];
+        var setShortcutsOpen = shortcutsOpenPair[1];
         var toastPair = useState("");
         var toast = toastPair[0];
         var setToast = toastPair[1];
@@ -4925,6 +6119,8 @@
 
         var menuButtonRef = useRef(null);
         var firstNavRef = useRef(null);
+        var mobileDrawerRef = useRef(null);
+        useFocusTrap(mobileOpen, mobileDrawerRef);
         var assistantInputRef = useRef(null);
         var assistantEndRef = useRef(null);
         var logRef = useRef(null);
@@ -4938,6 +6134,7 @@
         var remoteRefreshRef = useRef(false);
         var remoteErrorRef = useRef(false);
         var thinkingRef = useRef(false);
+        var assistantAbortRef = useRef(null);
         var pendingBotRef = useRef(new Set());
         var dragWidgetRef = useRef(null);
 
@@ -4981,6 +6178,115 @@
               return current.find(function (bot) { return bot.id === remoteBot.id; }) || remoteBot;
             });
           });
+        }
+
+        async function loadPluginsFromApi() {
+          var payload = await requestJson("/api/v1/plugins", { cache: "no-store", headers: { Accept: "application/json" } });
+          if (!Array.isArray(payload)) throw new Error("The plugin API returned an invalid response.");
+          setPlugins(payload);
+          try {
+            var overview = await requestJson("/api/v1/plugins/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            setPluginSafeMode(Boolean(overview && overview.safe_mode));
+          } catch (error) {
+            setPluginSafeMode(false);
+          }
+        }
+
+        async function loadAutomationFromApi() {
+          try {
+            var workflowsPayload = await requestJson("/api/v1/automation/workflows", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (Array.isArray(workflowsPayload)) setWorkflows(workflowsPayload);
+            var overviewPayload = await requestJson("/api/v1/automation/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (overviewPayload && typeof overviewPayload === "object") setAutomationOverview(overviewPayload);
+          } catch (error) {
+            setWorkflows([]);
+          }
+        }
+
+        async function loadCommunicationsFromApi() {
+          try {
+            var notificationsPayload = await requestJson("/api/v1/communications/notifications", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (notificationsPayload && Array.isArray(notificationsPayload.notifications)) setNotifications(notificationsPayload.notifications);
+            var overviewPayload = await requestJson("/api/v1/communications/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (overviewPayload && typeof overviewPayload === "object") setCommunicationsOverview(overviewPayload);
+          } catch (error) {
+            setNotifications([]);
+          }
+        }
+
+        async function loadWearablesFromApi() {
+          try {
+            var devicesPayload = await requestJson("/api/v1/wearables/devices", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (devicesPayload && Array.isArray(devicesPayload.devices)) setWearableDevices(devicesPayload.devices);
+          } catch (error) {
+            setWearableDevices([]);
+          }
+        }
+
+        async function loadMobileFromApi() {
+          try {
+            var clientsPayload = await requestJson("/api/v1/mobile/clients", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (clientsPayload && Array.isArray(clientsPayload.clients)) setMobileClients(clientsPayload.clients);
+            var overviewPayload = await requestJson("/api/v1/mobile/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (overviewPayload && typeof overviewPayload === "object") setMobileOverview(overviewPayload);
+          } catch (error) {
+            setMobileClients([]);
+          }
+        }
+
+        async function loadSecurityFromApi() {
+          try {
+            var eventsPayload = await requestJson("/api/v1/security/security-events", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (eventsPayload && Array.isArray(eventsPayload.events)) setSecurityEvents(eventsPayload.events);
+            var overviewPayload = await requestJson("/api/v1/security/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (overviewPayload && typeof overviewPayload === "object") setSecurityOverview(overviewPayload);
+          } catch (error) {
+            setSecurityEvents([]);
+          }
+        }
+
+        async function loadPerformanceFromApi() {
+          try {
+            var overviewPayload = await requestJson("/api/v1/performance/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (overviewPayload && typeof overviewPayload === "object") setPerformanceOverview(overviewPayload);
+            var resourcesPayload = await requestJson("/api/v1/performance/resources", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (resourcesPayload && typeof resourcesPayload === "object") setPerformanceResources(resourcesPayload);
+            var queuesPayload = await requestJson("/api/v1/performance/queues", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (queuesPayload && Array.isArray(queuesPayload.queues)) setPerformanceQueues(queuesPayload.queues);
+            var cachesPayload = await requestJson("/api/v1/performance/caches", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (cachesPayload && Array.isArray(cachesPayload.caches)) setPerformanceCaches(cachesPayload.caches);
+            var modelsPayload = await requestJson("/api/v1/performance/models", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (modelsPayload && Array.isArray(modelsPayload.models)) setPerformanceModels(modelsPayload.models);
+            var leaksPayload = await requestJson("/api/v1/performance/leaks", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (leaksPayload && Array.isArray(leaksPayload.indicators)) setPerformanceLeaks(leaksPayload.indicators);
+            var budgetsPayload = await requestJson("/api/v1/performance/budgets", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (budgetsPayload && Array.isArray(budgetsPayload.budgets)) setPerformanceBudgets(budgetsPayload.budgets);
+            var regressionsPayload = await requestJson("/api/v1/performance/regressions", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (regressionsPayload && Array.isArray(regressionsPayload.regressions)) setPerformanceRegressions(regressionsPayload.regressions);
+            var tracesPayload = await requestJson("/api/v1/performance/traces", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (tracesPayload && Array.isArray(tracesPayload.traces)) setPerformanceTraces(tracesPayload.traces);
+            var settingsPayload = await requestJson("/api/v1/performance/settings", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (settingsPayload && settingsPayload.settings) setPerformanceSettings(settingsPayload.settings);
+            var benchmarksPayload = await requestJson("/api/v1/performance/benchmarks", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (benchmarksPayload && Array.isArray(benchmarksPayload.benchmarks)) setPerformanceBenchmarks(benchmarksPayload.benchmarks);
+          } catch (error) {
+            setPerformanceOverview({ overall: "unknown", load: "unknown", memory_pressure: { pressure: "unknown" }, disk_pressure: { pressure: "unknown" }, gpu_pressure: { pressure: "unknown" }, load_shedding_active: false, queue_count: 0, cache_count: 0, models_loaded: 0, models_blocked: 0, active_agents: 0, active_workflows: 0, plugins_violating: 0, leak_indicators: 0, regressions: 0, low_power_mode: false, metered_network: false, metrics: {} });
+          }
+        }
+
+        async function runPerformanceAction(action) {
+          try {
+            var payload = await requestJson("/api/v1/performance/actions", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ action: action }) });
+            if (action === "unload-idle-models") notify("Idle models unloaded: " + ((payload && payload.unloaded_models) || []).length);
+            if (action === "clear-safe-caches") notify("Safe caches cleared: " + (payload && payload.cleared_caches || 0));
+            if (action === "enter-low-resource-mode") notify("Low-resource mode enabled.");
+            if (action === "exit-low-resource-mode") notify("Low-resource mode disabled.");
+            if (action === "pause-indexing") notify("Background indexing paused.");
+            if (action === "resume-indexing") notify("Background indexing resumed.");
+            loadPerformanceFromApi();
+          } catch (error) {
+            notify("Performance action failed: " + error.message);
+          }
         }
 
         function replaceLiveLogs(rows, activeProfiles) {
@@ -5050,7 +6356,7 @@
           if (remoteRefreshRef.current) return;
           remoteRefreshRef.current = true;
           try {
-            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi()]);
+            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi(), loadSecurityFromApi(), loadPerformanceFromApi()]);
             var failures = results.filter(function (result) { return result.status === "rejected"; });
             if (failures.length) {
               if (results[0].status === "rejected") setRuntime({ online: false, status: "offline", model: null, version: null, message: "JoeOS telemetry API is unavailable" });
@@ -5137,19 +6443,41 @@
             monospace: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
             serif: 'Charter, "Iowan Old Style", Georgia, serif'
           };
-          root.style.setProperty("--font-scale", String(theme.font_scale));
+          var effectiveTheme = uiPrefs.theme === "system" ? (systemPrefersDark() ? "dark" : "light") : uiPrefs.theme;
+          root.setAttribute("data-theme", effectiveTheme);
+          root.setAttribute("data-contrast", uiPrefs.contrast);
+          root.setAttribute("data-motion", uiPrefs.motion);
+          root.setAttribute("data-density", uiPrefs.density);
+          var effects = uiPrefs.effects;
+          if (performanceSettings && (performanceSettings.low_power_mode || performanceSettings.metered_network)) effects = "reduced";
+          root.setAttribute("data-effects", effects);
+          root.style.setProperty("--font-scale", String((uiPrefs.large_text ? 1.15 : 1) * theme.font_scale));
           root.style.setProperty("--workspace-font", fonts[theme.font_family] || fonts.system);
           root.style.setProperty("--cyan", theme.accent_hex);
           root.style.setProperty("--cyan-soft", theme.accent_hex);
-          root.style.setProperty("--text", theme.text_hex);
-          root.style.setProperty("--canvas", theme.canvas_hex);
-          root.style.setProperty("--canvas-2", theme.canvas_hex);
+          // Light theme uses its own contrast-checked token set; the dark
+          // workspace canvas/text hexes only apply to the dark presentation.
+          if (effectiveTheme !== "light") {
+            root.style.setProperty("--text", theme.text_hex);
+            root.style.setProperty("--canvas", theme.canvas_hex);
+            root.style.setProperty("--canvas-2", theme.canvas_hex);
+          } else {
+            root.style.setProperty("--text", "");
+            root.style.setProperty("--canvas", "");
+            root.style.setProperty("--canvas-2", "");
+          }
           root.style.setProperty("--workspace-radius", theme.radius + "px");
           root.style.setProperty("--glass-opacity", String(theme.glass_opacity));
           root.style.setProperty("--workspace-gap", gaps[theme.density] || gaps.comfortable);
           var themeColor = document.querySelector('meta[name="theme-color"]');
-          if (themeColor) themeColor.setAttribute("content", theme.canvas_hex);
-        }, [workspace.theme]);
+          if (themeColor) themeColor.setAttribute("content", effectiveTheme === "light" ? "#eef4fb" : theme.canvas_hex);
+        }, [workspace.theme, uiPrefs, performanceSettings]);
+
+        function updateUiPrefs(next) {
+          saveUiPrefs(next);
+          setUiPrefs(next);
+          notify("Interface preferences updated.");
+        }
 
         useEffect(function () {
           function onVisibilityChange() {
@@ -5185,9 +6513,16 @@
         }, [mobileOpen, deployOpen, catalogOpen, customizerOpen, paletteOpen, selectedNode, assistantOpen]);
 
         useEffect(function () {
+          function inEditable(target) {
+            var node = target && target.tagName;
+            return node === "INPUT" || node === "TEXTAREA" || node === "SELECT" || (target && target.isContentEditable);
+          }
           function onKeyDown(event) {
+            var meta = event.metaKey || event.ctrlKey;
+            var key = event.key.toLowerCase();
             if (event.key === "Escape") {
-              if (paletteOpen) setPaletteOpen(false);
+              if (shortcutsOpen) setShortcutsOpen(false);
+              else if (paletteOpen) setPaletteOpen(false);
               else if (catalogOpen) setCatalogOpen(false);
               else if (customizerOpen) setCustomizerOpen(false);
               else if (deployOpen) setDeployOpen(false);
@@ -5195,16 +6530,51 @@
               else if (mobileOpen) closeMobile();
               else if (notificationsOpen) setNotificationsOpen(false);
               else if (assistantOpen) setAssistantOpen(false);
+              return;
             }
-            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+            if (meta && key === "k") {
               event.preventDefault();
               if (event.shiftKey) setAssistantOpen(true);
               else setPaletteOpen(true);
+              return;
+            }
+            if (meta && event.shiftKey && key === "n") {
+              event.preventDefault();
+              setNotificationsOpen(function (current) { return !current; });
+              return;
+            }
+            if (meta && key === ",") {
+              event.preventDefault();
+              selectSection("settings");
+              return;
+            }
+            if (meta && key === "/") {
+              event.preventDefault();
+              setShortcutsOpen(true);
+              return;
+            }
+            if (!meta && !event.altKey && event.key === "?" && !inEditable(event.target)) {
+              event.preventDefault();
+              setShortcutsOpen(true);
+              return;
+            }
+            if (event.altKey && !inEditable(event.target) && /^[0-9]$/.test(event.key)) {
+              var index = event.key === "0" ? 9 : Number(event.key) - 1;
+              var item = NAV_ITEMS[index];
+              if (item) {
+                event.preventDefault();
+                selectSection(item.id);
+              }
+              return;
+            }
+            if ((meta && key === "g") && !inEditable(event.target)) {
+              event.preventDefault();
+              setPaletteOpen(true);
             }
           }
           window.addEventListener("keydown", onKeyDown);
           return function () { window.removeEventListener("keydown", onKeyDown); };
-        }, [paletteOpen, catalogOpen, customizerOpen, deployOpen, selectedNode, mobileOpen, notificationsOpen, assistantOpen]);
+        }, [paletteOpen, catalogOpen, customizerOpen, deployOpen, selectedNode, mobileOpen, notificationsOpen, assistantOpen, shortcutsOpen]);
 
         function openMobile() {
           setMobileOpen(true);
@@ -5509,6 +6879,8 @@
           var clean = String(command || "").trim();
           if (!clean || thinkingRef.current) return;
           thinkingRef.current = true;
+          var controller = new AbortController();
+          assistantAbortRef.current = controller;
           var userMessage = { id: "msg-" + messageIdRef.current++, role: "user", text: clean };
           setMessages(function (current) { return current.concat([userMessage]).slice(-30); });
           setAssistantInput("");
@@ -5524,16 +6896,31 @@
                   history: messages.slice(-10).map(function (message) { return { role: message.role, text: message.text }; })
                 }
               }),
-              timeoutMs: 120000
+              timeoutMs: 120000,
+              signal: controller.signal
             });
             var reply = payload && (payload.reply || payload.response || payload.message);
             if (!reply) throw new Error("The assistant returned an empty response.");
             setMessages(function (current) { return current.concat([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: String(reply) }]).slice(-30); });
           } catch (error) {
-            setMessages(function (current) { return current.concat([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: "I couldn’t complete that local request: " + error.message }]).slice(-30); });
+            if (error && error.name === "AbortError") {
+              setMessages(function (current) { return current.concat([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: "Generation stopped by the operator." }]).slice(-30); });
+            } else {
+              setMessages(function (current) { return current.concat([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: "I couldn’t complete that local request: " + error.message }]).slice(-30); });
+            }
           } finally {
             thinkingRef.current = false;
+            assistantAbortRef.current = null;
             setThinking(false);
+          }
+        }
+
+        function cancelAssistant() {
+          if (assistantAbortRef.current) {
+            assistantAbortRef.current.abort();
+          } else {
+            setThinking(false);
+            thinkingRef.current = false;
           }
         }
 
@@ -5558,14 +6945,32 @@
 
         var activeItem = NAV_ITEMS.find(function (item) { return item.id === active; }) || NAV_ITEMS[0];
         var unread = notifications.filter(function (notification) { return notification.unread; }).length;
+        var banners = [];
+        if (securityOverview && securityOverview.lockdown_active) {
+          banners.push({ id: "lockdown", tone: "security", icon: "fa-lock", text: "Lockdown is active — privileged operations are blocked until reauthentication.", action: function () { selectSection("security-center"); }, actionLabel: "Open Security Center" });
+        }
+        if (!runtime || !runtime.online) {
+          banners.push({ id: "offline", tone: "warning", icon: "fa-plug-circle-xmark", text: "Lemonade Server is offline — local AI and model telemetry are unavailable.", action: function () { selectSection("dashboard"); }, actionLabel: "View dashboard" });
+        }
+        if (performanceSettings && (performanceSettings.low_power_mode || performanceSettings.metered_network)) {
+          banners.push({ id: "low-resource", tone: "info", icon: "fa-battery-quarter", text: "Low-resource mode is active — background work is reduced and visual effects are flattened." });
+        }
+        if (performanceOverview && performanceOverview.disk_pressure && performanceOverview.disk_pressure.pressure === "critical") {
+          banners.push({ id: "disk-critical", tone: "warning", icon: "fa-hard-drive", text: "Disk space is critically low — safe caches trimmed, uploads blocked.", action: function () { selectSection("performance"); }, actionLabel: "Open Performance Center" });
+        }
         var paletteCommands = NAV_ITEMS.map(function (item) {
-          return { id: "nav-" + item.id, label: "Open " + item.label, detail: "Navigate to the " + item.short + " workspace", icon: item.icon, run: function () { selectSection(item.id); } };
+          return { id: "nav-" + item.id, label: "Open " + item.label, detail: "Navigate to the " + item.short + " workspace", icon: item.icon, category: "Navigation", run: function () { selectSection(item.id); } };
         }).concat([
-          { id: "customize", label: "Customize Mission Control", detail: "Change fonts, colors, density, radius, and glass", icon: "fa-palette", shortcut: "C", run: function () { selectSection("mission"); setCustomizerOpen(true); } },
-          { id: "widgets", label: "Add a widget", detail: "Open the versioned module catalog", icon: "fa-table-cells-large", shortcut: "W", run: function () { selectSection("mission"); setCatalogOpen(true); } },
-          { id: "edit", label: "Edit workspace layout", detail: "Drag, move, resize, or hide Mission Control modules", icon: "fa-pen-ruler", shortcut: "E", run: function () { selectSection("mission"); setEditingLayout(true); } },
-          { id: "assistant", label: "Ask JoeOS AI", detail: "Open the private read-only Lemonade assistant", icon: "fa-wand-magic-sparkles", shortcut: "⇧⌘K", run: function () { setAssistantOpen(true); } },
-          { id: "refresh", label: "Refresh Halo state", detail: "Reload telemetry, profiles, and local events", icon: "fa-rotate", run: function () { refreshRemoteData(true); } }
+          { id: "customize", label: "Customize Mission Control", detail: "Change fonts, colors, density, radius, and glass", icon: "fa-palette", shortcut: "C", category: "Commands", run: function () { selectSection("mission"); setCustomizerOpen(true); } },
+          { id: "widgets", label: "Add a widget", detail: "Open the versioned module catalog", icon: "fa-table-cells-large", shortcut: "W", category: "Commands", run: function () { selectSection("mission"); setCatalogOpen(true); } },
+          { id: "edit", label: "Edit workspace layout", detail: "Drag, move, resize, or hide Mission Control modules", icon: "fa-pen-ruler", shortcut: "E", category: "Commands", run: function () { selectSection("mission"); setEditingLayout(true); } },
+          { id: "assistant", label: "Ask JoeOS AI", detail: "Open the private read-only Lemonade assistant", icon: "fa-wand-magic-sparkles", shortcut: "⇧⌘K", category: "Commands", run: function () { setAssistantOpen(true); } },
+          { id: "settings", label: "Open Settings", detail: "Appearance, accessibility, and interface behavior", icon: "fa-sliders", shortcut: "Ctrl+,", category: "Navigation", run: function () { selectSection("settings"); } },
+          { id: "shortcuts", label: "Open keyboard shortcuts", detail: "View the registered shortcut registry", icon: "fa-keyboard", shortcut: "?", category: "Help", run: function () { setShortcutsOpen(true); } },
+          { id: "refresh", label: "Refresh Halo state", detail: "Reload telemetry, profiles, and local events", icon: "fa-rotate", category: "Commands", run: function () { refreshRemoteData(true); } },
+          { id: "stop", label: "Stop current operation", detail: "Cancel the active AI generation", icon: "fa-stop", shortcut: "Esc", category: "Commands", run: function () { cancelAssistant(); } },
+          { id: "focus-content", label: "Focus main content", detail: "Move keyboard focus to the primary workspace", icon: "fa-up-right-and-down-left-from-center", category: "Commands", run: function () { var node = document.getElementById("main-content"); if (node) { node.setAttribute("tabindex", "-1"); node.focus(); } } },
+          { id: "lockdown", label: "Open Security Center", detail: "Reach Lockdown and Emergency Stop", icon: "fa-shield-halved", risk: "security", category: "Security", run: function () { selectSection("security-center"); } }
         ]);
 
         var section = null;
@@ -5579,17 +6984,37 @@
           section = h(InfrastructureSection, { nodes: nodes, onInspect: setSelectedNode, onRefresh: refreshFleet });
         } else if (active === "security") {
           section = h(SecuritySection, { security: security, logs: logs, streamStatus: streamStatus, paused: logsPaused, logFilter: logFilter, onLogFilter: setLogFilter, onPause: toggleLogs, onClear: clearVisibleLogs, onExport: exportLogs, logRef: logRef });
+        } else if (active === "plugins") {
+          section = h(PluginsSection, { plugins: plugins, safeMode: pluginSafeMode, onInspect: setSelectedPlugin });
+        } else if (active === "automation") {
+          section = h(AutomationSection, { workflows: workflows, overview: automationOverview, onInspect: setSelectedPlugin });
+        } else if (active === "communications") {
+          section = h(CommunicationsSection, { notifications: notifications, overview: communicationsOverview });
+        } else if (active === "wearables") {
+          section = h(WearablesSection, { devices: wearableDevices, onInspect: setSelectedPlugin });
+        } else if (active === "mobile") {
+          section = h(MobileSection, { clients: mobileClients, overview: mobileOverview, onInspect: setSelectedPlugin });
+        } else if (active === "security-center") {
+          section = h(SecurityCenterSection, { overview: securityOverview, events: securityEvents });
+        } else if (active === "performance") {
+          section = h(PerformanceSection, { overview: performanceOverview, resources: performanceResources, queues: performanceQueues, caches: performanceCaches, models: performanceModels, leaks: performanceLeaks, benchmarks: performanceBenchmarks, budgets: performanceBudgets, regressions: performanceRegressions, traces: performanceTraces, settings: performanceSettings });
+        } else if (active === "settings") {
+          section = h(SettingsSection, { prefs: uiPrefs, onChange: updateUiPrefs, onShortcuts: function () { setShortcutsOpen(true); }, version: "2.0.0", performanceSettings: performanceSettings });
         } else {
           section = h(BotsSection, { bots: bots, pending: pendingBots, onToggle: toggleBot, onDeploy: function () { setDeployOpen(true); } });
         }
 
         return h(
-          "div",
-          { className: "app-shell" },
-          h(DesktopSidebar, { active: active, onSelect: selectSection, runtime: runtime }),
+          React.Fragment,
+          null,
+          h("a", { className: "skip-link", href: "#main-content", onFocus: function () {}, onKeyDown: function (event) { if (event.key === "Enter") { var node = document.getElementById("main-content"); if (node) { node.setAttribute("tabindex", "-1"); node.focus(); } } } }, "Skip to main content"),
           h(
             "div",
-            { className: "main-shell " + (assistantOpen ? "ai-open" : "") },
+            { className: "app-shell" },
+            h(DesktopSidebar, { active: active, onSelect: selectSection, runtime: runtime }),
+            h(
+              "div",
+              { className: "main-shell " + (assistantOpen ? "ai-open" : "") },
             h(
               "header",
               { className: "topbar" },
@@ -5621,7 +7046,20 @@
                 h("button", { type: "button", className: "assistant-top-button", onClick: function () { setAssistantOpen(true); }, "aria-label": "Open JoeOS AI assistant" }, icon("fa-wand-magic-sparkles"), h("span", null, "Ask JoeOS AI"))
               )
             ),
-            h("main", { className: "content", id: "main-content" }, section)
+            banners.length ? h(
+              "div",
+              { className: "banner-stack", role: "region", "aria-label": "System conditions" },
+              banners.map(function (banner) {
+                return h(
+                  "div",
+                  { className: "system-banner " + banner.tone, key: banner.id },
+                  h("span", { className: "banner-icon", "aria-hidden": "true" }, icon(banner.icon)),
+                  h("span", null, banner.text),
+                  banner.action ? h("button", { type: "button", className: "text-button banner-action", onClick: banner.action }, banner.actionLabel) : null
+                );
+              })
+            ) : null,
+            h("main", { className: "content", id: "main-content", tabIndex: -1 }, section)
           ),
           mobileOpen ? h(
             React.Fragment,
@@ -5629,7 +7067,7 @@
             h("div", { className: "mobile-overlay", onClick: closeMobile, "aria-hidden": "true" }),
             h(
               "div",
-              { className: "mobile-drawer", id: "mobile-navigation", role: "dialog", "aria-modal": "true", "aria-label": "Mobile navigation" },
+              { className: "mobile-drawer", id: "mobile-navigation", role: "dialog", "aria-modal": "true", "aria-label": "Mobile navigation", ref: mobileDrawerRef },
               h("aside", { className: "sidebar", "aria-label": "Mobile navigation" }, h("button", { type: "button", className: "icon-button mobile-drawer-close", onClick: closeMobile, "aria-label": "Close navigation menu" }, icon("fa-xmark")), h(SidebarContent, { active: active, onSelect: selectSection, runtime: runtime, mobile: true, firstNavRef: firstNavRef }))
             )
           ) : null,
@@ -5651,7 +7089,9 @@
           }) : h("button", { type: "button", className: "assistant-fab", onClick: function () { setAssistantOpen(true); }, "aria-label": "Open JoeOS AI assistant", title: "Ask JoeOS AI" }, icon("fa-wand-magic-sparkles")),
           deployOpen ? h(DeployModal, { name: agentName, role: agentRole, onName: setAgentName, onRole: setAgentRole, onClose: function () { setDeployOpen(false); }, onSubmit: deployAgent }) : null,
           selectedNode ? h(NodeModal, { node: selectedNode, onClose: function () { setSelectedNode(null); }, onRefresh: refreshNode }) : null,
+          h(ShortcutsDialog, { open: shortcutsOpen, onClose: function () { setShortcutsOpen(false); } }),
           toast ? h("div", { className: "toast", role: "status" }, icon("fa-circle-check"), toast) : null
+          )
         );
       }
 
