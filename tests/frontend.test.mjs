@@ -135,3 +135,83 @@ test("ships a Performance Center driven by real measured state", () => {
   assert.match(html, /Unknown metrics stay unknown/i);
   assert.match(html, /No fabricated FPS, latency, or hardware utilization values are shown/i);
 });
+
+test("ships a Settings surface for appearance and accessibility", () => {
+  assert.match(html, /id: ["']settings["'], label: ["']Settings["']/);
+  assert.match(html, /function SettingsSection\(/);
+  assert.match(html, /function defaultUiPrefs\(/);
+  assert.match(html, /joeos:ui-prefs/);
+  assert.match(html, /theme:\s*"system"/);
+  assert.match(html, /setAttribute\(\s*["']data-theme["']\s*,\s*effectiveTheme/);
+});
+
+test("ships one semantic design token registry", () => {
+  assert.match(html, /--color-text-primary\s*:/);
+  assert.match(html, /--color-status-critical\s*:/);
+  assert.match(html, /--color-action-destructive\s*:/);
+  assert.match(html, /--color-focus-ring\s*:/);
+  assert.match(html, /--duration-standard\s*:/);
+  assert.match(html, /--z-dialog\s*:/);
+  assert.match(html, /--touch-target\s*:/);
+});
+
+test("supports themes, high contrast, density, reduced effects and motion", () => {
+  assert.match(html, /html\[data-theme="light"\]/);
+  assert.match(html, /html\[data-contrast="high"\]/);
+  assert.match(html, /html\[data-density="compact"\]/);
+  assert.match(html, /html\[data-effects="reduced"\]/);
+  assert.match(html, /html\[data-motion="reduced"\]/);
+  assert.match(html, /prefers-reduced-motion: reduce/);
+  assert.match(html, /prefers-color-scheme: dark/);
+});
+
+test("ships a keyboard-first focus system with skip link and focus traps", () => {
+  assert.match(html, /className: ["']skip-link["']/);
+  assert.match(html, /Skip to main content/);
+  assert.match(html, /function useFocusTrap\(/);
+  assert.match(html, /aria-modal"\s*:\s*["']true["']/);
+  assert.match(html, /document\.activeElement/);
+});
+
+test("centralizes keyboard shortcuts in one registry with a reference dialog", () => {
+  assert.match(html, /var KEYBOARD_SHORTCUTS\s*=/);
+  assert.match(html, /Open Command Palette/);
+  assert.match(html, /function ShortcutsDialog\(/);
+  assert.match(html, /Open keyboard shortcuts/);
+  assert.match(html, /event\.key === "\?"/);
+});
+
+test("command palette ranks results, groups by category, and marks risk", () => {
+  assert.match(html, /function paletteScore\(/);
+  assert.match(html, /palette-group/);
+  assert.match(html, /palette-caption/);
+  assert.match(html, /palette-risk/);
+  assert.match(html, /risk: ["']security["']/);
+  assert.match(html, /role: ["']option["']/);
+});
+
+test("exposes a consistent status badge primitive with non-color labels", () => {
+  assert.match(html, /function StatusBadge\(/);
+  assert.match(html, /status-badge/);
+  assert.match(html, /status-running/);
+  assert.match(html, /aria-label": label/);
+});
+
+test("shows persistent conditions in an accessible banner region", () => {
+  assert.match(html, /banner-stack/);
+  assert.match(html, /system-banner/);
+  assert.match(html, /Lockdown is active/);
+  assert.match(html, /Lemonade Server is offline/);
+  assert.match(html, /aria-label": "System conditions"/);
+});
+
+test("supports stopping the active AI operation with honest state", () => {
+  assert.match(html, /function cancelAssistant\(/);
+  assert.match(html, /Stop current operation/);
+  assert.match(html, /Generation stopped by the operator/);
+});
+
+test("uses calm, precise microcopy without blame or hype", () => {
+  assert.doesNotMatch(html, /\bOops\b|\bUh-oh\b|\bYou broke it\b/i);
+  assert.doesNotMatch(html, /\bSupercharge\b|\bRevolutionary\b|\bGuaranteed\b/i);
+});

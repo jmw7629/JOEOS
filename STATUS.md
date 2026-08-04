@@ -4,7 +4,7 @@ Generated: 2026-08-04.
 
 ## Current phase
 
-Phase 16 — Performance Optimization and Resource Governance (delivered).
+Phase 17 — UI/UX Polish, Interaction, Accessibility, Responsiveness, and Visual Consistency (delivered).
 
 ## What works
 
@@ -20,11 +20,12 @@ Phase 16 — Performance Optimization and Resource Governance (delivered).
 - Mobile Companion and Secure Remote Operations Platform: authoritative Mobile Client Registry, Host Registry with explicit discovery, two-party secure pairing (short-lived single-use hashed codes, host + client confirmation), short-lived revocable sessions with rotating hashed refresh credentials, allowlisted Remote Command Gateway (prohibited operations rejected, raw AI never executed), Scoped Remote API backed by real authoritative state providers, safe-only idempotent offline action queue revalidated against base versions (conflicts preserve authoritative state), handoff coordinator, opaque single-use user-bound deep links, privacy-safe provider-neutral push contracts with an isolated test fixture (production APNs/FCM not claimed), immediate server-side revocation and honest lost-device mode, an extended native SwiftUI iOS policy module (`MobileCompanionPolicy`), and a Mobile Companion section in the Command Center UI.
 - Security Platform and zero-trust hardening: deny-by-default Policy Registry and Evaluation Engine (typed structured rules, never eval), Identity Registry with no cross-type impersonation, Scope Resolver with explicit path containment (traversal/symlink/NUL rejection), exact-bound Approvals with risk-based strength levels (0-5) and separation of duties, authoritative Secret Broker (AES-256-GCM at rest, rotation, revocation, destination policy, masked secret detection), hash-chained Audit Log with tamper verification, Security Events, Incident Registry, Lockdown (reauthentication to exit), Emergency Stop (honest incomplete cancellation), Quarantine, per-target Circuit Breakers, Data Classification (model can never lower), Privacy Policy Engine (cloud blocked for restricted classes), Threat Model Registry for critical boundaries, and a Security Center section in the Command Center UI. No fabricated vulnerability counts, malware results, compliance claims, or security scores are produced.
 - Performance and Resource Governance Platform: an authoritative, measurement-driven layer that reuses the existing telemetry/health architecture (never a second telemetry source). Provides a Performance Metrics Registry (bounded, source/availability-typed), typed Workload Classification (callers cannot self-declare critical), a 16-lane Priority Scheduler with fairness, aging, deadlines, cancellation, and queue visibility, Admission Control over real measured CPU/memory/disk/battery/thermal/model state (capacity is never fabricated), a per-scope Concurrency Governor (subsystems cannot raise their own limits), a Resource Governor with honest pressure states (GPU/VRAM/battery/thermal stay unknown until actually measurable), ordered visible Load Shedding that never sheds security/cancellation/approvals/foreground, bounded Backpressure queues that preserve security-critical and final-state events, a Cache Registry with explicit invalidation that refuses security-sensitive state and invalidates immediately on permission/session/secret changes, a Model Resource Manager (max resident models, idle unload, OOM marks resource_blocked with no endless retry, never unloads during an active request), long-session Leak Detection (single high samples are never flagged), a Benchmark Registry running real isolated fixtures with median/variance (never fastest-run cherry-pick), a versioned Performance Budget Registry scoped by hardware profile, a Regression Analyzer that only flags regressions beyond measured noise, redacted Performance Tracing (no secrets/prompts/paths/raw values), GPU honesty fixed at the telemetry source (unmeasured GPU is no longer reported as 0%), and a Performance Center section in the Command Center UI. No fabricated FPS, latency, throughput, memory, GPU, VRAM, battery, or thermal numbers are shown; unknown stays unknown.
+- Product-experience polish pass: one semantic Design Token registry (color/typography/spacing/radius/elevation/motion/z-index/touch targets), a light theme plus high-contrast, reduced-effects, reduced-motion, and density presentations applied through `data-*` attributes on the shell, a Settings workspace (Appearance + Accessibility + About) persisted locally and integrated with the workspace theme engine, a centralized Keyboard Shortcut Registry with a reference dialog and new global shortcuts (Ctrl+, Ctrl+/ ?, Alt+1..0 navigation, Ctrl+Shift+N notifications, Ctrl+G search), a ranked and categorized Command Palette with keyboard navigation, focus trapping, risk labels, and honest availability, a focus-management system (skip-to-content link, reusable focus-trap utility, focus restoration on dialog/palette/drawer close, `tabIndex=-1` main content), a consistent StatusBadge primitive with non-color labels applied to production surfaces, an accessible system banner region for Lockdown, offline runtime, low-resource mode, and critical disk pressure, a cancellable AI assistant with truthful stop state, coarse-pointer touch-target bump, and calm consistent microcopy. No decorative mocks, dead controls, placeholder routes, or fabricated state were introduced; every new surface reflects authoritative service state.
 
 ## Test status
 
 - Python: 532 passed, 61 subtests passed.
-- Frontend: 15/15 passed.
+- Frontend: 25/25 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 
 ## Not yet built
@@ -39,7 +40,9 @@ Phase 16 — Performance Optimization and Resource Governance (delivered).
 - Native iOS build/sign/simulator (requires Xcode, not installed on this machine), production APNs/FCM push, background-execution guarantees, biometric security, universal links, and App Store distribution (contracts documented; not claimed as implemented).
 - OS keychain/hardware-backed secret storage, immutable audit logs, and full OS-level sandboxing (documented limitations; AES-GCM vault, hash-chain tamper evidence, and subprocess isolation are the honest current guarantees).
 
-See `docs/architecture/PERFORMANCE_PLATFORM.md` for the performance and
+See `docs/architecture/EXPERIENCE_UX.md` for the product-experience polish
+design and honest guarantees,
+`docs/architecture/PERFORMANCE_PLATFORM.md` for the performance and
 resource governance design and honest guarantees,
 `docs/architecture/SECURITY_PLATFORM.md` for the security platform
 design and honest guarantees, `docs/architecture/MOBILE_COMPANION.md` for the
