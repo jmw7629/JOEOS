@@ -46,6 +46,17 @@ Every release must pass:
 - Frontend structural tests (`tests/frontend.test.mjs`).
 - Client and plugin SDK tests.
 - A dry-run package that produces a complete bundle and hash manifest.
+- `python scripts/doctor.py` diagnostics (no fail-state checks).
+- Production release gates reported by `GET /api/v1/production/status`; scans,
+  signing, SBOM, and update distribution are honestly `not_configured`.
+
+## Production readiness platform
+
+`server/production/` provides the release status, versioned migrations,
+verified backups, staged restores with security-state reset, staged update
+verification, Safe Mode / Repair Mode / crash-loop recovery, and the `doctor`
+CLI. See `docs/architecture/PRODUCTION_READINESS.md` for details and honest
+guarantees.
 
 ## Honest limitations
 
@@ -53,5 +64,7 @@ Every release must pass:
   locally. A future CI configuration should invoke the same commands.
 - No signed artifacts or checksum verification workflow is implemented.
   `release-manifest.json` provides digests for manual verification.
+- No signing, notarization, package-manager publication, container
+  publication, or mobile-store distribution is implemented or claimed.
 - Browser E2E and visual-regression tooling require runtimes not installed on
   this machine; they are not release gates here.

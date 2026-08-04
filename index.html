@@ -3964,6 +3964,7 @@
         { id: "security-center", label: "Security Center", short: "Security", icon: "fa-user-shield" },
         { id: "performance", label: "Performance Center", short: "Performance", icon: "fa-gauge-high" },
         { id: "ai", label: "Models & AI", short: "Models", icon: "fa-brain" },
+        { id: "production", label: "Production & Release", short: "Production", icon: "fa-rocket" },
         { id: "settings", label: "Settings", short: "Settings", icon: "fa-sliders" },
         { id: "bots", label: "Bot Fleet", short: "Bot Fleet", icon: "fa-robot" }
       ];
@@ -5478,6 +5479,99 @@
         );
       }
 
+      function productionGateLabel(state) {
+        return String(state || "unknown").toUpperCase();
+      }
+
+      function ProductionSection(props) {
+        var status = props.status || {};
+        var build = props.build || {};
+        var backups = props.backups || [];
+        var migrations = props.migrations || [];
+        var recovery = props.recovery || {};
+        var gates = status.gates || [];
+        var targets = status.targets || [];
+        var blocking = gates.filter(function (gate) { return gate.state === "blocking"; });
+        var verifiedBackups = backups.filter(function (record) { return record.verified; }).length;
+        var futureSchemas = migrations.filter(function (migration) { return migration.future_schema; });
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "production-title" },
+          h(SectionHeader, {
+            kicker: "Honest release readiness",
+            title: h("span", { id: "production-title" }, "Production & Release"),
+            description: "Build metadata, supported targets, release gates, migrations, backups, and recovery are reported from real state. Unsupported targets, scans, signing, and update distribution are shown as unsupported or not configured — never as passing.",
+            actions: [
+              h("span", { className: "live-pill" + (blocking.length ? " attention" : ""), key: "prod" }, h("span", { className: "live-dot" }), (status.overall || "unknown").toUpperCase() + (status.version ? " · v" + status.version : ""))
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-tag")), h("div", null, h("strong", null, build.version || "—"), h("span", null, build.dirty_working_tree ? "dirty development build" : "clean working tree"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon " + (blocking.length ? "" : "success") }, icon("fa-clipboard-check")), h("div", null, h("strong", null, String(gates.length)), h("span", null, "release gates · " + blocking.length + " blocking"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon " + (verifiedBackups ? "success" : "") }, icon("fa-database")), h("div", null, h("strong", null, String(backups.length)), h("span", null, "backups · " + verifiedBackups + " verified")))
+          ),
+          h(
+            "div",
+            { className: "perf-actions" },
+            h("button", { type: "button", className: "btn btn-ghost", onClick: function () { runProductionAction("create-backup"); } }, icon("fa-database"), "Create verified backup"),
+            h("button", { type: "button", className: "btn btn-ghost", onClick: function () { runProductionAction("safe-mode"); } }, icon("fa-shield-halved"), recovery.safe_mode ? "Safe Mode active" : "Enter Safe Mode")
+          ),
+          h(
+            "div",
+            { className: "perf-grid" },
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-clipboard-check"), h("strong", null, "Release gates")),
+              gates.slice(0, 12).map(function (gate) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: gate.gate_id },
+                  h("span", { className: "plugin-badge " + (gate.state === "blocking" ? "warning" : gate.state === "passing" ? "success" : "") }, productionGateLabel(gate.state)),
+                  h("span", null, gate.name + (gate.detail ? " · " + gate.detail : ""))
+                );
+              })
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-laptop-code"), h("strong", null, "Supported targets")),
+              targets.slice(0, 8).map(function (target) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: target.platform },
+                  h("span", { className: "plugin-badge" }, target.support_state.toUpperCase()),
+                  h("span", null, target.platform + " · " + target.architecture + " · " + target.package_format + (target.signing_state === "unsigned" ? " · unsigned" : ""))
+                );
+              })
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-arrow-right-arrow-left"), h("strong", null, "Migrations")),
+              migrations.length ? migrations.slice(0, 8).map(function (migration) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: migration.store },
+                  h("span", { className: "plugin-badge " + (migration.future_schema ? "warning" : "") }, migration.future_schema ? "FUTURE SCHEMA" : migration.needs_migration ? "MIGRATION" : "CURRENT"),
+                  h("span", null, migration.store + " · " + migration.current_schema + " → " + migration.target_schema)
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-arrow-right-arrow-left"), h("strong", null, "No migration data yet"))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-heart-pulse"), h("strong", null, "Recovery")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge " + (recovery.safe_mode ? "warning" : "") }, recovery.safe_mode ? "SAFE MODE" : "NORMAL"), h("span", null, "Startup mode")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge " + (recovery.crash_loop_detected ? "warning" : "") }, recovery.crash_loop_detected ? "CRASH LOOP" : "STABLE"), h("span", null, "Restart state")),
+              h("p", { className: "plugin-description" }, recovery.detail || "Safe Mode restricts third-party plugins, workflows, agents, cloud providers, remote clients, and model preload.")
+            )
+          )
+        );
+      }
+
       function missionAttentionItems(metrics, runtime, security, bots) {
         var items = [];
         if (!runtime || !runtime.online) {
@@ -6068,6 +6162,21 @@
         var aiInterpretationsPair = useState([]);
         var aiInterpretations = aiInterpretationsPair[0];
         var setAiInterpretations = aiInterpretationsPair[1];
+        var productionStatusPair = useState({ overall: "unknown", version: "", channel: "development", gates: [], targets: [], message: "Release status pending." });
+        var productionStatus = productionStatusPair[0];
+        var setProductionStatus = productionStatusPair[1];
+        var productionBuildPair = useState({ version: "", commit: "", channel: "", dirty_working_tree: false, schema_versions: {} });
+        var productionBuild = productionBuildPair[0];
+        var setProductionBuild = productionBuildPair[1];
+        var productionBackupsPair = useState([]);
+        var productionBackups = productionBackupsPair[0];
+        var setProductionBackups = productionBackupsPair[1];
+        var productionMigrationsPair = useState([]);
+        var productionMigrations = productionMigrationsPair[0];
+        var setProductionMigrations = productionMigrationsPair[1];
+        var productionRecoveryPair = useState({ safe_mode: false, repair_mode: false, crash_loop_detected: false });
+        var productionRecovery = productionRecoveryPair[0];
+        var setProductionRecovery = productionRecoveryPair[1];
         var securityOverviewPair = useState({ security_events_open: 0, incidents_open: 0, pending_approvals: 0, secrets_requiring_rotation: 0, audit_integrity_verified: true, lockdown_active: false });
         var securityOverview = securityOverviewPair[0];
         var setSecurityOverview = securityOverviewPair[1];
@@ -6344,6 +6453,38 @@
           }
         }
 
+        async function loadProductionFromApi() {
+          try {
+            var statusPayload = await requestJson("/api/v1/production/status", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (statusPayload && typeof statusPayload === "object") setProductionStatus(statusPayload);
+            var buildPayload = await requestJson("/api/v1/production/build", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (buildPayload && typeof buildPayload === "object") setProductionBuild(buildPayload);
+            var backupsPayload = await requestJson("/api/v1/production/backups", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (backupsPayload && Array.isArray(backupsPayload.backups)) setProductionBackups(backupsPayload.backups);
+            var migrationsPayload = await requestJson("/api/v1/production/migrations", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (migrationsPayload && Array.isArray(migrationsPayload.migrations)) setProductionMigrations(migrationsPayload.migrations);
+            var recoveryPayload = await requestJson("/api/v1/production/recovery", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (recoveryPayload && typeof recoveryPayload === "object") setProductionRecovery(recoveryPayload);
+          } catch (error) {
+            setProductionStatus({ overall: "unknown", version: "", channel: "development", gates: [], targets: [], message: "Production API unavailable." });
+          }
+        }
+
+        async function runProductionAction(action) {
+          try {
+            if (action === "create-backup") {
+              var payload = await requestJson("/api/v1/production/backups", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: "{}" });
+              notify("Backup " + ((payload && payload.backup_id) || "").slice(0, 12) + (payload && payload.verified ? " created and verified." : " created but not verified."));
+            } else if (action === "safe-mode") {
+              var safe = await requestJson("/api/v1/production/recovery/safe-mode", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: "{}" });
+              notify(safe && safe.safe_mode ? "Safe Mode activated." : "Safe Mode request failed.");
+            }
+            loadProductionFromApi();
+          } catch (error) {
+            notify("Production action failed: " + error.message);
+          }
+        }
+
         async function runPerformanceAction(action) {
           try {
             var payload = await requestJson("/api/v1/performance/actions", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ action: action }) });
@@ -6426,7 +6567,7 @@
           if (remoteRefreshRef.current) return;
           remoteRefreshRef.current = true;
           try {
-            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi(), loadSecurityFromApi(), loadPerformanceFromApi(), loadAiFromApi()]);
+            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi(), loadSecurityFromApi(), loadPerformanceFromApi(), loadAiFromApi(), loadProductionFromApi()]);
             var failures = results.filter(function (result) { return result.status === "rejected"; });
             if (failures.length) {
               if (results[0].status === "rejected") setRuntime({ online: false, status: "offline", model: null, version: null, message: "JoeOS telemetry API is unavailable" });
@@ -7070,6 +7211,8 @@
           section = h(PerformanceSection, { overview: performanceOverview, resources: performanceResources, queues: performanceQueues, caches: performanceCaches, models: performanceModels, leaks: performanceLeaks, benchmarks: performanceBenchmarks, budgets: performanceBudgets, regressions: performanceRegressions, traces: performanceTraces, settings: performanceSettings });
         } else if (active === "ai") {
           section = h(AiSection, { overview: aiOverview, interpretations: aiInterpretations });
+        } else if (active === "production") {
+          section = h(ProductionSection, { status: productionStatus, build: productionBuild, backups: productionBackups, migrations: productionMigrations, recovery: productionRecovery });
         } else if (active === "settings") {
           section = h(SettingsSection, { prefs: uiPrefs, onChange: updateUiPrefs, onShortcuts: function () { setShortcutsOpen(true); }, version: "2.0.0", performanceSettings: performanceSettings });
         } else {

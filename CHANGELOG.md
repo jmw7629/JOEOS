@@ -5,6 +5,28 @@ by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
 
 ## [2.0.0] — 2026-08-04
 
+### Phase 18 — Production readiness, reliability, packaging, release
+
+- Production and Release platform (`server/production/`): automatic build
+  metadata, honest supported-target matrix, explicit release gates (never
+  fabricated), Migration Coordinator with backup-before-risk and
+  future-schema write-blocking, verified Backup and staged Restore with
+  security-state reset, staged Update verification, Safe Mode / Repair Mode /
+  crash-loop recovery, and a `doctor` CLI.
+- Version authority (`scripts/version.py`), release tool (`scripts/release.py`
+  with SHA-256 release manifest), redacted `/_internal/diagnostics`, data-dir
+  writability probe, graceful shutdown event, versioned web manifest,
+  `CHANGELOG.md`, and `docs/architecture/RELEASING.md`.
+- Production & Release workspace in the Command Center.
+
+### Phase 18 earlier — Local AI Runtime
+
+- Provider-neutral Local AI Runtime platform (`server/ai/`): inference
+  registry over the private local Lemonade server (cloud never silent),
+  local-first embeddings with content-hash deduplication and honest
+  availability, bounded context construction, and AI-assisted interpretation
+  with provenance. Models & AI workspace in the Command Center.
+
 ### Phase 17 — UI/UX polish, interaction, accessibility, responsiveness
 
 - Semantic design token registry (color, status, spacing, radius, elevation,

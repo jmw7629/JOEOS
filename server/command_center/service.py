@@ -68,6 +68,7 @@ class CommandCenterService:
         security_ready: Optional[Callable[[], bool]] = None,
         performance_ready: Optional[Callable[[], bool]] = None,
         ai_ready: Optional[Callable[[], bool]] = None,
+        production_ready: Optional[Callable[[], bool]] = None,
     ) -> None:
         self._connection_factory = connection_factory
         self._runtime_provider = runtime_provider
@@ -86,6 +87,7 @@ class CommandCenterService:
         self._security_ready = security_ready or (lambda: False)
         self._performance_ready = performance_ready or (lambda: False)
         self._ai_ready = ai_ready or (lambda: False)
+        self._production_ready = production_ready or (lambda: False)
 
     def overview(self) -> OverviewEnvelope:
         services = self.services().services
@@ -154,6 +156,12 @@ class CommandCenterService:
                 "Local AI Runtime",
                 self._ai_ready,
                 "Provider-neutral local AI runtime with embeddings and interpretation.",
+            ),
+            self._readiness_health(
+                "production.platform",
+                "Production Platform",
+                self._production_ready,
+                "Production readiness, release, backup, and recovery platform.",
             ),
             self._readiness_health(
                 "automation.engine",

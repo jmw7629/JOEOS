@@ -224,3 +224,13 @@ test("ships a Models & AI workspace driven by real local runtime state", () => {
   assert.match(html, /never presented as parsed facts/i);
   assert.match(html, /cloud routing is never silent/i);
 });
+
+test("ships a Production & Release workspace with honest gates and targets", () => {
+  assert.match(html, /id: ["']production["'], label: ["']Production & Release["']/);
+  assert.match(html, /function ProductionSection\(/);
+  assert.match(html, /\/api\/v1\/production\/status/);
+  assert.match(html, /loadProductionFromApi\(\)/);
+  assert.match(html, /not configured — never as passing/i);
+  assert.match(html, /Create verified backup/);
+  assert.match(html, /Enter Safe Mode/);
+});

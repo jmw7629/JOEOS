@@ -40,6 +40,7 @@ from server.identity import (
 )
 from server.plugins import PluginService, plugins_router
 from server.performance import PerformanceService, performance_router
+from server.production import ProductionService, production_router
 from server.ai import AIService, ai_router
 from server.realtime import RealtimeService, SQLiteEventRepository, realtime_router
 from server.wearables import WearableService, wearables_router
@@ -755,6 +756,47 @@ def _automation_security_gate(app: FastAPI):
     )
 
 
+def _wire_production_schemas(app: FastAPI) -> None:
+    """Register declared schema versions and the main database store with the
+    Production migration/compatibility machinery so the release schema gate
+    reflects real compatibility (future on-disk schemas block writes)."""
+    production = app.state.production_service
+    from server.production.metadata import build_metadata
+
+    for store, version in (build_metadata().schema_versions or {}).items():
+        production.register_declared_schema(store, int(version))
+    production.register_schema("main", 1, 1, lambda: _connect(app.state.db_path))
+
+
+def _production_security_reset(app: FastAPI) -> dict:
+    """Post-restore security-state reset: revoke mobile sessions and invalidate
+    pending approvals so restored state never reactivates stale authority.
+    Workflow pausing and device restriction are reported as policy
+    requirements; only real resets are counted."""
+    result = {"sessions": 0, "approvals": 0, "workflows": 0, "devices": 0}
+    mobile = getattr(app.state, "mobile_service", None)
+    if mobile is not None:
+        try:
+            result["sessions"] = mobile.revoke_all()
+        except Exception:
+            result["sessions"] = 0
+    security = getattr(app.state, "security_service", None)
+    if security is not None:
+        try:
+            pending = security.approvals.list(state="pending")
+            count = 0
+            for approval in pending:
+                try:
+                    security.approvals.invalidate(approval.approval_id, reason="post-restore security reset")
+                    count += 1
+                except Exception:
+                    continue
+            result["approvals"] = count
+        except Exception:
+            result["approvals"] = 0
+    return result
+
+
 def _wire_mobile_scopes(app: FastAPI) -> None:
     """Register scoped remote queries that read real authoritative state."""
     mobile = app.state.mobile_service
@@ -931,6 +973,7 @@ async def lifespan(app: FastAPI):
         security_ready=lambda: getattr(app.state, "security_service", None) is not None,
         performance_ready=lambda: getattr(app.state, "performance_service", None) is not None,
         ai_ready=lambda: getattr(app.state, "ai_service", None) is not None,
+        production_ready=lambda: getattr(app.state, "production_service", None) is not None,
     )
     app.state.engineering_service = EngineeringService(
         connection_factory=lambda: _connect(db_path),
@@ -1023,6 +1066,17 @@ async def lifespan(app: FastAPI):
         pool=5.0,
     )
     app.state.http = httpx.AsyncClient(timeout=timeout)
+    app.state.production_service = ProductionService(
+        str(db_path.parent / "production"),
+        application_version=JOEOS_VERSION,
+        data_root=db_path.parent,
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+        governance_blocked=_governance_probe,
+    )
+    _wire_production_schemas(app)
+    app.state.production_service.set_security_reset_hook(lambda: _production_security_reset(app))
     app.state.ai_service = AIService(
         str(db_path.parent / "ai"),
         http_client=app.state.http,
@@ -1086,6 +1140,7 @@ app.include_router(mobile_router)
 app.include_router(security_router)
 app.include_router(performance_router)
 app.include_router(ai_router)
+app.include_router(production_router)
 
 
 @app.middleware("http")

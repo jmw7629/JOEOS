@@ -996,12 +996,12 @@ class BootstrapService:
                 description="List organizational memory proposals.",
             ),
             RouteDescriptor(
-                id="agents.memory-proposals.review",
-                path="/api/v1/agents/memory-proposals/{proposal_id}/review",
+                id="production.overview",
+                path="/api/v1/production/status",
                 protocol="http",
-                methods=("POST",),
-                access="approval",
-                description="Review an organizational memory proposal.",
+                methods=("GET",),
+                access="read_only",
+                description="Production readiness and release status with real build metadata, targets, and release gates.",
             ),
             RouteDescriptor(
                 id="plugins.overview",
@@ -1364,9 +1364,8 @@ class BootstrapService:
                     "agents.reviews.complete",
                     "agents.approvals.approve",
                     "agents.approvals.deny",
-                    "agents.memory-proposals.review",
                 ),
-                description="Approval-gated charter definition, review completion, approvals, and memory proposal review.",
+                description="Approval-gated charter definition, review completion, and approvals.",
             ),
             CapabilityDescriptor(
                 id="plugins.platform.read",
@@ -1435,6 +1434,13 @@ class BootstrapService:
                 access="read_only",
                 route_ids=("ai.overview",),
                 description="Read the Local AI Runtime overview.",
+            ),
+            CapabilityDescriptor(
+                id="production.platform.read",
+                status="available",
+                access="read_only",
+                route_ids=("production.overview",),
+                description="Read the production readiness and release status.",
             ),
             CapabilityDescriptor(
                 id="assistant.local_analysis",
