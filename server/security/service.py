@@ -55,7 +55,7 @@ def _now() -> str:
 
 
 class SecurityService:
-    def __init__(self, data_dir: str, *, master_key: bytes, event_sink=None) -> None:
+    def __init__(self, data_dir: str, *, master_key: bytes, event_sink=None, cancellation_handlers=None) -> None:
         self.storage = SecurityStorage(data_dir)
         self.storage.prepare()
         self._data_dir = Path(data_dir)
@@ -70,7 +70,9 @@ class SecurityService:
         self.audit = AuditService(self._connection_factory)
         self.events = SecurityEventService(self._connection_factory)
         self.incidents = IncidentService(self._connection_factory)
-        self.governance = GovernanceService(self._connection_factory)
+        self.governance = GovernanceService(
+            self._connection_factory, cancellation_handlers=cancellation_handlers
+        )
         self.circuit_breakers = CircuitBreakerRegistry(self._connection_factory)
         self.classifications = DataClassificationService(secrets=self.secrets)
         self.privacy = PrivacyPolicyEngine(self.classifications)

@@ -296,11 +296,12 @@ class IncidentService:
 class GovernanceService:
     """Lockdown, Emergency Stop, and Quarantine."""
 
-    def __init__(self, connection_factory: Callable[[], sqlite3.Connection]) -> None:
+    def __init__(self, connection_factory: Callable[[], sqlite3.Connection], cancellation_handlers=None) -> None:
         self._connection_factory = connection_factory
         self._lock = threading.RLock()
         self._lockdown = LockdownState()
         self._emergency_stop = False
+        self._cancellation_handlers = list(cancellation_handlers or [])
 
     # ---- lockdown ----
 
@@ -360,18 +361,29 @@ class GovernanceService:
 
     # ---- emergency stop ----
 
+    def register_cancellation_handler(self, handler: Callable[[], int]) -> None:
+        self._cancellation_handlers.append(handler)
+
     def emergency_stop(self) -> dict:
-        """Stop/cancel active autonomous work. Reports incomplete cancellation
-        honestly; never auto-restarts."""
+        """Stop/cancel active autonomous work. Reports actual cancelled
+        counts and any incomplete cancellation honestly; never auto-restarts."""
         self._emergency_stop = True
-        cancelled = {"agents": 0, "workflows": 0, "tools": 0, "terminals": 0, "plugin_jobs": 0}
-        # In this integration, Emergency Stop marks the governance state and
-        # audits it; platform-specific cancellation propagates via each
-        # platform's own cancellable boundaries.
+        cancelled: Dict[str, int] = {"agents": 0, "workflows": 0, "tools": 0, "terminals": 0, "plugin_jobs": 0}
+        incomplete: List[str] = []
+        for handler in list(self._cancellation_handlers):
+            try:
+                result = handler()
+                if isinstance(result, dict):
+                    for key, value in result.items():
+                        cancelled[key] = cancelled.get(key, 0) + int(value or 0)
+                    if result.get("incomplete"):
+                        incomplete.extend(result["incomplete"])
+            except Exception as exc:  # isolation: one handler failure must not block others
+                incomplete.append("handler failed: %s" % type(exc).__name__)
         return {
             "stopped": True,
             "cancelled": cancelled,
-            "incomplete": [],  # populated by integrations when cancellation is partial
+            "incomplete": incomplete,
             "automatic_restart": False,
         }
 

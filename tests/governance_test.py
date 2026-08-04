@@ -216,6 +216,56 @@ class WearableGovernanceTests(unittest.TestCase):
         self.security.deactivate_lockdown(reauthenticated=True)
 
 
+class EmergencyStopCancellationTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile as _tempfile
+        from server.security import SecurityService
+        from server.automation import AutomationService
+        self.tempdir = _tempfile.TemporaryDirectory()
+        self.root = Path(self.tempdir.name)
+        self.security = SecurityService(str(self.root / "security"), master_key=bytes(range(32)))
+        self.security.prepare_defaults()
+        self.automation = AutomationService(
+            str(self.root / "automation"), master_key=bytes(range(32)),
+            governance_blocked=self.security.governance_blocked,
+        )
+        self.security.governance.register_cancellation_handler(
+            lambda: {"workflows": self.automation.cancel_active_runs_all(), "incomplete": []}
+        )
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+
+    def test_emergency_stop_cancels_active_runs(self):
+        from server.automation.models import (
+            WorkflowDefinition, NodeConfig, EdgeConfig, TriggerConfig, ResourcePolicy,
+        )
+        definition = WorkflowDefinition(
+            workflow_id="acme.estop", name="EStop", description="d", owner="user", creator="user",
+            source="user", version="1.0.0", risk="low",
+            triggers=(TriggerConfig(trigger_id="manual_es", type="manual"),),
+            nodes=(
+                NodeConfig(id="start", type="start"),
+                NodeConfig(id="wait", type="delay", params={"seconds": 30}),
+                NodeConfig(id="end", type="end"),
+            ),
+            edges=(EdgeConfig(source="start", target="wait"), EdgeConfig(source="wait", target="end")),
+            resource=ResourcePolicy(max_active_runs=2, max_parallel_branches=1, max_loop_iterations=10, max_duration_seconds=3600, max_model_calls=0, max_tool_calls=10),
+        )
+        self.automation.create_workflow(definition)
+        self.automation.enable_workflow("acme.estop")
+        with self.automation._connection_factory() as connection:
+            connection.execute(
+                "INSERT INTO workflow_runs (run_id, workflow_id, workflow_version, state, current_node, started_at, created_at) VALUES ('run_inflight', 'acme.estop', '1.0.0', 'running', 'wait', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')"
+            )
+        result = self.security.emergency_stop()
+        self.assertEqual(result["cancelled"]["workflows"], 1)
+        self.assertEqual(result["incomplete"], [])
+        cancelled = self.automation.list_runs(state="cancelled")
+        self.assertEqual(len(cancelled), 1)
+        self.security.release_emergency_stop()
+
+
 class PluginGovernanceTests(unittest.TestCase):
     def setUp(self):
         import tempfile as _tempfile

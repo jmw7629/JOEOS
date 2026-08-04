@@ -329,6 +329,15 @@ class AutomationService:
             )
         return cursor.rowcount
 
+    def cancel_active_runs_all(self) -> int:
+        """Cancel every active workflow run across all workflows (Emergency Stop)."""
+        with self._connection_factory() as connection:
+            cursor = connection.execute(
+                "UPDATE workflow_runs SET state = 'cancelled', cancellation_state = 'cancelled', ended_at = ? WHERE state IN ('queued','preparing','running','waiting','delayed','retrying')",
+                (_now(),),
+            )
+        return cursor.rowcount
+
     # ------------------------------------------------------------------
     # Approvals / input
     # ------------------------------------------------------------------

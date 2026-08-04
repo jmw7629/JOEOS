@@ -625,6 +625,15 @@ async def _identity_maintenance_loop(app: FastAPI) -> None:
         await asyncio.sleep(5)
 
 
+def _emergency_stop_workflows(app: FastAPI) -> dict:
+    """Cancel active workflow runs; returns cancelled counts for Emergency Stop."""
+    automation = getattr(app.state, "automation_service", None)
+    if automation is None:
+        return {"workflows": 0, "incomplete": ["automation service unavailable"]}
+    cancelled = automation.cancel_active_runs_all()
+    return {"workflows": cancelled, "incomplete": []}
+
+
 def _automation_security_gate(app: FastAPI):
     """Wire the Security Platform into the Automation Engine as the policy +
     audit gate for every workflow action."""
@@ -835,6 +844,10 @@ async def lifespan(app: FastAPI):
         communications=app.state.communications_service,
         security_gate=_automation_security_gate(app),
         governance_blocked=_governance_probe,
+    )
+    # Emergency Stop actually cancels active workflow runs.
+    app.state.security_service.governance.register_cancellation_handler(
+        lambda: _emergency_stop_workflows(app)
     )
     app.state.wearables_service = WearableService(
         str(db_path.parent / "wearables"),
