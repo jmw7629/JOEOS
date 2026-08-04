@@ -3963,6 +3963,7 @@
         { id: "mobile", label: "Mobile Companion", short: "Mobile", icon: "fa-mobile-screen" },
         { id: "security-center", label: "Security Center", short: "Security", icon: "fa-user-shield" },
         { id: "performance", label: "Performance Center", short: "Performance", icon: "fa-gauge-high" },
+        { id: "ai", label: "Models & AI", short: "Models", icon: "fa-brain" },
         { id: "settings", label: "Settings", short: "Settings", icon: "fa-sliders" },
         { id: "bots", label: "Bot Fleet", short: "Bot Fleet", icon: "fa-robot" }
       ];
@@ -5425,6 +5426,58 @@
         );
       }
 
+      function AiSection(props) {
+        var overview = props.overview || {};
+        var interpretations = props.interpretations || [];
+        var modelLabel = overview.model || "No model selected";
+        var providerState = overview.provider_available ? "online" : "offline";
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "ai-title" },
+          h(SectionHeader, {
+            kicker: "Provider-neutral local intelligence",
+            title: h("span", { id: "ai-title" }, "Models & AI"),
+            description: "The Local AI Runtime reports honest provider, model, embedding, and interpretation state. AI-assisted interpretations are labeled as such with provenance and are never presented as parsed facts. Cloud routing is never silent.",
+            actions: [
+              h("span", { className: "live-pill" + (overview.provider_available ? "" : " attention"), key: "ai" }, h("span", { className: "live-dot " + providerState }), overview.provider_available ? "LOCAL MODEL READY" : "RUNTIME OFFLINE")
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon " + (overview.provider_available ? "success" : "") }, icon("fa-microchip")), h("div", null, h("strong", null, modelLabel), h("span", null, "Active model"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-vector-square")), h("div", null, h("strong", null, overview.embedding_available ? (overview.embedding_model || "Ready") : "Unavailable"), h("span", null, "Local embeddings"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon purple" }, icon("fa-wand-magic-sparkles")), h("div", null, h("strong", null, String(overview.interpretation_count || 0)), h("span", null, "AI-assisted records")))
+          ),
+          overview.provider_reason ? h("div", { className: "glass-card panel-card" }, h("div", { className: "plugin-header" }, icon("fa-circle-info"), h("strong", null, "Runtime status")), h("p", { className: "plugin-description" }, overview.provider_reason)) : null,
+          h(
+            "div",
+            { className: "perf-grid" },
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-wand-magic-sparkles"), h("strong", null, "AI-assisted interpretations")),
+              interpretations.length ? interpretations.slice(0, 8).map(function (record) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: record.interpretation_id },
+                  h("span", { className: "plugin-badge" }, record.interpretation_type.toUpperCase()),
+                  h("span", null, record.summary + (record.model ? " · " + record.model : "") + (record.confidence != null ? " · confidence " + Math.round(record.confidence * 100) + "%" : ""))
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-wand-magic-sparkles"), h("strong", null, "No interpretations recorded"), h("p", null, "Interpretations are labeled AI-assisted with provenance and are never presented as parsed facts."))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-shield-halved"), h("strong", null, "Privacy and routing")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, "LOCAL"), h("span", null, "Inference and embeddings run on the Halo loopback")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, "RESTRICTED"), h("span", null, "Privacy classification enforced for restricted classes")),
+              h("p", { className: "plugin-description" }, "Cloud providers require explicit policy approval before registration; they are never enabled silently.")
+            )
+          )
+        );
+      }
+
       function missionAttentionItems(metrics, runtime, security, bots) {
         var items = [];
         if (!runtime || !runtime.online) {
@@ -6009,6 +6062,12 @@
         var securityEventsPair = useState([]);
         var securityEvents = securityEventsPair[0];
         var setSecurityEvents = securityEventsPair[1];
+        var aiOverviewPair = useState({ provider_available: false, provider_reason: "", model: null, embedding_available: false, embedding_model: null, interpretation_count: 0, message: "Local AI runtime state pending." });
+        var aiOverview = aiOverviewPair[0];
+        var setAiOverview = aiOverviewPair[1];
+        var aiInterpretationsPair = useState([]);
+        var aiInterpretations = aiInterpretationsPair[0];
+        var setAiInterpretations = aiInterpretationsPair[1];
         var securityOverviewPair = useState({ security_events_open: 0, incidents_open: 0, pending_approvals: 0, secrets_requiring_rotation: 0, audit_integrity_verified: true, lockdown_active: false });
         var securityOverview = securityOverviewPair[0];
         var setSecurityOverview = securityOverviewPair[1];
@@ -6274,6 +6333,17 @@
           }
         }
 
+        async function loadAiFromApi() {
+          try {
+            var overviewPayload = await requestJson("/api/v1/ai/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (overviewPayload && typeof overviewPayload === "object") setAiOverview(overviewPayload);
+            var interpretationsPayload = await requestJson("/api/v1/ai/interpretations", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (interpretationsPayload && Array.isArray(interpretationsPayload.interpretations)) setAiInterpretations(interpretationsPayload.interpretations);
+          } catch (error) {
+            setAiOverview({ provider_available: false, provider_reason: "Local AI runtime API unavailable.", model: null, embedding_available: false, embedding_model: null, interpretation_count: 0, message: "Local AI runtime state pending." });
+          }
+        }
+
         async function runPerformanceAction(action) {
           try {
             var payload = await requestJson("/api/v1/performance/actions", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ action: action }) });
@@ -6356,7 +6426,7 @@
           if (remoteRefreshRef.current) return;
           remoteRefreshRef.current = true;
           try {
-            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi(), loadSecurityFromApi(), loadPerformanceFromApi()]);
+            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi(), loadSecurityFromApi(), loadPerformanceFromApi(), loadAiFromApi()]);
             var failures = results.filter(function (result) { return result.status === "rejected"; });
             if (failures.length) {
               if (results[0].status === "rejected") setRuntime({ online: false, status: "offline", model: null, version: null, message: "JoeOS telemetry API is unavailable" });
@@ -6998,6 +7068,8 @@
           section = h(SecurityCenterSection, { overview: securityOverview, events: securityEvents });
         } else if (active === "performance") {
           section = h(PerformanceSection, { overview: performanceOverview, resources: performanceResources, queues: performanceQueues, caches: performanceCaches, models: performanceModels, leaks: performanceLeaks, benchmarks: performanceBenchmarks, budgets: performanceBudgets, regressions: performanceRegressions, traces: performanceTraces, settings: performanceSettings });
+        } else if (active === "ai") {
+          section = h(AiSection, { overview: aiOverview, interpretations: aiInterpretations });
         } else if (active === "settings") {
           section = h(SettingsSection, { prefs: uiPrefs, onChange: updateUiPrefs, onShortcuts: function () { setShortcutsOpen(true); }, version: "2.0.0", performanceSettings: performanceSettings });
         } else {

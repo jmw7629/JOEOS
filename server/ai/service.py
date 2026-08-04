@@ -1,0 +1,135 @@
+"""AIService — the authoritative Local AI Runtime facade.
+
+Composes a provider-neutral inference registry (local Lemonade only unless a
+cloud provider is explicitly policy-approved), a local-first embedding service,
+bounded context construction, and AI-assisted interpretation with provenance.
+It reports honest availability, records real latency into the Performance
+Metrics Registry, and never routes to cloud silently.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
+
+import httpx
+
+from .context import ContextBuilder
+from .embeddings import EmbeddingService
+from .interpret import InterpretationService
+from .models import (
+    AIOverview,
+    ContextResult,
+    EmbeddingResult,
+    InferenceResult,
+    InterpretationRecord,
+    ProviderRecord,
+)
+from .providers import LocalLemonadeProvider, ProviderRegistry
+from .storage import AIStorage
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class AIService:
+    def __init__(
+        self,
+        data_dir: str,
+        *,
+        http_client: httpx.AsyncClient,
+        runtime_provider: Callable[[], Dict[str, Any]],
+        api_base: str,
+        headers: Optional[Dict[str, str]] = None,
+        event_sink: Optional[Callable[[str, str, str], None]] = None,
+        governance_blocked: Optional[Callable[[], tuple]] = None,
+        record_metric: Optional[Callable[[str, float], None]] = None,
+        version: str = "2.0.0",
+    ) -> None:
+        from pathlib import Path as _Path
+
+        data_path = _Path(data_dir)
+        data_path.mkdir(parents=True, exist_ok=True)
+        db_path = data_path / "ai.db"
+
+        def connect() -> sqlite3.Connection:
+            connection = sqlite3.connect(str(db_path), timeout=10)
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA busy_timeout = 10000")
+            return connection
+
+        self.storage = AIStorage(connect)
+        self.local_provider = LocalLemonadeProvider(
+            http_client=http_client,
+            runtime_provider=runtime_provider,
+            api_base=api_base,
+            headers=headers,
+        )
+        self.providers = ProviderRegistry(self.local_provider)
+        self.embeddings = EmbeddingService(self.providers, self.storage)
+        self.context = ContextBuilder(self.storage)
+        self.interpretations = InterpretationService(self.storage)
+        self._event_sink = event_sink
+        self._governance_blocked = governance_blocked or (lambda: (False, ""))
+        self._record_metric = record_metric
+        self._version = version
+
+    def providers_records(self) -> List[ProviderRecord]:
+        return self.providers.records()
+
+    def overview(self) -> AIOverview:
+        default = self.providers.default()
+        record = default.availability() if default else ProviderRecord(
+            provider_id="none", name="None", available=False, reason="No inference provider is registered."
+        )
+        return AIOverview(
+            provider_available=record.available,
+            provider_reason=record.reason,
+            model=record.model,
+            embedding_available=record.embedding_model is not None,
+            embedding_model=record.embedding_model,
+            interpretation_count=self.interpretations.count(),
+            generated_at=_now_iso(),
+            message="Local AI runtime state reported honestly from Lemonade; cloud routing is never silent.",
+        )
+
+    async def infer(self, messages: List[dict], *, model: str = "", temperature: float = 0.25, max_tokens: int = 1200) -> InferenceResult:
+        provider = self.providers.default()
+        if provider is None:
+            raise RuntimeError("No inference provider is registered.")
+        record = provider.availability()
+        if not record.available:
+            raise RuntimeError(record.reason)
+        chosen = model or record.model or ""
+        result = await provider.infer(messages, model=chosen, temperature=temperature, max_tokens=max_tokens)
+        if self._record_metric is not None and result.latency_ms is not None:
+            self._record_metric("model.first_token_ms", result.latency_ms)
+        if self._event_sink is not None:
+            self._event_sink("info", "ai", "Local inference completed with %s." % chosen)
+        return result
+
+    async def embed(self, texts: List[str], *, project: str = "", source_refs: Optional[List[str]] = None, privacy_class: str = "restricted") -> EmbeddingResult:
+        if not self.embeddings.available():
+            raise RuntimeError("No local embedding model is available; vectors are not fabricated.")
+        return await self.embeddings.embed(texts, project=project, source_refs=source_refs, privacy_class=privacy_class)
+
+    def build_context(self, sources: List[dict], *, project: str = "", token_budget: int = 0, purpose: str = "analysis") -> ContextResult:
+        return self.context.build(sources, project=project, token_budget=token_budget, purpose=purpose)
+
+    def create_interpretation(self, **kwargs) -> InterpretationRecord:
+        record = self.interpretations.create(**kwargs)
+        if self._event_sink is not None:
+            self._event_sink("info", "ai", "AI-assisted %s interpretation recorded." % record.interpretation_type)
+        return record
+
+    def list_interpretations(self, interpretation_type: str = "", limit: int = 100) -> List[InterpretationRecord]:
+        return self.interpretations.list(interpretation_type=interpretation_type, limit=limit)
+
+    def delete_interpretation(self, interpretation_id: str) -> bool:
+        blocked, reason = self._governance_blocked()
+        if blocked:
+            raise PermissionError("governance: %s" % reason)
+        return self.interpretations.delete(interpretation_id)

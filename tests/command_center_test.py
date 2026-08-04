@@ -233,7 +233,7 @@ class MainApplicationCommandCenterTests(CommandCenterFixture):
         self.assertEqual(overview.status_code, 200)
         self.assertEqual(services.status_code, 200)
         self.assertEqual(overview.json()["overall"], "unavailable")
-        self.assertEqual(len(services.json()["services"]), 15)
+        self.assertEqual(len(services.json()["services"]), 16)
 
 
 if __name__ == "__main__":

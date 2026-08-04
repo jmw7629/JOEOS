@@ -40,6 +40,7 @@ from server.identity import (
 )
 from server.plugins import PluginService, plugins_router
 from server.performance import PerformanceService, performance_router
+from server.ai import AIService, ai_router
 from server.realtime import RealtimeService, SQLiteEventRepository, realtime_router
 from server.wearables import WearableService, wearables_router
 from server.security import (
@@ -929,6 +930,7 @@ async def lifespan(app: FastAPI):
         mobile_ready=lambda: getattr(app.state, "mobile_service", None) is not None,
         security_ready=lambda: getattr(app.state, "security_service", None) is not None,
         performance_ready=lambda: getattr(app.state, "performance_service", None) is not None,
+        ai_ready=lambda: getattr(app.state, "ai_service", None) is not None,
     )
     app.state.engineering_service = EngineeringService(
         connection_factory=lambda: _connect(db_path),
@@ -1021,6 +1023,19 @@ async def lifespan(app: FastAPI):
         pool=5.0,
     )
     app.state.http = httpx.AsyncClient(timeout=timeout)
+    app.state.ai_service = AIService(
+        str(db_path.parent / "ai"),
+        http_client=app.state.http,
+        runtime_provider=lambda: app.state.runtime,
+        api_base=_lemonade_api_base(),
+        headers=_lemonade_headers(),
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+        governance_blocked=_governance_probe,
+        record_metric=app.state.performance_service.record,
+        version=JOEOS_VERSION,
+    )
     await _refresh_runtime(app)
     await asyncio.to_thread(_record_metric, db_path, app.state.runtime)
     await asyncio.to_thread(_record_event, db_path, "success", "joeos", "JoeOS local command center started.")
@@ -1070,6 +1085,7 @@ app.include_router(wearables_router)
 app.include_router(mobile_router)
 app.include_router(security_router)
 app.include_router(performance_router)
+app.include_router(ai_router)
 
 
 @app.middleware("http")

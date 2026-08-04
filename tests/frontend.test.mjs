@@ -215,3 +215,12 @@ test("uses calm, precise microcopy without blame or hype", () => {
   assert.doesNotMatch(html, /\bOops\b|\bUh-oh\b|\bYou broke it\b/i);
   assert.doesNotMatch(html, /\bSupercharge\b|\bRevolutionary\b|\bGuaranteed\b/i);
 });
+
+test("ships a Models & AI workspace driven by real local runtime state", () => {
+  assert.match(html, /id: ["']ai["'], label: ["']Models & AI["']/);
+  assert.match(html, /function AiSection\(/);
+  assert.match(html, /\/api\/v1\/ai\/overview/);
+  assert.match(html, /loadAiFromApi\(\)/);
+  assert.match(html, /never presented as parsed facts/i);
+  assert.match(html, /cloud routing is never silent/i);
+});

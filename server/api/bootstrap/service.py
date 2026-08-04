@@ -964,12 +964,12 @@ class BootstrapService:
                 description="Smart glasses and wearable platform overview with real device, session, and capability state.",
             ),
             RouteDescriptor(
-                id="agents.detections.resolve",
-                path="/api/v1/agents/detections/{detection_id}/resolve",
+                id="ai.overview",
+                path="/api/v1/ai/overview",
                 protocol="http",
-                methods=("POST",),
-                access="read_write",
-                description="Resolve a detection event.",
+                methods=("GET",),
+                access="read_only",
+                description="Local AI Runtime overview with real provider, model, embedding, and interpretation state.",
             ),
             RouteDescriptor(
                 id="communications.overview",
@@ -1350,10 +1350,9 @@ class BootstrapService:
                 route_ids=(
                     "agents.interventions.open",
                     "agents.approvals.request",
-                    "agents.detections.resolve",
                     "agents.memory-proposals.create",
                 ),
-                description="Open interventions and approvals, resolve detections, and propose memory.",
+                description="Open interventions and approvals, and propose memory.",
             ),
             CapabilityDescriptor(
                 id="agents.organization.approval",
@@ -1429,6 +1428,13 @@ class BootstrapService:
                 access="read_only",
                 route_ids=("performance.overview",),
                 description="Read the performance and resource governance overview.",
+            ),
+            CapabilityDescriptor(
+                id="ai.runtime.read",
+                status="available",
+                access="read_only",
+                route_ids=("ai.overview",),
+                description="Read the Local AI Runtime overview.",
             ),
             CapabilityDescriptor(
                 id="assistant.local_analysis",
