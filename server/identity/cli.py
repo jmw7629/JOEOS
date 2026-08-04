@@ -26,6 +26,8 @@ from .key_protection import (
     load_or_create_identity_master_key,
 )
 from .service import DeviceEnrollmentService, EnrollmentOriginError
+from .authority_repository import SQLiteAuthorityRepository
+from .authority_service import AuthorityService, AuthorityConflictError
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -246,6 +248,193 @@ def _revoke(arguments, service: DeviceEnrollmentService) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# Authoritative application identity CLI (Phase P3A) — local console only.
+# ---------------------------------------------------------------------------
+
+
+def _authority_service(database: Path) -> AuthorityService:
+    connection_factory = lambda: _connect(database)
+    device_repository = SQLiteDeviceIdentityRepository(
+        connection_factory,
+        PairingKeyProtector(load_or_create_identity_master_key(database)),
+    )
+    service = AuthorityService(
+        repository=SQLiteAuthorityRepository(connection_factory),
+        device_repository=device_repository,
+    )
+    service.prepare()
+    return service
+
+
+def _authority_bootstrap(arguments, service: AuthorityService) -> int:
+    try:
+        result = service.bootstrap(
+            display_name=arguments.display_name,
+            organization_name=arguments.organization_name,
+            workspace_name=arguments.workspace_name,
+        )
+    except AuthorityConflictError as error:
+        print("Bootstrap refused: %s" % error.public_message, file=sys.stderr)
+        return 1
+    print("JoeOS local owner installation created.")
+    print("  user_id:          %s" % result["user_id"])
+    print("  organization_id:  %s" % result["organization_id"])
+    print("  workspace_id:     %s" % result["workspace_id"])
+    print("  owner_role_id:    %s" % result["owner_role_id"])
+    print("No password, token, or key was created or printed.")
+    return 0
+
+
+def _authority_users(arguments, service: AuthorityService) -> int:
+    users = service.list_users()
+    if not users:
+        print("No authority users exist. Bootstrap the local owner first.")
+        return 0
+    for user in users:
+        print("%s  %s  %s" % (user["id"], user["status"], user["display_name"]))
+    return 0
+
+
+def _authority_orgs(arguments, service: AuthorityService) -> int:
+    for org in service.list_organizations():
+        print("%s  %s  %s" % (org["id"], org["status"], org["name"]))
+    return 0
+
+
+def _authority_workspaces(arguments, service: AuthorityService) -> int:
+    for workspace in service.list_workspaces():
+        print("%s  %s  %s" % (
+            workspace["id"], workspace["status"], workspace["name"]))
+    return 0
+
+
+def _authority_roles(arguments, service: AuthorityService) -> int:
+    for role in service.list_roles():
+        immutable = "immutable" if role["immutable"] else ""
+        print("%s  %s  %s  %s" % (role["id"], role["scope"], role["name"], immutable))
+    return 0
+
+
+def _authority_capabilities(arguments, service: AuthorityService) -> int:
+    for capability in service.list_capabilities():
+        print("%s  %s  %s" % (capability["name"], capability["risk"], capability["status"]))
+    return 0
+
+
+def _authority_devices(arguments, service: AuthorityService) -> int:
+    devices = service.list_devices()
+    if not devices:
+        print("No enrolled devices.")
+        return 0
+    for device in devices:
+        assignment = device.get("assignment_status") or "none"
+        print("%s  %s  assigned:%s  %s" % (
+            device["device_id"], device["state"], assignment, device["display_name"]))
+    return 0
+
+
+def _authority_assign(arguments, service: AuthorityService) -> int:
+    try:
+        result = service.assign_device(
+            device_id=UUID(arguments.device_id),
+            user_id=UUID(arguments.user_id),
+            organization_id=UUID(arguments.organization_id),
+            workspace_id=UUID(arguments.workspace_id),
+            role_ids=[UUID(value) for value in arguments.role],
+            assigned_by=UUID(arguments.by),
+        )
+    except (ValueError, AuthorityConflictError, Exception) as error:  # noqa: BLE001
+        print("Assignment failed: %s" % error, file=sys.stderr)
+        return 2
+    print("Assigned device %s to principal %s (workspace %s, status %s)." % (
+        result["device_id"], result["user_id"], result["workspace_id"], result["status"]))
+    return 0
+
+
+def _authority_revoke_assignment(arguments, service: AuthorityService) -> int:
+    try:
+        revoked = service.revoke_device_assignment(
+            UUID(arguments.device_id), UUID(arguments.by))
+    except (ValueError, AuthorityConflictError) as error:
+        print("Assignment was not revoked: %s" % error, file=sys.stderr)
+        return 2
+    if not revoked:
+        print("No active assignment matched that device.", file=sys.stderr)
+        return 1
+    print("Revoked device assignment for %s." % arguments.device_id)
+    return 0
+
+
+def _authority_user_status(arguments, service: AuthorityService) -> int:
+    try:
+        updated = service.set_user_status(UUID(arguments.user_id), arguments.status)
+    except (ValueError, AuthorityConflictError) as error:
+        print("User status was not changed: %s" % error, file=sys.stderr)
+        return 2
+    if not updated:
+        print("No active user matched that ID.", file=sys.stderr)
+        return 1
+    print("User %s status set to %s. All active sessions were revoked." % (
+        arguments.user_id, arguments.status))
+    return 0
+
+
+def _authority_revoke_sessions(arguments, service: AuthorityService) -> int:
+    try:
+        if arguments.user is not None:
+            count = service.revoke_sessions_for_user(UUID(arguments.user))
+            print("Revoked %d session(s) for user %s." % (count, arguments.user))
+        elif arguments.device is not None:
+            count = service.revoke_sessions_for_device(UUID(arguments.device))
+            print("Revoked %d session(s) for device %s." % (count, arguments.device))
+        else:
+            print("Specify --user or --device.", file=sys.stderr)
+            return 2
+    except ValueError as error:
+        print("Sessions were not revoked: %s" % error, file=sys.stderr)
+        return 2
+    return 0
+
+
+def _add_authority_subcommands(subcommands) -> None:
+    authority = subcommands.add_parser(
+        "authority", help="Local-console JoeOS application identity operations.")
+    authority_sub = authority.add_subparsers(dest="authority_operation", required=True)
+
+    bootstrap = authority_sub.add_parser("bootstrap", help="Create the first local owner installation.")
+    bootstrap.add_argument("--display-name", default="JoeOS Owner", help="Owner display name.")
+    bootstrap.add_argument("--organization-name", default="JoeOS", help="Organization name.")
+    bootstrap.add_argument("--workspace-name", default="Default Workspace", help="Workspace name.")
+
+    authority_sub.add_parser("users", help="List authority users.")
+    authority_sub.add_parser("orgs", help="List organizations.")
+    authority_sub.add_parser("workspaces", help="List workspaces.")
+    authority_sub.add_parser("roles", help="List roles.")
+    authority_sub.add_parser("capabilities", help="List capabilities.")
+    authority_sub.add_parser("devices", help="List enrolled devices and assignment state.")
+
+    assign = authority_sub.add_parser("assign", help="Assign an enrolled device to a principal.")
+    assign.add_argument("--device", required=True, help="Enrolled device UUID.")
+    assign.add_argument("--user", required=True, help="Principal user UUID.")
+    assign.add_argument("--org", required=True, help="Organization UUID.")
+    assign.add_argument("--workspace", required=True, help="Workspace UUID.")
+    assign.add_argument("--role", action="append", required=True, help="Role UUID (repeatable).")
+    assign.add_argument("--by", required=True, help="Operator user UUID performing the assignment.")
+
+    revoke = authority_sub.add_parser("revoke", help="Revoke a device assignment.")
+    revoke.add_argument("--device", required=True, help="Enrolled device UUID.")
+    revoke.add_argument("--by", required=True, help="Operator user UUID.")
+
+    status = authority_sub.add_parser("user-status", help="Disable or re-enable a user.")
+    status.add_argument("--user", required=True, help="User UUID.")
+    status.add_argument("--status", choices=("active", "disabled", "locked", "deleted"), required=True)
+
+    sessions = authority_sub.add_parser("revoke-sessions", help="Revoke all sessions for a user or device.")
+    sessions.add_argument("--user", help="User UUID.")
+    sessions.add_argument("--device", help="Device UUID.")
+
+
 def parser() -> argparse.ArgumentParser:
     command = argparse.ArgumentParser(
         prog="python -m server.identity.cli",
@@ -260,11 +449,42 @@ def parser() -> argparse.ArgumentParser:
     revoke = subcommands.add_parser("revoke", help="Revoke one paired device locally.")
     revoke.add_argument("device_id")
     revoke.add_argument("--reason", default="Revoked by the local JoeOS operator")
+    _add_authority_subcommands(subcommands)
     return command
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     arguments = parser().parse_args(argv)
+    if arguments.operation == "authority":
+        try:
+            service = _authority_service(_database_path(arguments.database))
+        except IdentityKeyConfigurationError as error:
+            print("JoeOS identity configuration is unavailable: %s" % error, file=sys.stderr)
+            return 2
+        operation = arguments.authority_operation
+        if operation == "bootstrap":
+            return _authority_bootstrap(arguments, service)
+        if operation == "users":
+            return _authority_users(arguments, service)
+        if operation == "orgs":
+            return _authority_orgs(arguments, service)
+        if operation == "workspaces":
+            return _authority_workspaces(arguments, service)
+        if operation == "roles":
+            return _authority_roles(arguments, service)
+        if operation == "capabilities":
+            return _authority_capabilities(arguments, service)
+        if operation == "devices":
+            return _authority_devices(arguments, service)
+        if operation == "assign":
+            return _authority_assign(arguments, service)
+        if operation == "revoke":
+            return _authority_revoke_assignment(arguments, service)
+        if operation == "user-status":
+            return _authority_user_status(arguments, service)
+        if operation == "revoke-sessions":
+            return _authority_revoke_sessions(arguments, service)
+        return 2
     try:
         service = _service(_database_path(arguments.database))
     except IdentityKeyConfigurationError as error:

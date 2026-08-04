@@ -38,6 +38,14 @@ from server.identity import (
     device_enrollment_router,
     load_or_create_identity_master_key,
 )
+from server.identity.authority_repository import SQLiteAuthorityRepository
+from server.identity.authority_service import AuthorityService
+from server.identity.authority_router import router as authority_router
+from server.conversations import (
+    ConversationService,
+    SQLiteConversationRepository,
+    conversations_router,
+)
 from server.plugins import PluginService, plugins_router
 from server.performance import PerformanceService, performance_router
 from server.production import ProductionService, production_router
@@ -1000,11 +1008,12 @@ async def lifespan(app: FastAPI):
         server_version=JOEOS_VERSION,
     )
     app.state.bootstrap_service.prepare()
+    device_identity_repository = SQLiteDeviceIdentityRepository(
+        lambda: _connect(db_path),
+        pairing_key_protector,
+    )
     app.state.device_enrollment_service = DeviceEnrollmentService(
-        repository=SQLiteDeviceIdentityRepository(
-            lambda: _connect(db_path),
-            pairing_key_protector,
-        ),
+        repository=device_identity_repository,
         server_id_provider=server_identity_repository.get_or_create_server_id,
         allowed_https_hosts=os.getenv("JOEOS_ALLOWED_HOSTS", "").split(","),
         event_sink=lambda level, source, message: _record_event(
@@ -1012,6 +1021,11 @@ async def lifespan(app: FastAPI):
         ),
     )
     app.state.device_enrollment_service.prepare()
+    app.state.authority_service = AuthorityService(
+        repository=SQLiteAuthorityRepository(lambda: _connect(db_path)),
+        device_repository=device_identity_repository,
+    )
+    app.state.authority_service.prepare()
     app.state.workspace_service = WorkspaceService(
         connection_factory=lambda: _connect(db_path),
         event_sink=lambda level, source, message: _record_event(
@@ -1174,6 +1188,27 @@ async def lifespan(app: FastAPI):
         record_metric=app.state.performance_service.record,
         version=JOEOS_VERSION,
     )
+
+    def _ai_availability() -> dict:
+        ai = getattr(app.state, "ai_service", None)
+        if ai is None:
+            return {"available": False, "reason": "AI platform is not initialized.", "streaming": False}
+        view = ai.overview()
+        return {
+            "available": view.provider_available,
+            "reason": view.provider_reason,
+            # The local Lemonade provider performs non-streaming inference. No
+            # partial events are fabricated.
+            "streaming": False,
+        }
+
+    app.state.conversation_service = ConversationService(
+        SQLiteConversationRepository(lambda: _connect(db_path)),
+        infer=lambda messages: app.state.ai_service.infer(messages),
+        availability=_ai_availability,
+        now_provider=lambda: int(time.time()),
+    )
+    app.state.conversation_service.prepare()
     await _refresh_runtime(app)
     await asyncio.to_thread(_record_metric, db_path, app.state.runtime)
     await asyncio.to_thread(_record_event, db_path, "success", "joeos", "JoeOS local command center started.")
@@ -1210,6 +1245,8 @@ app.add_middleware(EnrollmentRequestGuardMiddleware)
 app.state.http_boundary = HttpRequestBoundary.from_environment()
 app.include_router(bootstrap_router)
 app.include_router(device_enrollment_router)
+app.include_router(authority_router)
+app.include_router(conversations_router)
 app.include_router(workspace_router)
 app.include_router(realtime_router)
 app.include_router(command_center_router)
