@@ -248,8 +248,15 @@ class BackupCoordinator:
         records = self.list()
         if len(records) <= self._retention:
             return
-        for record in sorted(records, key=lambda record: record.created_at)[: len(records) - self._retention]:
+        # Never delete the only verified backup: a known-good recovery point
+        # must always remain, mirroring the explicit delete() guarantee.
+        verified_ids = {record.backup_id for record in records if record.verified}
+        victims = sorted(records, key=lambda record: record.created_at)[: len(records) - self._retention]
+        for record in victims:
+            if len(verified_ids) == 1 and record.backup_id in verified_ids:
+                continue
             (self._backup_root / (record.backup_id + ".joeos-backup")).unlink(missing_ok=True)
+            verified_ids.discard(record.backup_id)
 
 
 class RestoreCoordinator:
@@ -336,6 +343,14 @@ class RestoreCoordinator:
             tmp = dst.with_suffix(dst.suffix + ".restore-tmp")
             shutil.copy2(src, tmp)
             tmp.replace(dst)
+            # A restored SQLite database replaces the live file; any stale
+            # write-ahead-log / shared-memory sidecar left by the pre-restore
+            # database would reference a different page state and risk a
+            # malformed database on next open. Remove the sidecars alongside
+            # the authoritative file so the restored store opens cleanly.
+            if _is_sqlite(dst):
+                for sidecar in (Path(str(dst) + "-wal"), Path(str(dst) + "-shm")):
+                    sidecar.unlink(missing_ok=True)
         # Backup staging and restore staging are never part of authoritative data.
         for leftover in self._data_dir.glob("*.restore-tmp"):
             leftover.unlink(missing_ok=True)

@@ -151,6 +151,34 @@ class BackupCoordinatorTests(unittest.TestCase):
         self.assertTrue(self.backup.delete(record.backup_id))
         self.assertTrue(self.backup.archive_path(second.backup_id).exists())
 
+    def test_retention_preserves_a_verified_recovery_point(self):
+        # Retention must never remove the only verified backup even when a
+        # newer archive is unreadable. The unreadable archive is pruned first.
+        older = self.backup.create()
+        newer = self.backup.create()
+        archive = self.backup.archive_path(newer.backup_id)
+        data = bytearray(archive.read_bytes())
+        data[0] ^= 0xFF
+        archive.write_bytes(bytes(data))
+        self.backup._retention = 1
+        self.backup._retain()
+        self.assertTrue(self.backup.archive_path(older.backup_id).exists())
+        self.assertFalse(self.backup.archive_path(newer.backup_id).exists())
+
+    def test_restore_removes_stale_wal_shm_sidecars(self):
+        record = self.backup.create()
+        db_path = self.data / "joeos.db"
+        # Simulate a stale WAL/SHM pair left by the pre-restore live database.
+        Path(str(db_path) + "-wal").write_bytes(b"\x00" * 32)
+        Path(str(db_path) + "-shm").write_bytes(b"\x00" * 32)
+        self.assertTrue(Path(str(db_path) + "-wal").exists())
+        registry = CompatibilityRegistry()
+        restore = RestoreCoordinator(self.data, self.backup, registry)
+        result = restore.restore(record.backup_id)
+        self.assertTrue(result["stores"])
+        self.assertFalse(Path(str(db_path) + "-wal").exists())
+        self.assertFalse(Path(str(db_path) + "-shm").exists())
+
     def test_restore_stages_and_activates(self):
         record = self.backup.create()
         (self.data / "note.txt").write_text("changed after backup", encoding="utf-8")

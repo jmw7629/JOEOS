@@ -1831,6 +1831,12 @@
       gap: 7px;
     }
 
+    .btn-compact {
+      padding: 4px 10px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
     .warning-text {
       color: #ffd166 !important;
     }
@@ -3965,6 +3971,7 @@
         { id: "performance", label: "Performance Center", short: "Performance", icon: "fa-gauge-high" },
         { id: "ai", label: "Models & AI", short: "Models", icon: "fa-brain" },
         { id: "production", label: "Production & Release", short: "Production", icon: "fa-rocket" },
+        { id: "selfmaintenance", label: "Maintenance & Improvement", short: "Maintenance", icon: "fa-gears" },
         { id: "settings", label: "Settings", short: "Settings", icon: "fa-sliders" },
         { id: "bots", label: "Bot Fleet", short: "Bot Fleet", icon: "fa-robot" }
       ];
@@ -5572,6 +5579,96 @@
         );
       }
 
+      function SelfMaintenanceSection(props) {
+        var state = props.state || {};
+        var health = state.health || { state: "unknown", detail: "" };
+        var checks = state.checks || [];
+        var proposals = state.proposals || [];
+        var log = state.log || [];
+        var lastRun = state.last_run || null;
+        var activeProposals = proposals.filter(function (p) { return p.state === "proposed" || p.state === "approved"; });
+        var checkCount = {
+          ok: checks.filter(function (c) { return c.state === "ok"; }).length,
+          degraded: checks.filter(function (c) { return c.state === "degraded" || c.state === "warning"; }).length,
+          failed: checks.filter(function (c) { return c.state === "failed"; }).length,
+          unknown: checks.filter(function (c) { return c.state === "unknown" || c.state === "skipped"; }).length
+        };
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "selfmaintenance-title" },
+          h(SectionHeader, {
+            kicker: "Autonomous continuous improvement",
+            title: h("span", { id: "selfmaintenance-title" }, "Maintenance & Improvement"),
+            description: "Health checks, evidence-based improvement proposals, and the maintenance log are derived from real service state. Proposals never self-apply and require operator approval; unmeasured signals stay unknown rather than passed.",
+            actions: [
+              h("span", { className: "live-pill" + (health.state === "failed" ? " attention" : health.state === "degraded" ? "" : ""), key: "ma" }, h("span", { className: "live-dot" }), (health.state || "unknown").toUpperCase())
+            ]
+          }),
+          h(
+            "div",
+            { className: "fleet-strip" },
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-heart-pulse")), h("div", null, h("strong", null, String(checks.length)), h("span", null, "health checks · " + checkCount.failed + " failed · " + checkCount.degraded + " degraded"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon " + (activeProposals.length ? "success" : "") }, icon("fa-lightbulb")), h("div", null, h("strong", null, String(activeProposals.length)), h("span", null, "open improvements"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon " + (lastRun && lastRun.outcome === "completed" ? "success" : "") }, icon("fa-rotate")), h("div", null, h("strong", null, lastRun ? new Date(lastRun.started_at).toLocaleString() : "—"), h("span", null, lastRun ? "last maintenance · " + lastRun.outcome : "no maintenance run yet")))
+          ),
+          h(
+            "div",
+            { className: "perf-actions" },
+            h("button", { type: "button", className: "btn btn-ghost", onClick: function () { runSelfmaintenanceAction("run"); } }, icon("fa-play"), "Run maintenance pass")
+          ),
+          h(
+            "div",
+            { className: "perf-grid" },
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-clipboard-check"), h("strong", null, "Health checks")),
+              checks.length ? checks.map(function (check) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: check.check_id },
+                  h("span", { className: "plugin-badge " + (check.state === "failed" ? "warning" : check.state === "degraded" || check.state === "warning" ? "attention" : check.state === "ok" ? "success" : "") }, check.state.toUpperCase()),
+                  h("span", null, check.name + (check.detail ? " · " + check.detail : ""))
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-clipboard-check"), h("strong", null, "No check results yet"))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-lightbulb"), h("strong", null, "Improvement proposals")),
+              proposals.length ? proposals.map(function (proposal) {
+                var actionable = proposal.apply_action && (proposal.state === "approved" || proposal.state === "proposed");
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: proposal.improvement_id },
+                  h("span", { className: "plugin-badge " + (proposal.priority === "high" ? "warning" : "") }, proposal.state.toUpperCase()),
+                  h("span", null, proposal.title + (proposal.apply_action ? " · " + proposal.apply_action : "")),
+                  actionable ? h(
+                    "span",
+                    { key: "actions" },
+                    h("button", { type: "button", className: "btn btn-ghost btn-compact", onClick: function () { runSelfmaintenanceAction("apply", proposal.improvement_id); } }, "Apply"),
+                    h("button", { type: "button", className: "btn btn-ghost btn-compact", onClick: function () { runSelfmaintenanceAction("dismiss", proposal.improvement_id); } }, "Dismiss")
+                  ) : null
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-lightbulb"), h("strong", null, "No improvement proposals yet"))
+            ),
+            h(
+              "article",
+              { className: "glass-card panel-card" },
+              h("div", { className: "plugin-header" }, icon("fa-list-ul"), h("strong", null, "Maintenance log")),
+              log.length ? log.slice(0, 10).map(function (entry) {
+                return h(
+                  "div",
+                  { className: "plugin-meta", key: entry.entry_id },
+                  h("span", { className: "plugin-badge " + (entry.level === "error" ? "warning" : entry.level === "warn" ? "warning" : "") }, entry.level.toUpperCase()),
+                  h("span", null, entry.action + " · " + entry.detail)
+                );
+              }) : h("div", { className: "empty-state" }, icon("fa-list-ul"), h("strong", null, "Maintenance log is empty"))
+            )
+          )
+        );
+      }
+
       function missionAttentionItems(metrics, runtime, security, bots) {
         var items = [];
         if (!runtime || !runtime.online) {
@@ -6177,6 +6274,9 @@
         var productionRecoveryPair = useState({ safe_mode: false, repair_mode: false, crash_loop_detected: false });
         var productionRecovery = productionRecoveryPair[0];
         var setProductionRecovery = productionRecoveryPair[1];
+        var selfmaintenanceStatePair = useState({ health: { state: "unknown", detail: "Self-maintenance status pending." }, checks: [], proposals: [], last_run: null, log: [] });
+        var selfmaintenanceState = selfmaintenanceStatePair[0];
+        var setSelfmaintenanceState = selfmaintenanceStatePair[1];
         var securityOverviewPair = useState({ security_events_open: 0, incidents_open: 0, pending_approvals: 0, secrets_requiring_rotation: 0, audit_integrity_verified: true, lockdown_active: false });
         var securityOverview = securityOverviewPair[0];
         var setSecurityOverview = securityOverviewPair[1];
@@ -6485,6 +6585,33 @@
           }
         }
 
+        async function loadSelfmaintenanceFromApi() {
+          try {
+            var payload = await requestJson("/api/v1/selfmaintenance/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (payload && typeof payload === "object") setSelfmaintenanceState(payload);
+          } catch (error) {
+            setSelfmaintenanceState({ health: { state: "unknown", detail: "Self-maintenance API unavailable." }, checks: [], proposals: [], last_run: null, log: [] });
+          }
+        }
+
+        async function runSelfmaintenanceAction(action, improvementId) {
+          try {
+            if (action === "run") {
+              var run = await requestJson("/api/v1/selfmaintenance/run", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: "{}" });
+              notify("Maintenance pass " + ((run && run.outcome) || "unknown").toUpperCase() + (run && run.detail ? " · " + run.detail : ""));
+            } else if (action === "apply") {
+              var applied = await requestJson("/api/v1/selfmaintenance/improvements/" + encodeURIComponent(improvementId) + "/apply", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: "{}" });
+              notify(applied && applied.applied ? "Improvement applied." : "Improvement could not be applied.");
+            } else if (action === "dismiss") {
+              await requestJson("/api/v1/selfmaintenance/improvements/" + encodeURIComponent(improvementId) + "/apply", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ state: "dismissed" }) });
+              notify("Improvement dismissed.");
+            }
+            loadSelfmaintenanceFromApi();
+          } catch (error) {
+            notify("Maintenance action failed: " + error.message);
+          }
+        }
+
         async function runPerformanceAction(action) {
           try {
             var payload = await requestJson("/api/v1/performance/actions", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ action: action }) });
@@ -6567,7 +6694,7 @@
           if (remoteRefreshRef.current) return;
           remoteRefreshRef.current = true;
           try {
-            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi(), loadSecurityFromApi(), loadPerformanceFromApi(), loadAiFromApi(), loadProductionFromApi()]);
+            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi(), loadSecurityFromApi(), loadPerformanceFromApi(), loadAiFromApi(), loadProductionFromApi(), loadSelfmaintenanceFromApi()]);
             var failures = results.filter(function (result) { return result.status === "rejected"; });
             if (failures.length) {
               if (results[0].status === "rejected") setRuntime({ online: false, status: "offline", model: null, version: null, message: "JoeOS telemetry API is unavailable" });
@@ -7213,6 +7340,8 @@
           section = h(AiSection, { overview: aiOverview, interpretations: aiInterpretations });
         } else if (active === "production") {
           section = h(ProductionSection, { status: productionStatus, build: productionBuild, backups: productionBackups, migrations: productionMigrations, recovery: productionRecovery });
+        } else if (active === "selfmaintenance") {
+          section = h(SelfMaintenanceSection, { state: selfmaintenanceState });
         } else if (active === "settings") {
           section = h(SettingsSection, { prefs: uiPrefs, onChange: updateUiPrefs, onShortcuts: function () { setShortcutsOpen(true); }, version: "2.0.0", performanceSettings: performanceSettings });
         } else {

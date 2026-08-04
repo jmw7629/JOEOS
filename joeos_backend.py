@@ -62,11 +62,35 @@ except ImportError:  # The launcher installs psutil; this keeps diagnostics impo
 LOGGER = logging.getLogger("joeos.backend")
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_DB_PATH = BASE_DIR / "data" / "joeos.db"
-INDEX_PATH = BASE_DIR / "index.html"
-MANIFEST_PATH = BASE_DIR / "manifest.webmanifest"
-SERVICE_WORKER_PATH = BASE_DIR / "sw.js"
-ICON_PATH = BASE_DIR / "joeos-icon.svg"
-SDK_PATH = BASE_DIR / "packages" / "sdk" / "src" / "index.js"
+
+
+def _package_asset(*names: str) -> Path:
+    """Resolve a bundled asset in either the repository or the packaged layout.
+
+    The release bundle keeps the backend at the bundle root and moves the web
+    frontend and SDK under ``web/`` and ``sdk/``. Resolving both layouts keeps
+    the same backend code launchable from a repository checkout and from the
+    packaged, installed tree.
+    """
+    root_candidate = BASE_DIR.joinpath(*names)
+    if root_candidate.exists():
+        return root_candidate
+    package_candidate = BASE_DIR.joinpath("web", *names)
+    if package_candidate.exists():
+        return package_candidate
+    return root_candidate
+
+
+INDEX_PATH = _package_asset("index.html")
+MANIFEST_PATH = _package_asset("manifest.webmanifest")
+SERVICE_WORKER_PATH = _package_asset("sw.js")
+ICON_PATH = _package_asset("joeos-icon.svg")
+
+_SDK_CANDIDATES = (
+    BASE_DIR / "packages" / "sdk" / "src" / "index.js",
+    BASE_DIR / "sdk" / "index.js",
+)
+SDK_PATH = next((candidate for candidate in _SDK_CANDIDATES if candidate.exists()), _SDK_CANDIDATES[0])
 JOEOS_VERSION = "2.0.0"
 SAMPLE_INTERVAL_SECONDS = 5
 SELFMAINTENANCE_INTERVAL_SECONDS = 3600
@@ -688,17 +712,6 @@ async def _collector_loop(app: FastAPI) -> None:
         await asyncio.sleep(SAMPLE_INTERVAL_SECONDS)
 
 
-async def _identity_maintenance_loop(app: FastAPI) -> None:
-    while True:
-        try:
-            await asyncio.to_thread(app.state.device_enrollment_service.expire_pending)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            LOGGER.warning("Identity maintenance failed: %s", type(exc).__name__)
-        await asyncio.sleep(5)
-
-
 def _emergency_stop_workflows(app: FastAPI) -> dict:
     """Cancel active workflow runs; returns cancelled counts for Emergency Stop."""
     automation = getattr(app.state, "automation_service", None)
@@ -1166,10 +1179,6 @@ async def lifespan(app: FastAPI):
     await asyncio.to_thread(_record_event, db_path, "success", "joeos", "JoeOS local command center started.")
     await _wire_selfmaintenance(app, db_path)
     collector = asyncio.create_task(_collector_loop(app), name="joeos-collector")
-    identity_maintenance = asyncio.create_task(
-        _identity_maintenance_loop(app),
-        name="joeos-identity-maintenance",
-    )
     selfmaintenance = asyncio.create_task(
         _selfmaintenance_loop(app),
         name="joeos-self-maintenance",
@@ -1178,12 +1187,9 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         collector.cancel()
-        identity_maintenance.cancel()
         selfmaintenance.cancel()
         with suppress(asyncio.CancelledError):
             await collector
-        with suppress(asyncio.CancelledError):
-            await identity_maintenance
         with suppress(asyncio.CancelledError):
             await selfmaintenance
         await app.state.http.aclose()

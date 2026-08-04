@@ -49,7 +49,7 @@ def _source_commit() -> str:
 def _bundle_paths() -> list:
     """Files and directories that make up the self-contained release bundle."""
     entries = [
-        ("backend", ROOT / "joeos_backend.py"),
+        ("joeos_backend.py", ROOT / "joeos_backend.py"),
         ("server", ROOT / "server"),
         ("web/index.html", ROOT / "index.html"),
         ("web/manifest.webmanifest", ROOT / "manifest.webmanifest"),
