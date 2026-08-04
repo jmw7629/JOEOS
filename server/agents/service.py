@@ -31,11 +31,14 @@ def _now() -> str:
 
 
 class AgentsService:
-    def __init__(self, data_dir: str) -> None:
+    def __init__(self, data_dir: str, *, governance_blocked=None) -> None:
         self.storage = AgentsStorage(data_dir)
         self.storage.prepare()
+        self._governance_blocked = governance_blocked or (lambda: (False, ""))
         self.organization = OrganizationService(self._connection_factory)
-        self.missions = MissionService(self._connection_factory, self.organization)
+        self.missions = MissionService(
+            self._connection_factory, self.organization, governance_blocked=self._governance_blocked
+        )
         self.collaboration = CollaborationService(self._connection_factory)
         self.governance = GovernanceService(self._connection_factory)
         self.budget = BudgetService(self._connection_factory)

@@ -266,6 +266,59 @@ class EmergencyStopCancellationTests(unittest.TestCase):
         self.security.release_emergency_stop()
 
 
+class AgentsGovernanceTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile as _tempfile
+        from server.security import SecurityService
+        from server.agents import AgentsService
+        self.tempdir = _tempfile.TemporaryDirectory()
+        self.root = Path(self.tempdir.name)
+        self.security = SecurityService(str(self.root / "security"), master_key=bytes(range(32)))
+        self.security.prepare_defaults()
+        self.service = AgentsService(
+            str(self.root / "agents"), governance_blocked=self.security.governance_blocked
+        )
+        self.org = self.service.get_or_create_organization()
+        self.role = self.service.organization.create_role(
+            "Engineer", required_capabilities=("coding", "reviewing")
+        )
+        self.agent = self.service.organization.create_agent(
+            "Agent", self.role.role_id, team="Engineering"
+        )
+        mission = self.service.missions.create_mission("Build", "Ship feature")
+        self.service.missions.new_charter(mission.mission_id, "Ship feature", ("tests pass",))
+        self.service.missions.approve_charter(mission.mission_id)
+        self.mission_id = mission.mission_id
+
+    def tearDown(self):
+        self.tempdir.cleanup()
+
+    def test_mission_start_blocked_during_emergency_stop(self):
+        from server.agents.missions import MissionError
+        self.security.emergency_stop()
+        with self.assertRaises(MissionError):
+            self.service.missions.start(self.mission_id)
+        self.security.release_emergency_stop()
+
+    def test_mission_start_allowed_after_release(self):
+        self.security.emergency_stop()
+        try:
+            self.service.missions.start(self.mission_id)
+            self.fail("expected governance denial")
+        except Exception:
+            pass
+        self.security.release_emergency_stop()
+        self.assertTrue(self.service.missions.start(self.mission_id))
+
+    def test_task_state_update_blocked_during_lockdown(self):
+        from server.agents.missions import MissionError
+        task = self.service.missions.create_task(self.mission_id, "T", "objective")
+        self.security.activate_lockdown(reason="test")
+        with self.assertRaises(MissionError):
+            self.service.missions.update_task_state(task.task_id, "in_progress")
+        self.security.deactivate_lockdown(reauthenticated=True)
+
+
 class PluginGovernanceTests(unittest.TestCase):
     def setUp(self):
         import tempfile as _tempfile

@@ -23,6 +23,11 @@ from .models import (
 )
 from .organization import OrganizationService
 
+
+class MissionError(RuntimeError):
+    pass
+
+
 MISSION_DEFAULT_BUDGET = ResourceBudget(
     agent_count=8, delegation_depth=3, retry_count=2, review_rounds=8
 )
@@ -40,9 +45,10 @@ def _id(*parts: str) -> str:
 
 
 class MissionService:
-    def __init__(self, connection_factory: Callable[[], sqlite3.Connection], organization: OrganizationService) -> None:
+    def __init__(self, connection_factory: Callable[[], sqlite3.Connection], organization: OrganizationService, governance_blocked=None) -> None:
         self._connection_factory = connection_factory
         self._organization = organization
+        self._governance_blocked = governance_blocked or (lambda: (False, ""))
 
     # ---- missions ----
 
@@ -263,6 +269,9 @@ class MissionService:
         return updated
 
     def update_task_state(self, task_id: str, status: str, *, note: str = "", final_result: str = "") -> Optional[MissionTask]:
+        blocked, reason = self._governance_blocked()
+        if blocked:
+            raise MissionError("governance: %s" % reason)
         task = self.task(task_id)
         if task is None:
             return None
@@ -305,6 +314,9 @@ class MissionService:
         return True
 
     def start(self, mission_id: str) -> bool:
+        blocked, reason = self._governance_blocked()
+        if blocked:
+            raise MissionError("governance: %s" % reason)
         return self.begin(mission_id)
 
     def get_mission(self, mission_id: str) -> Optional[MissionRecord]:

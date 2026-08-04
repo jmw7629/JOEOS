@@ -809,7 +809,6 @@ async def lifespan(app: FastAPI):
         data_dir=str(db_path.parent / "intelligence"),
     )
     app.state.memory_service = MemoryService(data_dir=str(db_path.parent / "memory"))
-    app.state.agents_service = AgentsService(data_dir=str(db_path.parent / "agents"))
     app.state.security_service = SecurityService(
         str(db_path.parent / "security"),
         master_key=load_or_create_identity_master_key(db_path),
@@ -819,6 +818,10 @@ async def lifespan(app: FastAPI):
     )
     app.state.security_service.prepare_defaults()
     _governance_probe = app.state.security_service.governance_blocked
+    app.state.agents_service = AgentsService(
+        data_dir=str(db_path.parent / "agents"),
+        governance_blocked=_governance_probe,
+    )
     app.state.plugins_service = PluginService(
         str(db_path.parent / "plugins"),
         master_key=load_or_create_identity_master_key(db_path),
