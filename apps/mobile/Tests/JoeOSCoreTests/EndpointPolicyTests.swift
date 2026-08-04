@@ -3,11 +3,12 @@ import XCTest
 @testable import JoeOSCore
 
 final class EndpointPolicyTests: XCTestCase {
-    func testDefaultHaloTailscaleEndpointIsAccepted() throws {
-        let validated = try EndpointPolicy.validate(ConnectionProfile.defaultHalo.endpoint).get()
+    func testDefaultVPSTailscaleEndpointIsAccepted() throws {
+        let validated = try EndpointPolicy.validate(ConnectionProfile.defaultVPS.endpoint).get()
         XCTAssertEqual(validated.origin.scheme, "http")
-        XCTAssertEqual(validated.origin.host, "100.121.165.22")
-        XCTAssertEqual(validated.origin.port, 8080)
+        XCTAssertEqual(validated.origin.host, "100.98.25.26")
+        XCTAssertEqual(validated.origin.effectivePort, 80)
+        XCTAssertNil(validated.origin.port)
     }
 
     func testHTTPSIsAcceptedForPublicAndPrivateHosts() throws {
@@ -123,13 +124,13 @@ final class EndpointPolicyTests: XCTestCase {
 
     func testProfilePayloadRoundTripsAndMalformedStorageFallsBackSafely() throws {
         let profiles = [
-            ConnectionProfile.defaultHalo,
-            ConnectionProfile(name: "Production", endpoint: "https://halo.example.com"),
+            ConnectionProfile.defaultVPS,
+            try ConnectionProfile(name: "Production", endpoint: "https://joeos.example.com"),
         ]
         let encoded = try ConnectionProfileStorage.encode(profiles)
         XCTAssertEqual(ConnectionProfileStorage.decode(encoded), profiles)
-        XCTAssertEqual(ConnectionProfileStorage.decode("not-json"), [.defaultHalo])
-        XCTAssertEqual(ConnectionProfileStorage.decode("[]"), [.defaultHalo])
+        XCTAssertEqual(ConnectionProfileStorage.decode("not-json"), [.defaultVPS])
+        XCTAssertEqual(ConnectionProfileStorage.decode("[]"), [.defaultVPS])
     }
 
     private func failure(_ address: String) -> EndpointValidationError? {

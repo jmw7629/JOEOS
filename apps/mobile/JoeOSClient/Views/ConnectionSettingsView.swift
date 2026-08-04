@@ -63,7 +63,7 @@ struct ConnectionSettingsView: View {
                         Image(systemName: activeDraftID == profile.id ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(activeDraftID == profile.id ? Color.joeOSCyan : .secondary)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(profile.name.isEmpty ? "Unnamed connection" : profile.name)
+                            Text(profile.displayName.isEmpty ? "Unnamed connection" : profile.displayName)
                                 .foregroundStyle(.primary)
                             Text(profile.endpoint)
                                 .font(.caption.monospaced())
@@ -80,7 +80,7 @@ struct ConnectionSettingsView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Edit \(profile.name) connection")
+                .accessibilityLabel("Edit \(profile.displayName) connection")
                 .swipeActions(edge: .trailing, allowsFullSwipe: profiles.count > 1) {
                     Button(role: .destructive) {
                         delete(profile.id)
@@ -106,15 +106,45 @@ struct ConnectionSettingsView: View {
     private var profileEditor: some View {
         if let index = selectedIndex {
             Section("Selected profile") {
-                TextField("Name", text: profileBinding(\.name, at: index))
+                TextField("Name", text: profileBinding(\.displayName, at: index))
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
 
-                TextField("JoeOS address", text: profileBinding(\.endpoint, at: index))
+                Picker("Protocol", selection: profileBinding(\.transport, at: index)) {
+                    ForEach(ConnectionProtocol.allCases, id: \.self) { transport in
+                        Text(transport.displayName).tag(transport)
+                    }
+                }
+
+                TextField("Host", text: profileBinding(\.host, at: index))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
                     .font(.body.monospaced())
+
+                HStack(spacing: 12) {
+                    TextField("Port", text: portBinding(at: index))
+                        .keyboardType(.numberPad)
+                        .font(.body.monospaced())
+                        .disabled(profiles[index].port == nil)
+                    Toggle("Auto-discover", isOn: portAutoBinding(at: index))
+                        .font(.footnote)
+                }
+
+                Picker("Environment", selection: profileBinding(\.environment, at: index)) {
+                    ForEach(ConnectionEnvironment.allCases, id: \.self) { environment in
+                        Text(environment.rawValue.capitalized).tag(environment)
+                    }
+                }
+
+                Picker("Authentication", selection: profileBinding(\.authenticationMode, at: index)) {
+                    ForEach(ProfileAuthenticationMode.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+
+                TextField("Notes", text: profileBinding(\.notes, at: index), axis: .vertical)
+                    .lineLimit(1...3)
 
                 if let validationMessage = validationMessage(for: profiles[index]) {
                     Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
@@ -143,7 +173,7 @@ struct ConnectionSettingsView: View {
         Section("Transport policy") {
             Label("HTTPS is allowed for any valid host.", systemImage: "lock.fill")
             Label("HTTP is limited to loopback, private, link-local, .local, and Tailscale 100.64/10 addresses.", systemImage: "network")
-            Text("Use Tailscale Serve or another private HTTPS reverse proxy for production access. Public HTTP is always rejected before WebKit loads it.")
+            Text("The current development profile is JoeOS VPS at 100.98.25.26. Switch it to HTTPS when the backend serves TLS; no source change is required.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -151,7 +181,7 @@ struct ConnectionSettingsView: View {
 
     private var privacySection: some View {
         Section("Privacy & storage") {
-            Text("Profile names and server addresses are non-secret preferences stored on this iPhone with AppStorage. JoeOS Client does not store passwords, API keys, approval tokens, or model credentials.")
+            Text("Profile names, hosts, and ports are non-secret preferences stored on this iPhone with AppStorage. JoeOS Client does not store passwords, API keys, approval tokens, or model credentials.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Text("The client connects only to the selected JoeOS origin. It never connects directly to Lemonade, Ollama, a shell, or an MCP runner.")
@@ -164,7 +194,7 @@ struct ConnectionSettingsView: View {
                     .foregroundStyle(.red)
             }
 
-            Button("Restore default Halo", role: .destructive, action: restoreDefault)
+            Button("Restore default profile", role: .destructive, action: restoreDefault)
         }
     }
 
@@ -178,9 +208,8 @@ struct ConnectionSettingsView: View {
         else {
             return false
         }
-
         return profiles.allSatisfy { profile in
-            !profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             validationMessage(for: profile) == nil
         }
     }
@@ -195,20 +224,55 @@ struct ConnectionSettingsView: View {
         )
     }
 
+    private func portBinding(at index: Int) -> Binding<String> {
+        Binding(
+            get: { profiles[index].port.map(String.init) ?? "" },
+            set: { raw in
+                profiles[index].port = Int(raw.trimmingCharacters(in: .whitespaces))
+            }
+        )
+    }
+
+    private func portAutoBinding(at index: Int) -> Binding<Bool> {
+        Binding(
+            get: { profiles[index].port == nil },
+            set: { auto in
+                profiles[index].port = auto ? nil : 8080
+            }
+        )
+    }
+
     private func validationMessage(for profile: ConnectionProfile) -> String? {
-        guard !profile.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard !profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return "Give this connection a name."
         }
         guard case .failure(let error) = EndpointPolicy.validate(profile.endpoint) else {
-            return nil
+            return duplicateMessage(for: profile)
         }
         return error.localizedDescription
     }
 
+    private func duplicateMessage(for profile: ConnectionProfile) -> String? {
+        let matches = profiles.contains { candidate in
+            candidate.id != profile.id &&
+            candidate.transport == profile.transport &&
+            candidate.host == profile.host &&
+            candidate.effectivePort == profile.effectivePort
+        }
+        return matches ? "A connection to \(profile.host) already exists." : nil
+    }
+
     private func addProfile() {
         let profile = ConnectionProfile(
-            name: "Halo \(profiles.count + 1)",
-            endpoint: ConnectionProfile.defaultHalo.endpoint
+            displayName: "Connection \(profiles.count + 1)",
+            transport: .http,
+            host: ConnectionProfile.defaultVPS.host,
+            port: nil,
+            environment: .development,
+            notes: "Editable development profile.",
+            apiVersion: nil,
+            requiresAuthentication: true,
+            authenticationMode: .deviceEnrollment
         )
         profiles.append(profile)
         selectedProfileID = profile.id
@@ -231,9 +295,9 @@ struct ConnectionSettingsView: View {
     }
 
     private func restoreDefault() {
-        profiles = [.defaultHalo]
-        selectedProfileID = ConnectionProfile.defaultHalo.id
-        activeDraftID = ConnectionProfile.defaultHalo.id
+        profiles = [.defaultVPS]
+        selectedProfileID = ConnectionProfile.defaultVPS.id
+        activeDraftID = ConnectionProfile.defaultVPS.id
         persistenceError = nil
     }
 
@@ -241,11 +305,20 @@ struct ConnectionSettingsView: View {
         guard canSave else { return }
         do {
             let normalized = try profiles.map { profile -> ConnectionProfile in
-                let endpoint = try EndpointPolicy.validate(profile.endpoint).get().url.absoluteString
+                let validated = try EndpointPolicy.validate(profile.endpoint).get()
                 return ConnectionProfile(
                     id: profile.id,
-                    name: profile.name.trimmingCharacters(in: .whitespacesAndNewlines),
-                    endpoint: endpoint
+                    displayName: profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines),
+                    transport: validated.origin.scheme == "https" ? .https : .http,
+                    host: validated.origin.host,
+                    port: profile.port,
+                    environment: profile.environment,
+                    notes: profile.notes,
+                    apiVersion: profile.apiVersion,
+                    requiresAuthentication: profile.requiresAuthentication,
+                    authenticationMode: profile.authenticationMode,
+                    lastConnectedAt: profile.lastConnectedAt,
+                    lastSuccessfulAt: profile.lastSuccessfulAt
                 )
             }
             encodedProfiles = try ConnectionProfileStorage.encode(normalized)

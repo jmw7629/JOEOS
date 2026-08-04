@@ -1,6 +1,6 @@
 # Mobile client boundary
 
-Owns the iPhone SwiftUI experience, Halo connection-profile selection, Keychain/Secure Enclave device identity, enrollment Face ID confirmation, and the future application-authentication, privileged-approval, push notification, offline cache, camera/microphone, and Even Reality G2 boundaries.
+Owns the iPhone SwiftUI experience, connection-profile selection (authoritative development profile: JoeOS VPS at `100.98.25.26`), Keychain/Secure Enclave device identity, enrollment Face ID confirmation, and the future application-authentication, privileged-approval, push notification, offline cache, camera/microphone, and Even Reality G2 boundaries.
 
 Current compatibility source: `../../JoeOSMobile.swift`, `../../JoeOSMobile-Info.plist`, and the root PWA.
 

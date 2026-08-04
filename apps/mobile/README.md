@@ -4,10 +4,13 @@ This directory contains the production-oriented SwiftUI source set for the next 
 
 ## Included
 
-- Multiple editable connection profiles, with the current Halo at `http://100.121.165.22:8080` as the default.
-- Non-secret profile persistence through SwiftUI `AppStorage`/`UserDefaults`.
+- Multiple editable connection profiles, with the authoritative development profile `JoeOS VPS` at `100.98.25.26` as the default. The old Halo address (`100.121.165.22`) remains available only as an explicit, editable profile and is never the default.
+- Production connection-profile system: profile list persistence, selected-profile persistence, last-successful profile, validation before activation, duplicate detection, migration from the legacy endpoint-format profiles, and automatic reconnect to the last successful profile.
+- Profile fields: UUID, display name, protocol, host, port (discovered from the backend when not set), HTTPS-required, development/production flag, notes, optional API version, and last-connected/last-successful timestamps. Profiles never store API keys, passwords, tokens, or private keys.
+- Non-secret profile persistence through SwiftUI `AppStorage`/`UserDefaults` (same keys as `JoeOSCore.ConnectionProfileStorage`).
 - HTTPS for any valid host; HTTP only for loopback, RFC 1918, link-local, `.local`, IPv6 unique-local/link-local, and Tailscale's `100.64.0.0/10` range.
 - Rejection of URL credentials, query strings, fragments, unsupported schemes, wildcard/public HTTP hosts, and malformed endpoints.
+- One shared backend contract (`JoeOSCore.JoeOSBackendClient`) consumed by the iPhone, iPad, Mac, desktop, and browser clients. Every request URL is derived from the validated profile, so moving the backend to HTTPS is a profile change with zero source changes.
 - Same-origin WebKit navigation. User-tapped external HTTP(S) links open in Safari; cross-origin redirects and custom schemes are blocked.
 - Non-blocking native discovery through the exact same-origin `/api/v1/bootstrap` path, with a strict 64 KiB response ceiling, five-second timeout, HTTP/content-type checks, redirect refusal, unknown-field rejection, and schema-v2 semantic contract validation.
 - Strict consumption of the schema-v2 local-console pairing advertisement: its fixed protocol/crypto profile, both enrollment POST routes, and the `identity.device_enrollment` capability are accepted only when they exactly match the server contract and grant no authority.
@@ -28,13 +31,21 @@ Pairing is real, but its only result is `active_unassigned`. It does not create 
 
 ```text
 Package.swift                         Testable local package manifest
-Sources/JoeOSCore/                    Profile/origin, bootstrap discovery,
-                                      enrollment crypto and transport policy
-Tests/JoeOSCoreTests/                 XCTest policy and wire-vector coverage
+Sources/JoeOSCore/                    Profile/origin, connection manager,
+                                      bootstrap discovery, enrollment crypto,
+                                      and the shared backend client
+Sources/JoeOSIntelligence/            Executive intelligence layer: provider and
+                                      model registries, execution router,
+                                      conversation engine, agent fabric,
+                                      executive council, memory, task graph,
+                                      approvals, diagnostics
+Tests/JoeOSCoreTests/                 XCTest connection/profile/endpoint policy
+Tests/JoeOSIntelligenceTests/         XCTest agent/routing/conversation tests
 JoeOSClient/App/                      SwiftUI application entry point
-JoeOSClient/State/                    Browser/enrollment coordinators and
-                                      strict Keychain receipt/journal state
-JoeOSClient/Views/                    Command chrome, settings, pairing review
+JoeOSClient/State/                    Application coordinator, session manager,
+                                      browser/enrollment coordinators, stores,
+                                      offline cache, synchronization engine
+JoeOSClient/Views/                    Command chrome, connections, pairing review
 JoeOSClient/Web/                      WKWebView and navigation delegates
 JoeOSClient/Resources/                Info.plist and asset catalog
 ```
@@ -73,7 +84,7 @@ Use Xcode 15 or newer:
 10. In **Signing & Capabilities**, enable automatic signing, choose your team, and set a unique bundle identifier such as `com.yourcompany.joeosclient`. No entitlements or background modes are required by this source set.
 11. Set Marketing Version to `1.0` and Current Project Version to `1`.
 12. Build once for an iOS 17 simulator. Then connect an iPhone running iOS 17 or later, select it as the run destination, approve Developer Mode/trust prompts if required, and run the app.
-13. Connect the iPhone to the same Tailscale tailnet or private network as the Halo. Accept the local-network prompt. The default profile opens the current Halo; use the gear button to edit it or add an HTTPS profile.
+13. Connect the iPhone to the same Tailscale tailnet or private network as the JoeOS VPS. Accept the local-network prompt. The default profile opens the JoeOS VPS; use the gear button to edit it or add an HTTPS profile.
 
 For distribution, create a proper 1024×1024 opaque PNG app icon based on the reused `JoeOSMark` SVG and add a standard `AppIcon` set. The repository deliberately does not masquerade the SVG as a valid App Store icon.
 
@@ -104,3 +115,21 @@ plutil -lint JoeOSClient/Resources/Info.plist
 The parser command validates syntax only. A real iOS SDK build, asset compilation, signing check, and device install still require full Xcode.
 
 On the current development Mac, the `JoeOSCore` target builds with Swift 6.1.2, every Swift source parses, the property list and asset JSON validate, and a compiled smoke harness passes the HTTPS/private-network policy, IPv4/IPv6/Tailscale boundaries, navigation handoff, and profile round trip. Apple Command Line Tools on this Mac does not include the `XCTest` module, so `swift test` cannot load the checked-in XCTest target here; run that suite once after installing full Xcode.
+
+## Mac / Xcode handoff (exact commands)
+
+```bash
+git clone https://github.com/jmw7629/JOEOS.git
+cd JOEOS
+git checkout ai-rebuild
+cd apps/mobile
+# Resolve packages (JoeOSCore + JoeOSIntelligence + both test targets)
+swift package resolve
+# Swift package checks (syntax + types on Apple hosts)
+swift build --target JoeOSCore
+swift build --target JoeOSIntelligence
+swift test --target JoeOSCoreTests
+swift test --target JoeOSIntelligenceTests
+```
+
+Then create the Xcode app project per the steps above (Product Name `JoeOSClient`), add the local package, add the `JoeOSClient` folders, and build for the iOS 17 simulator. No `.xcodeproj` is committed; the package manifest plus the source folders are the project-generation definition, and the `JoeOSClient/Resources/Info.plist` is the app plist. No signing certificates, provisioning profiles, or `xcuserdata` are committed.

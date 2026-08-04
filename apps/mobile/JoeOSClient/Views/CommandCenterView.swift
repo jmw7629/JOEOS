@@ -6,7 +6,7 @@ struct CommandCenterView: View {
     private var encodedProfiles = ConnectionProfileStorage.defaultPayload
 
     @AppStorage(ConnectionProfileStorage.activeProfileKey)
-    private var activeProfileID = ConnectionProfile.defaultHalo.id.uuidString
+    private var activeProfileID = ConnectionProfile.defaultVPS.id.uuidString
 
     @StateObject private var session = BrowserSession()
     @StateObject private var enrollment = DeviceEnrollmentCoordinator()
@@ -64,7 +64,7 @@ struct CommandCenterView: View {
                     Text("JOEOS")
                         .font(.system(size: 16, weight: .heavy, design: .rounded))
                         .tracking(1.2)
-                    Text(activeProfile.name)
+                    Text(activeProfile.displayName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)

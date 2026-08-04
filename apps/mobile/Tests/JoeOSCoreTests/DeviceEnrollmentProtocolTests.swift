@@ -102,7 +102,7 @@ final class DeviceEnrollmentProtocolTests: XCTestCase {
             )
         )
         XCTAssertNoThrow(
-            try EnrollmentAudienceOrigin("http://100.121.165.22:8080")
+            try EnrollmentAudienceOrigin("http://100.98.25.26:8080")
         )
         XCTAssertThrowsError(try EnrollmentAudienceOrigin("HTTPS://joeos.example.com"))
         XCTAssertThrowsError(try EnrollmentAudienceOrigin("https://[::ffff:c000:201]"))

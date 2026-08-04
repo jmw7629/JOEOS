@@ -64,10 +64,10 @@ class ReleaseToolTests(unittest.TestCase):
             self.assertEqual(manifest["version"], self.release.current_version())
             self.assertGreaterEqual(len(manifest["files"]), 10)
             # Critical production files must be present and hashed.
-            for label in ("web/index.html", "backend", "requirements.txt", "web/manifest.webmanifest"):
+            for label in ("web/index.html", "joeos_backend.py", "requirements.txt", "web/manifest.webmanifest"):
                 self.assertIn(label, manifest["files"])
                 self.assertRegex(manifest["files"][label], r"^[0-9a-f]{64}$")
-            self.assertTrue((output / "backend").exists())
+            self.assertTrue((output / "joeos_backend.py").exists())
             self.assertTrue((output / "server").is_dir())
             self.assertTrue((output / "web" / "index.html").exists())
             self.assertTrue((output / "sdk" / "index.js").exists())

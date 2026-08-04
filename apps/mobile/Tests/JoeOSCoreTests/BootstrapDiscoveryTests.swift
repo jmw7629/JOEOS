@@ -147,16 +147,16 @@ final class BootstrapDiscoveryTests: XCTestCase {
     }
 
     func testBootstrapURLIsExactAndSameOriginForTailscaleProfile() throws {
-        let endpoint = try EndpointPolicy.validate("http://100.121.165.22:8080/some/base/path").get()
+        let endpoint = try EndpointPolicy.validate("http://100.98.25.26:8080/some/base/path").get()
         let url = try BootstrapDiscoveryClient.bootstrapURL(from: endpoint)
-        XCTAssertEqual(url.absoluteString, "http://100.121.165.22:8080/api/v1/bootstrap")
+        XCTAssertEqual(url.absoluteString, "http://100.98.25.26:8080/api/v1/bootstrap")
         XCTAssertEqual(EndpointOrigin(url: url), endpoint.origin)
     }
 
     func testClientUsesInjectedTransportWithBoundedGETRequest() async throws {
-        let endpoint = try EndpointPolicy.validate(ConnectionProfile.defaultHalo.endpoint).get()
+        let endpoint = try EndpointPolicy.validate(ConnectionProfile.defaultVPS.endpoint).get()
         let response = BootstrapHTTPResponse(
-            finalURL: URL(string: "http://100.121.165.22:8080/api/v1/bootstrap")!,
+            finalURL: URL(string: "http://100.98.25.26:8080/api/v1/bootstrap")!,
             statusCode: 200,
             headers: ["Content-Type": "application/json", "Cache-Control": "no-store"],
             body: Self.validPayload
@@ -169,14 +169,14 @@ final class BootstrapDiscoveryTests: XCTestCase {
 
         XCTAssertEqual(result.serverVersion, "2.0.0")
         XCTAssertEqual(requests.count, 1)
-        XCTAssertEqual(requests[0].url?.absoluteString, "http://100.121.165.22:8080/api/v1/bootstrap")
+        XCTAssertEqual(requests[0].url?.absoluteString, "http://100.98.25.26:8080/api/v1/bootstrap")
         XCTAssertEqual(requests[0].httpMethod, "GET")
         XCTAssertEqual(requests[0].value(forHTTPHeaderField: "Accept"), "application/json")
         XCTAssertNil(requests[0].httpBody)
     }
 
     func testClientRejectsCrossOriginFinalResponse() async throws {
-        let endpoint = try EndpointPolicy.validate(ConnectionProfile.defaultHalo.endpoint).get()
+        let endpoint = try EndpointPolicy.validate(ConnectionProfile.defaultVPS.endpoint).get()
         let response = BootstrapHTTPResponse(
             finalURL: URL(string: "https://attacker.example/api/v1/bootstrap")!,
             statusCode: 200,
@@ -190,9 +190,9 @@ final class BootstrapDiscoveryTests: XCTestCase {
     }
 
     func testClientRejectsSameOriginWrongFinalPath() async throws {
-        let endpoint = try EndpointPolicy.validate(ConnectionProfile.defaultHalo.endpoint).get()
+        let endpoint = try EndpointPolicy.validate(ConnectionProfile.defaultVPS.endpoint).get()
         let response = BootstrapHTTPResponse(
-            finalURL: URL(string: "http://100.121.165.22:8080/api/v1/not-bootstrap")!,
+            finalURL: URL(string: "http://100.98.25.26:8080/api/v1/not-bootstrap")!,
             statusCode: 200,
             headers: ["Content-Type": "application/json"],
             body: Self.validPayload
@@ -204,8 +204,8 @@ final class BootstrapDiscoveryTests: XCTestCase {
     }
 
     func testClientRejectsBadStatusContentTypeAndOversizedBody() async throws {
-        let endpoint = try EndpointPolicy.validate(ConnectionProfile.defaultHalo.endpoint).get()
-        let finalURL = URL(string: "http://100.121.165.22:8080/api/v1/bootstrap")!
+        let endpoint = try EndpointPolicy.validate(ConnectionProfile.defaultVPS.endpoint).get()
+        let finalURL = URL(string: "http://100.98.25.26:8080/api/v1/bootstrap")!
 
         let notFound = BootstrapDiscoveryClient(
             transport: RecordingBootstrapTransport(
