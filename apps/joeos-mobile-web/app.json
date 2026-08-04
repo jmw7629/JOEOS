@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "JoeOS",
+    "slug": "joeos-mobile-web",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "joeos",
+    "web": {
+      "output": "single",
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1220"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "platforms": ["web"],
+    "plugins": ["expo-router"]
+  }
+}
