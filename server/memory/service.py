@@ -252,6 +252,19 @@ class MemoryService:
                 )
         return len(rows)
 
+    def count_due(self, now: Optional[str] = None) -> int:
+        """Read-only count of memory records whose retention has expired.
+
+        Does not mutate state; used by the Self-Maintenance platform to detect
+        a real hygiene improvement without applying it.
+        """
+        now = now or _now()
+        with self._connection_factory() as connection:
+            return connection.execute(
+                "SELECT COUNT(*) FROM memory_records WHERE deletion_state = 'active' AND expires_at IS NOT NULL AND expires_at <= ?",
+                (now,),
+            ).fetchone()[0]
+
     # ---- evidence / entities / relationships ----
 
     def add_evidence(self, evidence: EvidenceRecord) -> EvidenceRecord:

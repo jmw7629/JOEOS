@@ -42,6 +42,7 @@ from server.plugins import PluginService, plugins_router
 from server.performance import PerformanceService, performance_router
 from server.production import ProductionService, production_router
 from server.ai import AIService, ai_router
+from server.selfmaintenance import SelfMaintenanceService, selfmaintenance_router
 from server.realtime import RealtimeService, SQLiteEventRepository, realtime_router
 from server.wearables import WearableService, wearables_router
 from server.security import (
@@ -68,6 +69,7 @@ ICON_PATH = BASE_DIR / "joeos-icon.svg"
 SDK_PATH = BASE_DIR / "packages" / "sdk" / "src" / "index.js"
 JOEOS_VERSION = "2.0.0"
 SAMPLE_INTERVAL_SECONDS = 5
+SELFMAINTENANCE_INTERVAL_SECONDS = 3600
 MAX_METRIC_ROWS = 720
 MAX_EVENT_ROWS = 240
 
@@ -768,6 +770,74 @@ def _wire_production_schemas(app: FastAPI) -> None:
     production.register_schema("main", 1, 1, lambda: _connect(app.state.db_path))
 
 
+async def _wire_selfmaintenance(app: FastAPI, db_path: Path) -> None:
+    """Compose the Self-Maintenance platform over live JoeOS services.
+
+    Providers read authoritative state (Production backups/migrations/recovery,
+    Memory expiry hygiene, telemetry, and the local event store) so checks and
+    improvement proposals are never invented. Executors bind approval-gated
+    proposals to real service operations.
+    """
+
+    def _migrations_writable():
+        production = getattr(app.state, "production_service", None)
+        if production is None:
+            return (False, "production platform is not initialized")
+        try:
+            production.migrations.assert_writable()
+            return (True, "schema compatible; writes allowed")
+        except Exception as exc:
+            return (False, "%s: %s" % (type(exc).__name__, exc))
+
+    def _memory_due():
+        memory = getattr(app.state, "memory_service", None)
+        if memory is None:
+            return 0
+        return memory.count_due()
+
+    app.state.selfmaintenance_service = SelfMaintenanceService(
+        str(db_path.parent / "selfmaintenance"),
+        main_connection_factory=lambda: _connect(db_path),
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+        governance_blocked=lambda: (
+            app.state.security_service.governance_blocked()
+            if getattr(app.state, "security_service", None) is not None
+            else (False, "")
+        ),
+    )
+    svc = app.state.selfmaintenance_service
+    production = getattr(app.state, "production_service", None)
+    if production is not None:
+        svc.set_provider("backup_list", lambda: production.backup.list())
+        svc.set_provider("migrations_writable", _migrations_writable)
+        svc.set_provider("recovery_state", lambda: production.recovery_state())
+        svc.register_executor("create_backup", lambda: str(production.create_backup().backup_id))
+        svc.register_executor("exit_safe_mode", lambda: str(production.exit_safe_mode()))
+        svc.register_executor("exit_repair_mode", lambda: str(production.exit_repair_mode()))
+    memory = getattr(app.state, "memory_service", None)
+    if memory is not None:
+        svc.set_provider("memory_due", _memory_due)
+        svc.register_executor("expire_memory", lambda: str(memory.expire_due()))
+    await asyncio.to_thread(svc.coordinator.run_improvements_pass)
+
+
+async def _selfmaintenance_loop(app: FastAPI) -> None:
+    """Periodically run the self-maintenance pass so checks stay current and
+    evidence-based improvement proposals are refreshed from live state."""
+    while True:
+        try:
+            svc = getattr(app.state, "selfmaintenance_service", None)
+            if svc is not None:
+                await asyncio.to_thread(svc.run_maintenance)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # Never let maintenance failure take down the server.
+            LOGGER.warning("Self-maintenance cycle failed: %s", type(exc).__name__)
+        await asyncio.sleep(SELFMAINTENANCE_INTERVAL_SECONDS)
+
+
 def _production_security_reset(app: FastAPI) -> dict:
     """Post-restore security-state reset: revoke mobile sessions and invalidate
     pending approvals so restored state never reactivates stale authority.
@@ -974,6 +1044,7 @@ async def lifespan(app: FastAPI):
         performance_ready=lambda: getattr(app.state, "performance_service", None) is not None,
         ai_ready=lambda: getattr(app.state, "ai_service", None) is not None,
         production_ready=lambda: getattr(app.state, "production_service", None) is not None,
+        selfmaintenance_ready=lambda: getattr(app.state, "selfmaintenance_service", None) is not None,
     )
     app.state.engineering_service = EngineeringService(
         connection_factory=lambda: _connect(db_path),
@@ -1093,20 +1164,28 @@ async def lifespan(app: FastAPI):
     await _refresh_runtime(app)
     await asyncio.to_thread(_record_metric, db_path, app.state.runtime)
     await asyncio.to_thread(_record_event, db_path, "success", "joeos", "JoeOS local command center started.")
+    await _wire_selfmaintenance(app, db_path)
     collector = asyncio.create_task(_collector_loop(app), name="joeos-collector")
     identity_maintenance = asyncio.create_task(
         _identity_maintenance_loop(app),
         name="joeos-identity-maintenance",
+    )
+    selfmaintenance = asyncio.create_task(
+        _selfmaintenance_loop(app),
+        name="joeos-self-maintenance",
     )
     try:
         yield
     finally:
         collector.cancel()
         identity_maintenance.cancel()
+        selfmaintenance.cancel()
         with suppress(asyncio.CancelledError):
             await collector
         with suppress(asyncio.CancelledError):
             await identity_maintenance
+        with suppress(asyncio.CancelledError):
+            await selfmaintenance
         await app.state.http.aclose()
         plugins_service = getattr(app.state, "plugins_service", None)
         if plugins_service is not None:
@@ -1141,6 +1220,7 @@ app.include_router(security_router)
 app.include_router(performance_router)
 app.include_router(ai_router)
 app.include_router(production_router)
+app.include_router(selfmaintenance_router)
 
 
 @app.middleware("http")

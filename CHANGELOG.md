@@ -5,6 +5,21 @@ by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
 
 ## [2.0.0] — 2026-08-04
 
+### Phase 19 — Self-Maintenance and Continuous Improvement
+
+- Self-Maintenance platform (`server/selfmaintenance/`): a real health-check
+  battery over live services (database, event store, telemetry freshness, disk,
+  schema migrations, verified backups, recovery flags), safe self-hygiene that
+  never touches authority (bounded retention of its own registry), an
+  evidence-based Continuous Improvement proposal registry that never
+  self-applies, approval-gated improvement application through real executors,
+  a periodic maintenance loop, honest `unknown`/`skipped` states when a signal
+  is unmeasured, and a Maintenance & Improvement workspace in the Command
+  Center (18th service).
+- `MemoryService.count_due()` read-only expiry observation.
+- Bootstrap: 3 new `selfmaintenance.*` routes (swapped 3 intelligence detail
+  routes) and 3 new capabilities; routes stay at exactly 128.
+
 ### Phase 18 — Production readiness, reliability, packaging, release
 
 - Production and Release platform (`server/production/`): automatic build
