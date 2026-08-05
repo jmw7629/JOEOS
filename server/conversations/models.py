@@ -16,8 +16,13 @@ class ConversationCreateRequest(StrictWireModel):
     title: str = Field(default="Conversation", max_length=120)
 
 
+class ConversationRenameRequest(StrictWireModel):
+    title: str = Field(min_length=1, max_length=120)
+
+
 class ConversationMessageRequest(StrictWireModel):
     content: str = Field(min_length=1, max_length=40_000)
+    idempotency_key: Optional[UUID] = Field(default=None, strict=False)
 
 
 class MessagePayload(StrictWireModel):
@@ -46,3 +51,21 @@ class ConversationPayload(StrictWireModel):
 class ConversationListResponse(StrictWireModel):
     conversations: List[ConversationPayload]
     stream_supported: bool = False
+
+
+class RunPayload(StrictWireModel):
+    run_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    status: str
+    provider: Optional[str]
+    model: Optional[str]
+    parent_run_id: Optional[UUID]
+    created_at: int
+    started_at: Optional[int]
+    terminal_at: Optional[int]
+    error_detail: str = ""
+
+
+class RetryRequest(StrictWireModel):
+    parent_run_id: Optional[UUID] = Field(default=None, strict=False)

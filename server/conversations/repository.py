@@ -16,6 +16,16 @@ from uuid import UUID
 MESSAGE_ROLES = ("user", "assistant", "system", "tool")
 MESSAGE_STATUSES = ("pending", "completed", "failed", "cancelled")
 CONVERSATION_STATUSES = ("active", "archived")
+RUN_STATUSES = (
+    "queued",
+    "running",
+    "cancellation_requested",
+    "completed",
+    "failed",
+    "cancelled",
+    "interrupted",
+)
+TERMINAL_RUN_STATUSES = ("completed", "failed", "cancelled", "interrupted")
 
 
 @dataclass(frozen=True)
@@ -47,6 +57,22 @@ class MessageRecord:
     parent_message_id: Optional[UUID]
     error_detail: str
     tokens_used: Optional[int]
+
+
+@dataclass(frozen=True)
+class RunRecord:
+    run_id: UUID
+    conversation_id: UUID
+    message_id: UUID
+    status: str
+    provider: Optional[str]
+    model: Optional[str]
+    parent_run_id: Optional[UUID]
+    created_at: int
+    started_at: Optional[int]
+    terminal_at: Optional[int]
+    error_detail: str
+    schema_version: int
 
 
 class SQLiteConversationRepository:
@@ -94,6 +120,32 @@ class SQLiteConversationRepository:
 
                 CREATE INDEX IF NOT EXISTS idx_messages_conversation_created
                 ON conversation_messages(conversation_id, created_at, message_id);
+
+                CREATE TABLE IF NOT EXISTS conversation_runs (
+                    run_id TEXT PRIMARY KEY,
+                    conversation_id TEXT NOT NULL
+                        REFERENCES conversations(conversation_id),
+                    message_id TEXT NOT NULL
+                        REFERENCES conversation_messages(message_id),
+                    status TEXT NOT NULL CHECK(status IN (
+                        'queued','running','cancellation_requested',
+                        'completed','failed','cancelled','interrupted'
+                    )),
+                    provider TEXT,
+                    model TEXT,
+                    parent_run_id TEXT,
+                    created_at INTEGER NOT NULL,
+                    started_at INTEGER,
+                    terminal_at INTEGER,
+                    error_detail TEXT NOT NULL DEFAULT '',
+                    schema_version INTEGER NOT NULL DEFAULT 1
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_conversation_runs_conversation
+                ON conversation_runs(conversation_id, created_at);
+
+                CREATE INDEX IF NOT EXISTS idx_conversation_runs_status
+                ON conversation_runs(status);
                 """
             )
             connection.commit()
@@ -286,6 +338,276 @@ class SQLiteConversationRepository:
                 (str(conversation_id),),
             ).fetchone()
         return self._message(row) if row is not None else None
+
+    # ------------------------------------------------------------------
+    # Runs
+    # ------------------------------------------------------------------
+
+    def create_run(
+        self,
+        *,
+        run_id: UUID,
+        conversation_id: UUID,
+        message_id: UUID,
+        status: str,
+        now: int,
+        parent_run_id: Optional[UUID] = None,
+    ) -> RunRecord:
+        with self._connection_factory() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                connection.execute(
+                    """
+                    INSERT INTO conversation_runs(
+                        run_id, conversation_id, message_id, status,
+                        parent_run_id, created_at, started_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(run_id),
+                        str(conversation_id),
+                        str(message_id),
+                        status,
+                        str(parent_run_id) if parent_run_id else None,
+                        now,
+                        now if status == "running" else None,
+                    ),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return self.get_run(run_id)  # type: ignore[return-value]
+
+    def get_run(self, run_id: UUID) -> Optional[RunRecord]:
+        with self._connection_factory() as connection:
+            row = connection.execute(
+                "SELECT * FROM conversation_runs WHERE run_id = ?", (str(run_id),)
+            ).fetchone()
+        return self._run(row) if row is not None else None
+
+    def list_runs(self, conversation_id: UUID) -> List[RunRecord]:
+        with self._connection_factory() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM conversation_runs
+                WHERE conversation_id = ?
+                ORDER BY created_at, run_id
+                """,
+                (str(conversation_id),),
+            ).fetchall()
+        return [self._run(row) for row in rows]
+
+    def list_runs_all(self) -> List[RunRecord]:
+        with self._connection_factory() as connection:
+            rows = connection.execute(
+                "SELECT * FROM conversation_runs ORDER BY created_at"
+            ).fetchall()
+        return [self._run(row) for row in rows]
+
+    def message_by_idempotency_key(self, key: UUID) -> Optional[MessageRecord]:
+        with self._connection_factory() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM conversation_messages WHERE idempotency_key = ?
+                """,
+                (str(key),),
+            ).fetchone()
+        return self._message(row) if row is not None else None
+
+    def fetch_conversation_events_after(
+        self,
+        cursor: int,
+        workspace_id: UUID,
+        conversation_id: Optional[UUID] = None,
+        limit: int = 100,
+    ) -> List[sqlite3.Row]:
+        """Cursor-resumable conversation events scoped to a workspace. Uses the
+        same shared `events` table as the existing realtime infrastructure."""
+        start = max(0, int(cursor))
+        count = max(1, min(200, int(limit)))
+        with self._connection_factory() as connection:
+            if conversation_id is None:
+                rows = connection.execute(
+                    """
+                    SELECT id, recorded_at, level, source, message
+                    FROM events
+                    WHERE id > ? AND source = 'conversations'
+                      AND json_extract(message, '$.ws') = ?
+                    ORDER BY id ASC LIMIT ?
+                    """,
+                    (start, str(workspace_id), count),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT id, recorded_at, level, source, message
+                    FROM events
+                    WHERE id > ? AND source = 'conversations'
+                      AND json_extract(message, '$.ws') = ?
+                      AND json_extract(message, '$.conversation') = ?
+                    ORDER BY id ASC LIMIT ?
+                    """,
+                    (start, str(workspace_id), str(conversation_id), count),
+                ).fetchall()
+        return rows
+
+    def update_run(
+        self,
+        run_id: UUID,
+        *,
+        status: str,
+        now: int,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        error_detail: str = "",
+    ) -> bool:
+        """Transitions a run. Once a run is terminal, later writes cannot
+        overwrite it (late provider output after cancellation is discarded)."""
+        with self._connection_factory() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT status FROM conversation_runs WHERE run_id = ?",
+                    (str(run_id),),
+                ).fetchone()
+                if row is None:
+                    connection.rollback()
+                    return False
+                current = str(row["status"])
+                if current in TERMINAL_RUN_STATUSES:
+                    connection.rollback()
+                    return False
+                terminal = status in TERMINAL_RUN_STATUSES
+                connection.execute(
+                    """
+                    UPDATE conversation_runs
+                    SET status = ?, provider = COALESCE(?, provider),
+                        model = COALESCE(?, model),
+                        error_detail = CASE WHEN ? = '' THEN error_detail ELSE ? END,
+                        started_at = COALESCE(started_at, ?),
+                        terminal_at = CASE WHEN ? THEN ? ELSE terminal_at END
+                    WHERE run_id = ? AND status NOT IN (
+                        'completed','failed','cancelled','interrupted'
+                    )
+                    """,
+                    (
+                        status,
+                        provider,
+                        model,
+                        error_detail,
+                        error_detail,
+                        now,
+                        1 if terminal else 0,
+                        now if terminal else None,
+                        str(run_id),
+                    ),
+                )
+                connection.commit()
+                return True
+            except Exception:
+                connection.rollback()
+                raise
+
+    def interrupt_stale_runs(self, now: int) -> int:
+        """Recovery: runs left in queued/running/cancellation_requested after a
+        restart are interrupted; their pending assistant messages are cancelled
+        with an explicit interruption note. User messages are preserved."""
+        with self._connection_factory() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                rows = connection.execute(
+                    """
+                    SELECT run_id, message_id FROM conversation_runs
+                    WHERE status IN ('queued','running','cancellation_requested')
+                    """
+                ).fetchall()
+                if rows:
+                    connection.executemany(
+                        """
+                        UPDATE conversation_runs
+                        SET status = 'interrupted', terminal_at = ?,
+                            error_detail = 'interrupted by restart'
+                        WHERE run_id = ? AND status IN (
+                            'queued','running','cancellation_requested'
+                        )
+                        """,
+                        [(now, str(row["run_id"])) for row in rows],
+                    )
+                    for row in rows:
+                        connection.execute(
+                            """
+                            UPDATE conversation_messages
+                            SET status = 'cancelled', completed_at = ?,
+                                error_detail = 'interrupted by restart'
+                            WHERE message_id = ? AND status = 'pending'
+                            """,
+                            (now, str(row["message_id"])),
+                        )
+                connection.commit()
+                return len(rows)
+            except Exception:
+                connection.rollback()
+                raise
+
+    # ------------------------------------------------------------------
+    # Conversation title / status
+    # ------------------------------------------------------------------
+
+    def set_conversation_title(self, conversation_id: UUID, title: str, now: int) -> bool:
+        with self._connection_factory() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = connection.execute(
+                    """
+                    UPDATE conversations
+                    SET title = ?, updated_at = ?, revision = revision + 1
+                    WHERE conversation_id = ? AND status = 'active'
+                    """,
+                    (title, now, str(conversation_id)),
+                )
+                connection.commit()
+                return cursor.rowcount == 1
+            except Exception:
+                connection.rollback()
+                raise
+
+    def set_conversation_status(
+        self, conversation_id: UUID, status: str, now: int
+    ) -> bool:
+        with self._connection_factory() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = connection.execute(
+                    """
+                    UPDATE conversations
+                    SET status = ?, updated_at = ?, revision = revision + 1
+                    WHERE conversation_id = ? AND status = 'active'
+                    """,
+                    (status, now, str(conversation_id)),
+                )
+                connection.commit()
+                return cursor.rowcount == 1
+            except Exception:
+                connection.rollback()
+                raise
+
+    @staticmethod
+    def _run(row: sqlite3.Row) -> RunRecord:
+        return RunRecord(
+            run_id=UUID(str(row["run_id"])),
+            conversation_id=UUID(str(row["conversation_id"])),
+            message_id=UUID(str(row["message_id"])),
+            status=str(row["status"]),
+            provider=str(row["provider"]) if row["provider"] else None,
+            model=str(row["model"]) if row["model"] else None,
+            parent_run_id=UUID(str(row["parent_run_id"])) if row["parent_run_id"] else None,
+            created_at=int(row["created_at"]),
+            started_at=int(row["started_at"]) if row["started_at"] is not None else None,
+            terminal_at=int(row["terminal_at"]) if row["terminal_at"] is not None else None,
+            error_detail=str(row["error_detail"]),
+            schema_version=int(row["schema_version"]),
+        )
 
     @staticmethod
     def _conversation(row: sqlite3.Row) -> ConversationRecord:

@@ -62,6 +62,66 @@ public struct BackendConversationList: Codable, Equatable, Sendable {
     }
 }
 
+public struct BackendConversationRun: Codable, Equatable, Sendable {
+    public let runID: UUID
+    public let conversationID: UUID
+    public let messageID: UUID
+    public let status: String
+    public let provider: String?
+    public let model: String?
+    public let parentRunID: UUID?
+    public let createdAt: Int
+    public let startedAt: Int?
+    public let terminalAt: Int?
+    public let errorDetail: String
+
+    public var isTerminal: Bool {
+        ["completed", "failed", "cancelled", "interrupted"].contains(status)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case runID = "run_id"
+        case conversationID = "conversation_id"
+        case messageID = "message_id"
+        case status
+        case provider
+        case model
+        case parentRunID = "parent_run_id"
+        case createdAt = "created_at"
+        case startedAt = "started_at"
+        case terminalAt = "terminal_at"
+        case errorDetail = "error_detail"
+    }
+}
+
+/// A persisted conversation event received over the authenticated SSE
+/// subscription. At-least-once delivery means clients deduplicate by `id`.
+public struct PersistedConversationEvent: Equatable, Sendable {
+    public let id: Int
+    public let schemaVersion: Int
+    public let event: String
+    public let organizationID: UUID?
+    public let workspaceID: UUID?
+    public let userID: UUID?
+    public let conversationID: UUID?
+    public let runID: UUID?
+    public let timestamp: Int
+    public let trace: String
+    public let payload: [String: Sendable]
+
+    public static func == (lhs: PersistedConversationEvent, rhs: PersistedConversationEvent) -> Bool {
+        lhs.id == rhs.id && lhs.event == rhs.event
+    }
+}
+
+/// Events delivered by the authenticated conversation-event subscription.
+public enum ConversationSubscriptionEvent: Equatable, Sendable {
+    case subscribed
+    case event(PersistedConversationEvent)
+    case revoked
+    case done
+}
+
 // MARK: - Server-sent conversation events
 
 public enum ConversationEvent: Equatable, Sendable {
@@ -150,24 +210,65 @@ public struct ConversationClient: Sendable {
         )
     }
 
-    public func submit(_ content: String, in conversationID: UUID, sessionID: UUID) async throws -> BackendConversation {
+    public func submit(_ content: String, in conversationID: UUID, sessionID: UUID, idempotencyKey: UUID? = nil) async throws -> BackendConversation {
         struct Body: Encodable, Sendable {
             let content: String
+            let idempotencyKey: String?
+            enum CodingKeys: String, CodingKey {
+                case content
+                case idempotencyKey = "idempotency_key"
+            }
         }
         return try await backend.post(
-            Body(content: content),
+            Body(content: content, idempotencyKey: idempotencyKey?.uuidString.lowercased()),
             to: "/api/v1/conversations/\(conversationID.uuidString.lowercased())/messages",
             endpoint: endpoint,
             headers: Self.headers(sessionID)
         )
     }
 
-    /// Retries the last user message without corrupting conversation history.
-    public func retry(in conversationID: UUID, sessionID: UUID) async throws -> BackendConversation {
+    /// Retries the last user message, optionally related to a prior run.
+    public func retry(in conversationID: UUID, sessionID: UUID, parentRunID: UUID? = nil) async throws -> BackendConversation {
+        struct Body: Encodable, Sendable {
+            let parentRunID: String?
+            enum CodingKeys: String, CodingKey {
+                case parentRunID = "parent_run_id"
+            }
+        }
+        return try await backend.post(
+            Body(parentRunID: parentRunID?.uuidString.lowercased()),
+            to: "/api/v1/conversations/\(conversationID.uuidString.lowercased())/retry",
+            endpoint: endpoint,
+            headers: Self.headers(sessionID)
+        )
+    }
+
+    public func rename(_ title: String, conversationID: UUID, sessionID: UUID) async throws -> BackendConversation {
+        struct Body: Encodable, Sendable {
+            let title: String
+        }
+        return try await backend.patch(
+            Body(title: title),
+            to: "/api/v1/conversations/\(conversationID.uuidString.lowercased())",
+            endpoint: endpoint,
+            headers: Self.headers(sessionID)
+        )
+    }
+
+    public func archive(conversationID: UUID, sessionID: UUID) async throws -> BackendConversation {
         struct Empty: Encodable, Sendable {}
         return try await backend.post(
             Empty(),
-            to: "/api/v1/conversations/\(conversationID.uuidString.lowercased())/retry",
+            to: "/api/v1/conversations/\(conversationID.uuidString.lowercased())/archive",
+            endpoint: endpoint,
+            headers: Self.headers(sessionID)
+        )
+    }
+
+    public func run(_ runID: UUID, in conversationID: UUID, sessionID: UUID) async throws -> BackendConversationRun {
+        try await backend.get(
+            BackendConversationRun.self,
+            path: "/api/v1/conversations/\(conversationID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())",
             endpoint: endpoint,
             headers: Self.headers(sessionID)
         )
@@ -189,7 +290,8 @@ public struct ConversationClient: Sendable {
     public func stream(
         _ content: String,
         in conversationID: UUID,
-        sessionID: UUID
+        sessionID: UUID,
+        idempotencyKey: UUID? = nil
     ) -> AsyncThrowingStream<ConversationEvent, Error> {
         AsyncThrowingStream { continuation in
             do {
@@ -205,7 +307,11 @@ public struct ConversationClient: Sendable {
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 request.setValue("application/json", forHTTPHeaderField: "Accept")
-                request.httpBody = try JSONEncoder().encode(["content": content])
+                var body: [String: String] = ["content": content]
+                if let idempotencyKey {
+                    body["idempotency_key"] = idempotencyKey.uuidString.lowercased()
+                }
+                request.httpBody = try JSONEncoder().encode(body)
                 request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
                 for (name, value) in Self.headers(sessionID) {
                     request.setValue(value, forHTTPHeaderField: name)
@@ -228,6 +334,135 @@ public struct ConversationClient: Sendable {
                 continuation.finish(throwing: error)
             }
         }
+    }
+
+    /// Subscribes to the authenticated conversation event stream, resuming from
+    /// the given cursor. Delivery is at-least-once; clients deduplicate by the
+    /// stable event id. The session id is carried in a header, never a query
+    /// string. The stream stops when the session is revoked or disabled.
+    public func subscribeToConversationEvents(
+        from cursor: Int,
+        conversationID: UUID? = nil,
+        sessionID: UUID,
+        backoff: (Int) -> TimeInterval = { _ in 0.5 }
+    ) -> AsyncThrowingStream<ConversationSubscriptionEvent, Error> {
+        AsyncThrowingStream { continuation in
+            do {
+                var path = "/api/v1/conversations/events?cursor=\(max(0, cursor))"
+                if let conversationID {
+                    path += "&conversation_id=\(conversationID.uuidString.lowercased())"
+                }
+                let url = try backend.url(endpoint: endpoint, path: path)
+                var request = URLRequest(
+                    url: url,
+                    cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
+                    timeoutInterval: 300
+                )
+                request.httpMethod = "GET"
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+                for (name, value) in Self.headers(sessionID) {
+                    request.setValue(value, forHTTPHeaderField: name)
+                }
+                let stream = try streaming.stream(request: request)
+                let task = Task {
+                    do {
+                        for try await chunk in stream {
+                            let events = try Self.parsePersistedEvents(chunk)
+                            for event in events {
+                                continuation.yield(event)
+                            }
+                        }
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+                continuation.onTermination = { _ in task.cancel() }
+            } catch {
+                continuation.finish(throwing: error)
+            }
+        }
+    }
+
+    /// Parses persisted conversation-event SSE frames into typed events.
+    static func parsePersistedEvents(_ data: Data) throws -> [ConversationSubscriptionEvent] {
+        guard let text = String(data: data, encoding: .utf8) else {
+            throw ConversationClientError.invalidEvent
+        }
+        var events: [ConversationSubscriptionEvent] = []
+        for block in text.components(separatedBy: "\n\n") {
+            var eventName = "message"
+            var dataLines: [String] = []
+            for line in block.components(separatedBy: "\n") {
+                if line.hasPrefix("event:") {
+                    eventName = String(line.dropFirst("event:".count)).trimmingCharacters(in: .whitespaces)
+                } else if line.hasPrefix("data:") {
+                    dataLines.append(String(line.dropFirst("data:".count)).trimmingCharacters(in: .whitespaces))
+                }
+            }
+            guard let dataText = dataLines.first, !dataText.isEmpty else { continue }
+            if eventName == "subscribed" {
+                events.append(.subscribed)
+                continue
+            }
+            if eventName == "revoked" {
+                events.append(.revoked)
+                continue
+            }
+            if eventName == "done" {
+                events.append(.done)
+                continue
+            }
+            guard let object = try? JSONSerialization.jsonObject(with: Data(dataText.utf8)) as? [String: Any] else {
+                throw ConversationClientError.invalidEvent
+            }
+            let envelope = try Self.decodeEnvelope(object)
+            events.append(.event(envelope))
+        }
+        return events
+    }
+
+    private struct EnvelopeDocument: Decodable, Sendable {
+        let schemaVersion: Int?
+        let event: String?
+        let org: String?
+        let ws: String?
+        let user: String?
+        let conversation: String?
+        let run: String?
+        let ts: Int?
+        let trace: String?
+
+        enum CodingKeys: String, CodingKey {
+            case schemaVersion = "schema_version"
+            case event
+            case org
+            case ws
+            case user
+            case conversation
+            case run
+            case ts
+            case trace
+        }
+    }
+
+    private static func decodeEnvelope(_ object: [String: Any]) throws -> PersistedConversationEvent {
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let doc = try JSONDecoder().decode(EnvelopeDocument.self, from: data)
+        let id = object["id"] as? Int ?? 0
+        return PersistedConversationEvent(
+            id: id,
+            schemaVersion: doc.schemaVersion ?? 1,
+            event: doc.event ?? "unknown",
+            organizationID: doc.org.flatMap(UUID.init(uuidString:)),
+            workspaceID: doc.ws.flatMap(UUID.init(uuidString:)),
+            userID: doc.user.flatMap(UUID.init(uuidString:)),
+            conversationID: doc.conversation.flatMap(UUID.init(uuidString:)),
+            runID: doc.run.flatMap(UUID.init(uuidString:)),
+            timestamp: doc.ts ?? 0,
+            trace: doc.trace ?? "",
+            payload: object
+        )
     }
 
     public static func headers(_ sessionID: UUID) -> [String: String] {

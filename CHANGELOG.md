@@ -3,6 +3,45 @@
 All notable changes to the JoeOS Command Center are documented here, grouped
 by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
 
+## [2.0.0] — 2026-08-05
+
+### Phase P3A — Authoritative identity, application sessions, canonical conversations
+
+- Authority domain (`server/identity/authority_*`): users, organizations,
+  workspaces, roles, capabilities (with risk classification), memberships,
+  principal role assignments, device principal assignments, application
+  sessions, single-use refresh credentials, authentication challenges, and
+  append-only authentication events.
+- Local-console CLI (`python -m server.identity.cli authority …`): idempotent
+  first-owner bootstrap (no password, no second owner), device assignment and
+  revocation, user status changes, and session revocation.
+- Device-key application authentication: the enrolled P-256 device-authentication
+  key signs a canonical `JOEOS-APPLICATION-AUTH-V1` challenge to establish a
+  short-lived revocable application session (`/api/v1/auth/challenge|session|refresh|logout`).
+- Protected routes deny by default (`X-JoeOS-Session` header); authenticated
+  principal endpoint returns user, organization, workspace, roles, and
+  capabilities.
+- Canonical conversations (`server/conversations/`): stable server-assigned
+  conversation ids, append-only messages with idempotency keys, durable runs,
+  create/list/reopen/rename/archive, submit, retry (new related run id, no user
+  duplication), server-side cancellation (queued cancels without provider work;
+  running moves to `cancellation_requested`), run recovery after restart
+  (`interrupted`), and `GET /events` authenticated cursor-resumable SSE.
+- Realtime integration: conversation lifecycle events (`conversation.created`,
+  `conversation.updated`, `conversation.archived`, `message.accepted`,
+  `run.queued`, `run.started`, `run.partial`, `run.completed`, `run.failed`,
+  `run.cancellation_requested`, `run.cancelled`) published to the shared events
+  table with a typed envelope (schema version, org/workspace/user scope,
+  conversation id, run id, timestamp, trace) and no conversation content.
+- Genuine streaming: provider capability negotiation (`supports_streaming`),
+  real SSE partials when the selected provider streams; honest single completed
+  delta otherwise. Test-only deterministic streaming/non-streaming providers.
+- Native Swift source integration (`JoeOSCore`): `ApplicationSessionClient`,
+  `ApplicationSessionManager` (full state machine, Keychain storage, serialized
+  refresh rotation, credential clearing), `ConversationClient` (canonical
+  conversations + streaming + event subscription), and
+  `JoeOSIntelligence.BackendConversationPersisting`.
+
 ## [2.0.0] — 2026-08-04
 
 ### Phase 19 — Self-Maintenance and Continuous Improvement

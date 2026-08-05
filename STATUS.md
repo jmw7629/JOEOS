@@ -26,14 +26,38 @@ Phase 19 — Self-Maintenance and Continuous Improvement (delivered).
 
 ## Test status
 
-- Python: 642 passed, 61 subtests passed.
+- Python: 643 passed, 61 subtests passed.
 - Frontend: 27/27 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
+
+## Phase P3A status
+
+Delivered:
+
+- authoritative identity (users, organizations, workspaces, roles, capabilities)
+- device-principal assignment
+- device-key application authentication (P-256 device-authentication key)
+- revocable application sessions and refresh rotation
+- protected routes (deny by default) and authenticated principal endpoint
+- canonical conversations with append-only messages, durable runs, retry, and cancellation
+- native Swift source integration (session manager, conversation client, backend-backed persisting adapter)
+- durable realtime conversation events with typed envelope and cursor resume
+- genuine test-provider streaming and honest non-streaming behavior
+- run recovery, interruption, and restart-safe conversation reopen
+
+Not yet delivered:
+
+- successful Swift compilation on this VPS (no Apple toolchain; Mac handoff required)
+- Xcode build, simulator, and physical iPhone validation
+- production provider streaming unless an actually configured provider supports it
+- passkey/OIDC browser authentication (browser sessions are gated; no bypass)
+- privileged approval execution, private runner, shell authority, Git mutation, deployment, and secret access
+- PostgreSQL/pgvector/Redis production migration
 
 ## Not yet built
 
 - Phase 4 local-first data platform (PostgreSQL/pgvector, Redis, outbox).
-- Phase 3 privileged runner: shell execution, deployments, Git mutation, external sending, secret access, remote control, and application-level privileged approvals (identity, sessions, device-key application authentication, principal/capability lookup, and canonical conversations ARE delivered; privileged capabilities are defined but never granted).
+- Phase 3 privileged runner: shell execution, deployments, Git mutation, external sending, secret access, remote control, and application-level privileged approvals (identity, sessions, device-key application authentication, principal/capability lookup, canonical conversations, and run recovery ARE delivered; privileged capabilities are defined but never granted).
 - Index-at-rest encryption, cross-project queries.
 - Plugin marketplace, public signing-key distribution, OS-level sandboxing, webhooks, and remote connectors (architecture documented; not implemented).
 - Real external provider adapters (email/chat), mobile push, smart-glasses delivery, and read receipts (architecture documented; not implemented).

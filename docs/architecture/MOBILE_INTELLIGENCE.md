@@ -74,10 +74,37 @@ application identity and conversation contracts:
   and streams canonical conversations with the session id presented on every
   request. Conversation history, message state, and run status are
   backend-authoritative.
-- Conversation lifecycle events (`conversation.created`, `message.appended`,
-  `run.started`, `run.completed`, `run.cancelled`, `run.failed`) are published
-  through the existing realtime event stream with cursor-based reconnect
-  (`/ws/events?after=<cursor>`); event payloads never contain message content.
+- Conversation lifecycle events (`conversation.created`, `message.accepted`,
+  `run.queued`, `run.started`, `run.partial`, `run.completed`, `run.cancelled`,
+  `run.failed`) are published through the existing realtime event stream with a
+  typed envelope (schema version, organization/workspace/principal scope,
+  conversation id, run id, timestamp, trace id) and cursor-based reconnect
+  (`/api/v1/conversations/events?cursor=<n>`, authenticated by header, scoped to
+  the session's workspace); event payloads never contain message content or
+  credentials.
 - Browser access to authority-protected endpoints is gated by the same
   application-session requirement; requests without a session are rejected
-  with 401 by default.
+  with 401 by default. The public shell and bootstrap metadata load; private
+  conversations, users, roles, capabilities, agents, and provider configuration
+  require an authenticated session.
+
+## Phase P3A session and run behavior
+
+- `ApplicationSessionManager` (JoeOSCore) distinguishes disconnected,
+  discovering, enrollmentRequired, activeUnassigned, authenticating,
+  authenticated, refreshing, offlineAuthenticatedCache, sessionExpired,
+  assignmentRevoked, deviceRevoked, userDisabled, organizationDisabled,
+  workspaceDisabled, backendIncompatible, transportRejected, and
+  authenticationFailed. Authority is unverified while offline even when cached
+  identity is displayed.
+- Sessions are stored only in ThisDeviceOnly Keychain; refresh rotation is
+  serialized, loop-protected, and clears credentials on any authoritative
+  rejection.
+- Runs are durable: queued → running → (completed | failed | cancelled |
+  interrupted). Cancelling a queued run never starts provider work; cancelling
+  a running run moves it to `cancellation_requested`; only one terminal state
+  is persisted and late provider output cannot overwrite it. After a restart,
+  runs left in queued/running/cancellation_requested are interrupted and their
+  pending messages cancelled without inventing an assistant response.
+- Retry creates a new run related to the original (`parent_run_id`) without
+  duplicating the user message.

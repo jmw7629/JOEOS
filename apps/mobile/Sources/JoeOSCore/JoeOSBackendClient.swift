@@ -224,12 +224,31 @@ public struct JoeOSBackendClient: Sendable {
         endpoint: ValidatedEndpoint,
         headers: [String: String] = [:]
     ) async throws -> Response {
+        try await send(method: "PUT", body: body, to: path, endpoint: endpoint, headers: headers)
+    }
+
+    public func patch<Body: Encodable & Sendable, Response: Decodable & Sendable>(
+        body: Body,
+        to path: String,
+        endpoint: ValidatedEndpoint,
+        headers: [String: String] = [:]
+    ) async throws -> Response {
+        try await send(method: "PATCH", body: body, to: path, endpoint: endpoint, headers: headers)
+    }
+
+    private func send<Body: Encodable & Sendable, Response: Decodable & Sendable>(
+        method: String,
+        body: Body,
+        to path: String,
+        endpoint: ValidatedEndpoint,
+        headers: [String: String]
+    ) async throws -> Response {
         var request = URLRequest(
             url: try url(endpoint: endpoint, path: path),
             cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
             timeoutInterval: timeout
         )
-        request.httpMethod = "PUT"
+        request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.httpBody = try JSONEncoder().encode(body)

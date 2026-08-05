@@ -1192,16 +1192,29 @@ async def lifespan(app: FastAPI):
     def _ai_availability() -> dict:
         ai = getattr(app.state, "ai_service", None)
         if ai is None:
-            return {"available": False, "reason": "AI platform is not initialized.", "streaming": False}
+            return {
+                "available": False,
+                "reason": "AI platform is not initialized.",
+                "streaming": False,
+                "state": "unavailable",
+            }
         view = ai.overview()
+        if not view.provider_available:
+            return {
+                "available": False,
+                "reason": view.provider_reason,
+                "streaming": False,
+                "state": "unavailable",
+            }
         return {
-            "available": view.provider_available,
+            "available": True,
             "reason": view.provider_reason,
             # Streaming is reported only when the selected provider genuinely
             # advertises it. Partial events are never fabricated.
             "streaming": ai.provider_streaming_supported(),
-            "provider_id": "lemonade" if view.provider_available else None,
+            "provider_id": "lemonade",
             "model": view.model,
+            "state": "streaming" if ai.provider_streaming_supported() else "non_streaming",
         }
 
     app.state.conversation_service = ConversationService(
@@ -1215,6 +1228,9 @@ async def lifespan(app: FastAPI):
         now_provider=lambda: int(time.time()),
     )
     app.state.conversation_service.prepare()
+    # Run recovery: interrupt runs left in queued/running/cancellation_requested
+    # after a restart. Accepted user messages are preserved.
+    await asyncio.to_thread(app.state.conversation_service.recover_after_restart)
     await _refresh_runtime(app)
     await asyncio.to_thread(_record_metric, db_path, app.state.runtime)
     await asyncio.to_thread(_record_event, db_path, "success", "joeos", "JoeOS local command center started.")
