@@ -46,6 +46,11 @@ from server.conversations import (
     SQLiteConversationRepository,
     conversations_router,
 )
+from server.actions import (
+    ActionService,
+    SQLiteControlStore,
+    control_router,
+)
 from server.plugins import PluginService, plugins_router
 from server.performance import PerformanceService, performance_router
 from server.production import ProductionService, production_router
@@ -1231,6 +1236,15 @@ async def lifespan(app: FastAPI):
     # Run recovery: interrupt runs left in queued/running/cancellation_requested
     # after a restart. Accepted user messages are preserved.
     await asyncio.to_thread(app.state.conversation_service.recover_after_restart)
+    app.state.action_service = ActionService(
+        SQLiteControlStore(lambda: _connect(db_path)),
+        device_repository=device_identity_repository,
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+    )
+    app.state.action_service.prepare()
+    await asyncio.to_thread(app.state.action_service.recover_after_restart)
     await _refresh_runtime(app)
     await asyncio.to_thread(_record_metric, db_path, app.state.runtime)
     await asyncio.to_thread(_record_event, db_path, "success", "joeos", "JoeOS local command center started.")
@@ -1269,6 +1283,7 @@ app.include_router(bootstrap_router)
 app.include_router(device_enrollment_router)
 app.include_router(authority_router)
 app.include_router(conversations_router)
+app.include_router(control_router)
 app.include_router(workspace_router)
 app.include_router(realtime_router)
 app.include_router(command_center_router)

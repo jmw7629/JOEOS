@@ -3,6 +3,46 @@
 All notable changes to the JoeOS Command Center are documented here, grouped
 by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
 
+## [2.0.0] — 2026-08-06
+
+### Phase P3B — Authoritative agents and approval control plane
+
+- Authoritative provider/model registry (`server/actions/`): durable versioned
+  ProviderDefinition and ModelDefinition records with health states
+  (unknown/checking/healthy/degraded/unavailable/incompatible/disabled/unauthorized),
+  streaming/tool-calling/structured-output capabilities, privacy and allowed
+  data classifications, and audit events. Availability is backend-authoritative.
+- Authoritative agent profiles with immutable agent versions: editing an agent
+  creates a new version; runs bind to the version present at start; delegation
+  cannot increase authority; cross-workspace access is denied.
+- Agent runs and task graphs with durable states, cancellation propagation, and
+  restart interruption recovery.
+- Authoritative tool catalog: versioned JSON input schemas, capability
+  requirements, risk classification (informational…critical), side-effect
+  classification (none…privileged), and `execution_availability: unavailable`
+  for privileged tools.
+- Structured tool requests: provider output is parsed, validated, and persisted
+  as an immutable action proposal; unknown tools, malformed or undeclared
+  parameters, unsafe encodings, and traversal targets are denied.
+- Deterministic policy engine: capability, status, risk-tier, reversibility,
+  and separation-of-duties evaluation; deny by default on unknown state;
+  persisted policy decisions with reason codes.
+- Human approvals: approval requests bound to the exact proposal digest, a
+  one-time `JOEOS-ACTION-APPROVAL-V1` approval challenge signed with the
+  enrolled P-256 approval key, replay/expiry/digest-change/cross-workspace/
+  self-approval rejection, and terminal `approved_awaiting_executor`.
+- Advisory Executive Council: definitions, runs, quorum rules, member-failure
+  handling, and dissent preservation; council output is advisory and never
+  self-approving.
+- Realtime events for agents, tasks, actions, approvals, and councils with the
+  typed envelope and cursor-resume mechanism.
+- Native Swift source integration: `JoeOSCore.ControlClient` typed models and
+  methods plus the approval flow state machine.
+- Trusted local-console CLI (`python -m server.actions.cli`) for provider,
+  model, and tool inspection (never prints secret values).
+- No privileged action executes: approved privileged proposals stop at
+  `approved_awaiting_executor`.
+
 ## [2.0.0] — 2026-08-05
 
 ### Phase P3A — Authoritative identity, application sessions, canonical conversations

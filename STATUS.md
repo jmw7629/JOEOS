@@ -26,38 +26,38 @@ Phase 19 — Self-Maintenance and Continuous Improvement (delivered).
 
 ## Test status
 
-- Python: 643 passed, 61 subtests passed.
+- Python: 666 passed, 61 subtests passed.
 - Frontend: 27/27 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 
-## Phase P3A status
+## Phase P3B status
 
 Delivered:
 
-- authoritative identity (users, organizations, workspaces, roles, capabilities)
-- device-principal assignment
-- device-key application authentication (P-256 device-authentication key)
-- revocable application sessions and refresh rotation
-- protected routes (deny by default) and authenticated principal endpoint
-- canonical conversations with append-only messages, durable runs, retry, and cancellation
-- native Swift source integration (session manager, conversation client, backend-backed persisting adapter)
-- durable realtime conversation events with typed envelope and cursor resume
-- genuine test-provider streaming and honest non-streaming behavior
-- run recovery, interruption, and restart-safe conversation reopen
+- authoritative provider and model registry (durable, audited, backend-authoritative availability)
+- authoritative agent profiles with immutable versions, agent runs, and task graphs
+- authoritative tool catalog with versioned JSON schemas and risk/side-effect classification
+- structured tool requests become immutable action proposals
+- deterministic policy evaluation (risk tiers, capabilities, separation of duties)
+- approval requests and cryptographically bound approval decisions (one-time approval challenge signed with the enrolled approval key)
+- realtime agent/action/approval/council events
+- native Swift source integration (ControlClient + approval flow)
+- advisory Executive Council runs with quorum and dissent handling
+- `approved_awaiting_executor` terminal state; privileged execution stays unavailable
+- trusted local-console CLI for provider/model/tool inspection
 
 Not yet delivered:
 
-- successful Swift compilation on this VPS (no Apple toolchain; Mac handoff required)
-- Xcode build, simulator, and physical iPhone validation
-- production provider streaming unless an actually configured provider supports it
-- passkey/OIDC browser authentication (browser sessions are gated; no bypass)
-- privileged approval execution, private runner, shell authority, Git mutation, deployment, and secret access
+- privileged action execution (shell, Git mutation, deployment, secret retrieval, email, payment, remote control)
+- private runner / executors
+- passkey/OIDC browser sign-in
+- production Apple build validation, physical Face ID, and physical Secure Enclave validation
 - PostgreSQL/pgvector/Redis production migration
 
 ## Not yet built
 
 - Phase 4 local-first data platform (PostgreSQL/pgvector, Redis, outbox).
-- Phase 3 privileged runner: shell execution, deployments, Git mutation, external sending, secret access, remote control, and application-level privileged approvals (identity, sessions, device-key application authentication, principal/capability lookup, canonical conversations, and run recovery ARE delivered; privileged capabilities are defined but never granted).
+- Phase 3 privileged runner: shell execution, deployments, Git mutation, external sending, secret access, remote control, and application-level privileged approvals ARE defined and gated at `approved_awaiting_executor`; no privileged side effect may actually execute. Identity, sessions, device-key application authentication, canonical conversations, agents, action proposals, policy evaluation, and cryptographically bound approvals ARE delivered.
 - Index-at-rest encryption, cross-project queries.
 - Plugin marketplace, public signing-key distribution, OS-level sandboxing, webhooks, and remote connectors (architecture documented; not implemented).
 - Real external provider adapters (email/chat), mobile push, smart-glasses delivery, and read receipts (architecture documented; not implemented).
