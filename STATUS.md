@@ -27,42 +27,43 @@ Phase 19 — Self-Maintenance and Continuous Improvement (delivered).
 ## Test status
 
 - Python: 685 passed, 61 subtests passed.
+- Runner: 29 passed (process safety + P3D daemon/executor suite).
 - Frontend: 27/27 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 
-## Phase P3C status
+## Phase P3D status
 
 Delivered:
 
-- private runner enrollment (one-time short-lived challenge, machine-fingerprint binding, P-256 runner key proof of possession, local trusted ceremony)
-- runner key handling (dedicated runner key, key rotation, revocation)
-- private authenticated runner connection (outbound, server-issued connection challenge, `JOEOS-RUNNER-CONNECTION-V1` domain signature, connection credential rotation, heartbeat)
-- immutable execution jobs created only from approved proposals (proposal/policy/approval binding, payload digest, idempotency keys)
-- policy and approval revalidation before dispatch
-- backend-selected runner and executor
-- durable job leasing with generations, signed acknowledgement, lease expiry, and restart recovery
-- bounded execution progress via the existing realtime/event infrastructure
-- cancellation, timeout, and emergency stop (dispatch pause + queued-job cancellation)
-- executor framework with a safe process foundation (`shell=False`, allowlisted executables, bounded output/timeout, process-group termination, secret redaction)
-- initial executors: runner diagnostics (read-only), bounded workspace filesystem, and a deterministic test-only adapter
-- secret-reference broker with short-lived execution-bound secret leases (no plaintext retrieval endpoint, injected dev secret values, output redaction)
-- artifact metadata and authorized listing (digest verification)
-- Swift source integration (`JoeOSCore.RunnerClient` + execution states)
-- end-to-end deterministic runner integration over the real HTTP path
+- long-lived runner daemon (outbound private connection loop, heartbeat, reconnect with bounded exponential backoff and jitter, lease polling, execution, journal)
+- strict typed runner configuration (unknown-field rejection, unsafe public HTTP rejection, key/configuration permission checks)
+- runner CLI (identity-init/show, config validate/effective, self-test, executors list/inspect, journal inspect/verify, emergency local-stop)
+- bounded, tamper-evident local execution journal (digest chain, retention)
+- real development-command executor using authoritative command templates
+- real constrained Git executor (temporary local repositories and a local bare remote; no external pushes)
+- user-service executor (deterministic adapter; no sudo, no arbitrary systemctl)
+- typed JoeOS deployment executor (exact immutable commit, release directory, health verification)
+- health-check executor (typed local/private checks)
+- runner-local secret provider (resolved only at launch, redaction, leak detection)
+- artifact transfer metadata
+- daemon cancellation, timeout, restart recovery
+- installer dry-run and Halo handoff scripts (no auto-enrollment, no secrets)
+- end-to-end backend-and-daemon integration via the runner transport
 
 Not yet delivered:
 
-- unrestricted shell, arbitrary command execution, or root execution
-- public runner access or browser terminal
-- Git/deployment/service executors with real side effects (defined as templates; no runner executes them here)
-- production enterprise secret manager, container/VM isolation, or a multi-node runner fleet
-- macOS runner validation, Swift compilation on this VPS, Xcode, physical iPhone/Face ID/Secure Enclave validation
-- passkey/OIDC browser sign-in, PostgreSQL/pgvector/Redis migration
+- physical installation on the Halo, real Tailscale connection, real systemd start
+- real GitHub credential validation and push from the Halo
+- real JoeOS deployment on the Halo
+- macOS runner, Swift compilation on this VPS, Xcode, physical iPhone/Face ID/Secure Enclave validation
+- unrestricted shell, root execution, arbitrary remote control, payment, unrestricted email, physical-device execution
+- enterprise external secret manager, VM-grade executor isolation, multi-runner production fleet
+- PostgreSQL/pgvector/Redis migration
 
 ## Not yet built
 
 - Phase 4 local-first data platform (PostgreSQL/pgvector, Redis, outbox).
-- Phase 3 privileged runner: shell authority, Git mutation, deployment, secret retrieval, email, payment, and remote control remain gated at `approved_awaiting_executor`; the private runner plane executes only narrowly scoped, approved, revalidated jobs through registered executor adapters. Identity, sessions, conversations, agents, action proposals, policy, approvals, and the signed private runner plane ARE delivered.
+- Phase 3 privileged runner: shell authority, Git mutation, deployment, secret retrieval, email, payment, and remote control remain gated at `approved_awaiting_executor`; the private runner plane executes only registered, approved, revalidated jobs through typed executor adapters. Identity, sessions, conversations, agents, action proposals, policy, approvals, the signed runner plane, and the production runner daemon ARE delivered.
 - Index-at-rest encryption, cross-project queries.
 - Plugin marketplace, public signing-key distribution, OS-level sandboxing, webhooks, and remote connectors (architecture documented; not implemented).
 - Real external provider adapters (email/chat), mobile push, smart-glasses delivery, and read receipts (architecture documented; not implemented).

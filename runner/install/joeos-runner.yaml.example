@@ -1,0 +1,24 @@
+# JoeOS runner configuration template (no secrets, no private key).
+# The private key lives in a separate 0600 file; secrets come from the
+# runner-local secret provider only.
+{
+  "backend_url": "https://<HALO_TAILSCALE_OR_BACKEND_HOST>:8080",
+  "installation_id": "<INSTALLATION_ID>",
+  "runner_id": "<RUNNER_ID>",
+  "organization_id": "<ORGANIZATION_ID>",
+  "workspace_id": "<WORKSPACE_ID>",
+  "identity_path": "/var/lib/joeos-runner/identity.json",
+  "key_path": "/var/lib/joeos-runner/runner-key.pem",
+  "journal_path": "/var/lib/joeos-runner/journal.jsonl",
+  "state_path": "/var/lib/joeos-runner/state",
+  "work_root": "/var/lib/joeos-runner/work",
+  "workspace_roots": "/var/lib/joeos-runner/workspace",
+  "allowed_executors": "joeos.test.deterministic,joeos.dev.command,joeos.git.repository,joeos.user.service,joeos.deployment",
+  "max_concurrency": 1,
+  "heartbeat_interval_ms": 15000,
+  "protocol_version": 1,
+  "secret_provider": {
+    "provider": "development",
+    "credential_directory": "/var/lib/joeos-runner/secrets"
+  }
+}

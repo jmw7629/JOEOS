@@ -348,6 +348,32 @@ class RunnerService:
                    organization_id=runner.organization_id, workspace_id=runner.workspace_id)
         return True
 
+    def rotate_connection_credential(self, credential: str) -> Dict:
+        """Rotates the short-lived connection credential. The old credential is
+        invalidated immediately; the new one is returned once."""
+        runner = self._authorize_connection(credential)
+        self._connection_credentials.pop(credential, None)
+        new_credential = str(_uid())
+        self._connection_credentials[new_credential] = runner.id
+        self._emit("runner.connection_rotated", runner_id=runner.id,
+                   organization_id=runner.organization_id, workspace_id=runner.workspace_id)
+        return {"connection_credential": new_credential,
+                "connection_ttl_ms": self.connection_ttl_ms}
+
+    def runner_report_health(self, credential: str, health: Dict) -> bool:
+        runner = self._authorize_connection(credential)
+        connection = self._store.get_active_connection(runner.id)
+        if connection is None:
+            return False
+        self._store.update_heartbeat(connection.id, self._now())
+        self._store.update_runner_state(runner.id, "active",
+                                        str(health.get("health", "healthy")), self._now(),
+                                        last_seen_at=self._now())
+        self._emit("runner.health_updated", runner_id=runner.id,
+                   organization_id=runner.organization_id, workspace_id=runner.workspace_id,
+                   data={"health": str(health.get("health", "healthy"))[:40]})
+        return True
+
     # ------------------------------------------------------------------
     # Executors
     # ------------------------------------------------------------------

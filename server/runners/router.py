@@ -206,6 +206,24 @@ def runner_heartbeat(credential: str = Depends(runner_credential),
         _raise(error)
 
 
+@runner_router.post("/rotate")
+def runner_rotate(credential: str = Depends(runner_credential),
+                  service: RunnerService = Depends(get_runner_service)):
+    try:
+        return service.rotate_connection_credential(credential)
+    except RunnerError as error:
+        _raise(error)
+
+
+@runner_router.post("/health")
+def runner_health_report(payload: Dict, credential: str = Depends(runner_credential),
+                         service: RunnerService = Depends(get_runner_service)):
+    try:
+        return {"ok": service.runner_report_health(credential, dict(payload))}
+    except RunnerError as error:
+        _raise(error)
+
+
 @runner_router.post("/lease")
 def runner_lease(credential: str = Depends(runner_credential),
                  service: RunnerService = Depends(get_runner_service)):

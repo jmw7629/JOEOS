@@ -3,6 +3,45 @@
 All notable changes to the JoeOS Command Center are documented here, grouped
 by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
 
+## [2.0.0] — 2026-08-08
+
+### Phase P3D — Production runner daemon and safe DevOps executors
+
+- Long-lived runner daemon (`runner/joeos_runner/daemon.py`): outbound private
+  connection loop, heartbeat, bounded exponential reconnect with jitter, lease
+  polling, executor dispatch, cancellation/timeout, and clean signal shutdown.
+- Strict typed runner configuration (`configuration.py`): unknown fields are
+  rejected, unsafe public HTTP endpoints are refused, and key/configuration
+  file permissions are verified.
+- Runner CLI (`cli.py`): identity init/show, config validate/effective,
+  self-test, executors list/inspect, journal inspect/verify, emergency
+  local-stop. Never prints private keys or secret values.
+- Bounded tamper-evident local execution journal (`journal.py`): digest-chained
+  append-only entries with retention and integrity verification.
+- Real development-command executor with authoritative command templates
+  (backend tests, runner tests, frontend contract, mobile-web typecheck/test/
+  build, Python compile).
+- Real constrained Git executor (`operations.py`): status/diff/branch/commit/
+  push with protected-branch and unknown-remote rejection, hooks disabled,
+  secret-scan gate, and commit/remote verification; tested against temporary
+  local repositories and a local bare remote.
+- User-service executor: exact `systemctl --user` argument arrays via a
+  deterministic adapter; no sudo, no arbitrary units.
+- Typed JoeOS deployment executor: immutable exact-commit binding, release
+  directory, health verification, and honest failure/rollback states.
+- Health-check executor (typed local/private HTTP, TCP, file-digest, process,
+  JoeOS bootstrap checks).
+- Runner-local secret provider (`secrets.py`): resolved only at executor
+  launch, protected 0600 temporary injection, output redaction, leak
+  detection, and quarantine.
+- Backend runner protocol additions: connection-credential rotation and runner
+  health reporting.
+- Halo installer and handoff (`runner/install/`): dry-run installer,
+  uninstaller, host validator, and configuration template. No auto-enrollment,
+  no embedded secrets, no public listener.
+- Native Swift source contracts were already present; the daemon and executors
+  extend the signed runner plane.
+
 ## [2.0.0] — 2026-08-07
 
 ### Phase P3C — Signed private runner execution plane
