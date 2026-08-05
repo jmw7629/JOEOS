@@ -51,6 +51,12 @@ from server.actions import (
     SQLiteControlStore,
     control_router,
 )
+from server.runners import (
+    RunnerService,
+    SQLiteRunnerStore,
+    runner_control_router,
+    runner_router,
+)
 from server.plugins import PluginService, plugins_router
 from server.performance import PerformanceService, performance_router
 from server.production import ProductionService, production_router
@@ -995,6 +1001,17 @@ def _wire_mobile_scopes(app: FastAPI) -> None:
     mobile.register_scoped_provider("performance", _performance)
 
 
+def _runner_origin() -> str:
+    """The private origin the runner authenticates against. Never a public URL."""
+    configured = os.getenv("JOEOS_RUNNER_ORIGIN", "").strip()
+    if configured:
+        return configured
+    address = os.getenv("JOEOS_PUBLIC_ORIGIN", "").strip()
+    if address:
+        return address
+    return "http://127.0.0.1:%s" % os.getenv("JOEOS_PORT", "8080")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db_path = _database_path()
@@ -1245,6 +1262,17 @@ async def lifespan(app: FastAPI):
     )
     app.state.action_service.prepare()
     await asyncio.to_thread(app.state.action_service.recover_after_restart)
+    app.state.runner_service = RunnerService(
+        SQLiteRunnerStore(lambda: _connect(db_path)),
+        installation_id=server_identity_repository.get_or_create_server_id,
+        action_service=app.state.action_service,
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+        origin_provider=lambda: _runner_origin(),
+    )
+    app.state.runner_service.prepare()
+    await asyncio.to_thread(app.state.runner_service.recover_after_restart)
     await _refresh_runtime(app)
     await asyncio.to_thread(_record_metric, db_path, app.state.runtime)
     await asyncio.to_thread(_record_event, db_path, "success", "joeos", "JoeOS local command center started.")
@@ -1284,6 +1312,8 @@ app.include_router(device_enrollment_router)
 app.include_router(authority_router)
 app.include_router(conversations_router)
 app.include_router(control_router)
+app.include_router(runner_control_router)
+app.include_router(runner_router)
 app.include_router(workspace_router)
 app.include_router(realtime_router)
 app.include_router(command_center_router)

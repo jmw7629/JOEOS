@@ -1,0 +1,33 @@
+[Unit]
+Description=JoeOS private runner
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=joeos-runner
+Group=joeos-runner
+WorkingDirectory=/opt/joeos/runner
+ExecStart=/opt/joeos/runner/.venv/bin/python -m joeos_runner --config /etc/joeos-runner/config.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+# The runner reads its configuration and key; the workspace root is the only
+# writable application path. Adjust ReadWritePaths only for approved roots.
+ReadOnlyPaths=/opt/joeos/runner
+ReadWritePaths=/var/lib/joeos-runner /tmp/joeos-runner
+PrivateDevices=true
+# Do not enable MemoryDenyWriteExecute on interpreters that require it without
+# validating the runner binary on the target platform first.
+
+[Install]
+WantedBy=multi-user.target

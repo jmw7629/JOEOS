@@ -26,38 +26,43 @@ Phase 19 — Self-Maintenance and Continuous Improvement (delivered).
 
 ## Test status
 
-- Python: 666 passed, 61 subtests passed.
+- Python: 685 passed, 61 subtests passed.
 - Frontend: 27/27 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 
-## Phase P3B status
+## Phase P3C status
 
 Delivered:
 
-- authoritative provider and model registry (durable, audited, backend-authoritative availability)
-- authoritative agent profiles with immutable versions, agent runs, and task graphs
-- authoritative tool catalog with versioned JSON schemas and risk/side-effect classification
-- structured tool requests become immutable action proposals
-- deterministic policy evaluation (risk tiers, capabilities, separation of duties)
-- approval requests and cryptographically bound approval decisions (one-time approval challenge signed with the enrolled approval key)
-- realtime agent/action/approval/council events
-- native Swift source integration (ControlClient + approval flow)
-- advisory Executive Council runs with quorum and dissent handling
-- `approved_awaiting_executor` terminal state; privileged execution stays unavailable
-- trusted local-console CLI for provider/model/tool inspection
+- private runner enrollment (one-time short-lived challenge, machine-fingerprint binding, P-256 runner key proof of possession, local trusted ceremony)
+- runner key handling (dedicated runner key, key rotation, revocation)
+- private authenticated runner connection (outbound, server-issued connection challenge, `JOEOS-RUNNER-CONNECTION-V1` domain signature, connection credential rotation, heartbeat)
+- immutable execution jobs created only from approved proposals (proposal/policy/approval binding, payload digest, idempotency keys)
+- policy and approval revalidation before dispatch
+- backend-selected runner and executor
+- durable job leasing with generations, signed acknowledgement, lease expiry, and restart recovery
+- bounded execution progress via the existing realtime/event infrastructure
+- cancellation, timeout, and emergency stop (dispatch pause + queued-job cancellation)
+- executor framework with a safe process foundation (`shell=False`, allowlisted executables, bounded output/timeout, process-group termination, secret redaction)
+- initial executors: runner diagnostics (read-only), bounded workspace filesystem, and a deterministic test-only adapter
+- secret-reference broker with short-lived execution-bound secret leases (no plaintext retrieval endpoint, injected dev secret values, output redaction)
+- artifact metadata and authorized listing (digest verification)
+- Swift source integration (`JoeOSCore.RunnerClient` + execution states)
+- end-to-end deterministic runner integration over the real HTTP path
 
 Not yet delivered:
 
-- privileged action execution (shell, Git mutation, deployment, secret retrieval, email, payment, remote control)
-- private runner / executors
-- passkey/OIDC browser sign-in
-- production Apple build validation, physical Face ID, and physical Secure Enclave validation
-- PostgreSQL/pgvector/Redis production migration
+- unrestricted shell, arbitrary command execution, or root execution
+- public runner access or browser terminal
+- Git/deployment/service executors with real side effects (defined as templates; no runner executes them here)
+- production enterprise secret manager, container/VM isolation, or a multi-node runner fleet
+- macOS runner validation, Swift compilation on this VPS, Xcode, physical iPhone/Face ID/Secure Enclave validation
+- passkey/OIDC browser sign-in, PostgreSQL/pgvector/Redis migration
 
 ## Not yet built
 
 - Phase 4 local-first data platform (PostgreSQL/pgvector, Redis, outbox).
-- Phase 3 privileged runner: shell execution, deployments, Git mutation, external sending, secret access, remote control, and application-level privileged approvals ARE defined and gated at `approved_awaiting_executor`; no privileged side effect may actually execute. Identity, sessions, device-key application authentication, canonical conversations, agents, action proposals, policy evaluation, and cryptographically bound approvals ARE delivered.
+- Phase 3 privileged runner: shell authority, Git mutation, deployment, secret retrieval, email, payment, and remote control remain gated at `approved_awaiting_executor`; the private runner plane executes only narrowly scoped, approved, revalidated jobs through registered executor adapters. Identity, sessions, conversations, agents, action proposals, policy, approvals, and the signed private runner plane ARE delivered.
 - Index-at-rest encryption, cross-project queries.
 - Plugin marketplace, public signing-key distribution, OS-level sandboxing, webhooks, and remote connectors (architecture documented; not implemented).
 - Real external provider adapters (email/chat), mobile push, smart-glasses delivery, and read receipts (architecture documented; not implemented).

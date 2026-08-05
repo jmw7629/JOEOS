@@ -3,6 +3,41 @@
 All notable changes to the JoeOS Command Center are documented here, grouped
 by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
 
+## [2.0.0] — 2026-08-07
+
+### Phase P3C — Signed private runner execution plane
+
+- Runner domain (`server/runners/`): durable runner definitions, runner signing
+  keys, one-time enrollment challenges, authenticated connections, health
+  snapshots, the executor catalog, immutable execution jobs, secret references
+  and leases, and artifact metadata.
+- Private runner enrollment: one-time short-lived challenge bound to the
+  installation, organization, workspace, and machine fingerprint; the runner
+  proves key possession by signing `JOEOS-RUNNER-ENROLLMENT-V1`. Trusted local
+  CLI for enrollment challenges, runner lifecycle, and emergency stop.
+- Authenticated runner connection: outbound private connection, server-issued
+  `JOEOS-RUNNER-CONNECTION-V1` challenge, connection credential rotation,
+  heartbeat, and immediate revocation.
+- Immutable execution jobs created only from approved action proposals with
+  proposal/policy/approval digest binding, idempotency keys, and a payload
+  digest. No client-created raw jobs; no client-selected proposal digest,
+  policy snapshot, approval records, or runner credentials.
+- Durable job leasing with generations, signed acknowledgement, lease expiry,
+  restart recovery, and only one authoritative terminal state.
+- Safe process foundation (`runner/joeos_runner/process.py`): `shell=False`,
+  allowlisted executables, typed argument vectors, minimal allowlisted
+  environment, process-group termination, bounded output, and timeout.
+- Executor framework and initial adapters: read-only runner diagnostics,
+  bounded workspace filesystem, and a deterministic test-only executor.
+- Secret-reference broker: short-lived execution-bound secret leases, no
+  plaintext retrieval endpoint, output redaction, lease revocation on
+  cancellation/runner revocation.
+- Cancellation, timeout, and emergency stop (dispatch pause + queued-job
+  cancellation), recorded in security audit history.
+- Realtime execution/runner events with bounded redacted payloads.
+- Native Swift source integration: `JoeOSCore.RunnerClient` typed models and
+  methods plus the execution-state model.
+
 ## [2.0.0] — 2026-08-06
 
 ### Phase P3B — Authoritative agents and approval control plane
