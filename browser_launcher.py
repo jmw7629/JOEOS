@@ -1,7 +1,7 @@
 import tkinter as tk
 import webbrowser
 
-URL = "http://100.121.165.22:8080"
+URL = "http://100.98.25.26:8080"
 
 root = tk.Tk()
 root.title("Web Launcher")

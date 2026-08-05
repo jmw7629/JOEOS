@@ -437,7 +437,7 @@ private struct ConnectionErrorCard: View {
                 Button("Connections", action: settings)
                     .buttonStyle(.bordered)
             }
-            Text("Retrying does not execute commands or change the Halo.")
+            Text("Retrying does not execute commands or change the VPS.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }

@@ -65,7 +65,7 @@ CATALOG: Tuple[WidgetDefinition, ...] = (
     _widget("mission.blockers", "Blocked & At Risk", "Blocked, overdue, and at-risk work.", "mission_control", "fa-triangle-exclamation", "ready", (4, 2), (3, 1), (12, 6)),
     _widget("mission.next_action", "Work on Next", "The highest-value recommended next action.", "mission_control", "fa-compass", "ready", (4, 2), (3, 1), (12, 6)),
     _widget("mission.changes", "Since Last Visit", "Material changes since the workspace was last reviewed.", "mission_control", "fa-clock-rotate-left", "ready", (4, 2), (3, 1), (12, 6)),
-    _widget("system.health", "Halo Health", "Live CPU, GPU, memory, disk, and model runtime health.", "operations", "fa-heart-pulse", "ready", (12, 2), (4, 1), (12, 6)),
+    _widget("system.health", "VPS Health", "Live CPU, GPU, memory, disk, and model runtime health.", "operations", "fa-heart-pulse", "ready", (12, 2), (4, 1), (12, 6)),
     _widget("calendar.today", "Today's Calendar", "Agenda, meeting preparation, and schedule risk.", "productivity", "fa-calendar-days", "integration_required", (6, 3), (3, 2), (12, 8), "calendar"),
     _widget("email.unread", "Important Email", "Unread and priority email requiring attention.", "communications", "fa-envelope", "integration_required", (6, 3), (3, 2), (12, 8), "email"),
     _widget("weather.local", "Weather & Traffic", "Local weather and travel conditions.", "briefing", "fa-cloud-sun", "integration_required", (4, 2), (3, 1), (8, 4), "weather_traffic"),
@@ -88,7 +88,7 @@ DEFAULT_WIDGETS: Tuple[Tuple[str, str, int, int], ...] = (
     ("blockers", "mission.blockers", 4, 2),
     ("next-action", "mission.next_action", 4, 2),
     ("changes", "mission.changes", 4, 2),
-    ("halo-health", "system.health", 12, 2),
+    ("vps-health", "system.health", 12, 2),
 )
 
 
@@ -98,7 +98,7 @@ ALIASES: Dict[str, Tuple[str, ...]] = {
     "mission.blockers": ("blockers", "blocked", "at risk", "overdue"),
     "mission.next_action": ("next action", "work on next", "recommendation"),
     "mission.changes": ("changes", "since last visit", "what changed"),
-    "system.health": ("system health", "halo health", "server health", "metrics"),
+    "system.health": ("system health", "vps health", "server health", "metrics"),
     "calendar.today": ("calendar", "agenda", "meetings"),
     "email.unread": ("email", "inbox", "unread mail"),
     "weather.local": ("weather", "traffic"),

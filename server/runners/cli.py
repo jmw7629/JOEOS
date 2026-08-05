@@ -80,11 +80,46 @@ def _enroll_challenge(arguments, service: RunnerService) -> int:
         print("Bootstrap the local owner first.", file=sys.stderr)
         return 1
     result = service.create_enrollment_challenge(principal, arguments.fingerprint)
+    challenge = service._store.get_enrollment_challenge(result["challenge_id"])
     print("Runner enrollment challenge created.")
     print("  challenge_id:    %s" % result["challenge_id"])
     print("  installation_id: %s" % result["installation_id"])
     print("  expires_at:      %s" % result["expires_at"])
-    print("Run the enrollment command on the runner with this challenge and the runner public key.")
+    print("  nonce:           %s" % challenge.nonce)
+    print("Run 'joeos-runner enrollment-sign --challenge-id <id> --nonce <nonce>' on the runner,")
+    print("then complete it here with 'python -m server.runners.cli enroll --payload <file>'.")
+    return 0
+
+
+def _complete_enrollment(arguments, service: RunnerService) -> int:
+    import json as _json
+    principal = _principal_from_db(_database_path(arguments.database))
+    if not principal:
+        print("Bootstrap the local owner first.", file=sys.stderr)
+        return 1
+    with open(arguments.payload, "r", encoding="utf-8") as handle:
+        payload = _json.load(handle)
+    runner = service.complete_enrollment(
+        principal,
+        challenge_id=UUID(str(payload["challenge_id"])),
+        key_identifier=payload["key_identifier"],
+        public_key=payload["public_key"],
+        machine_fingerprint=payload["machine_fingerprint"],
+        runner_version=payload.get("runner_version", ""),
+        protocol_version=int(payload.get("protocol_version", 1)),
+        operating_system=payload.get("operating_system", ""),
+        architecture=payload.get("architecture", ""),
+        signature_b64url=payload["signature"],
+        private_network_identity=payload.get("private_network_identity", ""),
+        allowed_executors=payload.get("allowed_executors", ""),
+    )
+    print("Runner enrolled.")
+    print("  runner_id:           %s" % runner["id"])
+    print("  key:                 %s" % runner["key"])
+    print("  display_name:        %s" % runner.get("display_name", ""))
+    print("  machine_fingerprint: %s" % runner["machine_fingerprint"])
+    print("  status:              %s" % runner["status"])
+    print("  health:              %s" % runner.get("health", "unknown"))
     return 0
 
 
@@ -122,6 +157,8 @@ def parser() -> argparse.ArgumentParser:
     challenge = subcommands.add_parser("enroll-challenge", help="Create a one-time runner enrollment challenge.")
     challenge.add_argument("--fingerprint", required=True, help="Expected machine fingerprint.")
     subcommands.add_parser("runners", help="List runners.")
+    enroll = subcommands.add_parser("enroll", help="Complete runner enrollment from a signed payload file.")
+    enroll.add_argument("--payload", required=True, help="JSON payload from 'joeos-runner enrollment-sign'.")
     revoke = subcommands.add_parser("revoke", help="Revoke a runner.")
     revoke.add_argument("runner_id")
     subcommands.add_parser("emergency-stop", help="Pause dispatch and cancel queued jobs.")
@@ -133,6 +170,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     service = _service(_database_path(arguments.database))
     if arguments.operation == "enroll-challenge":
         return _enroll_challenge(arguments, service)
+    if arguments.operation == "enroll":
+        return _complete_enrollment(arguments, service)
     if arguments.operation == "runners":
         return _list_runners(arguments, service)
     if arguments.operation == "revoke":

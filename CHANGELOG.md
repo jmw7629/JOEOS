@@ -3,6 +3,35 @@
 All notable changes to the JoeOS Command Center are documented here, grouped
 by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
 
+## [2.0.0] — 2026-08-05
+
+### Phase P3E — Private runner activated on the local VPS; VPS retargeting
+
+- Repository-wide correction: every "Halo"/"Ryzen AI Max" reference now targets
+  the local VPS, the sole JoeOS deployment target. Updated docs, dashboard
+  strings, web manifest, launcher scripts, backend telemetry labels, workspace
+  widgets, tests, and the Swift sources/contracts. Installer renamed
+  `runner/install/install-halo.sh` -> `install-runner.sh` (and the uninstaller
+  to `uninstall-runner.sh`); the deprecated `ConnectionProfile.defaultHalo` was
+  removed and connection profiles target the authoritative `JoeOS VPS` origin
+  only.
+- Real HTTP runner transport (`runner/joeos_runner/transport.py`): the
+  runner-protocol over the private endpoint with `X-Runner-Credential`. The
+  daemon now signs the server-issued `JOEOS-RUNNER-CONNECTION-V1` challenge
+  message.
+- `python -m joeos_runner` daemon entrypoint (`__main__.py`) wiring
+  config/signer/journal/secret-provider/executor resolution.
+- Complete enrollment ceremony: runner CLI `enrollment-sign` and backend CLI
+  `enroll`; `enroll-challenge` now prints the challenge nonce.
+- systemd unit sets `PYTHONPATH=/opt/joeos` so the runner can import the shared
+  server utility.
+- Live activation on the local VPS: host validation and installer dry-run
+  passed; real P-256 identity generated locally (0600, never printed);
+  fingerprint-bound enrollment; connection over private loopback; 5s heartbeat
+  verified; restart reconnect verified; revocation verified (daemon denied with
+  `runner_not_active`); re-enrollment verified. Privileged/read-only job
+  dispatch remains approval-gated pending P3F.
+
 ## [2.0.0] — 2026-08-08
 
 ### Phase P3D — Production runner daemon and safe DevOps executors
@@ -36,7 +65,7 @@ by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
   detection, and quarantine.
 - Backend runner protocol additions: connection-credential rotation and runner
   health reporting.
-- Halo installer and handoff (`runner/install/`): dry-run installer,
+- VPS installer and handoff (`runner/install/`): dry-run installer,
   uninstaller, host validator, and configuration template. No auto-enrollment,
   no embedded secrets, no public listener.
 - Native Swift source contracts were already present; the daemon and executors

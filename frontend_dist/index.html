@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#050912">
-  <meta name="description" content="JoeOS private Halo command center">
+  <meta name="description" content="JoeOS private VPS command center">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="JoeOS">
   <meta name="format-detection" content="telephone=no">
-  <title>JoeOS — Halo Command Center</title>
+  <title>JoeOS — VPS Command Center</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/joeos-icon.svg">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2308111f'/%3E%3Cpath d='M32 9 53 20v24L32 55 11 44V20Z' fill='none' stroke='%2331d7ff' stroke-width='5'/%3E%3Cpath d='m21 39 11-22 11 22h-7l-4-9-4 9Z' fill='%2331d7ff'/%3E%3C/svg%3E">
@@ -3991,7 +3991,7 @@
           previous: 0,
           unit: metric.unit,
           icon: metric.icon,
-          detail: "Waiting for Halo telemetry",
+          detail: "Waiting for VPS telemetry",
           loading: true,
           history: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         };
@@ -4014,7 +4014,7 @@
       ];
 
       var INITIAL_NODES = [
-        { id: "halo-local", name: "joeos-halo", region: "Private local fabric", role: "Ryzen AI Max+ 395 · Lemonade", ip: "Waiting for server", status: "degraded", temp: 0, latency: 0, cpu: 0, disk: 0 }
+        { id: "vps-local", name: "joeos-vps", region: "Private local fabric", role: "AMD EPYC · Lemonade", ip: "Waiting for server", status: "degraded", temp: 0, latency: 0, cpu: 0, disk: 0 }
       ];
 
       var INITIAL_LOGS = [
@@ -4026,7 +4026,7 @@
       var ACTIVITIES = [
         { id: "act-1", icon: "fa-lemon", title: "Private inference", copy: "Lemonade remains behind the JoeOS same-origin proxy", time: "Local only" },
         { id: "act-2", icon: "fa-chart-line", title: "Real telemetry", copy: "CPU, memory, GPU, disk, and uptime sample every five seconds", time: "Live" },
-        { id: "act-3", icon: "fa-database", title: "Private persistence", copy: "Metrics, profiles, and events stay in local SQLite", time: "On Halo" },
+        { id: "act-3", icon: "fa-database", title: "Private persistence", copy: "Metrics, profiles, and events stay in local SQLite", time: "On VPS" },
         { id: "act-4", icon: "fa-mobile-screen", title: "Mobile control", copy: "Installable command center for your private phone connection", time: "Ready" }
       ];
 
@@ -4037,7 +4037,7 @@
         { id: "mission.ai_delegation", version: 1, name: "AI Can Handle", description: "Read-only analysis JoeOS can perform without privileged execution.", category: "mission_control", icon: "fa-wand-magic-sparkles", state: "ready", default_size: { columns: 6, rows: 2 } },
         { id: "mission.blockers", version: 1, name: "Blocked & At Risk", description: "Unavailable runtimes, unconnected sources, and approval boundaries.", category: "mission_control", icon: "fa-triangle-exclamation", state: "ready", default_size: { columns: 4, rows: 2 } },
         { id: "mission.next_action", version: 1, name: "Recommended Next", description: "The smallest safe action supported by current evidence.", category: "mission_control", icon: "fa-arrow-right", state: "ready", default_size: { columns: 6, rows: 2 } },
-        { id: "system.health", version: 1, name: "Halo Health", description: "CPU, unified memory, GPU, storage, and local model runtime health.", category: "operations", icon: "fa-heart-pulse", state: "ready", default_size: { columns: 12, rows: 2 } },
+        { id: "system.health", version: 1, name: "VPS Health", description: "CPU, unified memory, GPU, storage, and local model runtime health.", category: "operations", icon: "fa-heart-pulse", state: "ready", default_size: { columns: 12, rows: 2 } },
         { id: "mission.changes", version: 1, name: "Recent Changes", description: "Fresh local audit evidence since the latest command-center refresh.", category: "mission_control", icon: "fa-clock-rotate-left", state: "ready", default_size: { columns: 6, rows: 2 } },
         { id: "calendar.today", version: 1, name: "Today's Calendar", description: "Meetings and time commitments from an approved calendar connector.", category: "integrations", icon: "fa-calendar-days", state: "integration_required", default_size: { columns: 6, rows: 2 }, integration: "calendar" },
         { id: "communications.inbox", version: 1, name: "Priority Inbox", description: "Important email and messages from approved communication connectors.", category: "integrations", icon: "fa-inbox", state: "integration_required", default_size: { columns: 6, rows: 2 }, integration: "email" },
@@ -4059,7 +4059,7 @@
           { instance_id: "blockers", widget_id: "mission.blockers", widget_version: 1, order: 2, size: { columns: 4, rows: 2 }, visible: true, settings: {} },
           { instance_id: "next-action", widget_id: "mission.next_action", widget_version: 1, order: 3, size: { columns: 4, rows: 2 }, visible: true, settings: {} },
           { instance_id: "changes", widget_id: "mission.changes", widget_version: 1, order: 4, size: { columns: 4, rows: 2 }, visible: true, settings: {} },
-          { instance_id: "halo-health", widget_id: "system.health", widget_version: 1, order: 5, size: { columns: 12, rows: 2 }, visible: true, settings: {} }
+          { instance_id: "vps-health", widget_id: "system.health", widget_version: 1, order: 5, size: { columns: 12, rows: 2 }, visible: true, settings: {} }
         ]
       };
 
@@ -4137,7 +4137,7 @@
           previous: unmeasured ? 0 : safeNumber(row.previous, 0, 100),
           unit: row.unit || fallback.unit,
           icon: row.icon || fallback.icon,
-          detail: unmeasured ? (row.detail || "No measurement available") + " · unmeasured" : (row.detail || "Live Halo telemetry"),
+          detail: unmeasured ? (row.detail || "No measurement available") + " · unmeasured" : (row.detail || "Live VPS telemetry"),
           loading: false,
           unmeasured: unmeasured,
           history: history.length ? history : [0, 0]
@@ -4457,7 +4457,7 @@
           ),
           h("div", { className: "metric-label" }, "Platform Uptime"),
           h("div", { className: "metric-value-row" }, h("span", { className: "metric-value", style: { fontSize: "18px" } }, formatUptime(props.seconds))),
-          h("div", { className: "metric-detail" }, "Halo boot-time counter · sampled locally")
+          h("div", { className: "metric-detail" }, "VPS boot-time counter · sampled locally")
         );
       }
 
@@ -4485,13 +4485,13 @@
             "div",
             { className: "brand" },
             h("div", { className: "brand-mark" }, icon("fa-shield-halved")),
-            h("div", { className: "brand-copy" }, h("strong", null, "JOEOS"), h("span", null, "Halo Command Center"))
+            h("div", { className: "brand-copy" }, h("strong", null, "JOEOS"), h("span", null, "VPS Command Center"))
           ),
           h(
             "div",
             { className: "environment-pill", title: "Active environment" },
             h("span", { className: "environment-icon" }, icon("fa-microchip")),
-            h("span", { className: "environment-copy" }, h("small", null, "Compute host"), h("span", null, "Halo · Private")),
+            h("span", { className: "environment-copy" }, h("small", null, "Compute host"), h("span", null, "VPS · Private")),
             icon("fa-lock", "chevron")
           ),
           h("p", { className: "nav-caption" }, "Operations"),
@@ -4545,7 +4545,7 @@
           h(SectionHeader, {
             kicker: "Private compute overview",
             title: h("span", { id: "dashboard-title" }, "Executive Dashboard"),
-            description: "Live operating telemetry and private AI status from your Ryzen AI Max+ 395 Halo.",
+            description: "Live operating telemetry and private AI status from your AMD EPYC VPS.",
             actions: [
               h("span", { className: "live-pill", key: "live" }, h("span", { className: "live-dot " + (props.lastUpdated ? "" : "checking") }), "LIVE · 5S", h("time", null, props.lastUpdated ? clockTime(props.lastUpdated) : "WAITING")),
               h("button", { type: "button", className: "secondary-button", onClick: props.onBrief, key: "brief" }, icon("fa-file-lines"), "Generate brief")
@@ -4566,7 +4566,7 @@
               h(
                 "div",
                 { className: "panel-header" },
-                h("div", { className: "panel-title" }, h("h2", null, "Compute utilization"), h("p", null, "Halo samples · trailing 70 seconds")),
+                h("div", { className: "panel-title" }, h("h2", null, "Compute utilization"), h("p", null, "VPS samples · trailing 70 seconds")),
                 h("div", { className: "legend" }, h("span", null, h("i", { className: "legend-dot" }), "CPU"), h("span", null, h("i", { className: "legend-dot ram" }), "Memory"))
               ),
               h(
@@ -4782,7 +4782,7 @@
           h(SectionHeader, {
             kicker: "Local compute estate",
             title: h("span", { id: "infra-title" }, "Infrastructure Health"),
-            description: "Your Halo host, local Lemonade inference health, thermal data when available, and real storage pressure.",
+            description: "Your VPS host, local Lemonade inference health, thermal data when available, and real storage pressure.",
             actions: [
               h("span", { className: "live-pill", key: "live" }, h("span", { className: "live-dot" }), "TELEMETRY LIVE"),
               h("button", { type: "button", className: "secondary-button", onClick: props.onRefresh, key: "refresh" }, icon("fa-arrows-rotate"), "Refresh fleet")
@@ -4791,7 +4791,7 @@
           h(
             "div",
             { className: "fleet-strip" },
-            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon " + (online ? "success" : "warning") }, icon("fa-server")), h("div", null, h("strong", null, online + "/" + props.nodes.length), h("span", null, "Halo online"))),
+            h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon " + (online ? "success" : "warning") }, icon("fa-server")), h("div", null, h("strong", null, online + "/" + props.nodes.length), h("span", null, "VPS online"))),
             h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon" }, icon("fa-gauge-high")), h("div", null, h("strong", null, medianLatency ? medianLatency + "ms" : "N/A"), h("span", null, "AI time to first token"))),
             h("article", { className: "glass-card fleet-stat" }, h("div", { className: "stat-icon " + (attention ? "warning" : "success") }, icon(attention ? "fa-triangle-exclamation" : "fa-check")), h("div", null, h("strong", null, String(attention)), h("span", null, "Attention items")))
           ),
@@ -4852,7 +4852,7 @@
               h(
                 "div",
                 { className: "terminal-header" },
-                h("div", { className: "terminal-title" }, h("span", { className: "terminal-dots" }, h("i", { className: "terminal-dot" }), h("i", { className: "terminal-dot" }), h("i", { className: "terminal-dot" })), "joeos://halo/local-events"),
+                h("div", { className: "terminal-title" }, h("span", { className: "terminal-dots" }, h("i", { className: "terminal-dot" }), h("i", { className: "terminal-dot" }), h("i", { className: "terminal-dot" })), "joeos://vps/local-events"),
                 h(
                   "div",
                   { className: "terminal-controls" },
@@ -5478,7 +5478,7 @@
               "article",
               { className: "glass-card panel-card" },
               h("div", { className: "plugin-header" }, icon("fa-shield-halved"), h("strong", null, "Privacy and routing")),
-              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, "LOCAL"), h("span", null, "Inference and embeddings run on the Halo loopback")),
+              h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, "LOCAL"), h("span", null, "Inference and embeddings run on the VPS loopback")),
               h("div", { className: "plugin-meta" }, h("span", { className: "plugin-badge" }, "RESTRICTED"), h("span", null, "Privacy classification enforced for restricted classes")),
               h("p", { className: "plugin-description" }, "Cloud providers require explicit policy approval before registration; they are never enabled silently.")
             )
@@ -5683,7 +5683,7 @@
         else if (security && security.warnings) items.push({ id: "warnings", severity: "warning", title: security.warnings + " resource warning" + (security.warnings === 1 ? "" : "s"), detail: "Local thresholds produced new notices.", icon: "fa-triangle-exclamation" });
         var queued = (bots || []).reduce(function (sum, bot) { return sum + (Number(bot.queued) || 0); }, 0);
         if (queued) items.push({ id: "queued", severity: "warning", title: queued + " queued agent task" + (queued === 1 ? "" : "s"), detail: "Work remains profile-tracked and approval-gated.", icon: "fa-list-check" });
-        if (!items.length) items.push({ id: "clear", severity: "success", title: "No urgent local attention", detail: "Halo telemetry and private runtime signals are within their current thresholds.", icon: "fa-check" });
+        if (!items.length) items.push({ id: "clear", severity: "success", title: "No urgent local attention", detail: "VPS telemetry and private runtime signals are within their current thresholds.", icon: "fa-check" });
         return items.slice(0, 4);
       }
 
@@ -5739,9 +5739,9 @@
 
       function DelegationWidget(props) {
         var options = [
-          { id: "health", title: "Summarize platform health", detail: "Read current Halo telemetry and runtime evidence.", command: "Summarize current platform health and identify anything requiring my attention" },
+          { id: "health", title: "Summarize platform health", detail: "Read current VPS telemetry and runtime evidence.", command: "Summarize current platform health and identify anything requiring my attention" },
           { id: "changes", title: "Explain recent changes", detail: "Turn the local audit stream into an executive summary.", command: "Summarize the recent JoeOS events and explain what changed" },
-          { id: "capacity", title: "Review capacity", detail: "Assess CPU, memory, GPU, and storage without changing the host.", command: "Analyze current Halo capacity and recommend safe follow-up checks" }
+          { id: "capacity", title: "Review capacity", detail: "Assess CPU, memory, GPU, and storage without changing the host.", command: "Analyze current VPS capacity and recommend safe follow-up checks" }
         ];
         return h("div", { className: "next-action-list" }, options.map(function (option) { return h("button", { type: "button", className: "next-action-row", style: { width: "100%", textAlign: "left" }, onClick: function () { props.onAsk(option.command); }, key: option.id }, h("span", { className: "attention-indicator success" }, icon("fa-wand-magic-sparkles")), h("span", { className: "next-action-copy" }, h("strong", null, option.title), h("span", null, option.detail)), icon("fa-chevron-right")); }));
       }
@@ -5820,8 +5820,8 @@
           h(
             "div",
             { className: "mission-summary" },
-            h("article", { className: "glass-card mission-hero" }, h("div", { className: "mission-hero-top" }, h("span", { className: "mission-hero-label" }, "Executive readiness"), h("span", { className: "mission-score " + (score < 60 ? "danger" : score < 85 ? "warning" : "") }, score)), h("h2", null, urgent ? urgent + " critical item" + (urgent === 1 ? "" : "s") + " require a decision." : warning ? warning + " condition" + (warning === 1 ? "" : "s") + " deserve attention." : "Your local command fabric is steady."), h("p", null, urgent || warning ? "JoeOS is prioritizing real local evidence. Review the source before authorizing any future action." : "Telemetry, audit events, and private inference are reporting no urgent threshold crossings."), h("div", { className: "workspace-status-row" }, h("span", null, icon("fa-microchip"), props.metrics[0] && !props.metrics[0].loading ? "Halo telemetry live" : "Waiting for telemetry"), h("span", null, icon("fa-robot"), props.bots.filter(function (bot) { return bot.status === "running"; }).length + " profiles enabled"), h("span", null, icon("fa-lock"), "Local-first workspace"))),
-            h("article", { className: "glass-card mission-brief-card" }, h("div", null, h("span", { className: "widget-eyebrow" }, "Morning brief"), h("strong", null, "Build the day from current evidence"), h("p", null, "Ask the private local model to summarize Halo health and the latest changes. Calendar, mail, markets, and manufacturing appear only after connectors are approved.")), h("button", { type: "button", className: "primary-button", onClick: function () { props.onAsk("Create my executive brief from current Halo health and recent JoeOS events. Clearly identify unavailable integrations."); } }, icon("fa-file-lines"), "Generate current brief"))
+            h("article", { className: "glass-card mission-hero" }, h("div", { className: "mission-hero-top" }, h("span", { className: "mission-hero-label" }, "Executive readiness"), h("span", { className: "mission-score " + (score < 60 ? "danger" : score < 85 ? "warning" : "") }, score)), h("h2", null, urgent ? urgent + " critical item" + (urgent === 1 ? "" : "s") + " require a decision." : warning ? warning + " condition" + (warning === 1 ? "" : "s") + " deserve attention." : "Your local command fabric is steady."), h("p", null, urgent || warning ? "JoeOS is prioritizing real local evidence. Review the source before authorizing any future action." : "Telemetry, audit events, and private inference are reporting no urgent threshold crossings."), h("div", { className: "workspace-status-row" }, h("span", null, icon("fa-microchip"), props.metrics[0] && !props.metrics[0].loading ? "VPS telemetry live" : "Waiting for telemetry"), h("span", null, icon("fa-robot"), props.bots.filter(function (bot) { return bot.status === "running"; }).length + " profiles enabled"), h("span", null, icon("fa-lock"), "Local-first workspace"))),
+            h("article", { className: "glass-card mission-brief-card" }, h("div", null, h("span", { className: "widget-eyebrow" }, "Morning brief"), h("strong", null, "Build the day from current evidence"), h("p", null, "Ask the private local model to summarize VPS health and the latest changes. Calendar, mail, markets, and manufacturing appear only after connectors are approved.")), h("button", { type: "button", className: "primary-button", onClick: function () { props.onAsk("Create my executive brief from current VPS health and recent JoeOS events. Clearly identify unavailable integrations."); } }, icon("fa-file-lines"), "Generate current brief"))
           ),
           visible.length ? h("div", { className: "widget-grid" }, visible.map(function (widget, index) {
             var definition = catalogById[widget.widget_id];
@@ -5872,7 +5872,7 @@
           h(
             "div",
             { className: "modal-header" },
-            h("div", null, h("h2", { id: "customizer-title" }, "Customize JoeOS"), h("p", null, "Tune your workspace. Changes stay on the Halo and save as a versioned layout.")),
+            h("div", null, h("h2", { id: "customizer-title" }, "Customize JoeOS"), h("p", null, "Tune your workspace. Changes stay on the VPS and save as a versioned layout.")),
             h("button", { type: "button", className: "icon-button", onClick: props.onClose, "aria-label": "Close customization panel" }, icon("fa-xmark"))
           ),
           h(
@@ -6098,7 +6098,7 @@
                 ref: props.inputRef,
                 value: props.input,
                 onChange: function (event) { props.onInput(event.target.value); },
-                placeholder: "Ask your local model about this Halo…",
+                placeholder: "Ask your local model about this VPS…",
                 autoComplete: "off",
                 enterKeyHint: "send",
                 spellCheck: true
@@ -6323,7 +6323,7 @@
         var toast = toastPair[0];
         var setToast = toastPair[1];
         var notificationsPair = useState([
-          { id: "n1", title: "Private local mode", text: "JoeOS keeps telemetry, profiles, and prompts on your Halo.", time: "now", unread: true, icon: "fa-lock" },
+          { id: "n1", title: "Private local mode", text: "JoeOS keeps telemetry, profiles, and prompts on your VPS.", time: "now", unread: true, icon: "fa-lock" },
           { id: "n2", title: "Repository runner disconnected", text: "CI/CD actions are an interactive preview until you authorize a local runner.", time: "now", unread: false, icon: "fa-code-branch" }
         ]);
         var notifications = notificationsPair[0];
@@ -6350,7 +6350,7 @@
         var thinking = thinkingPair[0];
         var setThinking = thinkingPair[1];
         var messagesPair = useState([
-          { id: "msg-1", role: "assistant", text: "I’m your private JoeOS copilot. Once Lemonade is online, ask me about this Halo’s live health, local events, or agent profiles." }
+          { id: "msg-1", role: "assistant", text: "I’m your private JoeOS copilot. Once Lemonade is online, ask me about this VPS’s live health, local events, or agent profiles." }
         ]);
         var messages = messagesPair[0];
         var setMessages = messagesPair[1];
@@ -6426,7 +6426,7 @@
 
         async function loadMetricsFromApi() {
           var payload = await requestJson("/api/metrics", { cache: "no-store", headers: { Accept: "application/json" } });
-          if (!payload || !Array.isArray(payload.metrics) || !payload.metrics.length) throw new Error("No Halo telemetry is available yet.");
+          if (!payload || !Array.isArray(payload.metrics) || !payload.metrics.length) throw new Error("No VPS telemetry is available yet.");
           setMetrics(payload.metrics.map(normalizeMetric));
           setUptimeSeconds(Math.max(0, Number(payload.uptime_seconds) || 0));
           if (payload.runtime && typeof payload.runtime === "object") setRuntime(payload.runtime);
@@ -6698,11 +6698,11 @@
             var failures = results.filter(function (result) { return result.status === "rejected"; });
             if (failures.length) {
               if (results[0].status === "rejected") setRuntime({ online: false, status: "offline", model: null, version: null, message: "JoeOS telemetry API is unavailable" });
-              if (!remoteErrorRef.current) notify("Some local data is unavailable. Confirm JoeOS and Lemonade are running on the Halo.");
+              if (!remoteErrorRef.current) notify("Some local data is unavailable. Confirm JoeOS and Lemonade are running on the VPS.");
               remoteErrorRef.current = true;
             } else {
               remoteErrorRef.current = false;
-              if (showSuccess) notify("Halo telemetry, profiles, and local events refreshed.");
+              if (showSuccess) notify("VPS telemetry, profiles, and local events refreshed.");
             }
           } finally {
             remoteRefreshRef.current = false;
@@ -7016,7 +7016,7 @@
               notify("Layout conflict detected. Your local preview was not overwritten.");
             } else {
               setWorkspaceError("Workspace save failed: " + error.message);
-              notify("The layout could not be saved on the Halo.");
+              notify("The layout could not be saved on the VPS.");
             }
             return null;
           } finally {
@@ -7305,7 +7305,7 @@
           { id: "assistant", label: "Ask JoeOS AI", detail: "Open the private read-only Lemonade assistant", icon: "fa-wand-magic-sparkles", shortcut: "⇧⌘K", category: "Commands", run: function () { setAssistantOpen(true); } },
           { id: "settings", label: "Open Settings", detail: "Appearance, accessibility, and interface behavior", icon: "fa-sliders", shortcut: "Ctrl+,", category: "Navigation", run: function () { selectSection("settings"); } },
           { id: "shortcuts", label: "Open keyboard shortcuts", detail: "View the registered shortcut registry", icon: "fa-keyboard", shortcut: "?", category: "Help", run: function () { setShortcutsOpen(true); } },
-          { id: "refresh", label: "Refresh Halo state", detail: "Reload telemetry, profiles, and local events", icon: "fa-rotate", category: "Commands", run: function () { refreshRemoteData(true); } },
+          { id: "refresh", label: "Refresh VPS state", detail: "Reload telemetry, profiles, and local events", icon: "fa-rotate", category: "Commands", run: function () { refreshRemoteData(true); } },
           { id: "stop", label: "Stop current operation", detail: "Cancel the active AI generation", icon: "fa-stop", shortcut: "Esc", category: "Commands", run: function () { cancelAssistant(); } },
           { id: "focus-content", label: "Focus main content", detail: "Move keyboard focus to the primary workspace", icon: "fa-up-right-and-down-left-from-center", category: "Commands", run: function () { var node = document.getElementById("main-content"); if (node) { node.setAttribute("tabindex", "-1"); node.focus(); } } },
           { id: "lockdown", label: "Open Security Center", detail: "Reach Lockdown and Emergency Stop", icon: "fa-shield-halved", risk: "security", category: "Security", run: function () { selectSection("security-center"); } }
@@ -7366,7 +7366,7 @@
                 "div",
                 { className: "topbar-left" },
                 h("button", { type: "button", className: "icon-button mobile-menu-button", ref: menuButtonRef, onClick: openMobile, "aria-label": "Open navigation menu", "aria-expanded": mobileOpen, "aria-controls": "mobile-navigation" }, icon("fa-bars-staggered")),
-                h("div", { className: "breadcrumb" }, h("small", null, "JoeOS / Halo Operations"), h("strong", null, activeItem.label))
+                h("div", { className: "breadcrumb" }, h("small", null, "JoeOS / VPS Operations"), h("strong", null, activeItem.label))
               ),
               h(
                 "div",

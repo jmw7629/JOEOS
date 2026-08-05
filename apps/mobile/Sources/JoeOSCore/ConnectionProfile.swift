@@ -184,22 +184,6 @@ public struct ConnectionProfile: Identifiable, Equatable, Sendable {
         authenticationMode: .deviceEnrollment
     )
 
-    /// Retained for compatibility with previously saved Halo profiles. The Halo
-    /// is no longer the default; this is available only as an editable option.
-    @available(*, deprecated, message: "The Halo is no longer the default JoeOS backend.")
-    public static let defaultHalo = ConnectionProfile(
-        id: UUID(uuidString: "6BA7B810-9DAD-4D5A-8000-00000000A002")!,
-        displayName: "Halo",
-        transport: .http,
-        host: "100.121.165.22",
-        port: 8080,
-        environment: .development,
-        notes: "Legacy development host. Prefer the JoeOS VPS profile.",
-        apiVersion: nil,
-        requiresAuthentication: true,
-        authenticationMode: .deviceEnrollment
-    )
-
     /// Returns a copy with the given last-connected timestamp.
     public func connected(at date: Date = Date()) -> ConnectionProfile {
         var copy = self

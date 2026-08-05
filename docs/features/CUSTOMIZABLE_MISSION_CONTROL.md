@@ -18,12 +18,12 @@ Use **Add widget** to open the catalog. Live core modules can be added immediate
 
 Use **Edit layout** to drag modules on desktop. On iPhone, keyboard, or assistive technology, each module also exposes Move Earlier, Move Later, Narrower, Wider, and Hide controls. **Done editing** saves through an optimistic workspace revision; a conflicting edit from another client is not overwritten.
 
-Use **Customize** to set font scale, font family, accent color, primary text color, canvas color, layout density, corner radius, and glass opacity. The native color controls preview immediately and also update the installed web app's browser chrome color. **Save workspace** persists the complete versioned layout in Halo SQLite.
+Use **Customize** to set font scale, font family, accent color, primary text color, canvas color, layout density, corner radius, and glass opacity. The native color controls preview immediately and also update the installed web app's browser chrome color. **Save workspace** persists the complete versioned layout in VPS SQLite.
 
 The configuration guide accepts requests such as:
 
 ```text
-Use a purple accent, larger rounded font, text color #F4F7FF, background #020711, compact density, add calendar and move Halo health first
+Use a purple accent, larger rounded font, text color #F4F7FF, background #020711, compact density, add calendar and move VPS health first
 ```
 
 It returns a typed proposal, integration requirements, warnings, and a reminder that secrets belong in a dedicated secret workflow. A proposal is a preview only. It does not mutate the workspace until the user applies and saves it.

@@ -25,7 +25,7 @@ if ! tailscale status >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "Starting JoeOS on the Halo loopback interface..."
+echo "Starting JoeOS on the VPS loopback interface..."
 JOEOS_HOST=127.0.0.1 JOEOS_PORT="$JOEOS_SECURE_PORT" "$JOEOS_SECURE_DIR/start_joeos.sh" &
 JOEOS_CHILD_PID=$!
 

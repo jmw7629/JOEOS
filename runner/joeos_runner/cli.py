@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 import sys
 from pathlib import Path
 from typing import Optional, Sequence
@@ -18,6 +19,10 @@ from .operations import DEV_COMMAND_TEMPLATES
 CONFIG_DEFAULT = "/etc/joeos-runner/config.json"
 KEY_DEFAULT = "/etc/joeos-runner/runner-key.pem"
 IDENTITY_DEFAULT = "/etc/joeos-runner/identity.json"
+
+ENROLLMENT_DOMAIN = (
+    "JOEOS-RUNNER-ENROLLMENT-V1\0{challenge_id}\0{key_identifier}\0{machine_fingerprint}\0{nonce}"
+)
 
 
 def _fail(code: str, message: str) -> int:
@@ -58,6 +63,40 @@ def _identity_show(arguments) -> int:
     return _ok({"runner_id": config.runner_id, "key_identifier": signer.key_identifier(),
                 "public_key": signer.public_key(),
                 "machine_fingerprint": signer.machine_fingerprint()})
+
+
+def _enrollment_sign(arguments) -> int:
+    """Signs the one-time enrollment challenge with the runner key. Prints only
+    the public material and signature needed by the backend to complete the
+    enrollment; never prints the private key."""
+    config = _load_config(arguments)
+    try:
+        signer = _load_signer(config)
+    except RunnerIdentityError as error:
+        return _fail("identity_error", str(error))
+    machine_fingerprint = signer.machine_fingerprint()
+    message = ENROLLMENT_DOMAIN.format(
+        challenge_id=arguments.challenge_id,
+        key_identifier=signer.key_identifier(),
+        machine_fingerprint=machine_fingerprint,
+        nonce=arguments.nonce,
+    )
+    payload = {
+        "challenge_id": arguments.challenge_id,
+        "key_identifier": signer.key_identifier(),
+        "public_key": signer.public_key(),
+        "machine_fingerprint": machine_fingerprint,
+        "signature": signer.sign(message),
+        "runner_version": arguments.runner_version,
+        "protocol_version": int(arguments.protocol_version),
+        "operating_system": arguments.operating_system,
+        "architecture": arguments.architecture,
+        "display_name": arguments.display_name or signer.key_identifier(),
+        "allowed_executors": arguments.allowed_executors or config.allowed_executors,
+        "private_network_identity": arguments.private_network_identity or "",
+    }
+    print(json.dumps(payload, sort_keys=True))
+    return 0
 
 
 def _config_validate(arguments) -> int:
@@ -133,6 +172,16 @@ def parser() -> argparse.ArgumentParser:
     init = sub.add_parser("identity-init")
     init.add_argument("--identifier", default="runner-key-1")
     sub.add_parser("identity-show")
+    sign = sub.add_parser("enrollment-sign")
+    sign.add_argument("--challenge-id", required=True)
+    sign.add_argument("--nonce", required=True)
+    sign.add_argument("--runner-version", default="0.1.0")
+    sign.add_argument("--protocol-version", default="1")
+    sign.add_argument("--operating-system", default=platform.system().lower())
+    sign.add_argument("--architecture", default=platform.machine().lower())
+    sign.add_argument("--display-name")
+    sign.add_argument("--allowed-executors")
+    sign.add_argument("--private-network-identity")
     sub.add_parser("config-validate")
     sub.add_parser("config-effective")
     sub.add_parser("self-test")
@@ -150,6 +199,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     handler = {
         "identity-init": _identity_init,
         "identity-show": _identity_show,
+        "enrollment-sign": _enrollment_sign,
         "config-validate": _config_validate,
         "config-effective": _config_effective,
         "self-test": _self_test,

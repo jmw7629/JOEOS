@@ -1,6 +1,6 @@
 # JoeOS Executive Operating System
 
-JoeOS is a local-first executive command center for the AMD Ryzen AI Max+ 395 Halo, iPhone, and Mac. The current operational release keeps telemetry, workspace configuration, audit events, agent profiles, and Lemonade inference on the Halo and exposes one same-origin web application over the user's private network.
+JoeOS is a local-first executive command center for the local VPS, iPhone, and Mac. The current operational release keeps telemetry, workspace configuration, audit events, agent profiles, and Lemonade inference on the VPS and exposes one same-origin web application over the user's private network.
 
 ## Working now
 
@@ -16,7 +16,7 @@ JoeOS is a local-first executive command center for the AMD Ryzen AI Max+ 395 Ha
 - Engineering workspace with a project registry, root-bounded file access, Git status/diff and approval-gated stage/commit, secret scanning, command validation, and repository search.
 - Project and repository intelligence: stable repository fingerprints, incremental file inventory and classification, language/framework/build detection, symbol/reference extraction for ten languages, dependency and architecture graphs, change-impact estimation, explainable risk findings, ADR/convention ingestion, project memory, hybrid structured retrieval, context packs, and a cancellable background index with health diagnostics.
 
-Start the current local release with `start_joeos.sh` on the Halo or `start_joeos.command` on macOS. For the recommended private HTTPS iPhone/PWA route, use `start_joeos_secure.sh` or double-click `start_joeos_secure.command`. See `DEPLOYMENT.md` for details.
+Start the current local release with `start_joeos.sh` on the VPS or `start_joeos.command` on macOS. For the recommended private HTTPS iPhone/PWA route, use `start_joeos_secure.sh` or double-click `start_joeos_secure.command`. See `DEPLOYMENT.md` for details.
 
 The modular native iPhone source now runs the reviewed pairing ceremony with server-scoped Secure Enclave keys, Face ID protection for the approval-key signature, and ThisDeviceOnly Keychain recovery for an exact signed retry. A full Xcode build, signing setup, and physical-device security drill are still required before distribution. Pairing grants no application session, role, approval, API authorization, or execution permission. See [Device Enrollment Security Protocol](docs/security/DEVICE_ENROLLMENT.md) for the exact boundary.
 

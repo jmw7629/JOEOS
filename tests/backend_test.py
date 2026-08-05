@@ -107,7 +107,7 @@ class LocalBackendContractTests(unittest.TestCase):
         self.assertTrue(backend.SDK_PATH.is_file())
         self.assertEqual(response.media_type, "application/javascript")
 
-    def test_metrics_endpoint_returns_local_halo_contract(self):
+    def test_metrics_endpoint_returns_local_vps_contract(self):
         payload = backend.metrics(make_request(self.db_path))
 
         self.assertEqual(payload["uptime_seconds"], 3605)
@@ -118,7 +118,7 @@ class LocalBackendContractTests(unittest.TestCase):
         self.assertEqual(payload["metrics"][0]["history"], [24.0, 28.0])
         self.assertEqual(payload["metrics"][2]["value"], 42.0)
         self.assertEqual(payload["runtime"]["model"], "local-test-model")
-        self.assertEqual(payload["nodes"][0]["id"], "halo-local")
+        self.assertEqual(payload["nodes"][0]["id"], "vps-local")
         self.assertEqual(payload["nodes"][0]["status"], "healthy")
 
     def test_bots_are_sqlite_backed_and_status_updates_are_audited(self):
@@ -175,7 +175,7 @@ class LemonadeProxyContractTests(unittest.IsolatedAsyncioTestCase):
                 200,
                 json={
                     "choices": [
-                        {"message": {"role": "assistant", "content": "Halo is healthy."}}
+                        {"message": {"role": "assistant", "content": "VPS is healthy."}}
                     ]
                 },
             )
@@ -196,7 +196,7 @@ class LemonadeProxyContractTests(unittest.IsolatedAsyncioTestCase):
                     RUNTIME_ONLINE,
                 )
 
-        self.assertEqual(result["reply"], "Halo is healthy.")
+        self.assertEqual(result["reply"], "VPS is healthy.")
         self.assertEqual(result["model"], "local-test-model")
         self.assertEqual(captured["url"], "http://127.0.0.1:13305/api/v1/chat/completions")
         self.assertEqual(captured["payload"]["model"], "local-test-model")

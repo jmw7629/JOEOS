@@ -49,7 +49,7 @@ public enum EndpointValidationError: Error, Equatable, LocalizedError, Sendable 
 /// A normalized origin: lowercased scheme and host with a scheme-relative port.
 ///
 /// Equality ignores a stored port that equals the scheme default, so
-/// `https://halo.example.com` and `https://halo.example.com:443` are the same
+/// `https://vps.example.com` and `https://vps.example.com:443` are the same
 /// origin for navigation and bootstrap purposes.
 public struct EndpointOrigin: Equatable, Hashable, Sendable {
     public let scheme: String

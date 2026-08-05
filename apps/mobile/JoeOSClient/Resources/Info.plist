@@ -32,7 +32,7 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>JoeOS Client connects to the private Halo command center you select. It does not scan your local network.</string>
+	<string>JoeOS Client connects to the private VPS command center you select. It does not scan your local network.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>JoeOS uses Face ID only to confirm the device-bound approval-key signature during an enrollment you explicitly review.</string>
 	<key>UIApplicationSceneManifest</key>

@@ -4,7 +4,7 @@ This directory contains the production-oriented SwiftUI source set for the next 
 
 ## Included
 
-- Multiple editable connection profiles, with the authoritative development profile `JoeOS VPS` at `100.98.25.26` as the default. The old Halo address (`100.121.165.22`) remains available only as an explicit, editable profile and is never the default.
+- Multiple editable connection profiles, with the authoritative development profile `JoeOS VPS` at `100.98.25.26` as the default. It is the only retained development profile.
 - Production connection-profile system: profile list persistence, selected-profile persistence, last-successful profile, validation before activation, duplicate detection, migration from the legacy endpoint-format profiles, and automatic reconnect to the last successful profile.
 - Profile fields: UUID, display name, protocol, host, port (discovered from the backend when not set), HTTPS-required, development/production flag, notes, optional API version, and last-connected/last-successful timestamps. Profiles never store API keys, passwords, tokens, or private keys.
 - Non-secret profile persistence through SwiftUI `AppStorage`/`UserDefaults` (same keys as `JoeOSCore.ConnectionProfileStorage`).

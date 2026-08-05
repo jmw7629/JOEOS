@@ -1,6 +1,6 @@
 # JoeOS Status
 
-Generated: 2026-08-04.
+Generated: 2026-08-05.
 
 ## Current phase
 
@@ -26,8 +26,8 @@ Phase 19 — Self-Maintenance and Continuous Improvement (delivered).
 
 ## Test status
 
-- Python: 685 passed, 61 subtests passed.
-- Runner: 29 passed (process safety + P3D daemon/executor suite).
+- Python: 714 passed, 61 subtests passed.
+- Runner: 35 passed (process safety + P3D daemon/executor suite + HTTP transport).
 - Frontend: 27/27 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 
@@ -37,7 +37,7 @@ Delivered:
 
 - long-lived runner daemon (outbound private connection loop, heartbeat, reconnect with bounded exponential backoff and jitter, lease polling, execution, journal)
 - strict typed runner configuration (unknown-field rejection, unsafe public HTTP rejection, key/configuration permission checks)
-- runner CLI (identity-init/show, config validate/effective, self-test, executors list/inspect, journal inspect/verify, emergency local-stop)
+- runner CLI (identity-init/show, enrollment-sign, config validate/effective, self-test, executors list/inspect, journal inspect/verify, emergency local-stop)
 - bounded, tamper-evident local execution journal (digest chain, retention)
 - real development-command executor using authoritative command templates
 - real constrained Git executor (temporary local repositories and a local bare remote; no external pushes)
@@ -47,14 +47,31 @@ Delivered:
 - runner-local secret provider (resolved only at launch, redaction, leak detection)
 - artifact transfer metadata
 - daemon cancellation, timeout, restart recovery
-- installer dry-run and Halo handoff scripts (no auto-enrollment, no secrets)
+- installer dry-run and VPS handoff scripts (no auto-enrollment, no secrets)
 - end-to-end backend-and-daemon integration via the runner transport
+- real HTTP runner transport (private endpoint, X-Runner-Credential, protocol endpoints)
+- `python -m joeos_runner` daemon entrypoint
+
+## Phase P3E status (private runner activation on the local VPS)
+
+Delivered (on the local VPS, `100.98.25.26` Tailscale origin; loopback transport):
+
+- host validation and installer dry-run passed
+- real P-256 runner identity generated locally (0600, never printed)
+- real enrollment ceremony: backend challenge (nonce-bound, fingerprint-bound) -> runner `enrollment-sign` -> backend `enroll` completion
+- runner enrolled (active) and connected to the authoritative backend over private loopback
+- live heartbeat verified (5s interval; `last_seen_at` advances)
+- daemon restart verified (new connection record; reconnect without re-enrollment)
+- revocation verified (runner set revoked; daemon denied with `runner_not_active` and backoff-reconnects)
+- re-enrollment verified (fresh challenge binds the same key/fingerprint; new runner active)
+- journal integrity verified
 
 Not yet delivered:
 
-- physical installation on the Halo, real Tailscale connection, real systemd start
-- real GitHub credential validation and push from the Halo
-- real JoeOS deployment on the Halo
+- systemd service start (requires interactive root; installer supports it via `runner/install/install-runner.sh`)
+- read-only diagnostic job execution (dispatch is approval-gated; blocked pending P3F native approval validation; no bypass, no fixture keys)
+- real GitHub credential validation and push from the VPS (approval-gated; pending P3F)
+- real JoeOS deployment on the VPS (approval-gated; pending P3F)
 - macOS runner, Swift compilation on this VPS, Xcode, physical iPhone/Face ID/Secure Enclave validation
 - unrestricted shell, root execution, arbitrary remote control, payment, unrestricted email, physical-device execution
 - enterprise external secret manager, VM-grade executor isolation, multi-runner production fleet

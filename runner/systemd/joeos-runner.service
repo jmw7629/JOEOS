@@ -8,6 +8,9 @@ Type=simple
 User=joeos-runner
 Group=joeos-runner
 WorkingDirectory=/opt/joeos/runner
+# The runner package imports a shared utility from the server package, so the
+# repository root must be importable.
+Environment=PYTHONPATH=/opt/joeos
 ExecStart=/opt/joeos/runner/.venv/bin/python -m joeos_runner --config /etc/joeos-runner/config.json
 Restart=on-failure
 RestartSec=5

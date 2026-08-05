@@ -42,7 +42,7 @@ The equivalent CLI is:
 The CLI automatically prefers a private Tailscale Serve HTTPS entry only when it is not Funnel-enabled and proxies to the expected JoeOS loopback port. It then tries the direct Tailscale HTTP listener and loopback, accepting only a reachable exact-origin bootstrap document for the same installation. `JOEOS_PUBLIC_ORIGIN` remains an explicit override when managed networking requires a different exact origin:
 
 ```bash
-JOEOS_PUBLIC_ORIGIN=https://your-halo.your-tailnet.ts.net ./.venv/bin/python -m server.identity.cli issue
+JOEOS_PUBLIC_ORIGIN=https://your-vps.your-tailnet.ts.net ./.venv/bin/python -m server.identity.cli issue
 ```
 
 Before printing a code, the CLI requests the exact origin's `/api/v1/bootstrap` document, refuses redirects, validates the bounded strict schema, verifies that its installation UUID matches the local database, and requires the advertised local-console enrollment capability.

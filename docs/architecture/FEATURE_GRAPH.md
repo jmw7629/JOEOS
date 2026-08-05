@@ -46,7 +46,7 @@ Agent task protocol
 
 | Capability | Status | Dependency / next completion gate |
 |---|---|---|
-| Halo CPU/RAM/GPU/disk/uptime | **partial** | Add reliable temperature/model usage sources and multi-host collection |
+| VPS CPU/RAM/GPU/disk/uptime | **partial** | Add reliable temperature/model usage sources and multi-host collection |
 | Local Lemonade chat | **partial** | Streaming, durable conversation, identity, memory scopes |
 | Bot fleet | **partial** | Replace profiles with durable agent/task state machine |
 | Local audit stream | **partial** | Typed resumable WebSocket is live; add actor/device/request IDs, append-only policy, host security collectors |

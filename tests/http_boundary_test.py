@@ -19,7 +19,7 @@ class HttpRequestBoundaryPolicyTests(unittest.TestCase):
         values = {
             "method": "GET",
             "path": "/api/metrics",
-            "host_header": "100.121.165.22:8080",
+            "host_header": "100.98.25.26:8080",
             "origin_header": None,
             "sec_fetch_site": None,
             "content_type": None,
@@ -40,9 +40,9 @@ class HttpRequestBoundaryPolicyTests(unittest.TestCase):
             "[fd12:3456::1]",
             "[fe80::1]:8080",
             "localhost:8080",
-            "halo.local",
-            "halo.tailnet-name.ts.net",
-            "joeos-halo",
+            "vps.local",
+            "vps.tailnet-name.ts.net",
+            "joeos-vps",
         ):
             self.assertIsNone(self.decision(host_header=host), host)
 
@@ -81,7 +81,7 @@ class HttpRequestBoundaryPolicyTests(unittest.TestCase):
         accepted = self.decision(
             method="POST",
             path="/api/chat",
-            origin_header="http://100.121.165.22:8080",
+            origin_header="http://100.98.25.26:8080",
             sec_fetch_site="same-origin",
             content_type="application/json; charset=utf-8",
         )
@@ -104,13 +104,13 @@ class HttpRequestBoundaryPolicyTests(unittest.TestCase):
         cross_port = self.decision(
             method="POST",
             path="/api/chat",
-            origin_header="http://100.121.165.22:9999",
+            origin_header="http://100.98.25.26:9999",
             content_type="application/json",
         )
         cross_site = self.decision(
             method="POST",
             path="/api/bots",
-            origin_header="http://100.121.165.22:8080",
+            origin_header="http://100.98.25.26:8080",
             sec_fetch_site="cross-site",
             content_type="application/json",
         )

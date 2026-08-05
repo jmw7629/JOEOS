@@ -15,7 +15,7 @@ final class EndpointPolicyTests: XCTestCase {
         for address in [
             "https://joeos.example.com",
             "https://203.0.113.10:9443/control",
-            "https://halo.local",
+            "https://vps.local",
         ] {
             XCTAssertNoThrow(try EndpointPolicy.validate(address).get(), address)
         }
@@ -66,16 +66,16 @@ final class EndpointPolicyTests: XCTestCase {
     }
 
     func testCredentialsQueriesFragmentsAndUnsupportedSchemesAreRejected() {
-        XCTAssertEqual(failure("https://user:password@halo.example.com"), .credentialsNotAllowed)
-        XCTAssertEqual(failure("https://halo.example.com?token=secret"), .queryNotAllowed)
-        XCTAssertEqual(failure("https://halo.example.com#fragment"), .fragmentNotAllowed)
+        XCTAssertEqual(failure("https://user:password@vps.example.com"), .credentialsNotAllowed)
+        XCTAssertEqual(failure("https://vps.example.com?token=secret"), .queryNotAllowed)
+        XCTAssertEqual(failure("https://vps.example.com#fragment"), .fragmentNotAllowed)
         XCTAssertEqual(failure("file:///tmp/joeos"), .unsupportedScheme)
         XCTAssertEqual(failure("   "), .empty)
     }
 
     func testDefaultPortsAreNormalizedForSameOriginNavigation() {
-        let endpoint = URL(string: "https://halo.example.com")!
-        let candidate = URL(string: "https://halo.example.com:443/mission")!
+        let endpoint = URL(string: "https://vps.example.com")!
+        let candidate = URL(string: "https://vps.example.com:443/mission")!
         XCTAssertEqual(
             EndpointPolicy.navigationDisposition(
                 for: candidate,
@@ -87,7 +87,7 @@ final class EndpointPolicyTests: XCTestCase {
     }
 
     func testUserInitiatedExternalWebLinksAreHandedOff() {
-        let endpoint = URL(string: "https://halo.example.com")!
+        let endpoint = URL(string: "https://vps.example.com")!
         let external = URL(string: "https://docs.example.com/joeos")!
         XCTAssertEqual(
             EndpointPolicy.navigationDisposition(
@@ -100,7 +100,7 @@ final class EndpointPolicyTests: XCTestCase {
     }
 
     func testExternalRedirectsAndNonWebSchemesAreBlocked() {
-        let endpoint = URL(string: "https://halo.example.com")!
+        let endpoint = URL(string: "https://vps.example.com")!
         let external = URL(string: "https://docs.example.com/joeos")!
         let custom = URL(string: "joeos://execute")!
 

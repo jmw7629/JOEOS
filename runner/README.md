@@ -1,7 +1,7 @@
 # JoeOS Private Runner
 
 The runner is the private execution plane for specifically approved work on a
-trusted machine (the Halo computer), connected to the authoritative backend
+trusted machine (the local JoeOS VPS), connected to the authoritative backend
 over a private network such as Tailscale. The VPS never becomes an unrestricted
 shell gateway.
 
@@ -38,15 +38,15 @@ runner/
   readable only by the dedicated runner user with mode 0600.
 - Never print or commit the private key.
 
-## Halo installation handoff (placeholders)
+## VPS installation handoff (placeholders)
 
-Replace `HALO` and machine-specific values. Do not embed real secrets.
+Replace the placeholder and machine-specific values. Do not embed real secrets.
 
 ```bash
 # 1. Create the dedicated unprivileged runner user.
 sudo useradd --system --create-home --shell /usr/sbin/nologin joeos-runner
 
-# 2. Fetch JoeOS on the Halo and check out ai-rebuild.
+# 2. Fetch JoeOS on the VPS and check out ai-rebuild.
 git clone https://github.com/jmw7629/JOEOS.git /opt/joeos
 cd /opt/joeos && git checkout ai-rebuild
 
@@ -60,7 +60,7 @@ sudo -u joeos-runner mkdir -p /etc/joeos-runner /var/lib/joeos-runner
 sudo chown -R joeos-runner:joeos-runner /etc/joeos-runner /var/lib/joeos-runner
 
 # 5. Confirm Tailscale connectivity to the backend, then on the backend:
-python -m server.runners.cli enroll-challenge --fingerprint "<HALO_MACHINE_FINGERPRINT>"
+python -m server.runners.cli enroll-challenge --fingerprint "<MACHINE_FINGERPRINT>"
 
 # 6. Enroll on the runner with the one-time challenge (runner CLI), which
 #    generates the signing key (0600), signs JOEOS-RUNNER-ENROLLMENT-V1, and

@@ -53,7 +53,7 @@ from server.identity.service import (
 
 
 SERVER_ID = UUID("12345678-1234-4abc-8def-1234567890ab")
-TAILSCALE_ORIGIN = "http://100.121.165.22:8080"
+TAILSCALE_ORIGIN = "http://100.98.25.26:8080"
 
 
 class MutableClock:
@@ -637,8 +637,8 @@ class DeviceEnrollmentServiceTests(DeviceEnrollmentFixture):
             with self.subTest(origin=origin), self.assertRaises(EnrollmentOriginError):
                 self.service.issue_pairing_offer(origin)
         self.assertEqual(
-            self.service.issue_pairing_offer("https://halo.tailnet-name.ts.net").audience_origin,
-            "https://halo.tailnet-name.ts.net",
+            self.service.issue_pairing_offer("https://vps.tailnet-name.ts.net").audience_origin,
+            "https://vps.tailnet-name.ts.net",
         )
 
         offer = self.service.issue_pairing_offer(TAILSCALE_ORIGIN)

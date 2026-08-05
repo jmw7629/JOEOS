@@ -2,7 +2,7 @@
 # The private key lives in a separate 0600 file; secrets come from the
 # runner-local secret provider only.
 {
-  "backend_url": "https://<HALO_TAILSCALE_OR_BACKEND_HOST>:8080",
+  "backend_url": "https://<PRIVATE_BACKEND_HOST>:8080",
   "installation_id": "<INSTALLATION_ID>",
   "runner_id": "<RUNNER_ID>",
   "organization_id": "<ORGANIZATION_ID>",

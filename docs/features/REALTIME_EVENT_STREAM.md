@@ -12,7 +12,7 @@ JoeOS exposes one typed WebSocket stream for a live Mission Control client:
 WS /ws/events?after=<cursor>
 ```
 
-The stream combines a current telemetry snapshot with ordered audit events already persisted in Halo SQLite. It does not create an execution channel, accept commands, expose Lemonade directly, or replace the existing polling APIs.
+The stream combines a current telemetry snapshot with ordered audit events already persisted in VPS SQLite. It does not create an execution channel, accept commands, expose Lemonade directly, or replace the existing polling APIs.
 
 ## Mission Control integration
 

@@ -356,7 +356,7 @@ final class DeviceEnrollmentCoordinator: ObservableObject {
             hasInvalidCompletionJournal = false
             review = nil
             phase = .cancelled
-            message = "The signed retry journal was explicitly discarded on this iPhone. The Halo may still contain a completed device record; inspect and revoke it from the local JoeOS console if needed."
+            message = "The signed retry journal was explicitly discarded on this iPhone. The VPS may still contain a completed device record; inspect and revoke it from the local JoeOS console if needed."
         } catch {
             phase = .pending
             message = safeMessage(for: error, operation: .discard)

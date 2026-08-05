@@ -30,7 +30,7 @@
             |                                         |
             +---------- signed device channel --------+
                                                       |
-                                           Halo Execution Plane
+                                           VPS Execution Plane
                                            - Lemonade / Ollama
                                            - Codex / Claude Code
                                            - MCP servers

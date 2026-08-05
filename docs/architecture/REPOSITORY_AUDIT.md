@@ -8,7 +8,7 @@ Scope: every repository-owned file outside dependency and Git object directories
 
 ## Executive result
 
-JoeOS already has a useful local vertical slice. FastAPI serves a polished single-file PWA, samples the Halo every five seconds, persists telemetry and profile state in SQLite, and proxies read-only chat to Lemonade. The SwiftUI wrappers load that private web application. These behaviors are compatibility requirements and must not regress.
+JoeOS already has a useful local vertical slice. FastAPI serves a polished single-file PWA, samples the VPS every five seconds, persists telemetry and profile state in SQLite, and proxies read-only chat to Lemonade. The SwiftUI wrappers load that private web application. These behaviors are compatibility requirements and must not regress.
 
 The current code is not yet the requested enterprise operating system. The local server is one 977-line module; the local web UI is one 4,231-line document; the Sites application is an iframe around a separate simulated dashboard. There is no identity boundary, widget registry, orchestration engine, durable memory, search/RAG, automation runner, approval protocol, WebSocket stream, PostgreSQL/Redis/pgvector layer, or synchronized offline cache.
 
@@ -45,7 +45,7 @@ Dormant paths
 ## Working compatibility baseline
 
 - Same-origin `/api/metrics`, `/api/bots`, `/api/events`, `/api/status`, and `/api/chat` routes.
-- Five-second Halo telemetry collection and bounded SQLite retention.
+- Five-second VPS telemetry collection and bounded SQLite retention.
 - Lemonade health/model discovery and private inference proxy.
 - Bot-profile create, start, and stop persistence with audit records.
 - Responsive glass command center, mobile drawer, filters, modals, notification panel, log export, and assistant.
@@ -63,7 +63,7 @@ Dormant paths
 | Agents | Database-backed display profiles; no process, planner, task lifecycle, delegation, or tool execution |
 | CI/CD | Browser-only simulation |
 | Security | JoeOS audit events, not host SSH/firewall/security telemetry |
-| Infrastructure | One Halo node |
+| Infrastructure | One VPS node |
 | Memory | Recent chat history supplied by the browser only |
 | Model usage | Transient runtime values, not durable metering or attribution |
 | Offline | Static shell cache; CDN React/icons and no data synchronization |
@@ -141,7 +141,7 @@ The workspace root is not a Git repository. `joeos-web` is a nested Git reposito
 
 ## Security findings
 
-1. Any client that can reach the Halo service can currently read telemetry, create or mutate profiles, and consume inference; there is no application identity or authorization.
+1. Any client that can reach the VPS service can currently read telemetry, create or mutate profiles, and consume inference; there is no application identity or authorization.
 2. Credentials previously pasted into conversation were not found in repository files, but all live-looking restricted credentials must be rotated independently of code changes.
 3. Browser access is HTTP. Tailscale protects transport within the tailnet, but an HTTPS origin is still required for the full iPhone/PWA secure-context feature set.
 4. SQLite permissions are restrictive but its contents are not encrypted.

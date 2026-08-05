@@ -19,7 +19,7 @@ from server.identity.key_protection import (
 
 SERVER_ID = UUID("12345678-1234-4abc-8def-1234567890ab")
 OFFER_ID = UUID("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
-ORIGIN = "http://100.121.165.22:8080"
+ORIGIN = "http://100.98.25.26:8080"
 
 
 class PairingKeyProtectorTests(unittest.TestCase):

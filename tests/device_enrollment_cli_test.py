@@ -11,7 +11,7 @@ from server.identity.service import EnrollmentOriginError
 
 
 SERVER_ID = UUID("12345678-1234-4abc-8def-1234567890ab")
-ORIGIN = "http://100.121.165.22:8080"
+ORIGIN = "http://100.98.25.26:8080"
 
 
 class _ServerRepository:
@@ -97,7 +97,7 @@ class DeviceEnrollmentCLITests(unittest.TestCase):
 
     def test_default_detection_uses_the_actual_tailscale_http_listener(self):
         def output(arguments):
-            return "100.121.165.22\n" if arguments == ("tailscale", "ip", "-4") else None
+            return "100.98.25.26\n" if arguments == ("tailscale", "ip", "-4") else None
 
         with patch.dict("os.environ", {}, clear=True), patch(
             "server.identity.cli._command_output", side_effect=output
@@ -108,25 +108,25 @@ class DeviceEnrollmentCLITests(unittest.TestCase):
         serve = json.dumps(
             {
                 "Web": {
-                    "halo.tailnet-name.ts.net:443": {
+                    "vps.tailnet-name.ts.net:443": {
                         "Handlers": {"/": {"Proxy": "http://127.0.0.1:8080"}}
                     }
                 },
-                "AllowFunnel": {"halo.tailnet-name.ts.net:443": False},
+                "AllowFunnel": {"vps.tailnet-name.ts.net:443": False},
             }
         )
 
         def output(arguments):
             if arguments == ("tailscale", "serve", "status", "--json"):
                 return serve
-            return "100.121.165.22\n"
+            return "100.98.25.26\n"
 
         with patch.dict("os.environ", {}, clear=True), patch(
             "server.identity.cli._command_output", side_effect=output
         ):
             self.assertEqual(
                 _detected_origin(8080),
-                "https://halo.tailnet-name.ts.net",
+                "https://vps.tailnet-name.ts.net",
             )
 
     def test_default_detection_ignores_wrong_port_and_funnel_serve_entries(self):
@@ -137,18 +137,18 @@ class DeviceEnrollmentCLITests(unittest.TestCase):
             serve = json.dumps(
                 {
                     "Web": {
-                        "halo.tailnet-name.ts.net:443": {
+                        "vps.tailnet-name.ts.net:443": {
                             "Handlers": {"/": {"Proxy": proxy}}
                         }
                     },
-                    "AllowFunnel": {"halo.tailnet-name.ts.net:443": funnel},
+                    "AllowFunnel": {"vps.tailnet-name.ts.net:443": funnel},
                 }
             )
 
             def output(arguments):
                 if arguments == ("tailscale", "serve", "status", "--json"):
                     return serve
-                return "100.121.165.22\n"
+                return "100.98.25.26\n"
 
             with self.subTest(proxy=proxy, funnel=funnel), patch.dict(
                 "os.environ", {}, clear=True

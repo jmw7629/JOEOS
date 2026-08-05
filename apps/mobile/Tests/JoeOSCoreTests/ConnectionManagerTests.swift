@@ -18,20 +18,9 @@ final class ConnectionManagerTests: XCTestCase {
         XCTAssertNil(profile.port)
     }
 
-    func testDefaultProfileEndpointsNeverReferenceTheHalo() {
+    func testDefaultProfileEndpointsOnlyReferenceTheVPS() {
         let decoded = ConnectionProfileStorage.decode(ConnectionProfileStorage.defaultPayload)
         XCTAssertEqual(decoded, [.defaultVPS])
-        XCTAssertFalse(decoded.contains { $0.host == "100.121.165.22" })
-    }
-
-    func testHaloRemainsAnExplicitEditableProfileNotTheDefault() {
-        let manager = ConnectionManager(store: MemoryProfileStore())
-        XCTAssertEqual(manager.activeProfile, .defaultVPS)
-        XCTAssertNotEqual(manager.activeProfile?.host, "100.121.165.22")
-        let halo = ConnectionProfile.defaultHalo
-        XCTAssertEqual(halo.host, "100.121.165.22")
-        let result = manager.upsert(halo)
-        XCTAssertEqual(result, .success(()))
     }
 
     // MARK: - Validation
@@ -123,30 +112,30 @@ final class ConnectionManagerTests: XCTestCase {
         XCTAssertEqual(decoded[0].lastSuccessfulAt, profile.lastSuccessfulAt)
     }
 
-    // MARK: - Migration from the old Halo profile
+    // MARK: - Migration from the legacy endpoint-format profile
 
-    func testLegacyHaloProfileMigratesToFieldBasedProfile() {
+    func testLegacyEndpointProfileMigratesToFieldBasedProfile() {
         let legacy = #"""
-        [{"schema_version":1,"id":"6BA7B810-9DAD-4D5A-8000-000000000111","name":"Halo","endpoint":"http://100.121.165.22:8080"}]
+        [{"schema_version":1,"id":"6BA7B810-9DAD-4D5A-8000-000000000111","name":"Legacy","endpoint":"http://100.64.0.5:8080"}]
         """#
         let profiles = ConnectionProfileStorage.decode(legacy)
         XCTAssertEqual(profiles.count, 1)
-        XCTAssertEqual(profiles[0].displayName, "Halo")
-        XCTAssertEqual(profiles[0].host, "100.121.165.22")
+        XCTAssertEqual(profiles[0].displayName, "Legacy")
+        XCTAssertEqual(profiles[0].host, "100.64.0.5")
         XCTAssertEqual(profiles[0].port, 8080)
         XCTAssertEqual(profiles[0].transport, .http)
         XCTAssertEqual(profiles[0].environment, .development)
         XCTAssertNotEqual(profiles[0].id, ConnectionProfile.defaultVPS.id)
     }
 
-    func testMigrationFromLegacyHaloDoesNotReplaceSavedProfiles() {
+    func testMigrationFromLegacyEndpointDoesNotReplaceSavedProfiles() {
         let store = MemoryProfileStore()
-        let legacy = #"[{"schema_version":1,"id":"6BA7B810-9DAD-4D5A-8000-000000000111","name":"Halo","endpoint":"http://100.121.165.22:8080"}]"#
+        let legacy = #"[{"schema_version":1,"id":"6BA7B810-9DAD-4D5A-8000-000000000111","name":"Legacy","endpoint":"http://100.64.0.5:8080"}]"#
         store.set(legacy, forKey: ConnectionProfileStorage.profilesKey)
         let manager = ConnectionManager(store: store)
         XCTAssertEqual(manager.profiles.count, 1)
-        XCTAssertEqual(manager.profiles[0].host, "100.121.165.22")
-        XCTAssertEqual(manager.activeProfile?.host, "100.121.165.22")
+        XCTAssertEqual(manager.profiles[0].host, "100.64.0.5")
+        XCTAssertEqual(manager.activeProfile?.host, "100.64.0.5")
         let persisted = store.string(forKey: ConnectionProfileStorage.profilesKey) ?? ""
         XCTAssertNotEqual(persisted, legacy)
         XCTAssertEqual(ConnectionProfileStorage.decode(persisted), manager.profiles)

@@ -128,7 +128,7 @@ class WorkspaceServiceTests(unittest.TestCase):
         request = ConfigurationGuideRequest(
             message=(
                 "Use a purple accent, larger rounded font, text color #F4F7FF, "
-                "background #020711, compact density, add calendar and move Halo health first"
+                "background #020711, compact density, add calendar and move VPS health first"
             )
         )
         first = self.service.guide(request).proposal

@@ -1,10 +1,10 @@
 # JoeOS Local — immediate use
 
-JoeOS is now a single private service on the Halo. FastAPI serves both the dashboard and its same-origin API; Lemonade remains on Halo loopback and is never exposed to the browser.
+JoeOS is now a single private service on the VPS. FastAPI serves both the dashboard and its same-origin API; Lemonade remains on VPS loopback and is never exposed to the browser.
 
 ## Start it
 
-On the AMD Halo, run `start_joeos.sh`. It creates a private Python environment on the first launch, installs the pinned packages, detects the Halo's Tailscale IPv4 address, and starts JoeOS on port `8080`.
+On the AMD VPS, run `start_joeos.sh`. It creates a private Python environment on the first launch, installs the pinned packages, detects the VPS's Tailscale IPv4 address, and starts JoeOS on port `8080`.
 
 On macOS, double-click `start_joeos.command`. On Windows, double-click `start_joeos.bat`.
 
@@ -13,14 +13,14 @@ For the recommended private HTTPS iPhone route, double-click `start_joeos_secure
 The launcher prints the exact URL. With the previously assigned Tailscale address it will be:
 
 ```text
-http://100.121.165.22:8080
+http://100.98.25.26:8080
 ```
 
 Keep that terminal window open while using JoeOS. Press `Ctrl+C` to stop it.
 
 ## Use it from iPhone
 
-1. Connect the iPhone to the same Tailscale tailnet as the Halo.
+1. Connect the iPhone to the same Tailscale tailnet as the VPS.
 2. Open the URL printed by the launcher.
 3. For an app-like icon, use **Share → Add to Home Screen**. Launch JoeOS from that icon afterward.
 
@@ -34,7 +34,7 @@ JoeOS now includes the server-side local-console pairing ceremony. Keep JoeOS ru
 ./pair_joeos_iphone.command
 ```
 
-On a Linux Halo without Finder, the equivalent is:
+On a Linux VPS without Finder, the equivalent is:
 
 ```bash
 ./.venv/bin/python -m server.identity.cli issue
@@ -43,10 +43,10 @@ On a Linux Halo without Finder, the equivalent is:
 The CLI automatically prefers a non-Funnel Tailscale Serve HTTPS mapping only when it proxies to the expected JoeOS loopback port. If that origin is stale or unreachable, it safely tries the direct Tailscale HTTP listener and then loopback, verifying the exact bootstrap URL and local installation UUID before creating anything. To bind a managed deployment to another exact origin, use the explicit override:
 
 ```bash
-JOEOS_PUBLIC_ORIGIN=https://your-halo.your-tailnet.ts.net ./.venv/bin/python -m server.identity.cli issue
+JOEOS_PUBLIC_ORIGIN=https://your-vps.your-tailnet.ts.net ./.venv/bin/python -m server.identity.cli issue
 ```
 
-The tool verifies that the exact configured origin reaches the same local JoeOS database before it prints the one-use code. Do not paste that code into a website, browser form, chat, log, or untrusted app. After building and installing the modular SwiftUI client as described in `apps/mobile/README.md`, open its native **Pair This iPhone** panel, paste the full code, verify the exact Halo origin and server ID, and explicitly confirm the two device keys with Face ID. The manual code is cleared before verification, the private keys remain in the Secure Enclave, and an exact signed completion is stored in the non-synchronizing ThisDeviceOnly Keychain before any completion request is sent.
+The tool verifies that the exact configured origin reaches the same local JoeOS database before it prints the one-use code. Do not paste that code into a website, browser form, chat, log, or untrusted app. After building and installing the modular SwiftUI client as described in `apps/mobile/README.md`, open its native **Pair This iPhone** panel, paste the full code, verify the exact VPS origin and server ID, and explicitly confirm the two device keys with Face ID. The manual code is cleared before verification, the private keys remain in the Secure Enclave, and an exact signed completion is stored in the non-synchronizing ThisDeviceOnly Keychain before any completion request is sent.
 
 A successful ceremony creates an `active_unassigned` device with no session, role, approval, API authorization, or execution authority. The app's stored receipt is not a live revocation check. Local operators can inspect and revoke these records with:
 

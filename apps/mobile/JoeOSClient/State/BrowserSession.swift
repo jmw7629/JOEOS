@@ -50,7 +50,7 @@ final class BrowserSession: ObservableObject {
     var statusDetail: String {
         switch phase {
         case .idle:
-            "Select a Halo connection to begin."
+            "Select a VPS connection to begin."
         case .loading:
             "Opening the private JoeOS command center."
         case .online:
@@ -91,7 +91,7 @@ final class BrowserSession: ObservableObject {
         progress = 0
         if Self.offlineCodes.contains(nsError.code) {
             phase = .offline
-            errorMessage = "JoeOS is unreachable. Confirm the Halo is online and this iPhone is connected to the same private network."
+            errorMessage = "JoeOS is unreachable. Confirm the VPS is online and this iPhone is connected to the same private network."
         } else if nsError.domain == NSURLErrorDomain,
                   nsError.code == NSURLErrorSecureConnectionFailed ||
                   nsError.code == NSURLErrorServerCertificateUntrusted ||

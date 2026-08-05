@@ -96,7 +96,7 @@ struct DeviceEnrollmentStatusRow: View {
         case .loadingLocalState:
             "Reading only this device's non-synchronizing Keychain state."
         case .ready:
-            "Create a five-minute code on the Halo, then review before Face ID signs anything."
+            "Create a five-minute code on the VPS, then review before Face ID signs anything."
         case .preparing:
             "Checking the exact origin, server proof, transcript, and both public keys. No signing yet."
         case .review:

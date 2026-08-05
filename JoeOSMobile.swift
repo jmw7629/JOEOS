@@ -2,7 +2,7 @@ import SwiftUI
 import WebKit
 
 struct JoeOSWebView: UIViewRepresentable {
-    private let url = URL(string: "http://100.121.165.22:8080")!
+    private let url = URL(string: "http://100.98.25.26:8080")!
 
     func makeUIView(context: Context) -> WKWebView {
         let webView = WKWebView()

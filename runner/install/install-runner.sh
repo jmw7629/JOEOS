@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# JoeOS private runner installer for the Halo computer (dry-run safe).
+# JoeOS private runner installer for the local VPS (dry-run safe).
 # Never generates a private key, never embeds secrets, never starts enrollment,
 # never opens a public port, and never alters firewall rules.
 set -euo pipefail

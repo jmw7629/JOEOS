@@ -245,7 +245,7 @@ def _seed_bots(connection: sqlite3.Connection) -> None:
             "lemonade-copilot",
             "Lemonade Copilot",
             "Private Local Inference",
-            "Routes JoeOS chat to the model loaded in Lemonade Server. No prompt leaves the Halo.",
+            "Routes JoeOS chat to the model loaded in Lemonade Server. No prompt leaves the VPS.",
             "running",
             0,
             0,
@@ -283,13 +283,13 @@ def _seed_bots(connection: sqlite3.Connection) -> None:
         (
             "resource-scout",
             "Resource Scout",
-            "Halo Telemetry",
+            "VPS Telemetry",
             "Samples CPU, unified memory, GPU, storage, and uptime every five seconds.",
             "running",
             0,
             0,
             100.0,
-            "Collecting Halo telemetry",
+            "Collecting VPS telemetry",
             "fa-chart-line",
             "monitor",
         ),
@@ -499,7 +499,7 @@ async def _refresh_runtime(app: FastAPI) -> Dict[str, Any]:
             "npu_percent": None,
             "tokens_per_second": None,
             "time_to_first_token": None,
-            "message": "Lemonade Server is not reachable on the Halo loopback interface.",
+            "message": "Lemonade Server is not reachable on the VPS loopback interface.",
         }
     else:
         system_stats = system_stats if isinstance(system_stats, dict) else {}
@@ -594,7 +594,7 @@ def _host_sample(runtime: Dict[str, Any]) -> Dict[str, Any]:
         disk = psutil.disk_usage(str(Path.home().anchor or "/"))
         uptime = max(0, int(time.time() - psutil.boot_time()))
         cpu_count = psutil.cpu_count(logical=True) or os.cpu_count() or 1
-        cpu_detail = "%s threads · local Halo" % cpu_count
+        cpu_detail = "%s threads · local VPS" % cpu_count
         ram_detail = "%.1f / %.1f GiB unified memory" % (
             memory.used / (1024 ** 3),
             memory.total / (1024 ** 3),
@@ -705,7 +705,7 @@ async def _collector_loop(app: FastAPI) -> None:
                     app.state.db_path,
                     "info",
                     "telemetry",
-                    "Halo telemetry captured · CPU %.1f%% · RAM %.1f%% · GPU %s"
+                    "VPS telemetry captured · CPU %.1f%% · RAM %.1f%% · GPU %s"
                     % (
                         sample["cpu_percent"],
                         sample["ram_percent"],
@@ -1440,10 +1440,10 @@ def _metric_payload(db_path: Path, runtime: Dict[str, Any]) -> Dict[str, Any]:
     disk = round(_bounded_number(latest["disk_percent"]))
     online = bool(runtime.get("online"))
     node = {
-        "id": "halo-local",
-        "name": socket.gethostname() or "joeos-halo",
+        "id": "vps-local",
+        "name": socket.gethostname() or "joeos-vps",
         "region": "Private local fabric",
-        "role": "Ryzen AI Max+ 395 · Lemonade",
+        "role": "AMD EPYC · Lemonade",
         "ip": "Loopback inference",
         "status": "healthy" if online else "degraded",
         "temp": round(_temperature_celsius()),
@@ -1719,7 +1719,7 @@ async def _chat_with_lemonade(
     if not runtime.get("online"):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Lemonade Server is offline. Start Lemonade on the Halo, then retry.",
+            detail="Lemonade Server is offline. Start Lemonade on the VPS, then retry.",
         )
     model = runtime.get("model")
     if not model:
@@ -1729,7 +1729,7 @@ async def _chat_with_lemonade(
         )
     active_section = str(context.get("active_section") or "dashboard")[:40]
     system_prompt = (
-        "You are JoeOS, a private local command-center copilot running on an AMD Ryzen AI Max+ 395 Halo. "
+        "You are JoeOS, a private local command-center copilot running on the JoeOS local VPS. "
         "Be concise, practical, and honest. The current UI section is %s. "
         "You may analyze information and suggest steps, but do not claim that you executed shell commands, "
         "changed files, deployed code, or controlled hardware. Browser chat is read-only unless a separate "

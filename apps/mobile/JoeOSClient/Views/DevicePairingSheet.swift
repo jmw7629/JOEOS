@@ -53,7 +53,7 @@ struct DevicePairingSheet: View {
             }
             Button("Keep for Safe Retry", role: .cancel) {}
         } message: {
-            Text("The Halo may already have completed this device record. Discarding only removes this iPhone's retry journal; inspect or revoke the device from the local JoeOS console if needed.")
+            Text("The VPS may already have completed this device record. Discarding only removes this iPhone's retry journal; inspect or revoke the device from the local JoeOS console if needed.")
         }
         .onDisappear {
             clearManualCode()
@@ -152,11 +152,11 @@ struct DevicePairingSheet: View {
     private var codeEntry: some View {
         PairingGlassPanel {
             VStack(alignment: .leading, spacing: 14) {
-                Label("Paste the one-use Halo code", systemImage: "key.viewfinder")
+                Label("Paste the one-use VPS code", systemImage: "key.viewfinder")
                     .font(.headline)
 
                 VStack(alignment: .leading, spacing: 7) {
-                    instruction(number: "1", text: "On the Halo, run the local JoeOS iPhone pairing tool.")
+                    instruction(number: "1", text: "On the VPS, run the local JoeOS iPhone pairing tool.")
                     instruction(number: "2", text: "Paste the full JOEOS1 code here while its five-minute window is open.")
                 }
 
@@ -330,7 +330,7 @@ struct DevicePairingSheet: View {
                             .foregroundStyle(Color.joeOSWarning)
                     }
 
-                    Text("This is a locally stored, server-validated key receipt. JoeOS does not yet provide an authenticated session or a live revocation check in the app. Manage revocation from the Halo's local console.")
+                    Text("This is a locally stored, server-validated key receipt. JoeOS does not yet provide an authenticated session or a live revocation check in the app. Manage revocation from the VPS's local console.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

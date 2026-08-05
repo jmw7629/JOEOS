@@ -34,8 +34,8 @@ JoeOS Backend ──► Local models │ cloud models │ enterprise models (ser
 `ConnectionManager` (JoeOSCore) owns the saved profiles and the selection. The
 default development profile is `JoeOS VPS` at `100.98.25.26` (Tailscale), HTTP
 during development, with the port discovered from the backend rather than
-hard-coded. The old Halo address is retained only as an explicit, editable
-profile. Every request URL is derived from the validated profile's
+hard-coded. It is the only retained development profile. Every request URL is
+derived from the validated profile's
 `(transport, host, port)`, so an HTTPS migration is a profile edit with zero
 source changes.
 

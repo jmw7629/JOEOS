@@ -2,7 +2,7 @@
   "id": "/",
   "name": "JoeOS Command Center",
   "short_name": "JoeOS",
-  "description": "Private mobile command center for a Ryzen AI Max+ Halo system and Lemonade Server.",
+  "description": "Private mobile command center for a local VPS system and Lemonade Server.",
   "version": "2.0.0",
   "start_url": "/",
   "scope": "/",

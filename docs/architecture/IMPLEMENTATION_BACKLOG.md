@@ -15,7 +15,7 @@ Acceptance:
 
 - No secret value in source or generated output.
 - Existing 8 backend, 5 root frontend, and 2 Sites tests remain green.
-- The current Halo launcher, API routes, dashboard, and Lemonade-offline failure mode still work.
+- The current VPS launcher, API routes, dashboard, and Lemonade-offline failure mode still work.
 
 ## P1 — Customizable Mission Control foundation
 

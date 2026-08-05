@@ -127,12 +127,12 @@ class RealtimeServiceTests(unittest.TestCase):
             MemoryRepository([]), allowed_origins=("https://command.example.com",)
         )
 
-        self.assertTrue(service.origin_allowed(None, "halo.local"))
-        self.assertTrue(service.origin_allowed("http://halo.local:8080", "halo.local:8080"))
+        self.assertTrue(service.origin_allowed(None, "vps.local"))
+        self.assertTrue(service.origin_allowed("http://vps.local:8080", "vps.local:8080"))
         self.assertTrue(service.origin_allowed("https://command.example.com", "proxy.internal"))
-        self.assertFalse(service.origin_allowed("https://evil.example", "halo.local"))
-        self.assertFalse(service.origin_allowed("https://halo.local/path", "halo.local"))
-        self.assertFalse(service.origin_allowed("null", "halo.local"))
+        self.assertFalse(service.origin_allowed("https://evil.example", "vps.local"))
+        self.assertFalse(service.origin_allowed("https://vps.local/path", "vps.local"))
+        self.assertFalse(service.origin_allowed("null", "vps.local"))
 
     def test_payload_limit_is_enforced(self):
         service = self.make_service(

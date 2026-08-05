@@ -130,7 +130,9 @@ class RunnerDaemon:
         challenge = self._transport.request_connection(
             self._config.runner_id, self._signer.key_identifier(), self._signer.public_key()
         )
-        message = self.CONNECTION_DOMAIN + "\0" + str(challenge["challenge_id"]) + "\0" + str(challenge["nonce"])
+        message = str(challenge.get("message", ""))
+        if not message:
+            message = self.CONNECTION_DOMAIN + "\0" + str(challenge["challenge_id"]) + "\0" + str(challenge["nonce"])
         authenticated = self._transport.authenticate(
             challenge, self._signer.sign(message)
         )
