@@ -155,7 +155,7 @@ public struct DeviceEnrollmentReview: Equatable, Sendable {
     public let authenticationKeyFingerprint: String
     public let approvalKeyFingerprint: String
 
-    public var isExpired(now: Date = Date()) -> Bool {
+    public func isExpired(now: Date = Date()) -> Bool {
         expiresAt <= now
     }
 }
@@ -214,7 +214,7 @@ public struct SignedDeviceEnrollmentCompletion: Equatable, Sendable {
             "review": review.makeDocument(),
         ]
         let data = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
-        guard !data.isEmpty, data.count <= maximumResumeDocumentBytes else {
+        guard !data.isEmpty, data.count <= Self.maximumResumeDocumentBytes else {
             throw DeviceEnrollmentError.malformedCompletionDocument
         }
         return data
@@ -225,6 +225,13 @@ public struct SignedDeviceEnrollmentCompletion: Equatable, Sendable {
             throw DeviceEnrollmentError.malformedCompletionDocument
         }
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw DeviceEnrollmentError.malformedCompletionDocument
+        }
+        let allowedKeys: Set<String> = [
+            "schema_version", "idempotency_key", "challenge_id",
+            "completion_url", "request_body_base64url", "review",
+        ]
+        guard Set(object.keys) == allowedKeys else {
             throw DeviceEnrollmentError.malformedCompletionDocument
         }
         guard let schema = object["schema_version"] as? Int, schema == 1 else {
@@ -297,7 +304,15 @@ public struct SignedDeviceEnrollmentCompletion: Equatable, Sendable {
         idempotencyKey: UUID,
         challengeID: UUID
     ) -> Bool {
-        guard let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+        guard let parsed = try? JSONSerialization.jsonObject(with: body),
+              let object = parsed as? [String: Any],
+              let canonical = try? JSONSerialization.data(withJSONObject: parsed, options: [.sortedKeys]),
+              canonical == body,
+              Set(object.keys) == [
+                  "schema_version", "idempotency_key", "challenge_id",
+                  "transcript_sha256", "client_proof",
+                  "device_authentication_signature", "approval_signature",
+              ],
               object["idempotency_key"] as? String == idempotencyKey.uuidString.lowercased(),
               object["challenge_id"] as? String == challengeID.uuidString.lowercased(),
               object["schema_version"] as? Int == 1,

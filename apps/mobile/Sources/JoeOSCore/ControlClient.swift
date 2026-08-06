@@ -319,7 +319,7 @@ public struct ControlClient: Sendable {
             }
         }
         return try await backend.post(
-            Body(conversationID: conversationID, messageID: messageID),
+            body: Body(conversationID: conversationID, messageID: messageID),
             to: "/api/v1/control/agents/\(agentID.uuidString.lowercased())/runs",
             endpoint: endpoint,
             headers: Self.headers(sessionID)
@@ -329,7 +329,7 @@ public struct ControlClient: Sendable {
     public func cancelRun(runID: UUID, sessionID: UUID) async throws {
         struct Empty: Encodable, Sendable {}
         _ = try await backend.post(
-            Empty(),
+            body: Empty(),
             to: "/api/v1/control/runs/\(runID.uuidString.lowercased())/cancel",
             endpoint: endpoint,
             headers: Self.headers(sessionID)
@@ -394,7 +394,7 @@ public struct ControlClient: Sendable {
             }
         }
         return try await backend.post(
-            Body(proposalID: proposalID, approvalRequestID: approvalRequestID,
+            body: Body(proposalID: proposalID, approvalRequestID: approvalRequestID,
                  policyDecisionID: policyDecisionID, decision: decision, deviceID: deviceID),
             to: "/api/v1/control/approvals/challenge",
             endpoint: endpoint,
@@ -433,7 +433,7 @@ public struct ControlClient: Sendable {
             let proposal: BackendActionProposal
         }
         let response: Response = try await backend.post(
-            Body(proposalID: proposalID, decision: decision, reason: reason,
+            body: Body(proposalID: proposalID, decision: decision, reason: reason,
                  signature: signatureB64URL, challengeID: challengeID, deviceID: deviceID),
             to: "/api/v1/control/approvals/\(approvalRequestID.uuidString.lowercased())/decide",
             endpoint: endpoint,

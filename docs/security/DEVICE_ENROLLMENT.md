@@ -167,7 +167,7 @@ Enrollment keys and identifying columns are immutable after insertion. Revocatio
 
 Before JoeOS can expose private state or privileged actions beyond the operator-managed private boundary, it still requires:
 
-- an Xcode project/signing pipeline plus physical-device, backup, recovery, biometric-change, replacement, and revocation-freshness drills for the implemented native pairing source;
+- an Xcode project/signing pipeline plus physical-device, backup, recovery, biometric-change, replacement, and revocation-freshness drills for the implemented native pairing source (tracked in [the P3F-B checklist](DEVICE_ENROLLMENT_P3F_B.md); the P3F-A remote build, simulator test bundle, device builds, and archive are complete);
 - authenticated, short-lived sessions bound to the enrolled authentication key;
 - users, workspaces, roles, capability policy, and server-side authorization on every protected route;
 - a separate immutable approval challenge with biometric step-up and anti-replay state;

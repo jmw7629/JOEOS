@@ -1,4 +1,5 @@
 import Foundation
+import JoeOSCore
 
 /// A point-in-time diagnostics snapshot. Unmeasured values stay unknown; the
 /// client never fabricates latency, tokens, or queue depth.
@@ -159,7 +160,7 @@ public struct JoeOSIntelligenceBackendClient: IntelligenceBackendServing, Sendab
             maxTokens: 1_200
         )
         let response = try await backend.post(
-            body,
+            body: body,
             to: "/api/v1/ai/inference",
             endpoint: endpoint
         ) as InferenceResponse

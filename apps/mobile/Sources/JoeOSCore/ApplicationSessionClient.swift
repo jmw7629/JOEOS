@@ -252,7 +252,7 @@ public struct ApplicationSessionClient: Sendable {
             }
         }
         return try await backend.post(
-            Body(deviceID: deviceID, userID: userID),
+            body: Body(deviceID: deviceID, userID: userID),
             to: "/api/v1/auth/challenge",
             endpoint: endpoint
         )
@@ -279,7 +279,7 @@ public struct ApplicationSessionClient: Sendable {
             }
         }
         let response: ApplicationSessionResponse = try await backend.post(
-            Body(
+            body: Body(
                 challengeID: challenge.challengeID,
                 signature: EnrollmentCoding.base64URLEncode(signature)
             ),
@@ -303,7 +303,7 @@ public struct ApplicationSessionClient: Sendable {
             }
         }
         return try await backend.post(
-            Body(refreshID: refreshID, refreshToken: refreshToken),
+            body: Body(refreshID: refreshID, refreshToken: refreshToken),
             to: "/api/v1/auth/refresh",
             endpoint: endpoint
         )
@@ -318,7 +318,7 @@ public struct ApplicationSessionClient: Sendable {
             }
         }
         _ = try await backend.post(
-            Body(sessionID: sessionID),
+            body: Body(sessionID: sessionID),
             to: "/api/v1/auth/logout",
             endpoint: endpoint,
             headers: Self.headers(sessionID)

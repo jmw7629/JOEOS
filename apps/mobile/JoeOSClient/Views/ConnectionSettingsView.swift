@@ -253,13 +253,14 @@ struct ConnectionSettingsView: View {
     }
 
     private func duplicateMessage(for profile: ConnectionProfile) -> String? {
-        let matches = profiles.contains { candidate in
-            candidate.id != profile.id &&
-            candidate.transport == profile.transport &&
-            candidate.host == profile.host &&
-            candidate.effectivePort == profile.effectivePort
+        for candidate in profiles where candidate.id != profile.id {
+            if candidate.transport == profile.transport,
+               candidate.host == profile.host,
+               (candidate.port ?? candidate.transport.defaultPort) == (profile.port ?? profile.transport.defaultPort) {
+                return "A connection to \(profile.host) already exists."
+            }
         }
-        return matches ? "A connection to \(profile.host) already exists." : nil
+        return nil
     }
 
     private func addProfile() {

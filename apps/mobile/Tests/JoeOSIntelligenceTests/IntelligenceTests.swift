@@ -63,6 +63,11 @@ private struct FakeCouncilExecutor: CouncilExecuting {
     let results: [AgentRole: String]
     let failingRole: AgentRole?
 
+    init(results: [AgentRole: String], failingRole: AgentRole? = nil) {
+        self.results = results
+        self.failingRole = failingRole
+    }
+
     func execute(role: AgentRole, objective: String) async throws -> String {
         if role == failingRole { throw URLError(.cannotConnectToHost) }
         return results[role] ?? "\(role.rawValue) review complete"
@@ -90,11 +95,11 @@ final class AgentLifecycleTests: XCTestCase {
         let agent = Agent(identity: "arch", role: .architect, capabilities: [.reasoning, .planning])
         fabric.register(agent)
 
-        let run = fabric.startRun(agentID: agent.id, objective: "Design the service boundary")
+        let run = await fabric.startRun(agentID: agent.id, objective: "Design the service boundary")
         XCTAssertEqual(run.status, .running)
         XCTAssertEqual(fabric.agent(id: agent.id)?.status, .running)
 
-        fabric.finishRun(runID: run.id, agentID: agent.id, result: "Boundary designed")
+        await fabric.finishRun(runID: run.id, agentID: agent.id, result: "Boundary designed")
         XCTAssertEqual(fabric.agent(id: agent.id)?.runHistory.first?.status, .completed)
 
         let restored = AgentFabric(runStore: runStore)
@@ -103,16 +108,16 @@ final class AgentLifecycleTests: XCTestCase {
         XCTAssertEqual(restored.agent(id: agent.id)?.runHistory.first?.result, "Boundary designed")
     }
 
-    func testCancelRunAndFailure() {
+    func testCancelRunAndFailure() async {
         let fabric = AgentFabric()
         let agent = Agent(identity: "dev", role: .developer, capabilities: [.coding])
         fabric.register(agent)
-        let run = fabric.startRun(agentID: agent.id, objective: "Implement")
-        fabric.cancelRun(runID: run.id, agentID: agent.id)
+        let run = await fabric.startRun(agentID: agent.id, objective: "Implement")
+        await fabric.cancelRun(runID: run.id, agentID: agent.id)
         XCTAssertEqual(fabric.agent(id: agent.id)?.runHistory.first?.status, .cancelled)
 
-        let other = fabric.startRun(agentID: agent.id, objective: "Fail")
-        fabric.failRun(runID: other.id, agentID: agent.id, error: "boom")
+        let other = await fabric.startRun(agentID: agent.id, objective: "Fail")
+        await fabric.failRun(runID: other.id, agentID: agent.id, error: "boom")
         XCTAssertEqual(fabric.agent(id: agent.id)?.runHistory.first?.error, "boom")
     }
 }
@@ -230,7 +235,7 @@ final class RoutingTests: XCTestCase {
         XCTAssertTrue(decision.useStreaming)
     }
 
-    func testCloudRoutingIsBlockedByLocalOnly() {
+    func testCloudRoutingIsBlockedByLocalOnly() throws {
         let (providers, models) = registries
         let router = ExecutionRouter(providers: providers, models: models)
         let localOnly = router.route(request: "x", useCase: .reasoning, localOnly: true)
@@ -250,11 +255,27 @@ final class RoutingTests: XCTestCase {
         )
         var providers2 = providers
         providers2.register(notApproved)
-        let router2 = ExecutionRouter(providers: providers2, models: models)
-        guard case .failure(.noSuitableModel) = router2.route(request: "x", useCase: .reasoning, localOnly: false) else {
-            XCTFail("Unapproved cloud model must not be routable")
-            return
-        }
+        var models2 = models
+        models2.register(
+            ModelRecord(
+                provider: "claude",
+                modelID: "claude-x",
+                displayName: "Claude X",
+                capabilities: [.reasoning],
+                contextLength: 200_000,
+                averageLatencyMs: 50,
+                estimatedCostPer1KTokens: 0,
+                streamingSupported: true,
+                offlineSupported: false,
+                availability: true,
+                safetyRating: 4,
+                preferredUseCases: [.reasoning]
+            )
+        )
+        let router2 = ExecutionRouter(providers: providers2, models: models2)
+        let decision = try router2.route(request: "x", useCase: .reasoning, localOnly: false).get()
+        XCTAssertNotEqual(decision.providerID, "claude", "Unapproved cloud model must not be routable")
+        XCTAssertEqual(decision.providerID, "lemonade")
     }
 
     func testNoAvailableProviderReportsHonestFailure() {
@@ -306,16 +327,50 @@ final class ConversationTests: XCTestCase {
 
     private func engine(executor: FakeConversationExecutor) -> ConversationEngine {
         let store = InMemoryConversationStore()
-        let providers = ProviderRegistry()
-        let models = ModelRegistry()
-        let router = ExecutionRouter(providers: providers, models: models)
-        return ConversationEngine(store: store, executor: executor, router: router)
+        return ConversationEngine(store: store, executor: executor, router: Self.router())
+    }
+
+    /// A router with one available local provider/model so routing can succeed.
+    private static func router() -> ExecutionRouter {
+        var providers = ProviderRegistry()
+        providers.register(
+            ProviderRecord(
+                providerID: "test-local",
+                name: "Test Local",
+                kind: .local,
+                available: true,
+                reason: "",
+                model: "test-model",
+                embeddingModel: nil,
+                baseURL: "loopback",
+                privacyClass: "restricted",
+                cloudApproved: false
+            )
+        )
+        var models = ModelRegistry()
+        models.register(
+            ModelRecord(
+                provider: "test-local",
+                modelID: "test-model",
+                displayName: "Test Model",
+                capabilities: [.reasoning],
+                contextLength: 8_192,
+                averageLatencyMs: 10,
+                estimatedCostPer1KTokens: 0,
+                streamingSupported: true,
+                offlineSupported: true,
+                availability: true,
+                safetyRating: 5,
+                preferredUseCases: [.general]
+            )
+        )
+        return ExecutionRouter(providers: providers, models: models)
     }
 
     func testConversationContinuityAcrossEngineInstances() async throws {
         let executor = FakeConversationExecutor(result: ExecutionResult(reply: "hello!"))
         let store = InMemoryConversationStore()
-        let router = ExecutionRouter(providers: ProviderRegistry(), models: ModelRegistry())
+        let router = Self.router()
 
         let first = ConversationEngine(store: store, executor: executor, router: router)
         let conversation = first.createConversation(title: "Persistent")
@@ -331,17 +386,15 @@ final class ConversationTests: XCTestCase {
     func testStreamingDeliversPartialsAndFinalMessage() async throws {
         let executor = FakeConversationExecutor(
             partials: ["Hel", "lo ", "world"],
-            result: ExecutionResult(reply: "Hello world", providerID: "lemonade", modelID: "llama3", tokenCount: 7)
+            result: ExecutionResult(reply: "Hello world", providerID: "test-local", modelID: "test-model", tokenCount: 7)
         )
         let store = InMemoryConversationStore()
-        let providers = ProviderRegistry()
-        let models = ModelRegistry()
-        let router = ExecutionRouter(providers: providers, models: models)
+        let router = Self.router()
         let engine = ConversationEngine(store: store, executor: executor, router: router)
         let conversation = engine.createConversation(title: "Stream")
         let assistant = try await engine.submit("Say hello", in: conversation.id)
         XCTAssertEqual(assistant.content, "Hello world")
-        XCTAssertEqual(assistant.providerID, "lemonade")
+        XCTAssertEqual(assistant.providerID, "test-local")
         let partials = await executor.partialCount()
         XCTAssertGreaterThan(partials, 0)
     }
@@ -353,7 +406,7 @@ final class ConversationTests: XCTestCase {
             cancellable: true
         )
         let store = InMemoryConversationStore()
-        let router = ExecutionRouter(providers: ProviderRegistry(), models: ModelRegistry())
+        let router = Self.router()
         let engine = ConversationEngine(store: store, executor: executor, router: router)
         let conversation = engine.createConversation(title: "Cancel")
         let submitTask = Task { try await engine.submit("go", in: conversation.id) }
@@ -365,18 +418,18 @@ final class ConversationTests: XCTestCase {
 
     func testRecoveryAndRetryAfterFailure() async throws {
         let executor = FakeConversationExecutor(
-            throwError: URLError(.cannotConnectToHost),
-            result: ExecutionResult(reply: "recovered")
+            result: ExecutionResult(reply: "recovered"),
+            throwError: URLError(.cannotConnectToHost)
         )
         let store = InMemoryConversationStore()
-        let router = ExecutionRouter(providers: ProviderRegistry(), models: ModelRegistry())
+        let router = Self.router()
         let engine = ConversationEngine(store: store, executor: executor, router: router)
         let conversation = engine.createConversation(title: "Retry")
         _ = try await engine.submit("ping", in: conversation.id)
         XCTAssertTrue(
             engine.conversations.first?.messages.last?.content.contains("could not complete") ?? false
         )
-        executor.clearError()
+        await executor.clearError()
         _ = try await engine.retry(in: conversation.id)
         XCTAssertEqual(engine.conversations.first?.messages.last?.content, "recovered")
     }
@@ -420,12 +473,13 @@ final class ApprovalFlowTests: XCTestCase {
     func testApprovalIsInvalidatedWhenActionChanges() async {
         let gate = ApprovalGate()
         let request = await gate.request(action: .gitPush, description: "Push the approved commit")
-        XCTAssertTrue(await gate.approve(id: request.id))
-        XCTAssertEqual(await gate.verify(id: request.id, action: .gitPush, description: "Push the approved commit"),
-                       .allowed)
+        let approved = await gate.approve(id: request.id)
+        XCTAssertTrue(approved)
+        let verdict = await gate.verify(id: request.id, action: .gitPush, description: "Push the approved commit")
+        XCTAssertEqual(verdict, .allowed)
 
-        let verdict = await gate.verify(id: request.id, action: .gitPush, description: "Push a DIFFERENT commit")
-        XCTAssertEqual(verdict, .denied(reason: "The approved action changed and is now invalidated."))
+        let changed = await gate.verify(id: request.id, action: .gitPush, description: "Push a DIFFERENT commit")
+        XCTAssertEqual(changed, .denied(reason: "The approved action changed and is now invalidated."))
         let status = await gate.requests[request.id]?.status
         XCTAssertEqual(status, .invalidated)
     }
@@ -433,7 +487,8 @@ final class ApprovalFlowTests: XCTestCase {
     func testDenyBlocksExecution() async {
         let gate = ApprovalGate()
         let request = await gate.request(action: .deploy, description: "Deploy release")
-        XCTAssertTrue(await gate.deny(id: request.id))
+        let denied = await gate.deny(id: request.id)
+        XCTAssertTrue(denied)
         let verdict = await gate.verify(id: request.id, action: .deploy, description: "Deploy release")
         guard case .denied = verdict else {
             XCTFail("Denied approval must block")
@@ -460,6 +515,7 @@ final class ExecutiveCouncilTests: XCTestCase {
     }
 }
 
+@MainActor
 final class ToolBrokerTests: XCTestCase {
     func testToolBrokerEnforcement() {
         let broker = AgentFabric()
@@ -479,7 +535,8 @@ final class ToolBrokerTests: XCTestCase {
         let verdict = fabric.requestAction(.gitPush, agent: agent)
         XCTAssertEqual(verdict, .requiresApproval)
         let request = await gate.request(action: .gitPush, description: "push approved")
-        XCTAssertTrue(await gate.approve(id: request.id))
+        let approved = await gate.approve(id: request.id)
+        XCTAssertTrue(approved)
     }
 }
 

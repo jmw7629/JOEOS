@@ -91,7 +91,7 @@ public struct EndpointOrigin: Equatable, Hashable, Sendable {
     public var url: URL? {
         var components = URLComponents()
         components.scheme = scheme
-        components.host = host
+        components.host = renderedHost
         if let port {
             components.port = port
         }
@@ -146,9 +146,10 @@ public enum EndpointPolicy {
         guard let rawHost = components.host?.lowercased(), !rawHost.isEmpty else {
             return .failure(.invalidHost(components.host ?? "none"))
         }
-        guard !rawHost.contains("*") else { return .failure(.wildcardHost) }
-        guard isSyntacticallyValidHost(rawHost) else {
-            return .failure(.invalidHost(rawHost))
+        let host = normalizedHost(rawHost)
+        guard !host.contains("*") else { return .failure(.wildcardHost) }
+        guard isSyntacticallyValidHost(host) else {
+            return .failure(.invalidHost(host))
         }
         if let port = components.port {
             guard (1...65_535).contains(port) else {
@@ -165,8 +166,8 @@ public enum EndpointPolicy {
             return .failure(.fragmentNotAllowed)
         }
 
-        let origin = EndpointOrigin(scheme: rawScheme, host: rawHost, port: components.port)
-        if rawScheme == "http" && !isPrivateHTTPHost(rawHost) {
+        let origin = EndpointOrigin(scheme: rawScheme, host: host, port: components.port)
+        if rawScheme == "http" && !isPrivateHTTPHost(host) {
             return .failure(.insecurePublicHost)
         }
 
@@ -206,6 +207,16 @@ public enum EndpointPolicy {
     }
 
     // MARK: - Host classification
+
+    /// Strips surrounding brackets from a host. Foundation keeps the brackets
+    /// on `URLComponents.host` for IPv6 literals, but `URL.host` and our own
+    /// rendering do not.
+    private static func normalizedHost(_ host: String) -> String {
+        if host.hasPrefix("[") && host.hasSuffix("]"), host.count > 2 {
+            return String(host.dropFirst().dropLast())
+        }
+        return host
+    }
 
     private static func isSyntacticallyValidHost(_ host: String) -> Bool {
         if host.contains(":") {

@@ -69,7 +69,7 @@ final class EndpointPolicyTests: XCTestCase {
         XCTAssertEqual(failure("https://user:password@vps.example.com"), .credentialsNotAllowed)
         XCTAssertEqual(failure("https://vps.example.com?token=secret"), .queryNotAllowed)
         XCTAssertEqual(failure("https://vps.example.com#fragment"), .fragmentNotAllowed)
-        XCTAssertEqual(failure("file:///tmp/joeos"), .unsupportedScheme)
+        XCTAssertEqual(failure("file:///tmp/joeos"), .unsupportedScheme("file"))
         XCTAssertEqual(failure("   "), .empty)
     }
 

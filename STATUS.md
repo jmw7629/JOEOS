@@ -72,7 +72,7 @@ Not yet delivered:
 - read-only diagnostic job execution (dispatch is approval-gated; blocked pending P3F native approval validation; no bypass, no fixture keys)
 - real GitHub credential validation and push from the VPS (approval-gated; pending P3F)
 - real JoeOS deployment on the VPS (approval-gated; pending P3F)
-- macOS runner, Swift compilation on this VPS, Xcode, physical iPhone/Face ID/Secure Enclave validation
+- macOS runner, physical iPhone/Face ID/Secure Enclave signing and device drills (native iOS build/simulator/tests/archive validated remotely; see `docs/security/DEVICE_ENROLLMENT_P3F_B.md`)
 - unrestricted shell, root execution, arbitrary remote control, payment, unrestricted email, physical-device execution
 - enterprise external secret manager, VM-grade executor isolation, multi-runner production fleet
 - PostgreSQL/pgvector/Redis migration
@@ -85,7 +85,7 @@ Not yet delivered:
 - Plugin marketplace, public signing-key distribution, OS-level sandboxing, webhooks, and remote connectors (architecture documented; not implemented).
 - Real external provider adapters (email/chat), mobile push, smart-glasses delivery, and read receipts (architecture documented; not implemented).
 - Real wearable manufacturer adapters (Bluetooth/USB/gaze/gesture), OS-level device pairing, and real camera/microphone capture (architecture documented; only an isolated simulator produces devices).
-- Native iOS build/sign/simulator (requires Xcode, not installed on this machine), production APNs/FCM push, background-execution guarantees, biometric security, universal links, and App Store distribution (contracts documented; not claimed as implemented).
+- Native iOS simulator build, Xcode test bundle (73/73), device `arm64` Debug/Release builds, and archive validated remotely on a Mac over Tailscale; physical-device signing, install, biometric/backup/recovery/revocation drills, and App Store distribution remain (tracked in `docs/security/DEVICE_ENROLLMENT_P3F_B.md`). Production APNs/FCM push, background-execution guarantees, biometric security, universal links, and App Store distribution (contracts documented; not claimed as implemented).
 - OS keychain/hardware-backed secret storage, immutable audit logs, and full OS-level sandboxing (documented limitations; AES-GCM vault, hash-chain tamper evidence, and subprocess isolation are the honest current guarantees).
 
 See `docs/architecture/PRODUCTION_READINESS.md` for the production readiness

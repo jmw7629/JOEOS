@@ -264,7 +264,7 @@ public struct RunnerClient: Sendable {
             }
         }
         return try await backend.post(
-            Body(proposalID: proposalID, idempotencyKey: idempotencyKey),
+            body: Body(proposalID: proposalID, idempotencyKey: idempotencyKey),
             to: "/api/v1/control/executions",
             endpoint: endpoint,
             headers: Self.headers(sessionID)
@@ -295,7 +295,7 @@ public struct RunnerClient: Sendable {
             let cancelled: Bool
         }
         let response: Response = try await backend.post(
-            Empty(),
+            body: Empty(),
             to: "/api/v1/control/executions/\(jobID.uuidString.lowercased())/cancel",
             endpoint: endpoint,
             headers: Self.headers(sessionID)

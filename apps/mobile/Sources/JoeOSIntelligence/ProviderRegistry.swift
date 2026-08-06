@@ -74,12 +74,15 @@ public struct ModelRegistry: Sendable {
     }
 
     /// The best available model for a capability, ranked by cost then latency.
+    /// `from` restricts candidates to models served by the given providers.
     public func best(
         for capability: ModelCapability,
+        from providerIDs: Set<String>? = nil,
         localOnly: Bool,
         requireStreaming: Bool = false
     ) -> ModelRecord? {
         availableModels(localOnly: localOnly)
+            .filter { providerIDs == nil || providerIDs!.contains($0.provider) }
             .filter { $0.canHandle(capability) }
             .filter { !requireStreaming || $0.streamingSupported }
             .sorted {

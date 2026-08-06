@@ -55,11 +55,18 @@ final class ConnectionManagerTests: XCTestCase {
     func testHostSwitchingChangesActiveProfileAndPersists() throws {
         let store = MemoryProfileStore()
         let manager = ConnectionManager(store: store)
-        var other = ConnectionProfile.defaultVPS
-        other.id = UUID()
-        other.host = "100.64.0.10"
-        other.displayName = "Second host"
-        XCTAssertEqual(manager.upsert(other), .success(()))
+        let other = ConnectionProfile(
+            id: UUID(),
+            displayName: "Second host",
+            transport: .http,
+            host: "100.64.0.10",
+            port: nil,
+            environment: .development
+        )
+        guard case .success = manager.upsert(other) else {
+            XCTFail("Upsert should succeed")
+            return
+        }
 
         XCTAssertEqual(manager.selectProfile(id: other.id), .success(other))
         XCTAssertEqual(manager.activeProfile?.host, "100.64.0.10")
@@ -72,12 +79,18 @@ final class ConnectionManagerTests: XCTestCase {
     func testPersistenceRestoresProfilesAcrossManagerInstances() throws {
         let store = MemoryProfileStore()
         let first = ConnectionManager(store: store)
-        var saved = ConnectionProfile.defaultVPS
-        saved.id = UUID()
-        saved.displayName = "Saved profile"
-        saved.host = "192.168.1.50"
-        saved.port = 8080
-        XCTAssertEqual(first.upsert(saved), .success(()))
+        let saved = ConnectionProfile(
+            id: UUID(),
+            displayName: "Saved profile",
+            transport: .http,
+            host: "192.168.1.50",
+            port: 8080,
+            environment: .development
+        )
+        guard case .success = first.upsert(saved) else {
+            XCTFail("Upsert should succeed")
+            return
+        }
         XCTAssertEqual(first.selectProfile(id: saved.id), .success(saved))
 
         let restored = ConnectionManager(store: store)
@@ -154,18 +167,26 @@ final class ConnectionManagerTests: XCTestCase {
     func testReconnectToLastSuccessfulProfile() throws {
         let store = MemoryProfileStore()
         let manager = ConnectionManager(store: store)
-        var other = ConnectionProfile.defaultVPS
-        other.id = UUID()
-        other.host = "100.64.0.20"
-        other.displayName = "Backup host"
-        XCTAssertEqual(manager.upsert(other), .success(()))
+        let other = ConnectionProfile(
+            id: UUID(),
+            displayName: "Backup host",
+            transport: .http,
+            host: "100.64.0.20",
+            port: nil,
+            environment: .development
+        )
+        guard case .success = manager.upsert(other) else {
+            XCTFail("Upsert should succeed")
+            return
+        }
         manager.recordSucceeded(other)
+        let recorded = try XCTUnwrap(manager.profiles.first { $0.id == other.id })
 
         XCTAssertEqual(manager.selectProfile(id: ConnectionProfile.defaultVPS.id),
                        .success(.defaultVPS))
         XCTAssertEqual(manager.activeProfile?.id, ConnectionProfile.defaultVPS.id)
 
-        XCTAssertEqual(manager.reconnectToLastSuccessful(), .success(other))
+        XCTAssertEqual(manager.reconnectToLastSuccessful(), .success(recorded))
         XCTAssertEqual(manager.activeProfile?.id, other.id)
     }
 
@@ -173,17 +194,24 @@ final class ConnectionManagerTests: XCTestCase {
         let store = MemoryProfileStore()
         let manager = ConnectionManager(store: store)
         manager.recordSucceeded(.defaultVPS)
-        XCTAssertEqual(manager.reconnectToLastSuccessful(), .success(.defaultVPS))
+        let recorded = try XCTUnwrap(
+            manager.profiles.first { $0.id == ConnectionProfile.defaultVPS.id }
+        )
+        XCTAssertEqual(manager.reconnectToLastSuccessful(), .success(recorded))
     }
 
     // MARK: - Session restoration
 
     func testSessionRestoresPreviouslySelectedProfile() {
         let store = MemoryProfileStore()
-        var selected = ConnectionProfile.defaultVPS
-        selected.id = UUID()
-        selected.host = "100.64.0.30"
-        selected.displayName = "Restored host"
+        let selected = ConnectionProfile(
+            id: UUID(),
+            displayName: "Restored host",
+            transport: .http,
+            host: "100.64.0.30",
+            port: nil,
+            environment: .development
+        )
         store.set(
             (try? ConnectionProfileStorage.encode([.defaultVPS, selected])) ?? "[]",
             forKey: ConnectionProfileStorage.profilesKey
@@ -200,9 +228,14 @@ final class ConnectionManagerTests: XCTestCase {
     func testDuplicateHostIsRejectedWithFriendlyError() throws {
         let store = MemoryProfileStore()
         let manager = ConnectionManager(store: store)
-        var duplicate = ConnectionProfile.defaultVPS
-        duplicate.id = UUID()
-        duplicate.displayName = "Duplicate VPS"
+        let duplicate = ConnectionProfile(
+            id: UUID(),
+            displayName: "Duplicate VPS",
+            transport: .http,
+            host: ConnectionProfile.defaultVPS.host,
+            port: nil,
+            environment: .development
+        )
         let result = manager.upsert(duplicate)
         guard case .failure(.duplicateProfile(let existing)) = result else {
             XCTFail("Expected duplicate rejection")

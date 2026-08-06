@@ -647,17 +647,17 @@ final class DeviceEnrollmentCoordinator: ObservableObject {
         }
         switch operation {
         case .journal:
-            "The signed completion could not be saved to this iPhone's Keychain, so it was not sent. Retry secure storage before completing."
+            return "The signed completion could not be saved to this iPhone's Keychain, so it was not sent. Retry secure storage before completing."
         case .discard:
-            "The signed completion remains in Keychain because it could not be deleted."
+            return "The signed completion remains in Keychain because it could not be deleted."
         case .localState:
-            "JoeOS enrollment state could not be read safely from this iPhone's Keychain."
+            return "JoeOS enrollment state could not be read safely from this iPhone's Keychain."
         case .completion:
-            "JoeOS did not validate the saved completion. The exact journal remains available for review or retry."
+            return "JoeOS did not validate the saved completion. The exact journal remains available for review or retry."
         case .confirm:
-            "Device-key confirmation did not finish. Nothing was sent."
+            return "Device-key confirmation did not finish. Nothing was sent."
         case .prepare:
-            "The pairing request could not be verified. No signed completion was created."
+            return "The pairing request could not be verified. No signed completion was created."
         }
     }
 

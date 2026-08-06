@@ -1,0 +1,11 @@
+// Copy this file to `Config/Local.xcconfig` (gitignored) and set your own
+// values. `Config/Base.xcconfig` includes it last, so anything here wins.
+//
+//   cp Config/Local.xcconfig.example Config/Local.xcconfig
+
+// Your Apple Developer team ID for automatic signing on device builds.
+// Leave empty for simulator-only builds.
+JOEOS_DEVELOPMENT_TEAM =
+
+// A unique bundle identifier for the app target.
+// JOEOS_BUNDLE_IDENTIFIER = com.example.joeosclient

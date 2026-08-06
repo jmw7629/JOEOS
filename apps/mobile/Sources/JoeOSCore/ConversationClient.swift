@@ -184,7 +184,7 @@ public struct ConversationClient: Sendable {
             let title: String
         }
         return try await backend.post(
-            Body(title: title),
+            body: Body(title: title),
             to: "/api/v1/conversations",
             endpoint: endpoint,
             headers: Self.headers(sessionID)
@@ -220,7 +220,7 @@ public struct ConversationClient: Sendable {
             }
         }
         return try await backend.post(
-            Body(content: content, idempotencyKey: idempotencyKey?.uuidString.lowercased()),
+            body: Body(content: content, idempotencyKey: idempotencyKey?.uuidString.lowercased()),
             to: "/api/v1/conversations/\(conversationID.uuidString.lowercased())/messages",
             endpoint: endpoint,
             headers: Self.headers(sessionID)
@@ -236,7 +236,7 @@ public struct ConversationClient: Sendable {
             }
         }
         return try await backend.post(
-            Body(parentRunID: parentRunID?.uuidString.lowercased()),
+            body: Body(parentRunID: parentRunID?.uuidString.lowercased()),
             to: "/api/v1/conversations/\(conversationID.uuidString.lowercased())/retry",
             endpoint: endpoint,
             headers: Self.headers(sessionID)
@@ -248,7 +248,7 @@ public struct ConversationClient: Sendable {
             let title: String
         }
         return try await backend.patch(
-            Body(title: title),
+            body: Body(title: title),
             to: "/api/v1/conversations/\(conversationID.uuidString.lowercased())",
             endpoint: endpoint,
             headers: Self.headers(sessionID)
@@ -258,7 +258,7 @@ public struct ConversationClient: Sendable {
     public func archive(conversationID: UUID, sessionID: UUID) async throws -> BackendConversation {
         struct Empty: Encodable, Sendable {}
         return try await backend.post(
-            Empty(),
+            body: Empty(),
             to: "/api/v1/conversations/\(conversationID.uuidString.lowercased())/archive",
             endpoint: endpoint,
             headers: Self.headers(sessionID)
@@ -278,7 +278,7 @@ public struct ConversationClient: Sendable {
     public func cancel(runID: UUID, in conversationID: UUID, sessionID: UUID) async throws {
         struct Empty: Encodable, Sendable {}
         _ = try await backend.post(
-            Empty(),
+            body: Empty(),
             to: "/api/v1/conversations/\(conversationID.uuidString.lowercased())/runs/\(runID.uuidString.lowercased())/cancel",
             endpoint: endpoint,
             headers: Self.headers(sessionID)
@@ -461,8 +461,31 @@ public struct ConversationClient: Sendable {
             runID: doc.run.flatMap(UUID.init(uuidString:)),
             timestamp: doc.ts ?? 0,
             trace: doc.trace ?? "",
-            payload: object
+            payload: sendableDictionary(object)
         )
+    }
+
+    /// Converts the raw JSON document to a `Sendable` dictionary. Every value
+    /// produced by `JSONSerialization` is JSON-safe, so this mapping never
+    /// loses data and never forwards an arbitrary non-`Sendable` value.
+    private static func sendableDictionary(_ object: [String: Any]) -> [String: Sendable] {
+        var result: [String: Sendable] = [:]
+        for (key, value) in object {
+            result[key] = sendableValue(value)
+        }
+        return result
+    }
+
+    private static func sendableValue(_ value: Any) -> Sendable {
+        switch value {
+        case let string as String: return string
+        case let bool as Bool: return bool
+        case let number as NSNumber: return number
+        case let array as [Any]: return array.map { sendableValue($0) }
+        case let dictionary as [String: Any]: return sendableDictionary(dictionary)
+        case is NSNull: return "null"
+        default: return String(describing: value)
+        }
     }
 
     public static func headers(_ sessionID: UUID) -> [String: String] {

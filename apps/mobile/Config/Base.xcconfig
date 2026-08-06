@@ -1,0 +1,18 @@
+// JoeOSClient base build configuration.
+//
+// Settings here can be overridden per developer by a local,
+// uncommitted `Config/Local.xcconfig` (see Local.xcconfig.example).
+// Order matters: defaults are declared first and `Local.xcconfig` is
+// included last so its assignments win.
+
+PRODUCT_NAME = JoeOSClient
+MARKETING_VERSION = 1.0
+CURRENT_PROJECT_VERSION = 1
+
+JOEOS_BUNDLE_IDENTIFIER = com.joeos.client
+JOEOS_DEVELOPMENT_TEAM =
+
+PRODUCT_BUNDLE_IDENTIFIER = $(JOEOS_BUNDLE_IDENTIFIER)
+DEVELOPMENT_TEAM = $(JOEOS_DEVELOPMENT_TEAM)
+
+#include? "Local.xcconfig"

@@ -237,7 +237,7 @@ struct CommandCenterView: View {
         return DeviceEnrollmentContext(
             contract: contract,
             endpoint: endpoint,
-            profileName: activeProfile.name
+            profileName: activeProfile.displayName
         )
     }
 
@@ -333,63 +333,63 @@ private struct BootstrapPostureRow: View {
     private var detail: String {
         switch state {
         case .idle:
-            "The web command center can load before discovery completes."
+            return "The web command center can load before discovery completes."
         case .checking:
-            "The web command center is loading independently; no trust is granted while this check runs."
+            return "The web command center is loading independently; no trust is granted while this check runs."
         case .validated(let contract):
             if !contract.supportsLocalConsolePairing || contract.hasApplicationAuthentication || contract.hasRoleBasedAccess || contract.hasPrivilegedActions {
                 return "Unexpected privileged posture reported; native controls remain disabled."
             }
             return "Local-console pairing is supported, but this iPhone is not enrolled. App authentication, roles, and privileged approvals are unavailable; the server UUID is informational only."
         case .legacyServer:
-            "This may be an older JoeOS server. The web command center remains available, but native identity and security posture are unverified."
+            return "This may be an older JoeOS server. The web command center remains available, but native identity and security posture are unverified."
         case .unavailable:
-            "The web command center remains available. No enrollment, authentication, or authorization is inferred."
+            return "The web command center remains available. No enrollment, authentication, or authorization is inferred."
         case .rejected:
-            "The response did not match the strict same-origin JoeOS contract. Web access is unaffected; native trust and privileged controls remain disabled."
+            return "The response did not match the strict same-origin JoeOS contract. Web access is unaffected; native trust and privileged controls remain disabled."
         }
     }
 
     private var badge: String? {
         switch state {
         case .validated:
-            "CONTRACT VALIDATED"
+            return "CONTRACT VALIDATED"
         case .legacyServer:
-            "WEB ONLY"
+            return "WEB ONLY"
         case .rejected:
-            "NOT VALIDATED"
+            return "NOT VALIDATED"
         default:
-            nil
+            return nil
         }
     }
 
     private var iconName: String {
         switch state {
         case .idle:
-            "shield"
+            return "shield"
         case .checking:
-            "hourglass"
+            return "hourglass"
         case .validated:
-            "checkmark.shield.fill"
+            return "checkmark.shield.fill"
         case .legacyServer:
-            "clock.badge.questionmark"
+            return "clock.badge.questionmark"
         case .unavailable:
-            "wifi.exclamationmark"
+            return "wifi.exclamationmark"
         case .rejected:
-            "xmark.shield.fill"
+            return "xmark.shield.fill"
         }
     }
 
     private var tint: Color {
         switch state {
         case .validated:
-            .joeOSGreen
+            return .joeOSGreen
         case .rejected:
-            .joeOSError
+            return .joeOSError
         case .legacyServer, .unavailable:
-            .joeOSWarning
+            return .joeOSWarning
         default:
-            .joeOSCyan
+            return .joeOSCyan
         }
     }
 }

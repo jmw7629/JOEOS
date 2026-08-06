@@ -194,7 +194,7 @@ public final class AgentFabric: ObservableObject {
     }
 
     @discardableResult
-    public func startRun(agentID: UUID, objective: String) -> AgentRun {
+    public func startRun(agentID: UUID, objective: String) async -> AgentRun {
         let run = AgentRun(objective: objective, status: .running)
         update(agentID: agentID) { agent in
             var updated = agent
@@ -202,12 +202,12 @@ public final class AgentFabric: ObservableObject {
             updated.runHistory.insert(run, at: 0)
             return updated
         }
-        persist(run, agentID: agentID)
+        await persist(run, agentID: agentID)
         return run
     }
 
-    public func finishRun(runID: UUID, agentID: UUID, result: String) {
-        mutateRun(runID: runID, agentID: agentID) { run in
+    public func finishRun(runID: UUID, agentID: UUID, result: String) async {
+        await mutateRun(runID: runID, agentID: agentID) { run in
             var updated = run
             updated.status = .completed
             updated.finishedAt = Date()
@@ -216,8 +216,8 @@ public final class AgentFabric: ObservableObject {
         }
     }
 
-    public func failRun(runID: UUID, agentID: UUID, error: String) {
-        mutateRun(runID: runID, agentID: agentID) { run in
+    public func failRun(runID: UUID, agentID: UUID, error: String) async {
+        await mutateRun(runID: runID, agentID: agentID) { run in
             var updated = run
             updated.status = .failed
             updated.finishedAt = Date()
@@ -226,8 +226,8 @@ public final class AgentFabric: ObservableObject {
         }
     }
 
-    public func cancelRun(runID: UUID, agentID: UUID) {
-        mutateRun(runID: runID, agentID: agentID) { run in
+    public func cancelRun(runID: UUID, agentID: UUID) async {
+        await mutateRun(runID: runID, agentID: agentID) { run in
             var updated = run
             updated.status = .cancelled
             updated.finishedAt = Date()
@@ -266,25 +266,22 @@ public final class AgentFabric: ObservableObject {
         agents[index] = transform(agents[index])
     }
 
-    private func mutateRun(runID: UUID, agentID: UUID, transform: (AgentRun) -> AgentRun) {
-        update(agentID: agentID) { agent in
-            var updated = agent
-            if let index = updated.runHistory.firstIndex(where: { $0.id == runID }) {
-                let mutated = transform(updated.runHistory[index])
-                updated.runHistory[index] = mutated
-                if mutated.status == .completed || mutated.status == .failed || mutated.status == .cancelled {
-                    updated.status = .idle
-                }
-                persist(mutated, agentID: agentID)
-            }
-            return updated
+    private func mutateRun(runID: UUID, agentID: UUID, transform: (AgentRun) -> AgentRun) async {
+        guard let index = agents.firstIndex(where: { $0.id == agentID }),
+              let runIndex = agents[index].runHistory.firstIndex(where: { $0.id == runID })
+        else {
+            return
         }
+        let mutated = transform(agents[index].runHistory[runIndex])
+        agents[index].runHistory[runIndex] = mutated
+        if mutated.status == .completed || mutated.status == .failed || mutated.status == .cancelled {
+            agents[index].status = .idle
+        }
+        try? await runStore.saveRun(mutated, agentID: agentID)
     }
 
-    private func persist(_ run: AgentRun, agentID: UUID) {
-        Task { [runStore] in
-            try? await runStore.saveRun(run, agentID: agentID)
-        }
+    private func persist(_ run: AgentRun, agentID: UUID) async {
+        try? await runStore.saveRun(run, agentID: agentID)
     }
 }
 

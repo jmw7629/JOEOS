@@ -18,7 +18,7 @@ JoeOS is a local-first executive command center for the local VPS, iPhone, and M
 
 Start the current local release with `start_joeos.sh` on the VPS or `start_joeos.command` on macOS. For the recommended private HTTPS iPhone/PWA route, use `start_joeos_secure.sh` or double-click `start_joeos_secure.command`. See `DEPLOYMENT.md` for details.
 
-The modular native iPhone source now runs the reviewed pairing ceremony with server-scoped Secure Enclave keys, Face ID protection for the approval-key signature, and ThisDeviceOnly Keychain recovery for an exact signed retry. A full Xcode build, signing setup, and physical-device security drill are still required before distribution. Pairing grants no application session, role, approval, API authorization, or execution permission. See [Device Enrollment Security Protocol](docs/security/DEVICE_ENROLLMENT.md) for the exact boundary.
+The modular native iPhone source now runs the reviewed pairing ceremony with server-scoped Secure Enclave keys, Face ID protection for the approval-key signature, and ThisDeviceOnly Keychain recovery for an exact signed retry. The committed Xcode project builds for the simulator and `arm64` device, the 73-test bundle passes under Xcode, and an archive succeeds; signing setup and a physical-device security drill remain before distribution (tracked in [DEVICE_ENROLLMENT_P3F_B.md](docs/security/DEVICE_ENROLLMENT_P3F_B.md)). Pairing grants no application session, role, approval, API authorization, or execution permission. See [Device Enrollment Security Protocol](docs/security/DEVICE_ENROLLMENT.md) for the exact boundary.
 
 ## Architecture program
 

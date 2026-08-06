@@ -7,7 +7,7 @@ public enum ProviderKind: String, Codable, Sendable {
     case cloud
 }
 
-public enum ModelCapability: String, Codable, CaseIterable, Sendable {
+public enum ModelCapability: String, Codable, CaseIterable, Sendable, Comparable {
     case vision
     case reasoning
     case coding
@@ -16,6 +16,10 @@ public enum ModelCapability: String, Codable, CaseIterable, Sendable {
     case toolUse = "tool_use"
     case streaming
     case offline
+
+    public static func < (lhs: ModelCapability, rhs: ModelCapability) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
 }
 
 public enum ModelUseCase: String, Codable, CaseIterable, Sendable {

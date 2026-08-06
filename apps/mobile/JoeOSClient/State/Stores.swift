@@ -12,7 +12,7 @@ public protocol CachePersisting: Sendable {
     func clearAll()
 }
 
-public actor InMemoryCacheStore: CachePersisting {
+public actor InMemoryCacheStore: @preconcurrency CachePersisting {
     private var values: [String: Data] = [:]
     public init() {}
     public func data(forKey key: String) -> Data? { values[key] }

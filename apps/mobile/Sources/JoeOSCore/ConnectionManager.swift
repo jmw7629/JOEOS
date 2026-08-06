@@ -108,12 +108,7 @@ public final class ConnectionManager: ObservableObject {
             lastError = .validationFailed(validationError)
             return .failure(.validationFailed(validationError))
         }
-        if let duplicate = profiles.first(where: { candidate in
-            candidate.id != profile.id &&
-            candidate.transport == profile.transport &&
-            candidate.host == profile.host &&
-            candidate.effectivePort == profile.effectivePort
-        }) {
+        if let duplicate = Self.duplicate(of: profile, in: profiles) {
             lastError = .duplicateProfile(duplicate)
             return .failure(.duplicateProfile(duplicate))
         }
@@ -167,6 +162,24 @@ public final class ConnectionManager: ObservableObject {
     public func save() throws {
         let payload = try ConnectionProfileStorage.encode(profiles)
         store.set(payload, forKey: ConnectionProfileStorage.profilesKey)
+    }
+
+    /// A profile that duplicates an existing entry's transport/host/port,
+    /// excluding the candidate itself.
+    private static func duplicate(
+        of profile: ConnectionProfile,
+        in existing: [ConnectionProfile]
+    ) -> ConnectionProfile? {
+        let targetPort = profile.port ?? profile.transport.defaultPort
+        for candidate in existing {
+            if candidate.id != profile.id,
+               candidate.transport == profile.transport,
+               candidate.host == profile.host,
+               candidate.port ?? candidate.transport.defaultPort == targetPort {
+                return candidate
+            }
+        }
+        return nil
     }
 
     // MARK: - Validation

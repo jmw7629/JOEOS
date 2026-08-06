@@ -202,8 +202,10 @@ public struct ConnectionProfile: Identifiable, Equatable, Sendable {
 // MARK: - Persistence
 
 /// Abstraction over profile preference storage so the manager is testable
-/// without touching `UserDefaults`.
-public protocol ProfilePersisting: Sendable {
+/// without touching `UserDefaults`. The owning manager is `@MainActor`, so the
+/// protocol does not require `Sendable`; `UserDefaults` itself is not
+/// `Sendable`-conforming.
+public protocol ProfilePersisting {
     func string(forKey key: String) -> String?
     func set(_ value: String, forKey key: String)
 }

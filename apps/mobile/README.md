@@ -50,43 +50,55 @@ JoeOSClient/Web/                      WKWebView and navigation delegates
 JoeOSClient/Resources/                Info.plist and asset catalog
 ```
 
-## Create the Xcode project
+## Xcode project (committed)
 
-Full Xcode is not installed on this machine, so the `.xcodeproj`, signing assets, simulator build, and device archive cannot be generated or verified here. The command-line Swift compiler is available and is used for package tests and parser checks.
+A complete Xcode project is committed at `apps/mobile/Xcode/JoeOSClient.xcodeproj`. It was
+built and validated remotely against a Mac over Tailscale (see `docs/security/DEVICE_ENROLLMENT_P3F_B.md`
+for the P3F-B signing and physical-device checklist). Because Xcode 16.4's SwiftPM integration
+cannot resolve a Swift package whose build graph contains more than one target on that Mac, the
+project does not link the Swift package directly. Instead a `PBXShellScriptBuildPhase`
+(`Prebuild JoeOS modules`) compiles `Sources/JoeOSCore` and `Sources/JoeOSIntelligence` with
+`xcrun swiftc -emit-library -static` into `$(OBJROOT)/PrebuiltModules`, and the app and
+`JoeOSClientTests` targets link the resulting static libraries with `SWIFT_INCLUDE_PATHS` and
+`LIBRARY_SEARCH_PATHS` pointing there. The app target compiles in Swift 5 mode; the modules
+compile with `-swift-version 6`.
 
-Use Xcode 15 or newer:
+The app target references sources under `JoeOSClient/` and `Config/` through `..` paths because
+`SRCROOT` is `apps/mobile/Xcode`. `Info.plist` comes from `JoeOSClient/Resources/Info.plist`,
+and `Config/Base.xcconfig` (which includes the gitignored `Config/Local.xcconfig`) supplies
+`PRODUCT_NAME`, versioning, and the bundle identifier.
 
-1. Open Xcode and choose **File → New → Project → iOS → App**.
-2. Use:
-   - Product Name: `JoeOSClient`
-   - Team: your Apple Developer team
-   - Organization Identifier: an identifier you control, for example `com.yourcompany`
-   - Interface: `SwiftUI`
-   - Language: `Swift`
-   - Testing System: `XCTest`
-   - Storage: none
-3. Save the project at `apps/mobile/Xcode/JoeOSClient`. Create the `Xcode` directory when Xcode asks for the destination.
-4. In the new app target, set **iOS Deployment Target** to `17.0`.
-5. Delete the generated app entry file and `ContentView.swift` references from the app target. Do not delete any source in this repository.
-6. Choose **File → Add Package Dependencies… → Add Local…**, select `apps/mobile`, and add the `JoeOSCore` product to the `JoeOSClient` app target.
-7. Choose **File → Add Files to “JoeOSClient”…** and select these folders:
-   - `apps/mobile/JoeOSClient/App`
-   - `apps/mobile/JoeOSClient/State`
-   - `apps/mobile/JoeOSClient/Views`
-   - `apps/mobile/JoeOSClient/Web`
-   - `apps/mobile/JoeOSClient/Resources/Assets.xcassets`
-8. In the file-add sheet, leave **Copy items if needed** off, choose **Create groups**, and check only the `JoeOSClient` app target.
-9. In the app target's Build Settings:
-   - Set **Generate Info.plist File** to `No`.
-   - Set **Info.plist File** to `../../JoeOSClient/Resources/Info.plist` when the project is stored at the path in step 3.
-   - Set **Asset Catalog Compiler – Global Accent Color Name** to `AccentColor`.
-   - Leave **Primary App Icon Set Name** empty until a real App Store icon is supplied.
-10. In **Signing & Capabilities**, enable automatic signing, choose your team, and set a unique bundle identifier such as `com.yourcompany.joeosclient`. No entitlements or background modes are required by this source set.
-11. Set Marketing Version to `1.0` and Current Project Version to `1`.
-12. Build once for an iOS 17 simulator. Then connect an iPhone running iOS 17 or later, select it as the run destination, approve Developer Mode/trust prompts if required, and run the app.
-13. Connect the iPhone to the same Tailscale tailnet or private network as the JoeOS VPS. Accept the local-network prompt. The default profile opens the JoeOS VPS; use the gear button to edit it or add an HTTPS profile.
+Build and test commands (validated remotely on Xcode 16.4 / iOS SDK 18.5):
 
-For distribution, create a proper 1024×1024 opaque PNG app icon based on the reused `JoeOSMark` SVG and add a standard `AppIcon` set. The repository deliberately does not masquerade the SVG as a valid App Store icon.
+```bash
+cd apps/mobile/Xcode
+# Simulator (iPhone 16 Pro on iOS 18.6)
+xcodebuild -project JoeOSClient.xcodeproj -scheme JoeOSClient \
+  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
+  -configuration Debug CODE_SIGNING_ALLOWED=NO build
+# Test bundle
+xcodebuild -project JoeOSClient.xcodeproj -scheme JoeOSClient \
+  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
+  -configuration Debug CODE_SIGNING_ALLOWED=NO test
+# Device (single ARCHS is required by the prebuild script)
+xcodebuild -project JoeOSClient.xcodeproj -scheme JoeOSClient \
+  -destination 'generic/platform=iOS' -configuration Debug \
+  ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO build
+# Archive
+xcodebuild -project JoeOSClient.xcodeproj -scheme JoeOSClient \
+  -destination 'generic/platform=iOS' -configuration Release \
+  ARCHS=arm64 ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO \
+  -archivePath JoeOSClient.xcarchive archive
+```
+
+`JoeOSClientTests` is a unit-test bundle target in the same scheme compiling
+`Tests/JoeOSCoreTests` and `Tests/JoeOSIntelligenceTests` with `@testable` access to the
+prebuilt modules. All 73 tests pass under both `swift test` and the Xcode test bundle.
+
+For distribution, set `JOEOS_DEVELOPMENT_TEAM` in the gitignored `Config/Local.xcconfig`, sign
+with automatic signing, and follow `docs/security/DEVICE_ENROLLMENT_P3F_B.md`. Create a proper
+1024×1024 opaque PNG app icon based on the reused `JoeOSMark` SVG and add a standard `AppIcon`
+set. The repository deliberately does not masquerade the SVG as a valid App Store icon.
 
 ## ATS and local-network rationale
 
@@ -112,9 +124,9 @@ find JoeOSClient Sources -name '*.swift' -print0 | xargs -0 swiftc -parse
 plutil -lint JoeOSClient/Resources/Info.plist
 ```
 
-The parser command validates syntax only. A real iOS SDK build, asset compilation, signing check, and device install still require full Xcode.
+The parser command validates syntax only. A real iOS SDK build, asset compilation, signing check, and device install require full Xcode (see the committed project and build commands above).
 
-On the current development Mac, the `JoeOSCore` target builds with Swift 6.1.2, every Swift source parses, the property list and asset JSON validate, and a compiled smoke harness passes the HTTPS/private-network policy, IPv4/IPv6/Tailscale boundaries, navigation handoff, and profile round trip. Apple Command Line Tools on this Mac does not include the `XCTest` module, so `swift test` cannot load the checked-in XCTest target here; run that suite once after installing full Xcode.
+On the current development Mac, the `JoeOSCore` target builds with Swift 6.1.2, every Swift source parses, the property list and asset JSON validate, a compiled smoke harness passes the HTTPS/private-network policy, IPv4/IPv6/Tailscale boundaries, navigation handoff, and profile round trip, and the full Xcode test bundle passes 73/73 on the iOS 18.6 simulator.
 
 ## Mac / Xcode handoff (exact commands)
 
@@ -132,4 +144,7 @@ swift test --target JoeOSCoreTests
 swift test --target JoeOSIntelligenceTests
 ```
 
-Then create the Xcode app project per the steps above (Product Name `JoeOSClient`), add the local package, add the `JoeOSClient` folders, and build for the iOS 17 simulator. No `.xcodeproj` is committed; the package manifest plus the source folders are the project-generation definition, and the `JoeOSClient/Resources/Info.plist` is the app plist. No signing certificates, provisioning profiles, or `xcuserdata` are committed.
+The committed Xcode project at `apps/mobile/Xcode/JoeOSClient.xcodeproj` replaces the manual
+"create the project in Xcode" steps; open it directly, set your team in
+`apps/mobile/Config/Local.xcconfig`, and build for the iOS 17 simulator or a connected device.
+No signing certificates, provisioning profiles, or `xcuserdata` are committed.

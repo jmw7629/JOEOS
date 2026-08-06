@@ -93,17 +93,17 @@ final class DeviceEnrollmentProtocolTests: XCTestCase {
                 )
             )
         )
-        XCTAssertThrowsError(
-            try JoeOSPairingCode(
-                Vector.manualCode.replacingOccurrences(
-                    of: "https://joeos.example.com",
-                    with: "http://192.168.1.20"
-                )
-            )
-        )
         XCTAssertNoThrow(
             try EnrollmentAudienceOrigin("http://100.98.25.26:8080")
         )
+        let differentOrigin = try JoeOSPairingCode(
+            Vector.manualCode.replacingOccurrences(
+                of: "https://joeos.example.com",
+                with: "http://192.168.1.20"
+            )
+        )
+        XCTAssertEqual(differentOrigin.audienceOrigin.value, "http://192.168.1.20")
+        XCTAssertEqual(differentOrigin.pairingSecret, Vector.pairingSecret)
         XCTAssertThrowsError(try EnrollmentAudienceOrigin("HTTPS://joeos.example.com"))
         XCTAssertThrowsError(try EnrollmentAudienceOrigin("https://[::ffff:c000:201]"))
     }
@@ -252,6 +252,9 @@ private enum Vector {
     static let clientNonce = Data(UInt8(0x20)...UInt8(0x3f))
     static let serverNonce = Data(UInt8(0x40)...UInt8(0x5f))
     static let manualCode = "JOEOS1|https://joeos.example.com|11111111-2222-4333-8444-555555555555|AAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPQ"
+    static let pairingSecret = EnrollmentCoding.base32Decode(
+        "AAAQEAYEAUDAOCAJBIFQYDIOB4IBCEQTCQKRMFYYDENBWHA5DYPQ"
+    )!
     static let authenticationSPKI = EnrollmentCoding.base64URLDecode(
         "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEaxfR8uEsQkf4vOblY6RA8ncDfYEt6zOg9KE5RdiYwpZP40Li_hp_m47n60p8D54WK84zV2sxXs7LtkBoN79R9Q"
     )!

@@ -1,0 +1,535 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A1B2C3D4E5F6000000000201 /* JoeOSMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000101 /* JoeOSMobileApp.swift */; };
+		A1B2C3D4E5F6000000000202 /* ApplicationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000102 /* ApplicationCoordinator.swift */; };
+		A1B2C3D4E5F6000000000203 /* BrowserSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000103 /* BrowserSession.swift */; };
+		A1B2C3D4E5F6000000000204 /* DeviceEnrollmentCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000104 /* DeviceEnrollmentCoordinator.swift */; };
+		A1B2C3D4E5F6000000000205 /* DeviceEnrollmentLocalState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000105 /* DeviceEnrollmentLocalState.swift */; };
+		A1B2C3D4E5F6000000000206 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000106 /* SessionManager.swift */; };
+		A1B2C3D4E5F6000000000207 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000107 /* Stores.swift */; };
+		A1B2C3D4E5F6000000000208 /* CommandCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000108 /* CommandCenterView.swift */; };
+		A1B2C3D4E5F6000000000209 /* ConnectionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000109 /* ConnectionSettingsView.swift */; };
+		A1B2C3D4E5F600000000020A /* DeviceEnrollmentStatusRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000010A /* DeviceEnrollmentStatusRow.swift */; };
+		A1B2C3D4E5F600000000020B /* DevicePairingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000010B /* DevicePairingSheet.swift */; };
+		A1B2C3D4E5F600000000020C /* JoeOSColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000010C /* JoeOSColors.swift */; };
+		A1B2C3D4E5F600000000020D /* JoeOSWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000010D /* JoeOSWebView.swift */; };
+		A1B2C3D4E5F600000000020E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000010E /* Assets.xcassets */; };
+		A1B2C3D4E5F6000000000211 /* libJoeOSCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000112 /* libJoeOSCore.a */; };
+		A1B2C3D4E5F6000000000212 /* libJoeOSIntelligence.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000113 /* libJoeOSIntelligence.a */; };
+		A1B2C3D4E5F6000000000213 /* BootstrapDiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000115 /* BootstrapDiscoveryTests.swift */; };
+		A1B2C3D4E5F6000000000214 /* ConnectionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000116 /* ConnectionManagerTests.swift */; };
+		A1B2C3D4E5F6000000000215 /* DeviceEnrollmentProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000117 /* DeviceEnrollmentProtocolTests.swift */; };
+		A1B2C3D4E5F6000000000216 /* EndpointPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000118 /* EndpointPolicyTests.swift */; };
+		A1B2C3D4E5F6000000000217 /* MobileCompanionPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000119 /* MobileCompanionPolicyTests.swift */; };
+		A1B2C3D4E5F6000000000218 /* IntelligenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000011A /* IntelligenceTests.swift */; };
+		A1B2C3D4E5F6000000000219 /* libJoeOSCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000112 /* libJoeOSCore.a */; };
+		A1B2C3D4E5F600000000021A /* libJoeOSIntelligence.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000113 /* libJoeOSIntelligence.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A1B2C3D4E5F6000000000101 /* JoeOSMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoeOSMobileApp.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000102 /* ApplicationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationCoordinator.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000103 /* BrowserSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserSession.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000104 /* DeviceEnrollmentCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceEnrollmentCoordinator.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000105 /* DeviceEnrollmentLocalState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceEnrollmentLocalState.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000106 /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000107 /* Stores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000108 /* CommandCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandCenterView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000109 /* ConnectionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionSettingsView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000010A /* DeviceEnrollmentStatusRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceEnrollmentStatusRow.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000010B /* DevicePairingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicePairingSheet.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000010C /* JoeOSColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoeOSColors.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000010D /* JoeOSWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoeOSWebView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000010E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000010F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000110 /* JoeOSClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JoeOSClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D4E5F6000000000111 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000112 /* libJoeOSCore.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "PrebuiltModules/libJoeOSCore.a"; sourceTree = "$(OBJROOT)"; };
+		A1B2C3D4E5F6000000000113 /* libJoeOSIntelligence.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "PrebuiltModules/libJoeOSIntelligence.a"; sourceTree = "$(OBJROOT)"; };
+		A1B2C3D4E5F6000000000114 /* JoeOSClientTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JoeOSClientTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D4E5F6000000000115 /* BootstrapDiscoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BootstrapDiscoveryTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000116 /* ConnectionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionManagerTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000117 /* DeviceEnrollmentProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceEnrollmentProtocolTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000118 /* EndpointPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointPolicyTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000119 /* MobileCompanionPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileCompanionPolicyTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000011A /* IntelligenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntelligenceTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A1B2C3D4E5F6000000000406 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1B2C3D4E5F6000000000219 /* libJoeOSCore.a in Frameworks */,
+				A1B2C3D4E5F600000000021A /* libJoeOSIntelligence.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A1B2C3D4E5F6000000000407 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+
+		A1B2C3D4E5F6000000000402 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1B2C3D4E5F6000000000211 /* libJoeOSCore.a in Frameworks */,
+				A1B2C3D4E5F6000000000212 /* libJoeOSIntelligence.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A1B2C3D4E5F600000000030A /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F600000000030B /* JoeOSCoreTests */,
+				A1B2C3D4E5F600000000030C /* JoeOSIntelligenceTests */,
+			);
+			path = "../Tests";
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F600000000030B /* JoeOSCoreTests */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6000000000115 /* BootstrapDiscoveryTests.swift */,
+				A1B2C3D4E5F6000000000116 /* ConnectionManagerTests.swift */,
+				A1B2C3D4E5F6000000000117 /* DeviceEnrollmentProtocolTests.swift */,
+				A1B2C3D4E5F6000000000118 /* EndpointPolicyTests.swift */,
+				A1B2C3D4E5F6000000000119 /* MobileCompanionPolicyTests.swift */,
+			);
+			path = JoeOSCoreTests;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F600000000030C /* JoeOSIntelligenceTests */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F600000000011A /* IntelligenceTests.swift */,
+			);
+			path = JoeOSIntelligenceTests;
+			sourceTree = "<group>";
+		};
+
+		A1B2C3D4E5F6000000000301 = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6000000000302 /* App */,
+				A1B2C3D4E5F6000000000303 /* State */,
+				A1B2C3D4E5F6000000000304 /* Views */,
+				A1B2C3D4E5F6000000000305 /* Web */,
+				A1B2C3D4E5F6000000000306 /* Resources */,
+				A1B2C3D4E5F6000000000309 /* Config */,
+				A1B2C3D4E5F6000000000308 /* Frameworks */,
+				A1B2C3D4E5F6000000000307 /* Products */,
+				A1B2C3D4E5F600000000030A /* Tests */,
+			);
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F6000000000302 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6000000000101 /* JoeOSMobileApp.swift */,
+			);
+			path = "../JoeOSClient/App";
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F6000000000303 /* State */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6000000000102 /* ApplicationCoordinator.swift */,
+				A1B2C3D4E5F6000000000103 /* BrowserSession.swift */,
+				A1B2C3D4E5F6000000000104 /* DeviceEnrollmentCoordinator.swift */,
+				A1B2C3D4E5F6000000000105 /* DeviceEnrollmentLocalState.swift */,
+				A1B2C3D4E5F6000000000106 /* SessionManager.swift */,
+				A1B2C3D4E5F6000000000107 /* Stores.swift */,
+			);
+			path = "../JoeOSClient/State";
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F6000000000304 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6000000000108 /* CommandCenterView.swift */,
+				A1B2C3D4E5F6000000000109 /* ConnectionSettingsView.swift */,
+				A1B2C3D4E5F600000000010A /* DeviceEnrollmentStatusRow.swift */,
+				A1B2C3D4E5F600000000010B /* DevicePairingSheet.swift */,
+				A1B2C3D4E5F600000000010C /* JoeOSColors.swift */,
+			);
+			path = "../JoeOSClient/Views";
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F6000000000305 /* Web */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F600000000010D /* JoeOSWebView.swift */,
+			);
+			path = "../JoeOSClient/Web";
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F6000000000306 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F600000000010E /* Assets.xcassets */,
+				A1B2C3D4E5F600000000010F /* Info.plist */,
+			);
+			path = "../JoeOSClient/Resources";
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F6000000000307 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6000000000110 /* JoeOSClient.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F6000000000309 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6000000000111 /* Base.xcconfig */,
+			);
+			path = "../Config";
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F6000000000308 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6000000000112 /* libJoeOSCore.a */,
+				A1B2C3D4E5F6000000000113 /* libJoeOSIntelligence.a */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A1B2C3D4E5F6000000000501 /* JoeOSClient */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1B2C3D4E5F6000000000504 /* Build configuration list for PBXNativeTarget "JoeOSClient" */;
+			buildPhases = (
+				A1B2C3D4E5F6000000000404 /* Prebuild JoeOS modules */,
+				A1B2C3D4E5F6000000000401 /* Sources */,
+				A1B2C3D4E5F6000000000402 /* Frameworks */,
+				A1B2C3D4E5F6000000000403 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = JoeOSClient;
+			productName = JoeOSClient;
+			productReference = A1B2C3D4E5F6000000000110 /* JoeOSClient.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A1B2C3D4E5F6000000000509 /* JoeOSClientTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1B2C3D4E5F6000000000510 /* Build configuration list for PBXNativeTarget "JoeOSClientTests" */;
+			buildPhases = (
+				A1B2C3D4E5F6000000000405 /* Sources */,
+				A1B2C3D4E5F6000000000406 /* Frameworks */,
+				A1B2C3D4E5F6000000000407 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A1B2C3D4E5F6000000000408 /* PBXTargetDependency */,
+			);
+			name = JoeOSClientTests;
+			productName = JoeOSClientTests;
+			productReference = A1B2C3D4E5F6000000000114 /* JoeOSClientTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+
+/* Begin PBXTargetDependency section */
+		A1B2C3D4E5F6000000000408 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A1B2C3D4E5F6000000000501 /* JoeOSClient */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXProject section */
+		A1B2C3D4E5F6000000000502 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				TargetAttributes = {
+					A1B2C3D4E5F6000000000501 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+				};
+			};
+			buildConfigurationList = A1B2C3D4E5F6000000000503 /* Build configuration list for PBXProject "JoeOSClient" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A1B2C3D4E5F6000000000301;
+			productRefGroup = A1B2C3D4E5F6000000000307 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A1B2C3D4E5F6000000000501 /* JoeOSClient */,
+				A1B2C3D4E5F6000000000509 /* JoeOSClientTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A1B2C3D4E5F6000000000403 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1B2C3D4E5F600000000020E /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+
+		A1B2C3D4E5F6000000000405 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1B2C3D4E5F6000000000213 /* BootstrapDiscoveryTests.swift in Sources */,
+				A1B2C3D4E5F6000000000214 /* ConnectionManagerTests.swift in Sources */,
+				A1B2C3D4E5F6000000000215 /* DeviceEnrollmentProtocolTests.swift in Sources */,
+				A1B2C3D4E5F6000000000216 /* EndpointPolicyTests.swift in Sources */,
+				A1B2C3D4E5F6000000000217 /* MobileCompanionPolicyTests.swift in Sources */,
+				A1B2C3D4E5F6000000000218 /* IntelligenceTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+		A1B2C3D4E5F6000000000401 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1B2C3D4E5F6000000000201 /* JoeOSMobileApp.swift in Sources */,
+				A1B2C3D4E5F6000000000202 /* ApplicationCoordinator.swift in Sources */,
+				A1B2C3D4E5F6000000000203 /* BrowserSession.swift in Sources */,
+				A1B2C3D4E5F6000000000204 /* DeviceEnrollmentCoordinator.swift in Sources */,
+				A1B2C3D4E5F6000000000205 /* DeviceEnrollmentLocalState.swift in Sources */,
+				A1B2C3D4E5F6000000000206 /* SessionManager.swift in Sources */,
+				A1B2C3D4E5F6000000000207 /* Stores.swift in Sources */,
+				A1B2C3D4E5F6000000000208 /* CommandCenterView.swift in Sources */,
+				A1B2C3D4E5F6000000000209 /* ConnectionSettingsView.swift in Sources */,
+				A1B2C3D4E5F600000000020A /* DeviceEnrollmentStatusRow.swift in Sources */,
+				A1B2C3D4E5F600000000020B /* DevicePairingSheet.swift in Sources */,
+				A1B2C3D4E5F600000000020C /* JoeOSColors.swift in Sources */,
+				A1B2C3D4E5F600000000020D /* JoeOSWebView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A1B2C3D4E5F6000000000404 /* Prebuild JoeOS modules */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Prebuild JoeOS modules";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "set -euo pipefail\nOUT=\"$OBJROOT/PrebuiltModules\"\nCORE_SRC=\"$SRCROOT/../Sources/JoeOSCore\"\nINTEL_SRC=\"$SRCROOT/../Sources/JoeOSIntelligence\"\nmkdir -p \"$OUT\"\nif [ \"$CONFIGURATION\" = \"Release\" ]; then OPT=\"-O\"; TESTING=\"\"; else OPT=\"-Onone\"; TESTING=\"-enable-testing\"; fi\nif [ \"$(printf '%s' \"$ARCHS\" | wc -w | tr -d ' ')\" -gt 1 ]; then\n  echo \"error: multi-arch build not supported; build with a single ARCHS\"\n  exit 1\nfi\nARCH=\"$ARCHS\"\nSUFFIX=\"\"\nif [ \"$PLATFORM_NAME\" = \"iphonesimulator\" ]; then SUFFIX=\"-simulator\"; fi\nTARGET=\"${ARCH}-apple-ios${IPHONEOS_DEPLOYMENT_TARGET}${SUFFIX}\"\nxcrun swiftc -emit-library -static \\\n  -module-name JoeOSCore \\\n  -emit-module -emit-module-path \"$OUT/JoeOSCore.swiftmodule\" \\\n  -parse-as-library -swift-version 6 \\\n  -sdk \"$SDKROOT\" -target \"$TARGET\" \\\n  $OPT $TESTING \"$CORE_SRC\"/*.swift \\\n  -o \"$OUT/libJoeOSCore.a\"\nxcrun swiftc -emit-library -static \\\n  -module-name JoeOSIntelligence \\\n  -emit-module -emit-module-path \"$OUT/JoeOSIntelligence.swiftmodule\" \\\n  -parse-as-library -swift-version 6 \\\n  -sdk \"$SDKROOT\" -target \"$TARGET\" \\\n  -I \"$OUT\" \\\n  $OPT $TESTING \"$INTEL_SRC\"/*.swift \\\n  -o \"$OUT/libJoeOSIntelligence.a\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A1B2C3D4E5F6000000000505 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A1B2C3D4E5F6000000000506 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A1B2C3D4E5F6000000000507 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1B2C3D4E5F6000000000111 /* Base.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "../JoeOSClient/Resources/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				LIBRARY_SEARCH_PATHS = "$(OBJROOT)/PrebuiltModules";
+				SWIFT_INCLUDE_PATHS = "$(OBJROOT)/PrebuiltModules";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1B2C3D4E5F6000000000508 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1B2C3D4E5F6000000000111 /* Base.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "../JoeOSClient/Resources/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				LIBRARY_SEARCH_PATHS = "$(OBJROOT)/PrebuiltModules";
+				SWIFT_INCLUDE_PATHS = "$(OBJROOT)/PrebuiltModules";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A1B2C3D4E5F6000000000511 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LIBRARY_SEARCH_PATHS = "$(OBJROOT)/PrebuiltModules";
+				PRODUCT_BUNDLE_IDENTIFIER = com.joeos.JoeOSClientTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_INCLUDE_PATHS = "$(OBJROOT)/PrebuiltModules";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1B2C3D4E5F6000000000512 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LIBRARY_SEARCH_PATHS = "$(OBJROOT)/PrebuiltModules";
+				PRODUCT_BUNDLE_IDENTIFIER = com.joeos.JoeOSClientTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_INCLUDE_PATHS = "$(OBJROOT)/PrebuiltModules";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A1B2C3D4E5F6000000000503 /* Build configuration list for PBXProject "JoeOSClient" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1B2C3D4E5F6000000000505 /* Debug */,
+				A1B2C3D4E5F6000000000506 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1B2C3D4E5F6000000000504 /* Build configuration list for PBXNativeTarget "JoeOSClient" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1B2C3D4E5F6000000000507 /* Debug */,
+				A1B2C3D4E5F6000000000508 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1B2C3D4E5F6000000000510 /* Build configuration list for PBXNativeTarget "JoeOSClientTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1B2C3D4E5F6000000000511 /* Debug */,
+				A1B2C3D4E5F6000000000512 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = A1B2C3D4E5F6000000000502 /* Project object */;
+}

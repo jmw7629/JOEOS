@@ -12,7 +12,7 @@ public struct BootstrapDocument: Codable, Sendable {
     public let capabilities: [CapabilityDescriptor]
     public let routes: [RouteDescriptor]
 
-    enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey, CaseIterable {
         case schemaVersion = "schema_version"
         case generatedAt = "generated_at"
         case server
@@ -23,8 +23,8 @@ public struct BootstrapDocument: Codable, Sendable {
     }
 
     public init(from decoder: Decoder) throws {
+        try Self.rejectUnknownKeys(decoder: decoder, known: CodingKeys.allCases)
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        try Self.rejectUnknownKeys(container: container, known: CodingKeys.allCases)
         schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
         generatedAt = try container.decode(String.self, forKey: .generatedAt)
         server = try container.decode(ServerIdentity.self, forKey: .server)
@@ -45,19 +45,40 @@ public struct BootstrapDocument: Codable, Sendable {
         try container.encode(routes, forKey: .routes)
     }
 
+    /// Enumerates the actual JSON keys (including undeclared ones) and rejects
+    /// any key the consuming type does not declare. Foundation only surfaces
+    /// declared keys through a typed container's `allKeys`, so a catch-all key
+    /// type is required to see (and reject) drift.
     static func rejectUnknownKeys<CodingKeysType>(
-        container: KeyedDecodingContainer<CodingKeysType>,
+        decoder: Decoder,
         known: [CodingKeysType]
     ) throws where CodingKeysType: CodingKey {
+        let container = try decoder.container(keyedBy: JSONCatchAllKey.self)
         let knownRaw = Set(known.map(\.stringValue))
         guard Set(container.allKeys.map(\.stringValue)).isSubset(of: knownRaw) else {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(
-                    codingPath: container.codingPath,
+                    codingPath: decoder.codingPath,
                     debugDescription: "Bootstrap document contains unknown fields."
                 )
             )
         }
+    }
+}
+
+/// A catch-all coding key that never fails to decode, so the real set of JSON
+/// keys (including undeclared ones) can be inspected during strict decoding.
+public struct JSONCatchAllKey: CodingKey, Sendable {
+    public var stringValue: String
+    public var intValue: Int?
+
+    public init?(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    public init?(intValue: Int) {
+        self.stringValue = String(intValue)
+        self.intValue = intValue
     }
 }
 
@@ -80,7 +101,7 @@ public struct ServerIdentity: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        try BootstrapDocument.rejectUnknownKeys(container: container, known: CodingKeys.allCases)
+        try BootstrapDocument.rejectUnknownKeys(decoder: decoder, known: CodingKeys.allCases)
         serverID = try container.decode(String.self, forKey: .serverID)
         productID = try container.decodeIfPresent(String.self, forKey: .productID)
         displayName = try container.decode(String.self, forKey: .displayName)
@@ -125,7 +146,7 @@ public struct SecurityPosture: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        try BootstrapDocument.rejectUnknownKeys(container: container, known: CodingKeys.allCases)
+        try BootstrapDocument.rejectUnknownKeys(decoder: decoder, known: CodingKeys.allCases)
         ownershipModel = try container.decodeIfPresent(String.self, forKey: .ownershipModel)
         networkBoundary = try container.decodeIfPresent(String.self, forKey: .networkBoundary)
         applicationAuthentication = try container.decode(String.self, forKey: .applicationAuthentication)
@@ -182,7 +203,7 @@ public struct DeviceEnrollmentProfile: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        try BootstrapDocument.rejectUnknownKeys(container: container, known: CodingKeys.allCases)
+        try BootstrapDocument.rejectUnknownKeys(decoder: decoder, known: CodingKeys.allCases)
         wireProtocol = try container.decode(String.self, forKey: .wireProtocol)
         offerAuthority = try container.decode(String.self, forKey: .offerAuthority)
         pairingSecretBytes = try container.decode(Int.self, forKey: .pairingSecretBytes)
@@ -231,7 +252,7 @@ public struct CapabilityDescriptor: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        try BootstrapDocument.rejectUnknownKeys(container: container, known: CodingKeys.allCases)
+        try BootstrapDocument.rejectUnknownKeys(decoder: decoder, known: CodingKeys.allCases)
         id = try container.decode(String.self, forKey: .id)
         status = try container.decode(String.self, forKey: .status)
         access = try container.decode(String.self, forKey: .access)
@@ -270,7 +291,7 @@ public struct RouteDescriptor: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        try BootstrapDocument.rejectUnknownKeys(container: container, known: CodingKeys.allCases)
+        try BootstrapDocument.rejectUnknownKeys(decoder: decoder, known: CodingKeys.allCases)
         id = try container.decode(String.self, forKey: .id)
         path = try container.decode(String.self, forKey: .path)
         wireProtocol = try container.decode(String.self, forKey: .wireProtocol)

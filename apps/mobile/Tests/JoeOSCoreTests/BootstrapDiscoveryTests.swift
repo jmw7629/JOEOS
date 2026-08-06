@@ -88,8 +88,8 @@ final class BootstrapDiscoveryTests: XCTestCase {
 
     func testValidatorMatchesSDKRouteAccessAndSecurityGateInvariants() throws {
         let accessPayload = Self.validJSON.replacingOccurrences(
-            of: "\"id\":\"discovery.bootstrap\",\n          \"status\":\"available\",\n          \"access\":\"read_only\"",
-            with: "\"id\":\"discovery.bootstrap\",\n          \"status\":\"available\",\n          \"access\":\"configuration\""
+            of: "\"id\":\"discovery.bootstrap\",\n      \"status\":\"available\",\n      \"access\":\"read_only\"",
+            with: "\"id\":\"discovery.bootstrap\",\n      \"status\":\"available\",\n      \"access\":\"configuration\""
         )
         let accessDocument = try JSONDecoder().decode(BootstrapDocument.self, from: Data(accessPayload.utf8))
         XCTAssertThrowsError(try BootstrapContractValidator.validate(accessDocument)) { error in
@@ -156,7 +156,7 @@ final class BootstrapDiscoveryTests: XCTestCase {
     func testClientUsesInjectedTransportWithBoundedGETRequest() async throws {
         let endpoint = try EndpointPolicy.validate(ConnectionProfile.defaultVPS.endpoint).get()
         let response = BootstrapHTTPResponse(
-            finalURL: URL(string: "http://100.98.25.26:8080/api/v1/bootstrap")!,
+            finalURL: URL(string: "http://100.98.25.26/api/v1/bootstrap")!,
             statusCode: 200,
             headers: ["Content-Type": "application/json", "Cache-Control": "no-store"],
             body: Self.validPayload
@@ -169,7 +169,7 @@ final class BootstrapDiscoveryTests: XCTestCase {
 
         XCTAssertEqual(result.serverVersion, "2.0.0")
         XCTAssertEqual(requests.count, 1)
-        XCTAssertEqual(requests[0].url?.absoluteString, "http://100.98.25.26:8080/api/v1/bootstrap")
+        XCTAssertEqual(requests[0].url?.absoluteString, "http://100.98.25.26/api/v1/bootstrap")
         XCTAssertEqual(requests[0].httpMethod, "GET")
         XCTAssertEqual(requests[0].value(forHTTPHeaderField: "Accept"), "application/json")
         XCTAssertNil(requests[0].httpBody)
@@ -192,7 +192,7 @@ final class BootstrapDiscoveryTests: XCTestCase {
     func testClientRejectsSameOriginWrongFinalPath() async throws {
         let endpoint = try EndpointPolicy.validate(ConnectionProfile.defaultVPS.endpoint).get()
         let response = BootstrapHTTPResponse(
-            finalURL: URL(string: "http://100.98.25.26:8080/api/v1/not-bootstrap")!,
+            finalURL: URL(string: "http://100.98.25.26/api/v1/not-bootstrap")!,
             statusCode: 200,
             headers: ["Content-Type": "application/json"],
             body: Self.validPayload
@@ -205,7 +205,7 @@ final class BootstrapDiscoveryTests: XCTestCase {
 
     func testClientRejectsBadStatusContentTypeAndOversizedBody() async throws {
         let endpoint = try EndpointPolicy.validate(ConnectionProfile.defaultVPS.endpoint).get()
-        let finalURL = URL(string: "http://100.98.25.26:8080/api/v1/bootstrap")!
+        let finalURL = URL(string: "http://100.98.25.26/api/v1/bootstrap")!
 
         let notFound = BootstrapDiscoveryClient(
             transport: RecordingBootstrapTransport(

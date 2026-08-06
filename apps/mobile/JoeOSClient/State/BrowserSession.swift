@@ -10,7 +10,7 @@ enum BrowserConnectionPhase: Equatable {
     case error
 }
 
-enum BootstrapDiscoveryState: Equatable {
+enum BootstrapDiscoveryState {
     case idle
     case checking
     case validated(ValidatedBootstrapContract)

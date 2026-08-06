@@ -20,6 +20,7 @@ build/
 coverage/
 xcuserdata/
 *.xcuserstate
+apps/mobile/Config/Local.xcconfig
 *.log
 .env
 .env.*

@@ -22,6 +22,7 @@ public enum ApplicationSessionState: Equatable, Sendable {
     case workspaceDisabled
     case backendIncompatible
     case transportRejected
+    case sessionRevoked
     case authenticationFailed
 
     public var isAuthoritative: Bool { self == .authenticated || self == .refreshing }
@@ -238,13 +239,12 @@ public final class ApplicationSessionManager: ObservableObject {
     }
 
     public func refresh() async {
-        refreshLock.lock()
-        if isRefreshing {
-            refreshLock.unlock()
-            return
+        let acquired = refreshLock.withLock {
+            if isRefreshing { return false }
+            isRefreshing = true
+            return true
         }
-        isRefreshing = true
-        refreshLock.unlock()
+        guard acquired else { return }
         state = .refreshing
         var attempts = 0
         while attempts < Self.maximumRefreshAttempts, let stored = store.load() {
@@ -260,7 +260,7 @@ public final class ApplicationSessionManager: ObservableObject {
                 principal = response.principal
                 lastVerifiedAt = clock()
                 state = .authenticated
-                isRefreshing = false
+                refreshLock.withLock { isRefreshing = false }
                 return
             } catch {
                 // A 401 on refresh means the refresh family is revoked.
@@ -268,12 +268,12 @@ public final class ApplicationSessionManager: ObservableObject {
                     clearCredentials()
                     lastError = .refreshRevoked
                     state = .sessionRevoked
-                    isRefreshing = false
+                    refreshLock.withLock { isRefreshing = false }
                     return
                 }
             }
         }
-        isRefreshing = false
+        refreshLock.withLock { isRefreshing = false }
         lastError = .refreshLoopPrevented
         state = .sessionExpired
     }

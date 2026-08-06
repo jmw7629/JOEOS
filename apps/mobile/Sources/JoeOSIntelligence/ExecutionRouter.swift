@@ -70,11 +70,25 @@ public struct ExecutionRouter: Sendable {
             return .failure(.noAvailableProvider)
         }
 
+        // Only models served by a provider that routing actually permits are
+        // candidates. An unapproved cloud model must never be selected (and
+        // never "hidden" behind a cheaper name), even when it is the only
+        // model that could handle the request.
+        let routableProviderIDs = Set(
+            candidates
+                .filter { providers.allowsRouting(to: $0, localOnly: localOnly) }
+                .map(\.providerID)
+        )
+        guard !routableProviderIDs.isEmpty else {
+            return .failure(.noAvailableProvider)
+        }
+
         let capabilityToCheck = requiredCapabilities.isEmpty
             ? ModelCapability.reasoning
             : requiredCapabilities.sorted().first ?? .reasoning
         guard let model = models.best(
             for: capabilityToCheck,
+            from: routableProviderIDs,
             localOnly: localOnly,
             requireStreaming: requireStreaming
         ) else {

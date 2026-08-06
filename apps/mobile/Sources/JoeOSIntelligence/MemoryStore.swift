@@ -39,7 +39,7 @@ public struct MemoryEntry: Identifiable, Equatable, Sendable {
         self.sourceRef = sourceRef
     }
 
-    public var isExpired(now: Date = Date()) -> Bool {
+    public func isExpired(now: Date = Date()) -> Bool {
         guard let expiresAt else { return false }
         return expiresAt <= now
     }
@@ -132,7 +132,7 @@ public final class MemoryStore: ObservableObject {
             .filter { $0.layer == .working || $0.layer == .conversation }
             .filter { !$0.isExpired() }
             .sorted { $0.createdAt > $1.createdAt }
-            .prefix(workingMemoryLimit)
+            .prefix(Self.workingMemoryLimit)
             .map { $0.value }
         return working.joined(separator: "\n")
     }
