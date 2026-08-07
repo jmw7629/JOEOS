@@ -1,0 +1,1150 @@
+[
+  {
+    "label": "Mission Control",
+    "heading": "Mission Control",
+    "requests": [
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      }
+    ],
+    "text_sample": "Skip to main content\nJOEOS\nVPS COMMAND CENTER\nCOMPUTE HOST\nVPS \u00b7 Private\n\nOPERATIONS\n\nMission Control\nExecutive Dashboard\nCI/CD Pipeline\nInfrastructure Health\nSecurity & Logs\nPlugin Manager\nAutomation\nCommunications\nDevice Manager\nMobile Companion\nSecurity Center\nPerformance Center\nModels & AI\nProduction & Release\nMaintenance & Improvement\nSettings\nBot Fleet\nLemonade offline\nJoeOS Local\nPrivate\nJOEOS / VPS OPERATIONS\nMission Control\nLemonade offline\n15:18:01\nAsk JoeOS AI\nLemonade Server is offline \u2014 local AI and model telemetry are unavailable.\nView dashboard\nEXECUTIVE OPERATING PICTURE\nMission Control\n\nWhat needs attention, what AI can safely handle, what is at risk, what to do next, and what changed since your last visit.\n\nLAYOUT R1\nAdd widget\nEdit layout\nCustomize\nEXECUTIVE READINESS\n69\n1 critical item require a decision.\n\nJoeOS is prioritizing real local evidence. Review the source before authorizing any future action.\n\nVPS telemetry live\n6 profiles enabled\nLocal-first workspace\nMORNING BRIEF\nBuild the day from current evidence\n\nAsk the private local model to summarize VPS health and the latest changes. Calendar, mail, markets, and manufacturing appear only after connectors are approved.\n\nGenerate current brief\nMISSION_CONTROL\nAttention Now\nLIVE\nLocal inference needs attention\nLemonade is offline or no text model is ready.\nDANGER\n7 resource warnings\nLocal thresholds produced new notices.\nWARNING\nMISSION_CONTROL\nAI Can Handle\nLIVE\nSummarize platform health\nRead current VPS"
+  },
+  {
+    "label": "Executive Dashboard",
+    "heading": "Executive Dashboard",
+    "requests": [
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      }
+    ],
+    "text_sample": "Skip to main content\nJOEOS\nVPS COMMAND CENTER\nCOMPUTE HOST\nVPS \u00b7 Private\n\nOPERATIONS\n\nMission Control\nExecutive Dashboard\nCI/CD Pipeline\nInfrastructure Health\nSecurity & Logs\nPlugin Manager\nAutomation\nCommunications\nDevice Manager\nMobile Companion\nSecurity Center\nPerformance Center\nModels & AI\nProduction & Release\nMaintenance & Improvement\nSettings\nBot Fleet\nLemonade offline\nJoeOS Local\nPrivate\nJOEOS / VPS OPERATIONS\nExecutive Dashboard\nLemonade offline\n15:18:10\nAsk JoeOS AI\nLemonade Server is offline \u2014 local AI and model telemetry are unavailable.\nView dashboard\nPRIVATE COMPUTE OVERVIEW\nExecutive Dashboard\n\nLive operating telemetry and private AI status from your AMD EPYC VPS.\n\nLIVE \u00b7 5S\n15:18:02\nGenerate brief\nATTENTION\nCPU LOAD\n95.7\n%\n 20.7\n2 threads \u00b7 local VPS\nNOMINAL\nUNIFIED MEMORY\n35.6\n%\n 0.0\n2.8 / 7.8 GiB unified memory\nUNMEASURED\nRADEON GPU\n\u2014\nno measurement\nWaiting for Lemonade GPU telemetry \u00b7 unmeasured\nNOMINAL\nSTORAGE\n62.2\n%\n 0.1\n59.5 / 95.8 GiB used\nLIVE\nPLATFORM UPTIME\n8d 23:58:26\nVPS boot-time counter \u00b7 sampled locally\nCompute utilization\n\nVPS samples \u00b7 trailing 70 seconds\n\nCPU\nMemory\n100\n75\n50\n25\n0\n-70s\n-35s\nnow\nLocal service health\n\nCurrent process reachability\n\n3/4\nJoeOS API\nOnline\nSQLite state\nOnline\nMetrics collector\nOnline\nLemonade Server\nOffline\nExecutive activity stream\n\nMaterial changes requiring operational awareness\n\nPrivate inference\n\nLemonade remains behind the JoeOS same-origin proxy\n\nLocal only\nReal telemetry\n\nCPU, memory, GPU, disk, and uptime sa"
+  },
+  {
+    "label": "CI/CD Pipeline",
+    "heading": "CI/CD Pipeline",
+    "requests": [
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      }
+    ],
+    "text_sample": "Skip to main content\nJOEOS\nVPS COMMAND CENTER\nCOMPUTE HOST\nVPS \u00b7 Private\n\nOPERATIONS\n\nMission Control\nExecutive Dashboard\nCI/CD Pipeline\nInfrastructure Health\nSecurity & Logs\nPlugin Manager\nAutomation\nCommunications\nDevice Manager\nMobile Companion\nSecurity Center\nPerformance Center\nModels & AI\nProduction & Release\nMaintenance & Improvement\nSettings\nBot Fleet\nLemonade offline\nJoeOS Local\nPrivate\nJOEOS / VPS OPERATIONS\nCI/CD Pipeline\nLemonade offline\n15:18:19\nAsk JoeOS AI\nLemonade Server is offline \u2014 local AI and model telemetry are unavailable.\nView dashboard\nINTERACTIVE RELEASE PREVIEW\nCI/CD Pipeline\n\nA functional local pipeline workspace using representative data. Connect a repository runner before treating actions as real deployments.\n\nLOCAL PREVIEW\nRun pipeline\nSUCCESS RATE\n96.8%\nLast 30 days\nAVERAGE DURATION\n3m 42s\n14s faster this week\nDEPLOYMENTS TODAY\n18\n6 production \u00b7 12 preview\nCHANGE FAILURE\n3.2%\nWithin 5% SLO\nSource\nVerified\nBuild\n42 seconds\nTest\nPassed\nSecurity\nPassed\nDeploy\nPromoted\nBuild history\n\n5 visible executions\n\nAll statuses\nSuccess\nFailed\nRunning\nBUILD\tBRANCH\tCOMMIT\tSTATUS\tDURATION\tAGE\t\nACTIONS\n\n#2841\tmain\t\nfeat(orders): add idempotency guard\nf4bc82a \u00b7 Maya Chen\n\t\nSUCCESS\t3m 12s\t2 min ago\t\n\n#2840\trelease/2.8\t\nfix(edge): rotate gateway tokens\n9d83f1c \u00b7 Omar Reed\n\t\nFAILED\t1m 46s\t18 min ago\t\n\n#2839\tmain\t\nperf(cache): coalesce product reads\ne210a7f \u00b7 Nadia Chen\n\t\nSUCCESS\t4m 05s\t43 min ago\t\n\n#2838\tfeature/audit-v2\t\ntest(audit): expand retention suite\n71ae4d9 \u00b7 "
+  },
+  {
+    "label": "Infrastructure Health",
+    "heading": "Infrastructure Health",
+    "requests": [
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      }
+    ],
+    "text_sample": "Skip to main content\nJOEOS\nVPS COMMAND CENTER\nCOMPUTE HOST\nVPS \u00b7 Private\n\nOPERATIONS\n\nMission Control\nExecutive Dashboard\nCI/CD Pipeline\nInfrastructure Health\nSecurity & Logs\nPlugin Manager\nAutomation\nCommunications\nDevice Manager\nMobile Companion\nSecurity Center\nPerformance Center\nModels & AI\nProduction & Release\nMaintenance & Improvement\nSettings\nBot Fleet\nLemonade offline\nJoeOS Local\nPrivate\nJOEOS / VPS OPERATIONS\nInfrastructure Health\nLemonade offline\n15:18:27\nAsk JoeOS AI\nLemonade Server is offline \u2014 local AI and model telemetry are unavailable.\nView dashboard\nLOCAL COMPUTE ESTATE\nInfrastructure Health\n\nYour VPS host, local Lemonade inference health, thermal data when available, and real storage pressure.\n\nTELEMETRY LIVE\nRefresh fleet\n0/1\nVPS ONLINE\nN/A\nAI TIME TO FIRST TOKEN\n1\nATTENTION ITEMS\nmcso9tqzb9\nAMD EPYC \u00b7 Lemonade\nDEGRADED\nTEMP\nN/A\nAI TTFT\nN/A\nCPU\n83%\nDISK\n62%\nCOMPUTE\n83%\nLoopback inference \u00b7 Private local fabric\nInspect\nRefresh\nJoeOS Local AI\nLemonade offline\nPRIVATE LEMONADE \u00b7 NO MODEL SELECTED\nI\u2019m your private JoeOS copilot. Once Lemonade is online, ask me about this VPS\u2019s live health, local events, or agent profiles.\nSummarize platform health\nReport bot fleet status\nShow storage utilization\nWhat can you do?\nEnter an operational command\nEnter to send\nRead-only local assistant"
+  },
+  {
+    "label": "Security & Logs",
+    "heading": "Security & Logs",
+    "requests": [
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      }
+    ],
+    "text_sample": "Skip to main content\nJOEOS\nVPS COMMAND CENTER\nCOMPUTE HOST\nVPS \u00b7 Private\n\nOPERATIONS\n\nMission Control\nExecutive Dashboard\nCI/CD Pipeline\nInfrastructure Health\nSecurity & Logs\nPlugin Manager\nAutomation\nCommunications\nDevice Manager\nMobile Companion\nSecurity Center\nPerformance Center\nModels & AI\nProduction & Release\nMaintenance & Improvement\nSettings\nBot Fleet\nLemonade offline\nJoeOS Local\nPrivate\nJOEOS / VPS OPERATIONS\nSecurity & Logs\nLemonade offline\n15:18:35\nAsk JoeOS AI\nLemonade Server is offline \u2014 local AI and model telemetry are unavailable.\nView dashboard\nPRIVATE AUDIT OPERATIONS\nSecurity & Logs\n\nA truthful local audit stream for JoeOS actions, resource warnings, profile changes, and Lemonade connectivity.\n\nEVENT STREAM LIVE\nExport evidence\nRECENT EVENTS\n40\nLatest local SQLite window\nWARNINGS\n7\nResource and runtime notices\nERRORS\n0\nConnectivity and operation failures\nENABLED PROFILES\n6\nLocal fleet profiles only\nRecent JoeOS events\n\nLocal state changes requiring awareness\n\nrunner\n{\"event\":\"runner.health_updated\",\"job\":null,\"org\":\"1e9025bc-5b1d-4ab5-b4a5-1c98f52da2b5\",\"runner\":\"213a91d9-6add-40ea-ae55-6501fffe9490\",\"schema_version\":1,\"trace\":\"7e16d90c-187c-4bf9-8583-d7f159099380\",\"ts\":1786115915441,\"ws\":\"e4f6321c-6dd0-46b4-bdaf-554823e57c78\"}\n15:18:35\nrunner\n{\"event\":\"runner.health_updated\",\"job\":null,\"org\":\"1e9025bc-5b1d-4ab5-b4a5-1c98f52da2b5\",\"runner\":\"213a91d9-6add-40ea-ae55-6501fffe9490\",\"schema_version\":1,\"trace\":\"7f0343a2-de8b-4c42-95bb-eea679e512d9\",\"ts\":17861159100"
+  },
+  {
+    "label": "Plugin Manager",
+    "heading": "Plugin Manager",
+    "requests": [
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      }
+    ],
+    "text_sample": "Skip to main content\nJOEOS\nVPS COMMAND CENTER\nCOMPUTE HOST\nVPS \u00b7 Private\n\nOPERATIONS\n\nMission Control\nExecutive Dashboard\nCI/CD Pipeline\nInfrastructure Health\nSecurity & Logs\nPlugin Manager\nAutomation\nCommunications\nDevice Manager\nMobile Companion\nSecurity Center\nPerformance Center\nModels & AI\nProduction & Release\nMaintenance & Improvement\nSettings\nBot Fleet\nLemonade offline\nJoeOS Local\nPrivate\nJOEOS / VPS OPERATIONS\nPlugin Manager\nLemonade offline\n15:18:42\nAsk JoeOS AI\nLemonade Server is offline \u2014 local AI and model telemetry are unavailable.\nView dashboard\nSECURE EXTENSION PLATFORM\nPlugin Manager\n\nInstalled plugins are versioned, permission-based, integrity-checked, and executed in an isolated Extension Host. A plugin is never trusted merely because it is installed.\n\n0 INSTALLED\n0\nPLUGINS INSTALLED\n0\nACTIVE\n0\nQUARANTINED\nNo plugins installed\n\nInstall a validated plugin package or a development plugin through the API to see it here.\n\nJoeOS Local AI\nLemonade offline\nPRIVATE LEMONADE \u00b7 NO MODEL SELECTED\nI\u2019m your private JoeOS copilot. Once Lemonade is online, ask me about this VPS\u2019s live health, local events, or agent profiles.\nSummarize platform health\nReport bot fleet status\nShow storage utilization\nWhat can you do?\nEnter an operational command\nEnter to send\nRead-only local assistant"
+  },
+  {
+    "label": "Automation",
+    "heading": "Automation",
+    "requests": [
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      }
+    ],
+    "text_sample": "Skip to main content\nJOEOS\nVPS COMMAND CENTER\nCOMPUTE HOST\nVPS \u00b7 Private\n\nOPERATIONS\n\nMission Control\nExecutive Dashboard\nCI/CD Pipeline\nInfrastructure Health\nSecurity & Logs\nPlugin Manager\nAutomation\nCommunications\nDevice Manager\nMobile Companion\nSecurity Center\nPerformance Center\nModels & AI\nProduction & Release\nMaintenance & Improvement\nSettings\nBot Fleet\nLemonade offline\nJoeOS Local\nPrivate\nJOEOS / VPS OPERATIONS\nAutomation\nLemonade offline\n15:18:51\nAsk JoeOS AI\nLemonade Server is offline \u2014 local AI and model telemetry are unavailable.\nView dashboard\nWORKFLOW ORCHESTRATION\nAutomation\n\nVersioned, validated workflows executed by the Automation Engine. Runs, schedules, approvals, and traces reflect real authoritative state; a workflow never gains authority merely because it exists.\n\n0 RUNNING\n1\nWORKFLOWS\n1\nENABLED\n0\nPENDING APPROVALS\nAPI Commsacme.api_comms v1.0.0\nENABLEDHealth: inactive\nInspect\nJoeOS Local AI\nLemonade offline\nPRIVATE LEMONADE \u00b7 NO MODEL SELECTED\nI\u2019m your private JoeOS copilot. Once Lemonade is online, ask me about this VPS\u2019s live health, local events, or agent profiles.\nSummarize platform health\nReport bot fleet status\nShow storage utilization\nWhat can you do?\nEnter an operational command\nEnter to send\nRead-only local assistant"
+  },
+  {
+    "label": "Communications",
+    "heading": "Communications",
+    "requests": [
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      },
+      {
+        "method": "GET",
+        "url": "REDACTED"
+      }
+    ],
+    "text_sample": "Skip to main content\nJOEOS\nVPS COMMAND CENTER\nCOMPUTE HOST\nVPS \u00b7 Private\n\nOPERATIONS\n\nMission Control\nExecutive Dashboard\nCI/CD Pipeline\nInfrastructure Health\nSecurity & Logs\nPlugin Manager\nAutomation\nCommunications\nDevice Manager\nMobile Companion\nSecurity Center\nPerformance Center\nModels & AI\nProduction & Release\nMaintenance & Improvement\nSettings\nBot Fleet\nLemonade offline\nJoeOS Local\nPrivate\nJOEOS / VPS OPERATIONS\nCommunications\nLemonade offline\n15:18:59\nAsk JoeOS AI\nLemonade Server is offline \u2014 local AI and model telemetry are unavailable.\nView dashboard\nUNIFIED INBOX\nCommunications\n\nA local-first, provider-neutral hub. Notifications, internal messages, drafts, and approvals reflect real state; external sending always requires approval bound to content and recipients.\n\n3 UNREAD\n3\nUNREAD\n0\nPENDING APPROVALS\n0\nOUTBOX\nAPI Alertautomation \u00b7 workflow_failed\nWARNINGPriority: normal\n\nhello\n\nBuild failedautomation \u00b7 workflow_failed\nERRORPriority: normal\nHellotest \u00b7 test\nWARNINGPriority: normal\nJoeOS Local AI\nLemonade offline\nPRIVATE LEMONADE \u00b7 NO MODEL SELECTED\nI\u2019m your private JoeOS copilot. Once Lemonade is online, ask me about this VPS\u2019s live health, local events, or agent profiles.\nSummarize platform health\nReport bot fleet status\nShow storage utilization\nWhat can you do?\nEnter an operational command\nEnter to send\nRead-only local assistant"
+  },
+  {
+    "label": "Device Manager",
+    "nav_error": "Locator.scroll_into_view_if_needed: Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator(\"nav.nav-list button.nav-button\").filter(has_text=\"Device Manager\").first\n"
+  },
+  {
+    "label": "Mobile Companion",
+    "nav_error": "Locator.scroll_into_view_if_needed: Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator(\"nav.nav-list button.nav-button\").filter(has_text=\"Mobile Companion\").first\n"
+  },
+  {
+    "label": "Security Center",
+    "nav_error": "Locator.scroll_into_view_if_needed: Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator(\"nav.nav-list button.nav-button\").filter(has_text=\"Security Center\").first\n"
+  },
+  {
+    "label": "Performance Center",
+    "nav_error": "Locator.scroll_into_view_if_needed: Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator(\"nav.nav-list button.nav-button\").filter(has_text=\"Performance Center\").first\n"
+  },
+  {
+    "label": "Models & AI",
+    "nav_error": "Locator.scroll_into_view_if_needed: Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator(\"nav.nav-list button.nav-button\").filter(has_text=\"Models & AI\").first\n"
+  },
+  {
+    "label": "Production & Release",
+    "nav_error": "Locator.scroll_into_view_if_needed: Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator(\"nav.nav-list button.nav-button\").filter(has_text=\"Production & Release\").first\n"
+  },
+  {
+    "label": "Maintenance & Improvement",
+    "nav_error": "Locator.scroll_into_view_if_needed: Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator(\"nav.nav-list button.nav-button\").filter(has_text=\"Maintenance & Improvement\").first\n"
+  },
+  {
+    "label": "Settings",
+    "nav_error": "Locator.scroll_into_view_if_needed: Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator(\"nav.nav-list button.nav-button\").filter(has_text=\"Settings\").first\n"
+  },
+  {
+    "label": "Bot Fleet",
+    "nav_error": "Locator.scroll_into_view_if_needed: Timeout 5000ms exceeded.\nCall log:\n  - waiting for locator(\"nav.nav-list button.nav-button\").filter(has_text=\"Bot Fleet\").first\n"
+  }
+]

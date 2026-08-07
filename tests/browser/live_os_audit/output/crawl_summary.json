@@ -1,0 +1,294 @@
+[
+  {
+    "label": "Mission Control",
+    "controls": 40,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Executive Dashboard",
+    "controls": 33,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "CI/CD Pipeline",
+    "controls": 39,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Infrastructure Health",
+    "controls": 35,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Security & Logs",
+    "controls": 36,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Plugin Manager",
+    "controls": 32,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Automation",
+    "controls": 33,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Communications",
+    "controls": 32,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Device Manager",
+    "controls": 33,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Mobile Companion",
+    "controls": 33,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Security Center",
+    "controls": 32,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Performance Center",
+    "controls": 36,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Models & AI",
+    "controls": 32,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Production & Release",
+    "controls": 34,
+    "clicked": [
+      "Mission Control",
+      "Executive Dashboard",
+      "CI/CD Pipeline",
+      "Infrastructure Health",
+      "Security & Logs",
+      "Plugin Manager",
+      "Automation",
+      "Communications",
+      "Device Manager",
+      "Mobile Companion",
+      "Security Center",
+      "Performance Center"
+    ],
+    "console_errors": 0,
+    "http": 0
+  },
+  {
+    "label": "Maintenance & Improvement",
+    "error": "Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"nav.nav-list button.nav-button\").filter(has_text=\"Maintenance & Improvement\").first\n    - locator resolved to <button type=\"button\" class=\"nav-button \">\u2026</button>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <html lang=\"en\" data-theme=\"light\" data-effects=\"full\" data-contrast=\"normal\" data-motion=\"standard\" data-density=\"balanced\">\u2026</html> intercepts pointer events\n    - retrying click action\n    - waiting 20ms\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - <html lang=\"en\" data-theme=\"light\" data-effects=\"full\" data-contrast=\"normal\" data-motion=\"standard\" data-density=\"balanced\">\u2026</html> intercepts pointer events\n    - retrying click action\n      - waiting 100ms\n    43 \u00d7 waiting for element to be visible, enabled and stable\n       - element is visible, enabled and stable\n       - scrolling into view if needed\n       - done scrolling\n       - <html lang=\"en\" data-theme=\"light\" data-effects=\"full\" data-contrast=\"normal\" data-motion=\"standard\" data-density=\"balanced\">\u2026</html> intercepts pointer events\n     - retrying click action\n       - waiting 500ms\n"
+  },
+  {
+    "label": "Settings",
+    "error": "Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"nav.nav-list button.nav-button\").filter(has_text=\"Settings\").first\n    - locator resolved to <button type=\"button\" class=\"nav-button \">\u2026</button>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - element is outside of the viewport\n    - retrying click action\n    - waiting 20ms\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - element is outside of the viewport\n    - retrying click action\n      - waiting 100ms\n    44 \u00d7 waiting for element to be visible, enabled and stable\n       - element is visible, enabled and stable\n       - scrolling into view if needed\n       - done scrolling\n       - element is outside of the viewport\n     - retrying click action\n       - waiting 500ms\n    - waiting for element to be visible, enabled and stable\n"
+  },
+  {
+    "label": "Bot Fleet",
+    "error": "Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"nav.nav-list button.nav-button\").filter(has_text=\"Bot Fleet\").first\n    - locator resolved to <button type=\"button\" class=\"nav-button \">\u2026</button>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - element is outside of the viewport\n    - retrying click action\n    - waiting 20ms\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is visible, enabled and stable\n      - scrolling into view if needed\n      - done scrolling\n      - element is outside of the viewport\n    - retrying click action\n      - waiting 100ms\n    42 \u00d7 waiting for element to be visible, enabled and stable\n       - element is visible, enabled and stable\n       - scrolling into view if needed\n       - done scrolling\n       - element is outside of the viewport\n     - retrying click action\n       - waiting 500ms\n"
+  }
+]

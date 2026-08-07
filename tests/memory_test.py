@@ -150,5 +150,27 @@ class EvidenceAndGraphTests(MemoryFixture):
         self.assertEqual(health.diagnostics.storage_version, 1)
 
 
+class MemoryOverviewTests(MemoryFixture):
+    def test_overview_builds_with_all_typed_fields(self):
+        record = _record(title="Overview record", content="overview content")
+        self.service.propose(record)
+        overview = self.service.overview()
+        self.assertGreaterEqual(overview.awaiting_review, 0)
+        self.assertGreaterEqual(overview.open_conflicts, 0)
+        self.assertGreaterEqual(overview.stale_memories, 0)
+        self.assertGreaterEqual(overview.expiring_soon, 0)
+        self.assertGreaterEqual(overview.deletion_failures, 0)
+        self.assertGreaterEqual(overview.documents_indexed, 0)
+        self.assertGreaterEqual(overview.active_context_count, 0)
+        self.assertEqual(overview.semantic_available, True)
+        self.assertIsInstance(overview.needs_attention, tuple)
+        self.assertTrue(any(r.memory_id == record.memory_id for r in overview.recent))
+        self.assertEqual(len(overview.recent), 1)
+
+    def test_overview_reflects_open_conflict_backlog(self):
+        health = self.service.overview().health
+        self.assertIn(health.state, {"healthy", "degraded", "partially_available"})
+
+
 if __name__ == "__main__":
     unittest.main()

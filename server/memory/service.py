@@ -496,6 +496,27 @@ class MemoryService:
             projects = connection.execute(
                 "SELECT DISTINCT value FROM memory_meta WHERE key = 'projects_with_memory'"
             ).fetchall()
+            deletion_failures = connection.execute(
+                "SELECT COUNT(*) FROM memory_records "
+                "WHERE deletion_state IN ('failed', 'blocked_by_retention', 'deleting')"
+            ).fetchone()[0]
+            documents_indexed = connection.execute(
+                "SELECT COUNT(*) FROM memory_documents "
+                "WHERE deletion_state = 'active' AND indexing_state = 'indexed'"
+            ).fetchone()[0]
+            active_context_count = connection.execute(
+                "SELECT COUNT(*) FROM memory_records "
+                "WHERE deletion_state = 'active' AND temporal_state != 'expired'"
+            ).fetchone()[0]
+        needs_attention = []
+        if health.diagnostics.unresolved_conflicts > 0:
+            needs_attention.append("unresolved_conflicts")
+        if health.diagnostics.deletion_backlog > 0:
+            needs_attention.append("deletion_backlog")
+        if health.diagnostics.stale > 0:
+            needs_attention.append("stale")
+        if health.diagnostics.unavailable_evidence > 0:
+            needs_attention.append("unavailable_evidence")
         return MemoryOverview(
             health=health,
             recent=self.list(limit=8),
@@ -503,8 +524,12 @@ class MemoryService:
             open_conflicts=conflicts,
             stale_memories=health.diagnostics.stale,
             expiring_soon=self._expiring_soon(),
+            deletion_failures=deletion_failures,
             projects_with_memory=tuple(p["value"] for p in projects),
+            documents_indexed=documents_indexed,
             semantic_available=True,
+            active_context_count=active_context_count,
+            needs_attention=tuple(needs_attention),
             generated_at=_now(),
         )
 
