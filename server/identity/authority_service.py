@@ -66,6 +66,17 @@ class AuthorityService:
         "conversation.cancel",
         "principal.read",
         "diagnostics.read",
+        "agent.read",
+        "agent.manage",
+        "agent.run",
+        "tool.read",
+        "policy.read",
+        "action.read",
+        "action.propose",
+        "action.cancel",
+        "approval.read",
+        "approval.decide.low",
+        "approval.decide.medium",
     ]
 
     def __init__(
@@ -84,6 +95,7 @@ class AuthorityService:
     def prepare(self) -> None:
         self._repository.prepare()
         self._repository.seed_capabilities(list(CAPABILITY_RISK_BY_NAME), self._now())
+        self._repository.grant_owner_capabilities(self.owner_standard_capabilities, self._now())
 
     # ------------------------------------------------------------------
     # Local owner bootstrap

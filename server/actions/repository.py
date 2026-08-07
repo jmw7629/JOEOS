@@ -278,6 +278,8 @@ class SQLiteControlStore(SQLiteControlRepository):
         max_token_budget: int,
         data_boundary: str,
         approval_policy: str,
+        default_provider_policy: str = "backend",
+        default_model_policy: str = "backend",
         created_by: UUID,
         now: int,
     ) -> tuple:
@@ -291,8 +293,9 @@ class SQLiteControlStore(SQLiteControlRepository):
                         purpose, status, system_instructions, allowed_tools, denied_tools,
                         required_capabilities, max_delegation_depth, max_parallel_tasks,
                         max_runtime_ms, max_token_budget, data_boundary, approval_policy,
+                        default_provider_policy, default_model_policy,
                         created_by, created_at, updated_at, revision
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
                     """,
                     (
                         str(id), str(organization_id), str(workspace_id) if workspace_id else None,
@@ -300,6 +303,7 @@ class SQLiteControlStore(SQLiteControlRepository):
                         allowed_tools, denied_tools, required_capabilities,
                         max_delegation_depth, max_parallel_tasks, max_runtime_ms,
                         max_token_budget, data_boundary, approval_policy,
+                        default_provider_policy, default_model_policy,
                         str(created_by), now, now,
                     ),
                 )
@@ -313,6 +317,8 @@ class SQLiteControlStore(SQLiteControlRepository):
                         "max_parallel_tasks": max_parallel_tasks, "max_runtime_ms": max_runtime_ms,
                         "max_token_budget": max_token_budget, "data_boundary": data_boundary,
                         "approval_policy": approval_policy,
+                        "default_provider_policy": default_provider_policy,
+                        "default_model_policy": default_model_policy,
                     },
                     sort_keys=True, separators=(",", ":"),
                 ))
@@ -403,6 +409,7 @@ class SQLiteControlStore(SQLiteControlRepository):
         requested_by: UUID,
         parent_run_id: Optional[UUID] = None,
         delegation_depth: int = 0,
+        objective: str = "",
         trace_id: str = "",
         now: int,
     ) -> AgentRunRecord:
@@ -413,15 +420,15 @@ class SQLiteControlStore(SQLiteControlRepository):
                     """
                     INSERT INTO control_agent_runs(
                         id, conversation_id, message_id, agent_id, agent_version_id,
-                        status, parent_run_id, delegation_depth, requested_by, trace_id,
-                        revision
-                    ) VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, 1)
+                        status, parent_run_id, delegation_depth, requested_by, objective,
+                        trace_id, revision
+                    ) VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, 1)
                     """,
                     (
                         str(id), str(conversation_id), str(message_id),
                         str(agent_id), str(agent_version_id),
                         str(parent_run_id) if parent_run_id else None,
-                        delegation_depth, str(requested_by), trace_id,
+                        delegation_depth, str(requested_by), objective, trace_id,
                     ),
                 )
                 connection.commit()
@@ -438,6 +445,14 @@ class SQLiteControlStore(SQLiteControlRepository):
                 "SELECT * FROM control_agent_runs WHERE id = ?", (str(run_id),)
             ).fetchone()
         return _run(row) if row is not None else None
+
+    def list_runs_for_agent(self, agent_id: UUID) -> List[AgentRunRecord]:
+        with self._connection_factory() as connection:
+            rows = connection.execute(
+                "SELECT * FROM control_agent_runs WHERE agent_id = ? ORDER BY started_at DESC",
+                (str(agent_id),),
+            ).fetchall()
+        return [_run(row) for row in rows]
 
     def list_runs_for_conversation(self, conversation_id: UUID) -> List[AgentRunRecord]:
         with self._connection_factory() as connection:
@@ -485,6 +500,120 @@ class SQLiteControlStore(SQLiteControlRepository):
             )
             connection.commit()
             return cursor.rowcount == 1
+
+    def set_run_result(
+        self,
+        run_id: UUID,
+        *,
+        status: str,
+        result: str,
+        now: int,
+        token_usage: int = 0,
+        failure: str = "",
+    ) -> bool:
+        """Persist a bounded run output and a terminal transition. Authoritative
+        runs never fabricate output: the result is the actual model response."""
+        with self._connection_factory() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                connection.execute(
+                    """
+                    UPDATE control_agent_runs
+                    SET status=?, result=?, token_usage=?, failure=CASE WHEN ? = '' THEN failure ELSE ? END,
+                        completed_at=COALESCE(completed_at, ?), revision=revision+1
+                    WHERE id=? AND status NOT IN ('succeeded','failed','cancelled','interrupted')
+                    """,
+                    (status, result[:32000], token_usage, failure, failure, now, str(run_id)),
+                )
+                connection.execute(
+                    """
+                    INSERT OR REPLACE INTO control_run_outputs(run_id, output, created_at, revision)
+                    VALUES (?, ?, ?, 1)
+                    """,
+                    (str(run_id), result[:64000], now),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+            return True
+
+    def get_run_output(self, run_id: UUID) -> str:
+        with self._connection_factory() as connection:
+            row = connection.execute(
+                "SELECT output FROM control_run_outputs WHERE run_id = ?", (str(run_id),)
+            ).fetchone()
+        return str(row["output"]) if row is not None else ""
+
+    def list_child_runs(self, parent_run_id: UUID) -> List[AgentRunRecord]:
+        with self._connection_factory() as connection:
+            rows = connection.execute(
+                "SELECT * FROM control_agent_runs WHERE parent_run_id = ? ORDER BY started_at",
+                (str(parent_run_id),),
+            ).fetchall()
+        return [_run(row) for row in rows]
+
+    def create_council_member_run(
+        self,
+        *,
+        id: UUID,
+        council_run_id: UUID,
+        agent_id: UUID,
+        objective: str,
+        now: int,
+    ) -> None:
+        with self._connection_factory() as connection:
+            connection.execute(
+                """
+                INSERT INTO control_council_member_runs(
+                    id, council_run_id, agent_id, objective, status, created_at, revision
+                ) VALUES (?, ?, ?, ?, 'queued', ?, 1)
+                """,
+                (str(id), str(council_run_id), str(agent_id), objective, now),
+            )
+            connection.commit()
+
+    def update_council_member_run(
+        self,
+        member_run_id: UUID,
+        *,
+        status: str,
+        result: str = "",
+        failure: str = "",
+        now: int,
+        agent_version_id: Optional[UUID] = None,
+        provider_id: Optional[UUID] = None,
+        model_id: Optional[UUID] = None,
+    ) -> None:
+        with self._connection_factory() as connection:
+            connection.execute(
+                """
+                UPDATE control_council_member_runs
+                SET status=?, result=?, failure=CASE WHEN ? = '' THEN failure ELSE ? END,
+                    agent_version_id=COALESCE(?, agent_version_id),
+                    provider_id=COALESCE(?, provider_id), model_id=COALESCE(?, model_id),
+                    started_at=COALESCE(started_at, ?),
+                    completed_at=CASE WHEN ? IN ('succeeded','failed','cancelled') THEN ? ELSE completed_at END,
+                    revision=revision+1
+                WHERE id=?
+                """,
+                (
+                    status, result[:32000], failure, failure,
+                    str(agent_version_id) if agent_version_id else None,
+                    str(provider_id) if provider_id else None,
+                    str(model_id) if model_id else None,
+                    now, 1, now, str(member_run_id),
+                ),
+            )
+            connection.commit()
+
+    def list_council_member_runs(self, council_run_id: UUID) -> List[Dict]:
+        with self._connection_factory() as connection:
+            rows = connection.execute(
+                "SELECT * FROM control_council_member_runs WHERE council_run_id = ? ORDER BY created_at",
+                (str(council_run_id),),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def recover_stale_runs(self, now: int) -> int:
         with self._connection_factory() as connection:
@@ -1249,9 +1378,11 @@ def _run(row: sqlite3.Row) -> AgentRunRecord:
         parent_run_id=UUID(str(row["parent_run_id"])) if row["parent_run_id"] else None,
         delegation_depth=int(row["delegation_depth"]),
         requested_by=UUID(str(row["requested_by"])),
+        objective=str(row["objective"]) if "objective" in row.keys() else "",
         started_at=int(row["started_at"]) if row["started_at"] is not None else None,
         completed_at=int(row["completed_at"]) if row["completed_at"] is not None else None,
         cancellation=str(row["cancellation"]), failure=str(row["failure"]),
+        result=str(row["result"]) if "result" in row.keys() else "",
         token_usage=int(row["token_usage"]), trace_id=str(row["trace_id"]),
         revision=int(row["revision"]),
     )

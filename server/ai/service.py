@@ -28,12 +28,29 @@ from .models import (
     ProviderRecord,
     StreamDelta,
 )
-from .providers import LocalLemonadeProvider, ProviderRegistry
+from .providers import LocalLemonadeProvider, OllamaProvider, ProviderRegistry
 from .storage import AIStorage
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _prefer_ollama_model(models: List[str]) -> Optional[str]:
+    """Pick the strongest installed model for general orchestration, preferring
+    larger coding-capable models. Unknown inventory returns None (never guessed)."""
+    if not models:
+        return None
+    ranked = sorted(
+        models,
+        key=lambda name: (
+            0 if ("deepseek" in name.lower() and "r1" in name.lower()) else 1,
+            -int("14b" in name),
+            -int("7b" in name),
+            0 if "agentic" in name.lower() or "safe" in name.lower() else 1,
+        ),
+    )
+    return ranked[0]
 
 
 class AIService:
@@ -49,6 +66,7 @@ class AIService:
         governance_blocked: Optional[Callable[[], tuple]] = None,
         record_metric: Optional[Callable[[str, float], None]] = None,
         version: str = "2.0.0",
+        ollama_api_base: str = "http://127.0.0.1:11434",
     ) -> None:
         from pathlib import Path as _Path
 
@@ -69,7 +87,12 @@ class AIService:
             api_base=api_base,
             headers=headers,
         )
+        self.ollama_provider = OllamaProvider(
+            http_client=http_client,
+            api_base=ollama_api_base,
+        )
         self.providers = ProviderRegistry(self.local_provider)
+        self.providers.register_local(self.ollama_provider)
         self.embeddings = EmbeddingService(self.providers, self.storage)
         self.context = ContextBuilder(self.storage)
         self.interpretations = InterpretationService(self.storage)
@@ -88,6 +111,42 @@ class AIService:
             return False
         record = provider.availability()
         return record.available and record.supports_streaming
+
+    async def probe_ollama(self) -> Dict[str, Any]:
+        """Measure the local Ollama runtime and cache its health on the adapter.
+
+        Never fabricates state: unmeasured stays unknown. Returns a safe,
+        redacted summary for the runtime collector and the control-plane
+        provider registry sync."""
+        version = None
+        models: List[str] = []
+        try:
+            version = await self.ollama_provider.version()
+        except Exception:  # noqa: BLE001
+            version = None
+        if version is None:
+            self.providers.set_ollama_health(
+                available=False, reason="Ollama is not reachable on the VPS loopback.",
+                model=None, version=None,
+            )
+            return {"available": False, "reason": "Ollama is not reachable on the VPS loopback.", "models": []}
+        try:
+            discovered = await self.ollama_provider.list_models()
+            models = [str(m["name"]) for m in discovered if m.get("name")]
+        except Exception:  # noqa: BLE001
+            models = []
+        preferred = _prefer_ollama_model(models)
+        self.providers.set_ollama_health(
+            available=True, reason="Ollama is healthy on the VPS loopback.",
+            model=preferred, version=version, supports_streaming=True,
+        )
+        return {
+            "available": True,
+            "reason": "Ollama is healthy on the VPS loopback.",
+            "version": version,
+            "model": preferred,
+            "models": models,
+        }
 
     def overview(self) -> AIOverview:
         default = self.providers.default()

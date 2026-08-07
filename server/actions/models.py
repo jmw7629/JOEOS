@@ -68,6 +68,8 @@ class AgentRequest(WireModel):
     max_token_budget: int = 0
     data_boundary: str = "restricted"
     approval_policy: str = "backend"
+    default_provider_policy: str = "backend"
+    default_model_policy: str = "backend"
 
 
 class AgentUpdateRequest(AgentRequest):
@@ -84,6 +86,12 @@ class AgentRunRequest(WireModel):
     model_preference: Optional[str] = None
     parent_run_id: Optional[UUID] = None
     delegation_depth: int = 0
+    objective: str = ""
+
+
+class DelegateRequest(WireModel):
+    agent_id: UUID
+    objective: str = Field(min_length=1, max_length=4000)
 
 
 class ToolRequest(WireModel):
