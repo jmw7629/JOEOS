@@ -15,6 +15,7 @@ JoeOS is a local-first executive command center for the local VPS, iPhone, and M
 - Server-side local-console device pairing with two distinct P-256 keys, encrypted pending-key storage, expiry/replay controls, local revocation, and an explicit no-authority `active_unassigned` state.
 - Engineering workspace with a project registry, root-bounded file access, Git status/diff and approval-gated stage/commit, secret scanning, command validation, and repository search.
 - Project and repository intelligence: stable repository fingerprints, incremental file inventory and classification, language/framework/build detection, symbol/reference extraction for ten languages, dependency and architecture graphs, change-impact estimation, explainable risk findings, ADR/convention ingestion, project memory, hybrid structured retrieval, context packs, and a cancellable background index with health diagnostics.
+- Browser knowledge layer (P4-UI-E): Memory, Files, Universal Search, and Context workspaces in the browser OS, driven by the authoritative memory, engineering, and agents APIs — records, provenance, evidence, review, token-overlap search, secret-masked file preview, and project artifact metadata.
 
 Start the current local release with `start_joeos.sh` on the VPS or `start_joeos.command` on macOS. For the recommended private HTTPS iPhone/PWA route, use `start_joeos_secure.sh` or double-click `start_joeos_secure.command`. See `DEPLOYMENT.md` for details.
 

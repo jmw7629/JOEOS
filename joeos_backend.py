@@ -1532,6 +1532,12 @@ def frontend() -> FileResponse:
     return FileResponse(INDEX_PATH, media_type="text/html")
 
 
+@app.get("/os/{rest:path}", include_in_schema=False)
+def os_frontend(rest: str) -> FileResponse:
+    """Serve the browser OS shell for /os/* deep links so a refresh keeps the route."""
+    return FileResponse(INDEX_PATH, media_type="text/html")
+
+
 @app.get("/manifest.webmanifest", include_in_schema=False)
 def manifest() -> FileResponse:
     return FileResponse(MANIFEST_PATH, media_type="application/manifest+json")

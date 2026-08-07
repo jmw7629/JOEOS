@@ -3,6 +3,23 @@
 All notable changes to the JoeOS Command Center are documented here, grouped
 by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
 
+## [2.1.0] — 2026-08-07
+
+### Browser knowledge layer (P4-UI-E)
+
+- Memory workspace: records list with scope filter, state chips, detail with
+  provenance/evidence/lifecycle, token-overlap search, review queue, correct and
+  forget through the authoritative `/api/v1/memory/*` contracts.
+- Files workspace: registered engineering projects, bounded directory browsing,
+  secret-masked file preview, and agent artifact metadata.
+- Universal Search workspace: orchestration of the real memory and project-file
+  search endpoints, grouped and typed, with honest token-overlap semantics.
+- Context workspace: knowledge boundaries (secrets and hidden reasoning never
+  stored) and recent authoritative memory context.
+- Deep links `/os/memory`, `/os/files`, `/os/search`, `/os/context` plus command
+  palette commands; knowledge refresh wired into the shared refresh cycle.
+- Frontend static tests extended to 35 (from 27).
+
 ## [2.0.0] — 2026-08-05
 
 ### Phase P3E — Private runner activated on the local VPS; VPS retargeting
