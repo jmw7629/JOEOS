@@ -148,7 +148,7 @@ class AutonomousService:
         return definition
 
     def list_definitions(self, principal: Dict, state: Optional[str] = None) -> List[AutomationDefinition]:
-        return self._store.list_definitions(principal["workspace"]["id"], state)
+        return self._store.list_definitions(_sid(principal["workspace"]["id"]), state)
 
     def update_definition(self, principal: Dict, automation_id: str,
                           payload: AutomationDefinitionCreate) -> AutomationDefinition:
@@ -281,6 +281,10 @@ class AutonomousService:
         })
         self._store.update_definition(updated)
 
+    def list_runs_by_state(self, state: str, workspace_ids: Sequence[str],
+                           limit: int = 100) -> List[AutomationRun]:
+        return self._store.list_runs_by_state(state, [_sid(w) for w in workspace_ids], limit)
+
     def list_runs_for_definition(self, principal: Dict, automation_id: str,
                                  limit: int = 50) -> List[AutomationRun]:
         self.get_definition(principal, automation_id)
@@ -403,7 +407,7 @@ class AutonomousService:
         return run  # type: ignore[return-value]
 
     def _assert_workspace(self, principal: Dict, definition: AutomationDefinition) -> None:
-        if definition.workspace_id != principal["workspace"]["id"]:
+        if _sid(definition.workspace_id) != _sid(principal["workspace"]["id"]):
             raise AutonomousDeniedError(403, "cross_workspace_denied",
                                         "Cross-workspace automation access is denied.")
 

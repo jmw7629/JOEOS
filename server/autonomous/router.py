@@ -51,7 +51,7 @@ def overview(
         "definitions": len(service.list_definitions(p)),
         "active": len([d for d in service.list_definitions(p) if d.state == "active"]),
         "paused": len([d for d in service.list_definitions(p) if d.state == "paused"]),
-        "needs_attention": len(service.list_runs_by_state("failed", [p["workspace"]["id"]], 50)),
+        "needs_attention": len(service.list_runs_by_state("failed", [str(p["workspace"]["id"])], 50)),
     })
 
 
