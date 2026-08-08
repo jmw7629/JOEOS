@@ -212,7 +212,8 @@ class AutonomousStore:
             rows = connection.execute(
                 """
                 SELECT * FROM automation_definitions
-                WHERE state IN ('active', 'paused')
+                WHERE state = 'active'
+                  AND enabled = 1
                   AND next_run_at <> '' AND next_run_at <= ?
                 ORDER BY next_run_at
                 """,

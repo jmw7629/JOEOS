@@ -82,6 +82,12 @@ class AutonomousScheduler:
         return processed
 
     async def _process_due(self, definition: AutomationDefinition, now: str) -> int:
+        # Re-check the durable state at claim time so a pause/disable that landed
+        # between the tick's read and now prevents a new occurrence.
+        fresh = await asyncio.to_thread(self._service.get_definition_record, definition.id)
+        if fresh is None or fresh.state != "active":
+            await asyncio.to_thread(self._service.advance_definition, definition.id)
+            return 0
         scheduled_for = definition.next_run_at or now
         run = await asyncio.to_thread(self._service.claim_and_run, definition, scheduled_for)
         if run is None or run.state in ("succeeded", "failed", "cancelled"):

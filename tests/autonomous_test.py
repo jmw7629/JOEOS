@@ -220,6 +220,35 @@ class RetryPolicyTests(AutonomousFixture):
         self.assertEqual(updated.attempt, 2)
 
 
+    def test_paused_definition_not_due(self):
+        definition = self.service.create_definition(principal(), self._recurring_payload())
+        self.service.set_state(principal(), definition.id, "paused")
+        due = self.service.due_now()
+        self.assertNotIn(definition.id, [d.id for d in due])
+        # advance does nothing while paused (schedule holds).
+        self.service.advance_definition(definition.id)
+        refreshed = self.service.get_definition(principal(), definition.id)
+        self.assertEqual(refreshed.state, "paused")
+        self.assertEqual(refreshed.next_run_at, definition.next_run_at)
+
+    def test_scheduler_rechecks_state_before_claim(self):
+        class FakeExecutor:
+            async def execute(self, definition, run, service):
+                return {"status": "succeeded", "result": "ok", "agent_run_id": "r",
+                        "provider_key": "ollama", "model_key": "m"}
+
+        definition = self.service.create_definition(principal(), self._one_time_payload(
+            (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()))
+        self.service._store.update_definition(definition.model_copy(
+            update={"next_run_at": (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()}))
+        # Pause before the tick; the scheduler must not create a run.
+        self.service.set_state(principal(), definition.id, "paused")
+        scheduler = AutonomousScheduler(self.service, FakeExecutor(), tick_interval_seconds=1.0, lease_seconds=60)
+        processed = asyncio.run(scheduler.tick())
+        runs = self.store.list_runs(definition.id)
+        self.assertEqual(len(runs), 0)
+
+
 class SchedulerTests(AutonomousFixture):
     def test_scheduler_executes_and_advances(self):
         class FakeExecutor:

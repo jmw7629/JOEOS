@@ -267,9 +267,14 @@ class AutonomousService:
         return run
 
     def advance_definition(self, automation_id: str) -> None:
-        """Advance next_run_at after an occurrence, respecting policies."""
+        """Advance next_run_at after an occurrence, respecting policies.
+
+        A paused/disabled/archived automation is not advanced further (its
+        schedule holds until resumed)."""
         definition = self._store.get_definition(automation_id)
         if definition is None:
+            return
+        if definition.state != "active":
             return
         now = self._now()
         nxt = next_occurrence(definition.trigger, now)
@@ -301,6 +306,9 @@ class AutonomousService:
     # ------------------------------------------------------------------
     # Scheduler support (used by AutonomousScheduler)
     # ------------------------------------------------------------------
+
+    def get_definition_record(self, automation_id: str) -> Optional[AutomationDefinition]:
+        return self._store.get_definition(automation_id)
 
     def get_run(self, run_id: str) -> Optional[AutomationRun]:
         return self._store.get_run(run_id)
