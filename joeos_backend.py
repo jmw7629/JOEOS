@@ -433,6 +433,14 @@ def _default_agent_model(ollama_state: Optional[Dict[str, Any]]) -> str:
     return "qwen2.5-coder:7b"
 
 
+def _autonomous_default_model(ollama_state: Optional[Dict[str, Any]]) -> str:
+    models = list((ollama_state or {}).get("models", []))
+    for candidate in ("qwen2.5-coder:1.5b", "qwen2.5-coder:1.5b-opencode-safe"):
+        if candidate in models:
+            return candidate
+    return "qwen2.5-coder:1.5b"
+
+
 def _principal_for_owner(app: FastAPI, owner_id: str) -> Dict[str, Any]:
     """Resolve a principal for the automation owner from authoritative identity.
 
@@ -1524,7 +1532,10 @@ async def lifespan(app: FastAPI):
     app.state.autonomous_executor = AgentFabricAutomationExecutor(
         app.state.action_service,
         principal_resolver=lambda owner_id: _principal_for_owner(app, owner_id),
-        default_model=_default_agent_model(app.state.ollama_state),
+        # Background agents use the stable 1.5B family to avoid OOM under
+        # combined load; the 7B/14B models stay installed but are not used for
+        # concurrent background runs on this VPS.
+        default_model=_autonomous_default_model(app.state.ollama_state),
     )
     app.state.runner_service = RunnerService(
         SQLiteRunnerStore(lambda: _connect(db_path)),
