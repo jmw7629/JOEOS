@@ -47,6 +47,9 @@ class AutomationNotifier:
                 action_links=links,
             )
         except Exception as error:  # pragma: no cover - defensive
+            # Duplicate suppression is expected (same run notified once).
+            if "duplicate notification" in str(error).lower():
+                return
             logger.exception("automation notification failed: %s", error)
 
     def completed(self, run: AutomationRun, definition: Optional[AutomationDefinition]) -> None:

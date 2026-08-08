@@ -53,18 +53,32 @@ class AgentFabricAutomationExecutor:
         self._default_model = default_model
 
     def _principal_for(self, definition: AutomationDefinition) -> Dict:
-        """Resolve the automation owner principal from authoritative identity."""
+        """Resolve the automation owner principal from authoritative identity.
+
+        The control plane stores ids as UUID objects and compares them directly,
+        so we return UUIDs to match the interactive principal shape."""
+        from uuid import UUID
+        try:
+            user_id = UUID(definition.owner_principal_id)
+            org_id = UUID(definition.organization_id)
+            ws_id = UUID(definition.workspace_id)
+        except (ValueError, TypeError):
+            user_id = definition.owner_principal_id
+            org_id = definition.organization_id
+            ws_id = definition.workspace_id
         if self._principal_resolver is not None:
             try:
-                return self._principal_resolver(definition.owner_principal_id)
+                resolved = self._principal_resolver(definition.owner_principal_id)
+                if resolved:
+                    return resolved
             except Exception:  # pragma: no cover - defensive
                 pass
         return {
             "session_id": None,
             "device_id": None,
-            "user": {"id": definition.owner_principal_id, "display_name": "", "status": "active"},
-            "organization": {"id": definition.organization_id},
-            "workspace": {"id": definition.workspace_id, "name": ""},
+            "user": {"id": user_id, "display_name": "", "status": "active"},
+            "organization": {"id": org_id},
+            "workspace": {"id": ws_id, "name": ""},
             "roles": ["joeos.owner"],
             "capabilities": [],
         }
@@ -79,8 +93,8 @@ class AgentFabricAutomationExecutor:
         # Fall back to any active agent of the same key across org (defensive).
         return None
 
-    def execute(self, definition: AutomationDefinition, run: AutomationRun,
-                service: AutonomousService) -> Dict:
+    async def execute(self, definition: AutomationDefinition, run: AutomationRun,
+                      service: AutonomousService) -> Dict:
         """Create + execute a real AgentRun for the occurrence. Returns the
         control-plane run payload (provider/model/result)."""
         principal = self._principal_for(definition)
@@ -106,7 +120,7 @@ class AgentFabricAutomationExecutor:
             model_preference=self._default_model if definition.agent_ref in ("joe", "auto", "architect") else None,
             objective=objective,
         )
-        executed = self._action_service.execute_agent_run(principal, run_payload["id"])
+        executed = await self._action_service.execute_agent_run(principal, run_payload["id"])
         return {
             "agent_run_id": str(executed["id"]),
             "status": executed.get("status"),

@@ -7,6 +7,7 @@ AgentFabric executor)."""
 
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 import tempfile
 import unittest
@@ -225,7 +226,7 @@ class SchedulerTests(AutonomousFixture):
             def __init__(self):
                 self.calls = 0
 
-            def execute(self, definition, run, service):
+            async def execute(self, definition, run, service):
                 self.calls += 1
                 return {"status": "succeeded", "result": "ok", "agent_run_id": "agent-run-1",
                         "provider_key": "ollama", "model_key": "qwen2.5-coder:1.5b"}
@@ -237,7 +238,7 @@ class SchedulerTests(AutonomousFixture):
             update={"next_run_at": (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()}))
         executor = FakeExecutor()
         scheduler = AutonomousScheduler(self.service, executor, tick_interval_seconds=1.0, lease_seconds=60)
-        processed = scheduler.tick()
+        processed = asyncio.run(scheduler.tick())
         self.assertGreaterEqual(processed, 1)
         self.assertGreaterEqual(executor.calls, 1)
         runs = self.store.list_runs(definition.id)
@@ -249,7 +250,7 @@ class SchedulerTests(AutonomousFixture):
         attempts = {"n": 0}
 
         class FlakyExecutor:
-            def execute(self, definition, run, service):
+            async def execute(self, definition, run, service):
                 attempts["n"] += 1
                 if attempts["n"] == 1:
                     return {"status": "failed", "failure": "OLLAMA_UNAVAILABLE"}
@@ -262,7 +263,7 @@ class SchedulerTests(AutonomousFixture):
             update={"next_run_at": (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()}))
         executor = FlakyExecutor()
         scheduler = AutonomousScheduler(self.service, executor, tick_interval_seconds=1.0, lease_seconds=60)
-        scheduler.tick()
+        asyncio.run(scheduler.tick())
         runs = self.store.list_runs(definition.id)
         self.assertEqual(runs[0].state, "retry_wait")
         self.assertEqual(runs[0].attempt, 2)

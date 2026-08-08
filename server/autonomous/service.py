@@ -49,6 +49,13 @@ def _uid() -> str:
     return uuid.uuid4().hex
 
 
+def _sid(value) -> str:
+    """Normalize a principal id (UUID object or string) to a string."""
+    if value is None:
+        return ""
+    return str(value)
+
+
 def _retryable(error_category: str, policy: RetryPolicySpec) -> bool:
     return error_category in policy.retryable_errors
 
@@ -108,9 +115,9 @@ class AutonomousService:
         first = initial_occurrence(trigger)
         definition = AutomationDefinition(
             id=automation_id,
-            organization_id=principal["organization"]["id"],
-            workspace_id=principal["workspace"]["id"],
-            owner_principal_id=principal["user"]["id"],
+            organization_id=_sid(principal["organization"]["id"]),
+            workspace_id=_sid(principal["workspace"]["id"]),
+            owner_principal_id=_sid(principal["user"]["id"]),
             name=payload.name.strip(),
             description=payload.description,
             objective=payload.objective.strip(),

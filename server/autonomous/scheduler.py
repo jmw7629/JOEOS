@@ -57,7 +57,7 @@ class AutonomousScheduler:
         logger.info("autonomous scheduler started (tick %.1fs)", self._tick_interval_seconds)
         while not self._stop.is_set():
             try:
-                await asyncio.to_thread(self.tick)
+                await self.tick()
             except Exception as error:  # pragma: no cover - defensive
                 logger.exception("autonomous scheduler tick failed: %s", error)
             try:
@@ -68,55 +68,55 @@ class AutonomousScheduler:
     def stop(self) -> None:
         self._stop.set()
 
-    def tick(self) -> int:
+    async def tick(self) -> int:
         now = _now_iso()
         # Recover expired leases first so a crashed worker's work can proceed.
-        self._service.recover_after_restart()
-        due = self._service.due_now()
+        await asyncio.to_thread(self._service.recover_after_restart)
+        due = await asyncio.to_thread(self._service.due_now)
         processed = 0
         for definition in due:
             try:
-                processed += self._process_due(definition, now)
+                processed += await self._process_due(definition, now)
             except Exception as error:  # pragma: no cover - defensive
                 logger.exception("scheduler failed for %s: %s", definition.id, error)
         return processed
 
-    def _process_due(self, definition: AutomationDefinition, now: str) -> int:
+    async def _process_due(self, definition: AutomationDefinition, now: str) -> int:
         scheduled_for = definition.next_run_at or now
-        run = self._service.claim_and_run(definition, scheduled_for)
+        run = await asyncio.to_thread(self._service.claim_and_run, definition, scheduled_for)
         if run is None or run.state in ("succeeded", "failed", "cancelled"):
             # Already terminal or duplicate; advance and move on.
-            self._service.advance_definition(definition.id)
+            await asyncio.to_thread(self._service.advance_definition, definition.id)
             return 0
-        claimed = self._service.claim_run(
-            run.id, worker="scheduler", now_iso=now,
+        claimed = await asyncio.to_thread(
+            self._service.claim_run, run.id, worker="scheduler", now_iso=now,
             lease_expires_iso=_lease_expiry(self._lease_seconds),
         )
         if not claimed:
             return 0
-        run = self._service.get_run(run.id)
+        run = await asyncio.to_thread(self._service.get_run, run.id)
         try:
-            outcome = self._executor.execute(definition, run, self._service)
+            outcome = await self._executor.execute(definition, run, self._service)
             status = outcome.get("status")
             if status == "succeeded":
-                self._service.complete_run(
-                    run.id, state="succeeded",
+                await asyncio.to_thread(
+                    self._service.complete_run, run.id, state="succeeded",
                     result_summary=outcome.get("result", "")[:12000],
                     agent_run_id=outcome.get("agent_run_id", ""),
                     provider_key=outcome.get("provider_key", ""),
                     model_key=outcome.get("model_key", ""),
                 )
             else:
-                self._handle_failure(definition, run, outcome)
-            self._service.advance_definition(definition.id)
+                await self._handle_failure(definition, run, outcome)
+            await asyncio.to_thread(self._service.advance_definition, definition.id)
             return 1
         except Exception as error:  # pragma: no cover - defensive
             logger.exception("automation run failed: %s", error)
-            self._handle_failure(definition, run, {"failure": "executor_error", "status": "failed"})
-            self._service.advance_definition(definition.id)
+            await self._handle_failure(definition, run, {"failure": "executor_error", "status": "failed"})
+            await asyncio.to_thread(self._service.advance_definition, definition.id)
             return 1
 
-    def _handle_failure(self, definition: AutomationDefinition, run: AutomationRun, outcome: Dict) -> None:
+    async def _handle_failure(self, definition: AutomationDefinition, run: AutomationRun, outcome: Dict) -> None:
         error_category = str(outcome.get("failure") or outcome.get("status") or "failed")
         retryable = self._service.is_retryable(error_category, definition)
         attempt = run.attempt + 1
@@ -127,20 +127,21 @@ class AutonomousScheduler:
                 definition.retry_policy.max_backoff_seconds,
             )
             next_retry = (datetime.now(timezone.utc) + timedelta(seconds=backoff)).isoformat()
-            self._service.update_run_with_retry(
-                run.id, attempt=attempt, error_category=error_category,
-                next_retry_at=next_retry,
+            await asyncio.to_thread(
+                self._service.update_run_with_retry, run.id, attempt=attempt,
+                error_category=error_category, next_retry_at=next_retry,
                 agent_run_id=outcome.get("agent_run_id", ""),
                 provider_key=outcome.get("provider_key", ""),
                 model_key=outcome.get("model_key", ""),
             )
-            self._service.notify_retry(run)
+            await asyncio.to_thread(self._service.notify_retry, run)
         else:
-            self._service.complete_run(
-                run.id, state="failed", error_category=error_category,
+            await asyncio.to_thread(
+                self._service.complete_run, run.id, state="failed",
+                error_category=error_category,
                 result_summary=str(outcome.get("result", ""))[:12000],
                 agent_run_id=outcome.get("agent_run_id", ""),
                 provider_key=outcome.get("provider_key", ""),
                 model_key=outcome.get("model_key", ""),
             )
-            self._service.notify_failure(run)
+            await asyncio.to_thread(self._service.notify_failure, run)
