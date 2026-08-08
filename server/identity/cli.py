@@ -415,10 +415,10 @@ def _add_authority_subcommands(subcommands) -> None:
     authority_sub.add_parser("devices", help="List enrolled devices and assignment state.")
 
     assign = authority_sub.add_parser("assign", help="Assign an enrolled device to a principal.")
-    assign.add_argument("--device", required=True, help="Enrolled device UUID.")
-    assign.add_argument("--user", required=True, help="Principal user UUID.")
-    assign.add_argument("--org", required=True, help="Organization UUID.")
-    assign.add_argument("--workspace", required=True, help="Workspace UUID.")
+    assign.add_argument("--device", dest="device_id", required=True, help="Enrolled device UUID.")
+    assign.add_argument("--user", dest="user_id", required=True, help="Principal user UUID.")
+    assign.add_argument("--org", dest="organization_id", required=True, help="Organization UUID.")
+    assign.add_argument("--workspace", dest="workspace_id", required=True, help="Workspace UUID.")
     assign.add_argument("--role", action="append", required=True, help="Role UUID (repeatable).")
     assign.add_argument("--by", required=True, help="Operator user UUID performing the assignment.")
 
