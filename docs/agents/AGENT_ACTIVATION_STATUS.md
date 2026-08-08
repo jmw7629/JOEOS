@@ -59,3 +59,32 @@ made no request to port 11434.
   remains separate from the authoritative control plane.
 - Live deployment of the new backend + console (integration into `ai-rebuild`
   pending; see deployment notes).
+
+## P0 blockers resolved (from the live audit)
+
+| Audit P0 | Resolution |
+| --- | --- |
+| No Ollama provider adapter | `OllamaProvider` in the AI provider layer, wired into the runtime and control-plane executor |
+| ProviderRegistry empty | Ollama registered local/private/server-side on startup |
+| ModelRegistry empty | 10 live models synced; missing models disabled, never deleted |
+| Agents unbound | Joe/Architect/Builder/Researcher/Verifier/Security bound to models that run on this VPS |
+| No real AgentRun execution | `execute_agent_run` runs a real local model and persists the result |
+| Delegation missing | real child AgentRun per delegation, depth-bounded |
+| TaskGraph partial | real executable task graph with per-task child runs |
+| ToolBroker empty | 5 safe read-only tools registered |
+| No browser session/auth | full WebCrypto device-enrollment ceremony -> legitimate application session |
+| No browser Agents UI | Agent Fabric console at /os/agents, /os/providers, /os/models |
+
+Deferred browser audit findings (not agent blockers) remain on the backlog:
+CI/CD fabricated data, notification-center hardcoding, Back/Forward routing,
+HSTS, and the older shell's other cosmetic issues.
+
+## Deployment status
+
+The feature branch `feature/agent-live-repair` is complete and pushed. The
+canonical `ai-rebuild` checkout carries unrelated uncommitted P3G work in files
+this branch also modifies (`joeos_backend.py`, `server/identity/*`). A safe
+merge requires that P3G work to be committed or set aside first; the live
+uvicorn on :8080 is the pre-activation backend and has not been restarted with
+this code. Until then the new console runs on the scratch/dev backend; the
+browser path is proven and reproducible.
