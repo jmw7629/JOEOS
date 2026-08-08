@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -14,7 +14,7 @@ class StrictWireModel(BaseModel):
 
 class AuthChallengeRequest(StrictWireModel):
     device_id: UUID = Field(strict=False, description="The enrolled device id.")
-    user_id: UUID = Field(strict=False, description="The principal user id this device is assigned to.")
+    user_id: Optional[UUID] = Field(default=None, strict=False, description="The principal user id this device is assigned to. Resolved from the device assignment when omitted.")
 
 
 class AuthChallengeResponse(StrictWireModel):

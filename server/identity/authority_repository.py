@@ -464,6 +464,36 @@ class SQLiteAuthorityRepository:
                 connection.rollback()
                 raise
 
+    def grant_owner_capabilities(self, capabilities: List[str], now: int) -> int:
+        """Idempotently grants the local owner role the given capabilities.
+
+        Used during startup so a pre-bootstrapped installation receives newly
+        introduced control-plane capabilities (e.g. agent.manage) without a
+        destructive re-bootstrap. Existing grants are preserved."""
+        granted = 0
+        with self._connection_factory() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                rows = connection.execute(
+                    "SELECT id FROM authority_roles WHERE name = 'joeos.owner' AND status = 'active'"
+                ).fetchall()
+                for row in rows:
+                    for capability in capabilities:
+                        self._ensure_capability_row(connection, capability, now)
+                        cursor = connection.execute(
+                            """
+                            INSERT OR IGNORE INTO authority_role_capabilities(role_id, capability_name)
+                            VALUES (?, ?)
+                            """,
+                            (str(row["id"]), capability),
+                        )
+                        granted += cursor.rowcount
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return granted
+
     # ------------------------------------------------------------------
     # Listing
     # ------------------------------------------------------------------
@@ -1435,6 +1465,13 @@ CAPABILITY_RISK_BY_NAME: Dict[str, tuple] = {
     "conversation.cancel": ("standard", "workspace"),
     "principal.read": ("standard", "workspace"),
     "diagnostics.read": ("standard", "workspace"),
+    # Agent Fabric read surfaces are standard, non-privileged
+    "agent.read": ("standard", "workspace"),
+    "tool.read": ("standard", "workspace"),
+    "policy.read": ("standard", "workspace"),
+    "action.read": ("standard", "workspace"),
+    "approval.read": ("standard", "workspace"),
+    "action.propose": ("standard", "workspace"),
     # engineering campaign read surfaces are standard, non-privileged
     "engineering.campaign.read": ("standard", "workspace"),
     "engineering.package.read": ("standard", "workspace"),
@@ -1446,6 +1483,15 @@ CAPABILITY_RISK_BY_NAME: Dict[str, tuple] = {
     "shell.execute": ("critical", "organization"),
     "git.mutate": ("privileged", "workspace"),
     "external.send": ("critical", "organization"),
+    # Agent Fabric orchestration is privileged; approval decisions are
+    # privilege-tiered; agent run creation is a normal operator action
+    "agent.manage": ("privileged", "workspace"),
+    "agent.run": ("standard", "workspace"),
+    "action.cancel": ("privileged", "workspace"),
+    "approval.decide.low": ("standard", "workspace"),
+    "approval.decide.medium": ("privileged", "workspace"),
+    "approval.decide.high": ("privileged", "workspace"),
+    "approval.decide.critical": ("critical", "workspace"),
     # engineering campaign orchestration is privileged; blocker resolution is
     # the only critical campaign capability and requires explicit grant
     "engineering.campaign.manage": ("privileged", "workspace"),

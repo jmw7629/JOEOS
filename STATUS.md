@@ -103,3 +103,17 @@ mobile companion design and platform strategy,
 `docs/architecture/AUTOMATION_PLATFORM.md` for the automation engine,
 `docs/architecture/PLUGIN_PLATFORM.md` for the plugin platform, and
 `docs/architecture/IMPLEMENTATION_BACKLOG.md` for the dependency-ordered plan.
+
+## Browser OS (P4-UI-A..E) status
+
+The browser OS is developed in isolated Git worktrees and integrated through
+commits. Current state (see `docs/browser-os/` for each phase):
+
+- Foundation + routing (`/os/<app>` deep links, `OS_APPS` registry).
+- Command center + conversations.
+- Agents workspace (directory, missions, task graphs, council) — uncommitted in
+  the agents worktree.
+- Knowledge layer (Memory, Files, Universal Search, Context workspaces) —
+  built on the authoritative memory/engineering/agents APIs in the knowledge
+  worktree, tracked as the browser memory/search/files phase.
+- Frontend: 35/35 static tests pass in the knowledge worktree.

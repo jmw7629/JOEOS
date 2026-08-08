@@ -449,55 +449,67 @@ class ApprovalTests(ControlFixture):
 
 
 class CouncilTests(ControlFixture):
-    def _run_council(self, results, fail_member=None, quorum_rule="majority"):
-        def executor(context, objective):
-            member = context["agent"]
-            if member == fail_member:
+    def _install_executor(self, behavior):
+        async def executor(messages, tools, decision):
+            agent_key = decision.get("agent") or ""
+            if behavior.get("fail") == agent_key:
                 raise RuntimeError("member failed")
-            return {"content": results.get(member, "agree")}
+            content = behavior.get("content") or "agree"
+            if callable(content):
+                content = content(agent_key)
+            return {"content": content}
+        self.service._executor = executor
 
-        self.service._council_executor = executor
+    def _run_council_sync(self, results, fail_member=None, quorum_rule="majority"):
         agents = [self._register_agent(key="m%d" % i) for i in range(3)]
+        behavior = {"content": lambda key: results.get(key, "agree")}
+        if fail_member:
+            behavior["fail"] = fail_member
+        self._install_executor(behavior)
         council = self.service.create_council(
             principal(), name="Review", member_agent_ids=[a["id"] for a in agents],
             quorum_rule=quorum_rule,
         )
-        run = self.service.run_council(
+        import asyncio
+        return asyncio.run(self.service.run_council(
             principal(), council_id=council["id"], objective="Review the plan",
-        )
-        return run
+        ))
 
     def test_unanimous_council(self):
-        run = self._run_council({})
+        agents = [self._register_agent(key="m%d" % i) for i in range(3)]
+        behavior = {"content": lambda key: "agree"}
+        self._install_executor(behavior)
+        council = self.service.create_council(
+            principal(), name="Review", member_agent_ids=[a["id"] for a in agents],
+        )
+        import asyncio
+        run = asyncio.run(self.service.run_council(
+            principal(), council_id=council["id"], objective="Review the plan",
+        ))
         self.assertEqual(run["state"], "completed")
         self.assertIn("agree", run["final_recommendation"])
+        member_runs = self.store.list_council_member_runs(run["id"])
+        self.assertEqual(len(member_runs), 3)
 
     def test_member_failure_but_quorum_met(self):
-        run = self._run_council({}, fail_member=None)
         agents = [self._register_agent(key="x%d" % i) for i in range(3)]
+        self._install_executor({"content": "ok", "fail": "x2"})
         council = self.service.create_council(
             principal(), name="Quorum", member_agent_ids=[a["id"] for a in agents],
         )
-        def failing(context, objective):
-            if context["agent"] == agents[2]["id"]:
-                raise RuntimeError("failed")
-            return {"content": "ok"}
-        self.service._council_executor = failing
-        run = self.service.run_council(principal(), council_id=council["id"], objective="x")
+        import asyncio
+        run = asyncio.run(self.service.run_council(principal(), council_id=council["id"], objective="x"))
         self.assertEqual(run["state"], "completed")
 
     def test_quorum_failure(self):
         agents = [self._register_agent(key="q%d" % i) for i in range(3)]
+        self._install_executor({"content": "ok", "fail": "q0"})
         council = self.service.create_council(
             principal(), name="Fail", member_agent_ids=[a["id"] for a in agents],
             quorum_rule="unanimous",
         )
-        def failing(context, objective):
-            if context["agent"] == str(agents[0]["id"]):
-                raise RuntimeError("failed")
-            return {"content": "ok"}
-        self.service._council_executor = failing
-        run = self.service.run_council(principal(), council_id=council["id"], objective="x")
+        import asyncio
+        run = asyncio.run(self.service.run_council(principal(), council_id=council["id"], objective="x"))
         self.assertEqual(run["state"], "failed")
 
 

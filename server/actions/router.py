@@ -23,7 +23,9 @@ from .models import (
     ApprovalDecisionRequest,
     CouncilRequest,
     CouncilRunRequest,
+    DelegateRequest,
     ModelRequest,
+    TaskGraphRequest,
     ModelStateRequest,
     ProposeRequest,
     ProviderRequest,
@@ -58,6 +60,19 @@ def _run(service: ActionService, principal: Dict, operation) -> Dict:
         return operation(principal)
     except ActionError as error:
         _raise_action_error(error)
+
+
+# ---------------------------------------------------------------------------
+# Overview
+# ---------------------------------------------------------------------------
+
+
+@router.get("/overview")
+def control_overview(
+    principal: Dict = Depends(require_application_session),
+    service: ActionService = Depends(get_action_service),
+):
+    return _run(service, principal, lambda p: service.overview(p))
 
 
 # ---------------------------------------------------------------------------
@@ -194,7 +209,17 @@ def start_agent_run(
         p, agent_id=agent_id, conversation_id=payload.conversation_id,
         message_id=payload.message_id, model_preference=payload.model_preference,
         parent_run_id=payload.parent_run_id, delegation_depth=payload.delegation_depth,
+        objective=payload.objective,
     ))
+
+
+@router.get("/agents/{agent_id}/runs")
+def list_agent_runs(
+    agent_id: UUID,
+    principal: Dict = Depends(require_application_session),
+    service: ActionService = Depends(get_action_service),
+):
+    return _run(service, principal, lambda p: {"runs": service.list_agent_runs(p, agent_id)})
 
 
 @router.get("/runs/{run_id}")
@@ -204,6 +229,43 @@ def get_agent_run(
     service: ActionService = Depends(get_action_service),
 ):
     return _run(service, principal, lambda p: service.get_agent_run(p, run_id))
+
+
+@router.post("/runs/{run_id}/execute", status_code=status.HTTP_200_OK)
+async def execute_agent_run(
+    run_id: UUID,
+    principal: Dict = Depends(require_application_session),
+    service: ActionService = Depends(get_action_service),
+):
+    try:
+        return await service.execute_agent_run(principal, run_id)
+    except ActionError as error:
+        _raise_action_error(error)
+
+
+@router.post("/runs/{run_id}/delegate", status_code=status.HTTP_200_OK)
+async def delegate_agent_run(
+    run_id: UUID,
+    payload: DelegateRequest,
+    principal: Dict = Depends(require_application_session),
+    service: ActionService = Depends(get_action_service),
+):
+    try:
+        return await service.delegate_agent_run(
+            principal, parent_run_id=run_id,
+            child_agent_id=payload.agent_id, objective=payload.objective,
+        )
+    except ActionError as error:
+        _raise_action_error(error)
+
+
+@router.get("/runs/{run_id}/delegations")
+def list_run_delegations(
+    run_id: UUID,
+    principal: Dict = Depends(require_application_session),
+    service: ActionService = Depends(get_action_service),
+):
+    return _run(service, principal, lambda p: {"delegations": service.list_run_delegations(p, run_id)})
 
 
 @router.post("/runs/{run_id}/cancel")
@@ -222,6 +284,29 @@ def list_run_tasks(
     service: ActionService = Depends(get_action_service),
 ):
     return _run(service, principal, lambda p: {"tasks": service.list_run_tasks(p, run_id)})
+
+
+@router.post("/runs/{run_id}/tasks")
+def create_task_graph(
+    run_id: UUID,
+    payload: TaskGraphRequest,
+    principal: Dict = Depends(require_application_session),
+    service: ActionService = Depends(get_action_service),
+):
+    return _run(service, principal, lambda p: service.create_task_graph(
+        p, run_id=run_id, tasks=payload.tasks))
+
+
+@router.post("/runs/{run_id}/tasks/execute", status_code=status.HTTP_200_OK)
+async def execute_task_graph(
+    run_id: UUID,
+    principal: Dict = Depends(require_application_session),
+    service: ActionService = Depends(get_action_service),
+):
+    try:
+        return await service.execute_task_graph(principal, run_id)
+    except ActionError as error:
+        _raise_action_error(error)
 
 
 # ---------------------------------------------------------------------------
@@ -371,16 +456,19 @@ def create_council(
 
 
 @router.post("/councils/{council_id}/runs", status_code=status.HTTP_202_ACCEPTED)
-def run_council(
+async def run_council(
     council_id: UUID,
     payload: CouncilRunRequest,
     principal: Dict = Depends(require_application_session),
     service: ActionService = Depends(get_action_service),
 ):
-    return _run(service, principal, lambda p: service.run_council(
-        p, council_id=council_id, objective=payload.objective,
-        conversation_id=payload.conversation_id, message_id=payload.message_id,
-    ))
+    try:
+        return await service.run_council(
+            principal, council_id=council_id, objective=payload.objective,
+            conversation_id=payload.conversation_id, message_id=payload.message_id,
+        )
+    except ActionError as error:
+        _raise_action_error(error)
 
 
 @router.get("/councils/runs/{run_id}")

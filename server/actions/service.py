@@ -213,7 +213,8 @@ class ActionService:
                      system_instructions="", allowed_tools="", denied_tools="",
                      required_capabilities="", max_delegation_depth=0, max_parallel_tasks=1,
                      max_runtime_ms=0, max_token_budget=0, data_boundary="restricted",
-                     approval_policy="backend") -> Dict:
+                     approval_policy="backend", default_provider_policy="backend",
+                     default_model_policy="backend") -> Dict:
         self._require(principal, AGENT_MANAGE_CAP)
         org = principal["organization"]["id"]
         ws = principal["workspace"]["id"]
@@ -225,6 +226,8 @@ class ActionService:
             max_delegation_depth=max_delegation_depth, max_parallel_tasks=max_parallel_tasks,
             max_runtime_ms=max_runtime_ms, max_token_budget=max_token_budget,
             data_boundary=data_boundary, approval_policy=approval_policy,
+            default_provider_policy=default_provider_policy,
+            default_model_policy=default_model_policy,
             created_by=principal["user"]["id"], now=self._now(),
         )
         self._emit(principal, "agent.created", data={"agent": str(profile.id), "key": key})
@@ -314,6 +317,7 @@ class ActionService:
         model_preference: Optional[str] = None,
         parent_run_id: Optional[UUID] = None,
         delegation_depth: int = 0,
+        objective: str = "",
     ) -> Dict:
         self._require(principal, AGENT_RUN_CAP)
         agent = self._store.get_agent(agent_id)
@@ -327,7 +331,8 @@ class ActionService:
             id=uuid4(), conversation_id=conversation_id, message_id=message_id,
             agent_id=agent_id, agent_version_id=version_id,
             requested_by=principal["user"]["id"], parent_run_id=parent_run_id,
-            delegation_depth=delegation_depth, trace_id=str(uuid4()), now=self._now(),
+            delegation_depth=delegation_depth, objective=objective[:4000],
+            trace_id=str(uuid4()), now=self._now(),
         )
         self._store.update_run_state(
             run.id, status="running", now=self._now(),
@@ -342,6 +347,255 @@ class ActionService:
         return run_payload(run, provider_key=provider.key if provider else None,
                            model_key=model.key if model else None)
 
+    async def execute_agent_run(self, principal: Dict, run_id: UUID) -> Dict:
+        """Execute a queued/running agent run through the injected executor.
+
+        The executor is the ONLY place a model call happens for agent runs; the
+        service never fabricates output. The result is persisted, bounded, and
+        the run transitions to a terminal state."""
+        self._require(principal, AGENT_RUN_CAP)
+        run = self._store.get_run(run_id)
+        if run is None:
+            raise ActionNotFoundError(404, "run_not_found", "The run does not exist.")
+        if run.status not in ("queued", "running", "waiting_for_tool", "waiting_for_approval"):
+            return run_payload(self._store.get_run(run_id))
+        agent = self._store.get_agent(run.agent_id)
+        if agent is None:
+            self._store.set_run_result(run_id, status="failed", result="", now=self._now(),
+                                       failure="agent_missing")
+            return run_payload(self._store.get_run(run_id))
+        provider = self._store.get_provider(run.provider_id) if run.provider_id else None
+        model = self._store.get_model(run.model_id) if run.model_id else None
+        if provider is None or model is None or provider.status != "active":
+            self._store.set_run_result(run_id, status="failed", result="", now=self._now(),
+                                       failure="provider_unavailable")
+            return run_payload(self._store.get_run(run_id))
+        decision = {
+            "provider": provider.key if provider else None,
+            "model": model.key if model else None,
+            "agent": agent.key,
+            "objective": run.objective,
+        }
+        messages = self._build_agent_messages(agent, run.objective)
+        tools = self._agent_tool_schemas(agent)
+        try:
+            outcome = await self._executor(messages, tools, decision)
+            content = (outcome or {}).get("content", "") or ""
+            token_usage = int((outcome or {}).get("token_usage") or 0)
+            status = "succeeded"
+            failure = ""
+        except ActionDeniedError:
+            raise
+        except Exception as error:  # noqa: BLE001 - normalized to a typed failure
+            content = ""
+            token_usage = 0
+            status = "failed"
+            failure = _normalize_agent_error(error)
+        self._store.set_run_result(run_id, status=status, result=content[:32000],
+                                   now=self._now(), token_usage=token_usage, failure=failure)
+        event = "agent.run.completed" if status == "succeeded" else "agent.run.failed"
+        self._emit(principal, event, run_id=run_id, conversation_id=run.conversation_id,
+                   data={"provider": provider.key, "model": model.key, "status": status})
+        final = self._store.get_run(run_id)
+        return run_payload(final, provider_key=provider.key, model_key=model.key,
+                           result=self._store.get_run_output(run_id))
+
+    async def delegate_agent_run(
+        self,
+        principal: Dict,
+        *,
+        parent_run_id: UUID,
+        child_agent_id: UUID,
+        objective: str,
+    ) -> Dict:
+        """Create and execute a REAL child AgentRun for a delegated task.
+
+        The child is a separate authoritative run with its own agent version,
+        provider, model, and persisted result. A bounded delegation depth
+        prevents runaway agent chains; cycles are impossible because a run can
+        only be created forward (never back to an ancestor)."""
+        self._require(principal, AGENT_RUN_CAP)
+        parent = self._store.get_run(parent_run_id)
+        if parent is None:
+            raise ActionNotFoundError(404, "run_not_found", "The parent run does not exist.")
+        depth = parent.delegation_depth + 1
+        parent_agent = self._store.get_agent(parent.agent_id)
+        max_depth = int(parent_agent.max_delegation_depth) if parent_agent else 0
+        if max_depth < 0:
+            # Negative is invalid configuration; treat as no delegation.
+            raise ActionDeniedError(403, "delegation_disabled",
+                                    "This agent does not permit delegation.")
+        if max_depth == 0 or depth > max_depth:
+            raise ActionDeniedError(403, "delegation_limit_reached",
+                                    "The delegation depth limit is reached.")
+        child = self.start_agent_run(
+            principal, agent_id=child_agent_id,
+            conversation_id=parent.conversation_id, message_id=parent.message_id,
+            parent_run_id=parent_run_id, delegation_depth=depth, objective=objective,
+        )
+        self._emit(principal, "agent.run.delegated", run_id=parent_run_id,
+                   conversation_id=parent.conversation_id,
+                   data={"child_run": str(child["id"]), "agent": str(child_agent_id)})
+        await self.execute_agent_run(principal, child["id"])
+        return run_payload(self._store.get_run(child["id"]))
+
+    def create_task_graph(
+        self,
+        principal: Dict,
+        *,
+        run_id: UUID,
+        tasks: List[Dict],
+    ) -> Dict:
+        """Create a real TaskGraph for a run.
+
+        Each task carries title/objective/assigned_agent_id/dependencies
+        (a comma-separated list of parent task ids within this graph). Tasks are
+        created in `ready`/`waiting_for_dependency` state based on whether their
+        dependencies exist; execution is driven by `execute_task_graph`."""
+        self._require(principal, AGENT_RUN_CAP)
+        created = []
+        by_key = {}
+        for task in tasks:
+            deps = [d.strip() for d in (task.get("dependencies") or "").split(",") if d.strip()]
+            resolved_deps = []
+            for dep in deps:
+                if dep not in by_key:
+                    raise ActionDeniedError(400, "unknown_task_dependency",
+                                            "Task dependency %s does not exist." % dep)
+                resolved_deps.append(str(by_key[dep]))
+            task_id = uuid4()
+            by_key[task["key"]] = task_id
+            state = "ready" if not resolved_deps else "waiting_for_dependency"
+            raw_agent = task.get("assigned_agent_id")
+            assigned = None
+            if raw_agent:
+                assigned = raw_agent if isinstance(raw_agent, UUID) else UUID(str(raw_agent))
+            record = self._store.create_task(
+                id=task_id, run_id=run_id, parent_task_id=None,
+                title=task.get("title") or task.get("key"),
+                objective=task.get("objective") or "",
+                assigned_agent_id=assigned,
+                dependencies=",".join(resolved_deps),
+                now=self._now(),
+            )
+            if state == "waiting_for_dependency":
+                self._store.update_task_state(task_id, state="waiting_for_dependency", now=self._now())
+            created.append(task_payload(record))
+            self._emit(principal, "agent.task.created", run_id=run_id, task_id=task_id,
+                       data={"title": task.get("title") or task.get("key")})
+        return {"tasks": created}
+
+    def _task_dependencies_met(self, task) -> bool:
+        deps = [d for d in task.dependencies.split(",") if d]
+        if not deps:
+            return True
+        for dep in deps:
+            parent = self._store.get_task(UUID(dep))
+            if parent is None or parent.state != "succeeded":
+                return False
+        return True
+
+    async def execute_task_graph(self, principal: Dict, run_id: UUID) -> Dict:
+        """Execute a real TaskGraph: compute ready tasks, run each ready task
+        through the assigned agent (a real child AgentRun per task), persist
+        results, and propagate failure/cancellation through dependencies.
+
+        Bounded: tasks execute sequentially (this VPS runs model calls one at a
+        time), and the graph terminates when all tasks are terminal."""
+        self._require(principal, AGENT_RUN_CAP)
+        tasks = self._store.list_tasks(run_id)
+        if not tasks:
+            raise ActionNotFoundError(404, "no_tasks", "The run has no tasks.")
+        remaining = [t for t in tasks if t.state in ("ready", "waiting_for_dependency", "running")]
+        guard = 0
+        while remaining and guard < 64:
+            guard += 1
+            progressed = False
+            for task in list(remaining):
+                if task.state == "waiting_for_dependency":
+                    if self._task_dependencies_met(task):
+                        self._store.update_task_state(task.id, state="ready", now=self._now())
+                        task = self._store.get_task(task.id)
+                        progressed = True
+                    continue
+                if task.state != "ready":
+                    continue
+                if task.assigned_agent_id is None:
+                    self._store.update_task_state(task.id, state="failed", now=self._now(),
+                                                  failure="no_agent_assigned")
+                    progressed = True
+                    continue
+                self._store.update_task_state(task.id, state="running", now=self._now())
+                try:
+                    child = await self.delegate_agent_run(
+                        principal, parent_run_id=run_id,
+                        child_agent_id=task.assigned_agent_id,
+                        objective=task.objective,
+                    )
+                    if child["status"] == "succeeded":
+                        self._store.update_task_state(
+                            task.id, state="succeeded", now=self._now(),
+                            output_reference=child.get("result", "")[:2000],
+                        )
+                    else:
+                        self._store.update_task_state(
+                            task.id, state="failed", now=self._now(),
+                            failure=child.get("failure") or "task_agent_failed",
+                        )
+                except Exception as error:  # noqa: BLE001
+                    self._store.update_task_state(
+                        task.id, state="failed", now=self._now(),
+                        failure=_normalize_agent_error(error),
+                    )
+                self._emit(principal, "agent.task.completed", run_id=run_id, task_id=task.id,
+                           data={"state": self._store.get_task(task.id).state})
+                progressed = True
+            if not progressed:
+                # Only dependency-failure cycles should stall; mark them blocked.
+                for task in remaining:
+                    if task.state == "waiting_for_dependency":
+                        blocked = any(
+                            self._store.get_task(UUID(d)) is not None
+                            and self._store.get_task(UUID(d)).state == "failed"
+                            for d in task.dependencies.split(",") if d
+                        )
+                        if blocked:
+                            self._store.update_task_state(task.id, state="blocked", now=self._now())
+                            progressed = True
+                if not progressed:
+                    break
+            remaining = [t for t in self._store.list_tasks(run_id)
+                         if t.state in ("ready", "waiting_for_dependency", "running")]
+        return {
+            "run_id": str(run_id),
+            "tasks": [task_payload(t) for t in self._store.list_tasks(run_id)],
+        }
+
+    def _build_agent_messages(self, agent, objective: str) -> List[Dict[str, str]]:
+        messages: List[Dict[str, str]] = []
+        if agent.system_instructions:
+            messages.append({"role": "system", "content": agent.system_instructions})
+        if objective:
+            messages.append({"role": "user", "content": objective[:4000]})
+        return messages
+
+    def _agent_tool_schemas(self, agent) -> List[Dict]:
+        allowed = {t for t in agent.allowed_tools.split(",") if t} if agent.allowed_tools else set()
+        if not allowed:
+            return []
+        schemas = []
+        for tool in self._store.list_tools():
+            if tool.key in allowed and tool.status == "active":
+                try:
+                    schema = json.loads(tool.input_schema) if tool.input_schema else {}
+                except json.JSONDecodeError:
+                    schema = {}
+                schemas.append({"type": "function", "function": {
+                    "name": tool.key, "description": tool.description,
+                    "parameters": schema or {"type": "object", "properties": {}},
+                }})
+        return schemas
+
     def cancel_agent_run(self, principal: Dict, run_id: UUID) -> bool:
         self._require(principal, ACTION_CANCEL_CAP)
         run = self._store.get_run(run_id)
@@ -354,12 +608,65 @@ class ActionService:
                    conversation_id=run.conversation_id)
         return cancelled
 
+    def overview(self, principal: Dict) -> Dict:
+        """Authoritative Agent Fabric overview for the browser and CLI."""
+        self._require(principal, AGENT_READ_CAP)
+        agents = [agent_payload(a, self._latest_version_id(a.id))
+                  for a in self._store.list_agents(principal["organization"]["id"],
+                                                   principal["workspace"]["id"])]
+        providers = [provider_payload(p) for p in self._store.list_providers()]
+        models = [model_payload(m) for m in self._store.list_models()]
+        tools = [tool_payload(t) for t in self._store.list_tools()]
+        runs = []
+        for agent in agents:
+            try:
+                runs.extend(self._store.list_runs_for_agent(agent["id"])[:5])
+            except Exception:  # noqa: BLE001
+                continue
+        return {
+            "schema_version": 1,
+            "agents": {
+                "total": len(agents),
+                "active": len([a for a in agents if a["status"] == "active"]),
+                "items": agents,
+            },
+            "providers": {
+                "total": len(providers),
+                "active": len([p for p in providers if p["status"] == "active"]),
+                "items": providers,
+            },
+            "models": {
+                "total": len(models),
+                "active": len([m for m in models if m["status"] == "active"]),
+                "items": models,
+            },
+            "tools": {
+                "total": len(tools),
+                "items": [{"key": t["key"], "category": t["category"],
+                           "risk": t["risk"], "status": t["status"]} for t in tools],
+            },
+            "recent_runs": [run_payload(r) for r in runs[:10]],
+        }
+
     def get_agent_run(self, principal: Dict, run_id: UUID) -> Dict:
         self._require(principal, AGENT_READ_CAP)
         run = self._store.get_run(run_id)
         if run is None:
             raise ActionNotFoundError(404, "run_not_found", "The run does not exist.")
-        return run_payload(run)
+        provider = self._store.get_provider(run.provider_id) if run.provider_id else None
+        model = self._store.get_model(run.model_id) if run.model_id else None
+        return run_payload(run, provider_key=provider.key if provider else None,
+                           model_key=model.key if model else None,
+                           result=self._store.get_run_output(run.id))
+
+    def list_agent_runs(self, principal: Dict, agent_id: UUID) -> List[Dict]:
+        self._require(principal, AGENT_READ_CAP)
+        runs = self._store.list_runs_for_agent(agent_id)
+        return [run_payload(r) for r in runs]
+
+    def list_run_delegations(self, principal: Dict, run_id: UUID) -> List[Dict]:
+        self._require(principal, AGENT_READ_CAP)
+        return [run_payload(r) for r in self._store.list_child_runs(run_id)]
 
     def list_run_tasks(self, principal: Dict, run_id: UUID) -> List[Dict]:
         self._require(principal, AGENT_READ_CAP)
@@ -783,16 +1090,14 @@ class ActionService:
         self._emit(principal, "council.created", data={"council": str(definition.id)})
         return council_payload(definition)
 
-    def run_council(self, principal: Dict, *, council_id: UUID, objective: str,
-                    conversation_id: Optional[UUID] = None, message_id: Optional[UUID] = None) -> Dict:
+    async def run_council(self, principal: Dict, *, council_id: UUID, objective: str,
+                          conversation_id: Optional[UUID] = None, message_id: Optional[UUID] = None) -> Dict:
         self._require(principal, AGENT_RUN_CAP)
         definition = self._store.get_council_definition(council_id)
         if definition is None or definition.status != "active":
             raise ActionDeniedError(403, "council_disabled", "The council is disabled or unknown.")
         if definition.workspace_id != principal["workspace"]["id"]:
             raise ActionDeniedError(403, "cross_workspace_denied", "Cross-workspace council access is denied.")
-        if self._council_executor is None:
-            raise ActionError(503, "council_executor_unavailable", "No council executor is available.")
         snapshot = council_payload(definition)
         run = self._store.create_council_run(
             id=uuid4(), council_definition_id=council_id, conversation_id=conversation_id,
@@ -802,18 +1107,33 @@ class ActionService:
         self._emit(principal, "council.started", conversation_id=conversation_id,
                    data={"council_run": str(run.id)})
         member_ids = [a for a in definition.member_agents.split(",") if a]
+        member_run_ids: List[str] = []
         results: List[str] = []
         failed = 0
         for index, agent_id in enumerate(member_ids):
+            member_run_id = uuid4()
+            self._store.create_council_member_run(
+                id=member_run_id, council_run_id=run.id, agent_id=UUID(agent_id),
+                objective=objective, now=self._now(),
+            )
+            member_run_ids.append(str(member_run_id))
             try:
-                member_result = self._council_executor(
-                    {"agent": agent_id, "objective": objective, "round": index}, objective
+                member_result = await self._execute_council_member(
+                    principal, member_run_id, UUID(agent_id), objective
                 )
                 results.append(member_result.get("content", ""))
+                self._store.update_council_member_run(
+                    member_run_id, status="succeeded", result=(member_result.get("content", ""))[:32000],
+                    now=self._now(),
+                )
                 self._emit(principal, "council.member_completed",
-                           data={"council_run": str(run.id), "member": agent_id})
+                           data={"council_run": str(run.id), "member": agent_id,
+                                 "member_run": str(member_run_id)})
             except Exception:  # noqa: BLE001
                 failed += 1
+                self._store.update_council_member_run(
+                    member_run_id, status="failed", failure="member_failed", now=self._now(),
+                )
         quorum = 1 if quorum_ok(definition.quorum_rule, len(member_ids), failed) else 0
         if quorum:
             recommendation = "\n".join(results)
@@ -822,13 +1142,32 @@ class ActionService:
             recommendation = ""
             state = "failed"
         self._store.update_council_run(
-            run.id, state=state, member_run_ids=",".join(member_ids),
+            run.id, state=state, member_run_ids=",".join(member_run_ids),
             rounds=definition.maximum_rounds, final_recommendation=recommendation,
             dissents="", proposed_action_ids="", now=self._now(),
         )
         self._emit(principal, "council.completed" if quorum else "council.failed",
                    data={"council_run": str(run.id)})
         return council_run_payload(self._store.get_council_run(run.id))  # type: ignore[arg-type]
+
+    async def _execute_council_member(self, principal: Dict, member_run_id: UUID,
+                                      agent_id: UUID, objective: str) -> Dict:
+        """Run one real council member AgentRun and return its structured output."""
+        member_run = self.start_agent_run(
+            principal, agent_id=agent_id,
+            conversation_id=member_run_id, message_id=member_run_id,
+            objective=objective, delegation_depth=1,
+        )
+        self._store.update_council_member_run(
+            member_run_id, status="running", now=self._now(),
+            agent_version_id=UUID(str(member_run["agent_version_id"])),
+            provider_id=UUID(str(member_run["provider_id"])) if member_run.get("provider_id") else None,
+            model_id=UUID(str(member_run["model_id"])) if member_run.get("model_id") else None,
+        )
+        executed = await self.execute_agent_run(principal, member_run["id"])
+        if executed["status"] != "succeeded":
+            raise RuntimeError("council member run failed")
+        return {"content": executed.get("result", "")}
 
     def get_council_run(self, principal: Dict, run_id: UUID) -> Dict:
         self._require(principal, AGENT_READ_CAP)
@@ -847,24 +1186,41 @@ class ActionService:
 
     def _select_provider_model(self, principal: Dict, agent, model_preference: Optional[str]):
         """Backend-authoritative provider/model selection. Local-only data never
-        routes to a non-local provider. Disabled providers/models are rejected."""
+        routes to a non-local provider. Disabled providers/models are rejected.
+
+        Model binding order (highest authority first):
+          1. explicit caller model_preference (validated against the registry)
+          2. the agent's configured default_model_policy (an installed model key)
+          3. the first active model of the selected provider (never fabricated)."""
         providers = self._store.list_providers()
         available = [p for p in providers if p.status == "active"]
         if not available:
             raise ActionDeniedError(503, "provider_unavailable", "No active provider is available.")
-        preferred = next((m for m in self._store.list_models() if m.key == model_preference), None)
+        all_models = self._store.list_models()
+        preferred = next((m for m in all_models if m.key == model_preference), None)
         if model_preference is not None and preferred is None:
             raise ActionDeniedError(403, "model_disabled", "The requested model is unknown or disabled.")
+        if preferred is None and agent.default_model_policy and agent.default_model_policy != "backend":
+            preferred = next((m for m in all_models if m.key == agent.default_model_policy), None)
         local_only = agent.data_boundary == "restricted"
         if local_only:
             available = [p for p in available if p.location == "local"]
             if not available:
                 raise ActionDeniedError(503, "provider_unavailable", "No local provider is available.")
+        provider_key = getattr(agent, "default_provider_policy", "backend")
         provider = preferred.provider_id if preferred else available[0]
+        if provider_key and provider_key != "backend":
+            keyed = next((p for p in available if p.key == provider_key), None)
+            if keyed is not None:
+                provider = keyed.id
         provider_record = next((p for p in available if p.id == provider), available[0])
         models = [m for m in self._store.list_models(provider_record.id) if m.status == "active"]
         if not models:
             raise ActionDeniedError(503, "model_unavailable", "No active model is available for the provider.")
+        if preferred is not None and preferred.provider_id != provider_record.id:
+            # A cross-provider model binding falls back to the provider's own
+            # active inventory; the used model is reported, never fabricated.
+            preferred = None
         model = preferred if preferred and preferred.status == "active" else models[0]
         return provider_record, model
 
@@ -905,6 +1261,23 @@ class ActionService:
         kwargs.setdefault("organization_id", principal["organization"]["id"])
         kwargs.setdefault("workspace_id", principal["workspace"]["id"])
         self._events.emit(event, **kwargs)
+
+
+def _normalize_agent_error(error: Exception) -> str:
+    """Map an executor exception to a bounded, non-leaking error code."""
+    text = str(error)
+    lowered = text.lower()
+    if "not reachable" in lowered or "connect" in lowered or "timeout" in lowered:
+        return "OLLAMA_UNAVAILABLE"
+    if "model not found" in lowered or "not found" in lowered and "model" in lowered:
+        return "MODEL_NOT_FOUND"
+    if "load" in lowered or "loading" in lowered:
+        return "MODEL_LOADING"
+    if "timeout" in lowered:
+        return "MODEL_TIMEOUT"
+    if "json" in lowered or "invalid" in lowered:
+        return "STRUCTURED_OUTPUT_INVALID"
+    return type(error).__name__[:60] or "AGENT_RUN_FAILED"
 
 
 def quorum_ok(rule: str, total: int, failed: int) -> bool:
@@ -964,17 +1337,21 @@ def agent_payload(r, version_id) -> Dict:
             "max_parallel_tasks": r.max_parallel_tasks, "max_runtime_ms": r.max_runtime_ms,
             "max_token_budget": r.max_token_budget, "data_boundary": r.data_boundary,
             "memory_policy": r.memory_policy, "approval_policy": r.approval_policy,
+            "default_provider_policy": r.default_provider_policy,
+            "default_model_policy": r.default_model_policy,
             "revision": r.revision, "latest_version_id": version_id}
 
 
-def run_payload(r, provider_key=None, model_key=None) -> Dict:
+def run_payload(r, provider_key=None, model_key=None, result=None) -> Dict:
     return {"id": r.id, "conversation_id": r.conversation_id, "message_id": r.message_id,
             "agent_id": r.agent_id, "agent_version_id": r.agent_version_id,
             "provider_id": r.provider_id, "model_id": r.model_id, "status": r.status,
             "parent_run_id": r.parent_run_id, "delegation_depth": r.delegation_depth,
-            "requested_by": r.requested_by, "started_at": r.started_at,
+            "requested_by": r.requested_by, "objective": getattr(r, "objective", "") or "",
+            "started_at": r.started_at,
             "completed_at": r.completed_at, "cancellation": r.cancellation,
-            "failure": r.failure, "token_usage": r.token_usage, "trace_id": r.trace_id,
+            "failure": r.failure, "result": result if result is not None else (getattr(r, "result", "") or ""),
+            "token_usage": r.token_usage, "trace_id": r.trace_id,
             "provider_key": provider_key, "model_key": model_key, "revision": r.revision}
 
 

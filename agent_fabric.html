@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050912">
+  <title>JoeOS — Agent Fabric</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --canvas: #050912; --surface: rgba(10,22,39,0.82); --line: rgba(139,212,255,0.14);
+      --text: #eaf6ff; --muted: #91a6ba; --cyan: #31d7ff; --success: #3de3a4;
+      --warning: #ffb45c; --danger: #ff647c;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--text);
+      font: 14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+    header { padding: 14px 22px; border-bottom: 1px solid var(--line); display: flex; gap: 14px;
+      align-items: center; flex-wrap: wrap; }
+    header strong { font-size: 16px; }
+    header .sub { color: var(--muted); }
+    main { padding: 20px 22px; max-width: 1280px; margin: 0 auto; }
+    button { background: rgba(49,215,255,0.12); color: var(--text); border: 1px solid rgba(49,215,255,0.4);
+      border-radius: 10px; padding: 8px 14px; cursor: pointer; font-size: 13px; }
+    button:hover { background: rgba(49,215,255,0.22); }
+    button.primary { background: var(--cyan); color: #04121c; border-color: var(--cyan); font-weight: 600; }
+    button.danger { border-color: rgba(255,100,124,0.5); color: var(--danger); background: rgba(255,100,124,0.08); }
+    input, textarea { background: rgba(8,18,32,0.9); color: var(--text); border: 1px solid var(--line);
+      border-radius: 10px; padding: 9px 12px; font-size: 13px; width: 100%; }
+    textarea { min-height: 74px; resize: vertical; }
+    label { display: block; color: var(--muted); font-size: 12px; margin: 10px 0 5px; }
+    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+      padding: 16px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--line); color: var(--muted); }
+    .badge.green { color: var(--success); border-color: rgba(61,227,164,0.5); }
+    .badge.amber { color: var(--warning); border-color: rgba(255,180,92,0.5); }
+    .badge.red { color: var(--danger); border-color: rgba(255,100,124,0.5); }
+    .badge.cyan { color: var(--cyan); border-color: rgba(49,215,255,0.5); }
+    .muted { color: var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
+    .msg { white-space: pre-wrap; background: rgba(0,0,0,0.3); border: 1px solid var(--line);
+      border-radius: 10px; padding: 10px; margin-top: 8px; max-height: 260px; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; }
+    .hidden { display: none; }
+    .pill { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .pill.green { background: var(--success); } .pill.amber { background: var(--warning); }
+    .pill.red { background: var(--danger); } .pill.gray { background: var(--muted); }
+    a { color: var(--cyan); text-decoration: none; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+    .tabs button.active { background: rgba(49,215,255,0.28); border-color: var(--cyan); }
+    .status-bar { color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>JoeOS Agent Fabric</strong>
+    <span class="sub" id="conn-status">Not connected</span>
+    <span style="flex:1"></span>
+    <button id="refresh-btn" class="hidden">Refresh</button>
+    <button id="logout-btn" class="hidden">Logout</button>
+    <button id="pair-btn">Connect / Pair</button>
+  </header>
+
+  <main>
+    <section id="pairing-panel" class="panel hidden">
+      <h3 style="margin-top:0">Connect this browser to JoeOS</h3>
+      <p class="muted">Enter the one-time pairing code issued by the local JoeOS console
+        (<span class="mono">python -m server.identity.cli pair</span>). This pairs browser
+        keys only and grants no role, session, approval, or execution authority until the
+        operator assigns the device.</p>
+      <label for="pair-code">Pairing code</label>
+      <input id="pair-code" placeholder="JOEOS1|https://...|uuid|SECRET" autocomplete="off">
+      <div class="row" style="margin-top:12px">
+        <button id="pair-submit" class="primary">Pair browser</button>
+        <button id="pair-check">Check status</button>
+      </div>
+      <p id="pair-message" class="muted" style="margin-top:10px"></p>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <div class="tabs">
+        <button data-tab="overview" class="active">Overview</button>
+        <button data-tab="agents">Agents</button>
+        <button data-tab="providers">Providers</button>
+        <button data-tab="models">Models</button>
+        <button data-tab="runs">Runs</button>
+        <button data-tab="tools">Tools</button>
+      </div>
+
+      <div id="tab-overview" class="tab-panel"></div>
+      <div id="tab-agents" class="tab-panel hidden"></div>
+      <div id="tab-providers" class="tab-panel hidden"></div>
+      <div id="tab-models" class="tab-panel hidden"></div>
+      <div id="tab-runs" class="tab-panel hidden"></div>
+      <div id="tab-tools" class="tab-panel hidden"></div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+    var ORIGIN = window.location.origin;
+
+    // ------------------------------------------------------------------
+    // Base64url / crypto helpers
+    // ------------------------------------------------------------------
+    function b64encode(bytes) {
+      var binary = "";
+      for (var i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    }
+    function b64decode(text) {
+      var base64 = text.replace(/-/g, "+").replace(/_/g, "/");
+      while (base64.length % 4) base64 += "=";
+      var binary = atob(base64);
+      var out = new Uint8Array(binary.length);
+      for (var i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+      return out;
+    }
+    function concatBytes(arrays) {
+      var total = arrays.reduce(function (n, a) { return n + a.byteLength; }, 0);
+      var out = new Uint8Array(total);
+      var offset = 0;
+      arrays.forEach(function (a) { out.set(a, offset); offset += a.byteLength; });
+      return out;
+    }
+    function textBytes(value) { return new TextEncoder().encode(value); }
+    function lenPrefixed(bytes) {
+      var out = new Uint8Array(4 + bytes.byteLength);
+      var view = new DataView(out.buffer);
+      view.setUint32(0, bytes.byteLength, false);
+      out.set(bytes, 4);
+      return out;
+    }
+    async function sha256(bytes) { return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)); }
+    async function hmacSha256(keyBytes, messageBytes) {
+      var key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      return new Uint8Array(await crypto.subtle.sign("HMAC", key, messageBytes));
+    }
+
+    // ------------------------------------------------------------------
+    // Session storage (no long-lived secrets; session id + refresh only)
+    // ------------------------------------------------------------------
+    var SESSION_KEY = "joeos:session";
+    var SESSION_REFRESH_KEY = "joeos:session-refresh";
+    var DEVICE_KEY_PAIR = "joeos:device-keypair";   // ephemeral device keys (WebCrypto exportable)
+
+    function loadSession() {
+      try { return JSON.parse(window.sessionStorage.getItem(SESSION_KEY) || "null"); } catch (e) { return null; }
+    }
+    function saveSession(session) {
+      try { window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch (e) {}
+    }
+    function clearSession() {
+      try {
+        window.sessionStorage.removeItem(SESSION_KEY);
+        window.sessionStorage.removeItem(SESSION_REFRESH_KEY);
+        window.localStorage.removeItem(DEVICE_KEY_PAIR);
+      } catch (e) {}
+    }
+
+    // ------------------------------------------------------------------
+    // HTTP
+    // ------------------------------------------------------------------
+    async function api(url, options) {
+      options = options || {};
+      var headers = Object.assign({}, options.headers || {});
+      headers["Accept"] = "application/json";
+      var session = loadSession();
+      if (session && session.session_id) headers["X-Joeos-Session"] = session.session_id;
+      if (options.body) headers["Content-Type"] = "application/json";
+      var controller = new AbortController();
+      var defaultTimeout = 90000;
+      if (url.indexOf("/execute") !== -1 || url.indexOf("/delegate") !== -1) defaultTimeout = 300000;
+      var timer = window.setTimeout(function () { controller.abort(); }, defaultTimeout);
+      try {
+        var response = await fetch(url, Object.assign({}, options, { headers: headers, signal: controller.signal }));
+        var payload = null;
+        try { payload = await response.json(); } catch (e) { payload = null; }
+        if (!response.ok) {
+          var detail = payload && (payload.detail || payload.message);
+          var message = detail && typeof detail === "object" ? detail.message : detail;
+          var err = new Error(message || ("Request failed with status " + response.status));
+          err.status = response.status;
+          err.payload = payload;
+          throw err;
+        }
+        return payload;
+      } finally {
+        window.clearTimeout(timer);
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // Device enrollment ceremony (WebCrypto P-256)
+    // ------------------------------------------------------------------
+    var DOMAINS = {
+      PAIRING_KEY_INFO: new Uint8Array(concatBytes([textBytes("joeos.device-enrollment.pairing-key.v1"), new Uint8Array([1])])),
+      CLAIM: textBytes("JOEOS-DEVICE-ENROLLMENT-CLAIM-V1\0"),
+      CLIENT_PROOF: textBytes("JOEOS-DEVICE-ENROLLMENT-CLIENT-PROOF-V1\0"),
+      TRANSCRIPT: textBytes("JOEOS-DEVICE-ENROLLMENT-TRANSCRIPT-V1\0"),
+    };
+
+    async function generateP256() {
+      return await crypto.subtle.generateKey(
+        { name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]
+      );
+    }
+    async function exportSPKI(keyPair) {
+      var spki = await crypto.subtle.exportKey("spki", keyPair.publicKey);
+      return b64encode(new Uint8Array(spki));
+    }
+    async function ecdsaSignDER(keyPair, message) {
+      var raw = await crypto.subtle.sign(
+        { name: "ECDSA", hash: "SHA-256" }, keyPair.privateKey, message
+      );
+      // Convert raw r||s (64 bytes, P1363) to DER SEQUENCE (as the server expects)
+      var r = new Uint8Array(raw.slice(0, 32));
+      var s = new Uint8Array(raw.slice(32, 64));
+      function toDERInt(bigEndian) {
+        var i = 0;
+        while (i < bigEndian.length && bigEndian[i] === 0) i++;
+        var value = bigEndian.slice(i);
+        var prefix = (value[0] & 0x80) ? [0] : [];
+        var body = new Uint8Array(prefix.concat(Array.from(value)));
+        var len = body.length;
+        var lenBytes;
+        if (len < 128) lenBytes = [len];
+        else lenBytes = [0x81, len];
+        return new Uint8Array([0x02].concat(lenBytes, Array.from(body)));
+      }
+      var seqBody = concatBytes([toDERInt(r), toDERInt(s)]);
+      var seqLen = seqBody.byteLength;
+      var seqLenBytes = seqLen < 128 ? [seqLen] : [0x81, seqLen];
+      var der = concatBytes([new Uint8Array([0x30].concat(seqLenBytes)), seqBody]);
+      return b64encode(der);
+    }
+    async function derivePairingKey(secretBytes, offerId) {
+      var offerBytes = new Uint8Array(16);
+      var view = new DataView(offerBytes.buffer);
+      // UUID bytes are big-endian
+      var hex = offerId.replace(/-/g, "");
+      for (var i = 0; i < 16; i++) view.setUint8(i, parseInt(hex.substr(i * 2, 2), 16));
+      var extracted = await hmacSha256(offerBytes, secretBytes);
+      // Server: HMAC(key=extracted, msg=PAIRING_KEY_INFO + 0x01)
+      return await hmacSha256(extracted, DOMAINS.PAIRING_KEY_INFO);
+    }
+    function base32Decode(encoded) {
+      // RFC 4648 base32 (no padding). Decode 8 chars -> 5 bytes.
+      var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+      var clean = encoded.replace(/=+$/, "").toUpperCase();
+      var bytes = [];
+      var buffer = 0;
+      var bitsLeft = 0;
+      for (var i = 0; i < clean.length; i++) {
+        var idx = alphabet.indexOf(clean.charAt(i));
+        if (idx === -1) throw new Error("Invalid pairing code.");
+        buffer = (buffer << 5) | idx;
+        bitsLeft += 5;
+        if (bitsLeft >= 8) {
+          bytes.push((buffer >>> (bitsLeft - 8)) & 0xff);
+          bitsLeft -= 8;
+        }
+      }
+      return new Uint8Array(bytes);
+    }
+    function parsePairingCode(code) {
+      var parts = (code || "").trim().split("|");
+      if (parts.length !== 4 || parts[0] !== "JOEOS1") throw new Error("Invalid pairing code.");
+      return { origin: parts[1], offer_id: parts[2], secret: base32Decode(parts[3]) };
+    }
+    function uuidv4() {
+      return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, function (c) {
+        return (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16);
+      });
+    }
+    function randomBytes32() {
+      var out = new Uint8Array(32);
+      crypto.getRandomValues(out);
+      return out;
+    }
+    function uuidBytes(uuid) {
+      var out = new Uint8Array(16);
+      var hex = uuid.replace(/-/g, "");
+      for (var i = 0; i < 16; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+      return out;
+    }
+
+    async function claimProof(pairingKey, fields) {
+      var values = [
+        textBytes(fields.observed_server_id), textBytes(fields.audience_origin),
+        textBytes(fields.offer_id), textBytes(fields.request_id),
+        textBytes(fields.client_instance_id), fields.client_nonce,
+        textBytes(fields.display_name), textBytes(fields.platform),
+        textBytes(fields.os_version), textBytes(fields.app_version),
+        fields.auth_spki, fields.approval_spki,
+      ];
+      var transcript = DOMAINS.CLAIM;
+      for (var i = 0; i < values.length; i++) transcript = concatBytes([transcript, lenPrefixed(values[i])]);
+      return await hmacSha256(pairingKey, transcript);
+    }
+
+    async function pairDevice(code) {
+      var parsed = parsePairingCode(code);
+      var authPair = await generateP256();
+      var approvalPair = await generateP256();
+      var requestId = uuidv4();
+      var clientInstanceId = uuidv4();
+      var clientNonce = randomBytes32();
+      var authSPKI = await exportSPKI(authPair);
+      var approvalSPKI = await exportSPKI(approvalPair);
+
+      var bootstrap = await api("/api/v1/bootstrap");
+      var serverId = bootstrap.server.server_id;
+      var pairingKey = await derivePairingKey(parsed.secret, parsed.offer_id);
+
+      var fields = {
+        observed_server_id: serverId, audience_origin: parsed.origin,
+        offer_id: parsed.offer_id, request_id: requestId,
+        client_instance_id: clientInstanceId, client_nonce: clientNonce,
+        display_name: "JoeOS Browser", platform: "linux",
+        os_version: "browser", app_version: "2.0.0",
+        auth_spki: b64decode(authSPKI), approval_spki: b64decode(approvalSPKI),
+      };
+      var proof = await claimProof(pairingKey, fields);
+
+      var challengePayload = {
+        schema_version: 1,
+        request_id: requestId,
+        offer_id: parsed.offer_id,
+        observed_server_id: serverId,
+        audience_origin: parsed.origin,
+        client_nonce: b64encode(clientNonce),
+        device: {
+          client_instance_id: clientInstanceId,
+          display_name: "JoeOS Browser",
+          platform: "linux",
+          os_version: "browser",
+          app_version: "2.0.0",
+        },
+        device_authentication_key: { algorithm: "ES256", format: "spki_der_base64url", value: authSPKI },
+        approval_key: { algorithm: "ES256", format: "spki_der_base64url", value: approvalSPKI },
+        claim_proof: b64encode(proof),
+      };
+      var challenge = await api("/api/v1/device-enrollment/challenges", {
+        method: "POST", body: JSON.stringify(challengePayload),
+      });
+
+      var transcriptDigest = b64decode(challenge.transcript_sha256);
+      var clientProof = await hmacSha256(pairingKey, concatBytes([DOMAINS.CLIENT_PROOF, transcriptDigest]));
+      var authPayload = b64decode(challenge.device_authentication_payload);
+      var approvalPayload = b64decode(challenge.approval_payload);
+      var authSignature = await ecdsaSignDER(authPair, authPayload);
+      var approvalSignature = await ecdsaSignDER(approvalPair, approvalPayload);
+
+      var completion = {
+        schema_version: 1,
+        idempotency_key: uuidv4(),
+        transcript_sha256: challenge.transcript_sha256,
+        client_proof: b64encode(clientProof),
+        device_authentication_signature: authSignature,
+        approval_signature: approvalSignature,
+      };
+      var receipt = await api("/api/v1/device-enrollment/challenges/" + challenge.challenge_id + "/complete", {
+        method: "POST", body: JSON.stringify(completion),
+      });
+
+      // Store the keypair for the auth challenge (ephemeral, exportable).
+      var exportedAuth = await crypto.subtle.exportKey("jwk", authPair.privateKey);
+      var exportedApproval = await crypto.subtle.exportKey("jwk", approvalPair.privateKey);
+      try {
+        window.localStorage.setItem(DEVICE_KEY_PAIR, JSON.stringify({
+          device_id: receipt.device_id, auth: exportedAuth, approval: exportedApproval,
+        }));
+      } catch (e) {}
+      return { receipt: receipt, server_id: serverId };
+    }
+
+    // ------------------------------------------------------------------
+    // Session (auth challenge -> solve)
+    // ------------------------------------------------------------------
+    async function establishSession() {
+      var stored = null;
+      try { stored = JSON.parse(window.localStorage.getItem(DEVICE_KEY_PAIR) || "null"); } catch (e) {}
+      if (!stored) throw new Error("No paired device keys on this browser.");
+      var authPair = await crypto.subtle.importKey("jwk", stored.auth,
+        { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+
+      // The auth challenge resolves the principal user from the device
+      // assignment; the browser never supplies a user id it cannot prove.
+      var authChallenge = await api("/api/v1/auth/challenge", {
+        method: "POST",
+        body: JSON.stringify({ device_id: stored.device_id }),
+      });
+      var message = textBytes(authChallenge.message);
+      var raw = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, authPair, message);
+      var r = new Uint8Array(raw.slice(0, 32));
+      var s = new Uint8Array(raw.slice(32, 64));
+      function derInt(bigEndian) {
+        var i = 0; while (i < bigEndian.length && bigEndian[i] === 0) i++;
+        var value = bigEndian.slice(i);
+        var body = new Uint8Array(((value[0] & 0x80) ? [0] : []).concat(Array.from(value)));
+        var len = body.length;
+        return new Uint8Array([0x02].concat(len < 128 ? [len] : [0x81, len], Array.from(body)));
+      }
+      var seq = concatBytes([derInt(r), derInt(s)]);
+      var sig = b64encode(concatBytes([new Uint8Array([0x30].concat(seq.byteLength < 128 ? [seq.byteLength] : [0x81, seq.byteLength])), seq]));
+
+      var sessionResult = await api("/api/v1/auth/session", {
+        method: "POST",
+        body: JSON.stringify({ challenge_id: authChallenge.challenge_id, signature: sig }),
+      });
+      saveSession(sessionResult.session);
+      try {
+        window.sessionStorage.setItem(SESSION_REFRESH_KEY, sessionResult.refresh_token);
+      } catch (e) {}
+      return sessionResult;
+    }
+
+    // ------------------------------------------------------------------
+    // UI
+    // ------------------------------------------------------------------
+    function $(id) { return document.getElementById(id); }
+    function setStatus(text, tone) {
+      $("conn-status").textContent = text;
+      $("conn-status").style.color = tone === "good" ? "var(--success)" : tone === "bad" ? "var(--danger)" : "var(--muted)";
+    }
+    function renderOverview(data) {
+      var el = $("tab-overview");
+      el.innerHTML =
+        '<div class="grid">' +
+        card("Agents", data.agents.total + " total · " + data.agents.active + " active",
+          data.agents.items.slice(0, 8).map(function (a) {
+            return "<div class='row'><span class='pill " + (a.status === "active" ? "green" : "gray") + "'></span><b>" +
+              esc(a.display_name) + "</b> <span class='badge cyan'>" + esc(a.default_model_policy || "backend") +
+              "</span></div>";
+          }).join("")) +
+        card("Providers", data.providers.total + " total · " + data.providers.active + " active",
+          data.providers.items.map(function (p) {
+            return "<div class='row'><span class='pill " + (p.status === "active" ? "green" : "red") + "'></span><b>" +
+              esc(p.display_name) + "</b> <span class='badge'>" + esc(p.health || "unknown") +
+              "</span> <span class='badge'>" + esc(p.location) + "</span></div>";
+          }).join("")) +
+        card("Models", data.models.total + " total · " + data.models.active + " active",
+          data.models.items.slice(0, 8).map(function (m) {
+            return "<div class='row'><span class='pill " + (m.status === "active" ? "green" : "amber") + "'></span><b>" +
+              esc(m.key) + "</b> <span class='badge'>" + (m.reasoning ? "reasoning" : "gen") + "</span></div>";
+          }).join("")) +
+        card("Recent runs", (data.recent_runs || []).length + " recent",
+          (data.recent_runs || []).slice(0, 5).map(function (r) {
+            return "<div class='row'><span class='pill " + runTone(r.status) + "'></span>" +
+              esc(r.objective || "").slice(0, 60) + " <span class='badge'>" + esc(r.status) +
+              "</span> <span class='badge cyan'>" + esc(r.model_key || "—") + "</span></div>";
+          }).join("") || "<span class='muted'>No runs yet.</span>") +
+        "</div>";
+    }
+    function runTone(status) {
+      if (status === "succeeded") return "green";
+      if (status === "running" || status === "queued") return "amber";
+      if (status === "failed" || status === "cancelled") return "red";
+      return "gray";
+    }
+    function card(title, subtitle, body) {
+      return "<div class='card'><h4 style='margin:0 0 2px'>" + esc(title) +
+        "</h4><div class='muted' style='margin-bottom:10px'>" + esc(subtitle) + "</div>" + body + "</div>";
+    }
+    function esc(value) {
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    function renderAgents(data) {
+      var el = $("tab-agents");
+      el.innerHTML = "<h3 style='margin-top:0'>Agents</h3>" +
+        data.agents.items.map(function (a) {
+          return "<div class='card' style='margin-bottom:10px'>" +
+            "<div class='row'><b>" + esc(a.display_name) + "</b> <span class='badge'>" + esc(a.key) +
+            "</span> <span class='badge " + (a.status === "active" ? "green" : "red") + "'>" + esc(a.status) +
+            "</span></div>" +
+            "<div class='muted' style='margin:6px 0'>" + esc(a.description || a.purpose || "") + "</div>" +
+            "<div class='row'><span class='badge cyan'>provider: " + esc(a.default_provider_policy || "backend") +
+            "</span> <span class='badge cyan'>model: " + esc(a.default_model_policy || "backend") +
+            "</span> <span class='badge'>depth: " + a.max_delegation_depth + "</span></div>" +
+            "<div class='row' style='margin-top:10px'>" +
+            "<button data-action='run' data-agent='" + a.id + "'>Start run</button>" +
+            "<button data-action='runs' data-agent='" + a.id + "'>Recent runs</button>" +
+            "</div>" +
+            "<div data-agent-runs='" + a.id + "'></div>" +
+            "</div>";
+        }).join("");
+    }
+
+    function renderProviders(data) {
+      $("tab-providers").innerHTML = "<h3 style='margin-top:0'>Providers</h3>" +
+        "<table><tr><th>Name</th><th>Type</th><th>Status</th><th>Health</th><th>Location</th><th>Streaming</th><th>Tools</th></tr>" +
+        data.providers.items.map(function (p) {
+          return "<tr><td><b>" + esc(p.display_name) + "</b> <span class='mono muted'>" + esc(p.key) + "</span></td>" +
+            "<td>" + esc(p.provider_type) + "</td>" +
+            "<td><span class='badge " + (p.status === "active" ? "green" : "red") + "'>" + esc(p.status) + "</span></td>" +
+            "<td><span class='badge " + healthTone(p.health) + "'>" + esc(p.health || "unknown") + "</span></td>" +
+            "<td>" + esc(p.location) + "</td>" +
+            "<td>" + (p.streaming ? "yes" : "no") + "</td>" +
+            "<td>" + (p.tool_calling ? "yes" : "no") + "</td></tr>";
+        }).join("") + "</table>";
+    }
+    function healthTone(h) {
+      if (h === "healthy") return "green";
+      if (h === "unavailable" || h === "disabled") return "red";
+      return "amber";
+    }
+
+    function renderModels(data) {
+      $("tab-models").innerHTML = "<h3 style='margin-top:0'>Models</h3>" +
+        "<table><tr><th>Key</th><th>Status</th><th>Provider</th><th>Streaming</th><th>Structured</th><th>Tools</th><th>Reasoning</th></tr>" +
+        data.models.items.map(function (m) {
+          return "<tr><td class='mono'><b>" + esc(m.key) + "</b></td>" +
+            "<td><span class='badge " + (m.status === "active" ? "green" : "amber") + "'>" + esc(m.status) + "</span></td>" +
+            "<td>" + esc(m.provider_id) + "</td>" +
+            "<td>" + (m.streaming ? "yes" : "no") + "</td>" +
+            "<td>" + (m.structured_output ? "yes" : "no") + "</td>" +
+            "<td>" + (m.tool_calling ? "yes" : "no") + "</td>" +
+            "<td>" + (m.reasoning ? "yes" : "no") + "</td></tr>";
+        }).join("") + "</table>";
+    }
+
+    function renderTools(data) {
+      $("tab-tools").innerHTML = "<h3 style='margin-top:0'>Tools</h3>" +
+        "<table><tr><th>Key</th><th>Category</th><th>Risk</th><th>Status</th></tr>" +
+        data.tools.items.map(function (t) {
+          return "<tr><td class='mono'><b>" + esc(t.key) + "</b></td><td>" + esc(t.category) +
+            "</td><td><span class='badge " + (t.risk === "informational" ? "green" : "amber") + "'>" +
+            esc(t.risk) + "</span></td><td>" + esc(t.status) + "</td></tr>";
+        }).join("") + "</table>";
+    }
+
+    function renderRuns(data) {
+      var el = $("tab-runs");
+      el.innerHTML = "<h3 style='margin-top:0'>Agent runs</h3>" +
+        (data.recent_runs || []).map(function (r) {
+          return "<div class='card' style='margin-bottom:10px'>" +
+            "<div class='row'><b>" + esc(r.agent_id) + "</b> <span class='badge " + runTone(r.status) + "'>" +
+            esc(r.status) + "</span> <span class='badge cyan'>" + esc(r.model_key || "—") +
+            "</span> <span class='mono muted'>" + esc(r.id) + "</span></div>" +
+            "<div class='muted' style='margin:6px 0'>" + esc(r.objective || "") + "</div>" +
+            (r.result ? "<div class='msg'>" + esc(r.result) + "</div>" : "") +
+            (r.failure ? "<div class='msg' style='color:var(--danger)'>" + esc(r.failure) + "</div>" : "") +
+            "</div>";
+        }).join("") || "<span class='muted'>No runs yet.</span>";
+    }
+
+    // ------------------------------------------------------------------
+    // Data loading
+    // ------------------------------------------------------------------
+    async function refreshAll() {
+      var overview = await api("/api/v1/control/overview");
+      renderOverview(overview);
+      renderAgents(overview);
+      renderProviders(overview);
+      renderModels(overview);
+      renderTools(overview);
+      renderRuns(overview);
+    }
+
+    async function startRun(agentId) {
+      var objective = window.prompt("Objective for this agent:", "Describe your configured role. Do not modify anything.");
+      if (!objective) return;
+      var run = await api("/api/v1/control/agents/" + agentId + "/runs", {
+        method: "POST",
+        body: JSON.stringify({
+          conversation_id: uuidv4(), message_id: uuidv4(), objective: objective,
+        }),
+      });
+      var executed = await api("/api/v1/control/runs/" + run.id + "/execute", {
+        method: "POST", body: JSON.stringify({}),
+      });
+      alert("Run " + executed.status + "\nModel: " + (executed.model_key || "?") +
+        "\n\n" + (executed.result || executed.failure || "").slice(0, 400));
+      await refreshAll();
+    }
+
+    async function showAgentRuns(agentId) {
+      var runs = await api("/api/v1/control/agents/" + agentId + "/runs");
+      var container = document.querySelector("[data-agent-runs='" + agentId + "']");
+      container.innerHTML = runs.runs.slice(0, 5).map(function (r) {
+        return "<div class='row' style='margin-top:6px'><span class='badge " + runTone(r.status) + "'>" +
+          esc(r.status) + "</span> <span class='mono muted'>" + esc(r.id) + "</span> " +
+          esc(r.objective || "").slice(0, 50) + "</div>";
+      }).join("") || "<span class='muted'>No runs.</span>";
+    }
+
+    // ------------------------------------------------------------------
+    // Boot
+    // ------------------------------------------------------------------
+    async function boot() {
+      var session = loadSession();
+      if (session) {
+        $("dashboard").classList.remove("hidden");
+        $("pairing-panel").classList.add("hidden");
+        $("refresh-btn").classList.remove("hidden");
+        $("logout-btn").classList.remove("hidden");
+        $("pair-btn").classList.add("hidden");
+        setStatus("Connected · session " + session.session_id.slice(0, 8), "good");
+        try {
+          await refreshAll();
+        } catch (e) {
+          setStatus("Session expired: " + e.message, "bad");
+          $("pairing-panel").classList.remove("hidden");
+        }
+      } else {
+        $("pairing-panel").classList.remove("hidden");
+        setStatus("Not connected");
+      }
+    }
+
+    $("pair-btn").addEventListener("click", function () {
+      $("pairing-panel").classList.remove("hidden");
+    });
+    $("pair-submit").addEventListener("click", async function () {
+      var code = $("pair-code").value.trim();
+      $("pair-message").textContent = "Pairing…";
+      try {
+        await pairDevice(code);
+        $("pair-message").textContent = "Browser paired. Ask the operator to assign this device, then click Check status.";
+      } catch (e) {
+        $("pair-message").textContent = "Pairing failed: " + e.message;
+      }
+    });
+    $("pair-check").addEventListener("click", async function () {
+      try {
+        var sessionResult = await establishSession();
+        saveSession(sessionResult.session);
+        $("dashboard").classList.remove("hidden");
+        $("pairing-panel").classList.add("hidden");
+        $("refresh-btn").classList.remove("hidden");
+        $("logout-btn").classList.remove("hidden");
+        $("pair-btn").classList.add("hidden");
+        setStatus("Connected · session " + sessionResult.session.session_id.slice(0, 8), "good");
+        await refreshAll();
+      } catch (e) {
+        $("pair-message").textContent = "Not ready yet: " + e.message +
+          ". The operator must assign this device to the owner role first.";
+      }
+    });
+    $("refresh-btn").addEventListener("click", refreshAll);
+    $("logout-btn").addEventListener("click", function () {
+      clearSession();
+      window.location.reload();
+    });
+
+    document.addEventListener("click", async function (event) {
+      var runBtn = event.target.closest("[data-action='run']");
+      if (runBtn) { event.preventDefault(); await startRun(runBtn.getAttribute("data-agent")); return; }
+      var runsBtn = event.target.closest("[data-action='runs']");
+      if (runsBtn) { event.preventDefault(); await showAgentRuns(runsBtn.getAttribute("data-agent")); return; }
+    });
+
+    document.querySelectorAll(".tabs button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.querySelectorAll(".tabs button").forEach(function (b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.add("hidden"); });
+        $("tab-" + btn.getAttribute("data-tab")).classList.remove("hidden");
+      });
+    });
+
+    boot();
+  </script>
+</body>
+</html>

@@ -234,3 +234,76 @@ test("ships a Production & Release workspace with honest gates and targets", () 
   assert.match(html, /Create verified backup/);
   assert.match(html, /Enter Safe Mode/);
 });
+
+test("ships a Memory workspace driven by the real memory platform", () => {
+  assert.match(html, /id: ["']memory["'], label: ["']Memory["']/);
+  assert.match(html, /function KnowledgeSection\(/);
+  assert.match(html, /function MemoryView\(/);
+  assert.match(html, /\/api\/v1\/memory\/overview/);
+  assert.match(html, /\/api\/v1\/memory\/records\?limit=500/);
+  assert.match(html, /\/api\/v1\/memory\/search/);
+  assert.match(html, /loadMemoryFromApi\(\)/);
+  assert.match(html, /token-overlap/);
+});
+
+test("Memory workspace exposes provenance, evidence, and lifecycle without secrets", () => {
+  assert.match(html, /function MemoryDetail\(/);
+  assert.match(html, /Provenance/);
+  assert.match(html, /Evidence/);
+  assert.match(html, /Lifecycle/);
+  assert.match(html, /\/memory\/records\/["'] \+ encodeURIComponent/);
+  assert.match(html, /correct/);
+  assert.match(html, /supersede/);
+  assert.match(html, /explicit browser forget/);
+  assert.match(html, /embedding: /);
+});
+
+test("Memory review queue resolves items through the authoritative API", () => {
+  assert.match(html, /\/api\/v1\/memory\/review\?state=open/);
+  assert.match(html, /function ReviewPanel\(/);
+  assert.match(html, /resolveMemoryReview\(/);
+  assert.match(html, /action: action, note: "resolved from browser workspace"/);
+});
+
+test("ships a Files workspace over registered engineering projects and artifacts", () => {
+  assert.match(html, /id: ["']files["'], label: ["']Files["']/);
+  assert.match(html, /\/api\/v1\/engineering\/projects/);
+  assert.match(html, /\/api\/v1\/agents\/artifacts\?limit=200/);
+  assert.match(html, /function FilesBrowse\(/);
+  assert.match(html, /files\/content\?path=/);
+  assert.match(html, /masked_secrets/);
+  assert.match(html, /The browser never reads the VPS filesystem directly/);
+});
+
+test("ships a Universal Search workspace orchestrating real per-domain search", () => {
+  assert.match(html, /id: ["']search["'], label: ["']Search["']/);
+  assert.match(html, /function SearchView\(/);
+  assert.match(html, /runUniversalSearch\(/);
+  assert.match(html, /\/api\/v1\/memory\/search\?q=/);
+  assert.match(html, /\/api\/v1\/engineering\/projects\/["'] \+ encodeURIComponent/);
+  assert.match(html, /Search memory, project files, agents, and artifacts/);
+});
+
+test("ships a Context workspace that excludes secrets and hidden reasoning", () => {
+  assert.match(html, /id: ["']context["'], label: ["']Context["']/);
+  assert.match(html, /function ContextView\(/);
+  assert.match(html, /Chain-of-thought excluded/);
+  assert.match(html, /Hidden reasoning and secrets are never stored/);
+  assert.match(html, /knowledge workspace/i);
+});
+
+test("knowledge apps register deep links and palette commands", () => {
+  assert.match(html, /appId === "memory"/);
+  assert.match(html, /appId === "files"/);
+  assert.match(html, /appId === "search"/);
+  assert.match(html, /appId === "context"/);
+  assert.match(html, /memory-open/);
+  assert.match(html, /search-open/);
+  assert.match(html, /context-open/);
+});
+
+test("knowledge layer avoids fabricating vector search", () => {
+  assert.match(html, /bounded token-overlap/);
+  assert.doesNotMatch(html, /cosineSimilarity\(/);
+  assert.doesNotMatch(html, /fake.*embedding|embedding.*fake/i);
+});

@@ -173,6 +173,8 @@ class AgentRunRecord:
     token_usage: int
     trace_id: str
     revision: int
+    objective: str = ""
+    result: str = ""
 
 
 @dataclass(frozen=True)
@@ -370,6 +372,27 @@ class SQLiteControlRepository:
     def __init__(self, connection_factory: Callable[[], sqlite3.Connection]) -> None:
         self._connection_factory = connection_factory
 
+    def _ensure_control_schema_columns(self, connection: sqlite3.Connection) -> None:
+        """Guarded additive migrations for control-plane tables. Existing
+        databases created before a column was introduced keep working; new
+        columns are added only when missing (idempotent, additive, safe)."""
+        migration = {
+            "control_agent_runs": {
+                "objective": "TEXT NOT NULL DEFAULT ''",
+                "result": "TEXT NOT NULL DEFAULT ''",
+            },
+        }
+        for table, columns in migration.items():
+            existing = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(%s)" % table).fetchall()
+            }
+            for column, definition in columns.items():
+                if column not in existing:
+                    connection.execute(
+                        "ALTER TABLE %s ADD COLUMN %s %s" % (table, column, definition)
+                    )
+
     def prepare(self) -> None:
         with self._connection_factory() as connection:
             connection.execute("PRAGMA foreign_keys = ON")
@@ -475,10 +498,12 @@ class SQLiteControlRepository:
                     parent_run_id TEXT,
                     delegation_depth INTEGER NOT NULL DEFAULT 0,
                     requested_by TEXT NOT NULL,
+                    objective TEXT NOT NULL DEFAULT '',
                     started_at INTEGER,
                     completed_at INTEGER,
                     cancellation TEXT NOT NULL DEFAULT '',
                     failure TEXT NOT NULL DEFAULT '',
+                    result TEXT NOT NULL DEFAULT '',
                     token_usage INTEGER NOT NULL DEFAULT 0,
                     trace_id TEXT NOT NULL,
                     revision INTEGER NOT NULL DEFAULT 1
@@ -680,6 +705,31 @@ class SQLiteControlRepository:
                     trace_id TEXT NOT NULL,
                     revision INTEGER NOT NULL DEFAULT 1
                 );
+
+                CREATE TABLE IF NOT EXISTS control_run_outputs (
+                    run_id TEXT PRIMARY KEY REFERENCES control_agent_runs(id),
+                    output TEXT NOT NULL DEFAULT '',
+                    created_at INTEGER NOT NULL,
+                    revision INTEGER NOT NULL DEFAULT 1
+                );
+
+                CREATE TABLE IF NOT EXISTS control_council_member_runs (
+                    id TEXT PRIMARY KEY,
+                    council_run_id TEXT NOT NULL REFERENCES control_council_runs(id),
+                    agent_id TEXT NOT NULL,
+                    agent_version_id TEXT,
+                    provider_id TEXT,
+                    model_id TEXT,
+                    objective TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL DEFAULT 'queued',
+                    result TEXT NOT NULL DEFAULT '',
+                    failure TEXT NOT NULL DEFAULT '',
+                    created_at INTEGER NOT NULL,
+                    started_at INTEGER,
+                    completed_at INTEGER,
+                    revision INTEGER NOT NULL DEFAULT 1
+                );
                 """
             )
+            self._ensure_control_schema_columns(connection)
             connection.commit()

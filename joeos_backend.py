@@ -411,6 +411,55 @@ def _lemonade_headers() -> Dict[str, str]:
     return headers
 
 
+def _ollama_api_base() -> str:
+    """Private loopback-only Ollama endpoint. Never exposed publicly; the
+    backend is the only Ollama client."""
+    return os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").strip().rstrip("/")
+
+
+def _default_agent_model(ollama_state: Optional[Dict[str, Any]]) -> str:
+    models = list((ollama_state or {}).get("models", []))
+    for candidate in ("qwen2.5-coder:7b", "qwen2.5-coder:1.5b"):
+        if candidate in models:
+            return candidate
+    return "qwen2.5-coder:7b"
+
+
+def _activation_principal(app: FastAPI) -> Dict[str, Any]:
+    """Build the local-owner activation principal from authoritative identity.
+    Runs only during backend lifespan on the private host; it grants the
+    control-plane capabilities the owner role already holds, so the activation
+    path uses the same authorization the operator would."""
+    authority = getattr(app.state, "authority_service", None)
+    if authority is None:
+        raise RuntimeError("authority service unavailable")
+    users = authority.list_users()
+    if not users:
+        raise RuntimeError("no owner user exists; bootstrap first")
+    orgs = authority.list_organizations()
+    workspaces = authority.list_workspaces()
+    if not orgs or not workspaces:
+        raise RuntimeError("owner organization/workspace missing")
+    try:
+        resolved = authority._repository.principal_roles_and_capabilities(
+            users[0]["id"], orgs[0]["id"], workspaces[0]["id"]
+        )
+        owner_capabilities = resolved.get("capabilities", [])
+        role_names = resolved.get("roles", ["joeos.owner"])
+    except Exception:  # noqa: BLE001 - fall back to the owner role name only
+        owner_capabilities = []
+        role_names = ["joeos.owner"]
+    return {
+        "session_id": None,
+        "device_id": None,
+        "user": {"id": users[0]["id"], "display_name": users[0]["display_name"], "status": "active"},
+        "organization": {"id": orgs[0]["id"]},
+        "workspace": {"id": workspaces[0]["id"], "name": workspaces[0]["name"]},
+        "roles": role_names,
+        "capabilities": sorted(owner_capabilities),
+    }
+
+
 def _text_models(payload: Any) -> List[Dict[str, Any]]:
     rows = payload.get("data", []) if isinstance(payload, dict) else []
     excluded_labels = {
@@ -1298,7 +1347,18 @@ async def lifespan(app: FastAPI):
         governance_blocked=_governance_probe,
         record_metric=app.state.performance_service.record,
         version=JOEOS_VERSION,
+        ollama_api_base=_ollama_api_base(),
     )
+    # Measure the local Ollama runtime and cache its honest health on the
+    # adapter. This is the single private, server-side Ollama client.
+    try:
+        app.state.ollama_state = await app.state.ai_service.probe_ollama()
+    except Exception:  # noqa: BLE001 - health probe never crashes startup
+        app.state.ollama_state = {
+            "available": False,
+            "reason": "Ollama is not reachable on the VPS loopback.",
+            "models": [],
+        }
 
     def _ai_availability() -> dict:
         ai = getattr(app.state, "ai_service", None)
@@ -1342,15 +1402,45 @@ async def lifespan(app: FastAPI):
     # Run recovery: interrupt runs left in queued/running/cancellation_requested
     # after a restart. Accepted user messages are preserved.
     await asyncio.to_thread(app.state.conversation_service.recover_after_restart)
+    from server.agents.execution import build_agent_executor
+
+    app.state.agent_executor = build_agent_executor(
+        app.state.ai_service,
+        default_model=_default_agent_model(app.state.ollama_state),
+    )
     app.state.action_service = ActionService(
         SQLiteControlStore(lambda: _connect(db_path)),
         device_repository=device_identity_repository,
+        agent_executor=app.state.agent_executor,
         event_sink=lambda level, source, message: _record_event(
             db_path, level, source, message
         ),
     )
     app.state.action_service.prepare()
     await asyncio.to_thread(app.state.action_service.recover_after_restart)
+    # Activate the production Agent Fabric: register Ollama, sync live models,
+    # create the agent team bound to real models, and register safe read tools.
+    try:
+        from server.agents.activation import activate_agent_fabric
+
+        activation_principal = await asyncio.to_thread(_activation_principal, app)
+        ollama_models = list((app.state.ollama_state or {}).get("models", []))
+        app.state.agent_fabric_summary = await asyncio.to_thread(
+            activate_agent_fabric,
+            app.state.action_service,
+            activation_principal,
+            installed_models=ollama_models,
+            ollama_health="healthy" if (app.state.ollama_state or {}).get("available") else "unavailable",
+            ollama_version=(app.state.ollama_state or {}).get("version"),
+        )
+        _record_event(db_path, "info", "agents",
+                      "Agent Fabric activated: %s agents, %s models." % (
+                          len(app.state.agent_fabric_summary.get("agents", [])),
+                          len(app.state.agent_fabric_summary.get("models_registered", [])),
+                      ))
+    except Exception as error:  # noqa: BLE001 - activation failure must not crash startup
+        _record_event(db_path, "error", "agents",
+                      "Agent Fabric activation failed: %s" % type(error).__name__)
     app.state.runner_service = RunnerService(
         SQLiteRunnerStore(lambda: _connect(db_path)),
         installation_id=server_identity_repository.get_or_create_server_id,
@@ -1646,6 +1736,18 @@ def frontend() -> FileResponse:
     return FileResponse(INDEX_PATH, media_type="text/html")
 
 
+@app.get("/os/{rest:path}", include_in_schema=False)
+def os_frontend(rest: str) -> FileResponse:
+    """Serve the browser OS shell for /os/* deep links so a refresh keeps the route.
+
+    The Agent Fabric console owns the agent-operations routes (/os/agents,
+    /os/providers, /os/models); all other /os/* deep links resolve to the shell."""
+    head = (rest or "").split("/", 1)[0]
+    if head in ("agents", "providers", "models"):
+        return FileResponse(AGENT_FABRIC_PAGE_PATH, media_type="text/html")
+    return FileResponse(INDEX_PATH, media_type="text/html")
+
+
 @app.get("/manifest.webmanifest", include_in_schema=False)
 def manifest() -> FileResponse:
     return FileResponse(MANIFEST_PATH, media_type="application/manifest+json")
@@ -1664,6 +1766,9 @@ def app_icon() -> FileResponse:
 @app.get("/sdk/index.js", include_in_schema=False)
 def browser_sdk() -> FileResponse:
     return FileResponse(SDK_PATH, media_type="application/javascript")
+
+
+AGENT_FABRIC_PAGE_PATH = _package_asset("agent_fabric.html")
 
 
 @app.get("/healthz")
