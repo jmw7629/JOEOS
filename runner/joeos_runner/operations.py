@@ -188,6 +188,13 @@ class GitExecutor:
                 commit_id = self._git("rev-parse", "HEAD").stdout.strip()
                 return {"status": "succeeded", "summary": "commit created",
                         "exit_classification": "clean", "data": {"commit": commit_id}}
+            if operation == "stage_all":
+                result = self._git("add", "-A")
+                if result.exit_code != 0:
+                    return {"status": "failed", "summary": "stage failed",
+                            "exit_classification": "failed"}
+                return {"status": "succeeded", "summary": "changes staged",
+                        "exit_classification": "clean"}
             if operation == "push_branch":
                 branch = str(parameters["branch"])
                 remote = str(parameters.get("remote", "origin"))
@@ -213,10 +220,70 @@ class GitExecutor:
                 commit_id = self._git("rev-parse", "HEAD").stdout.strip()
                 return {"status": "succeeded", "summary": "commit verified",
                         "exit_classification": "clean", "data": {"commit": commit_id}}
+            if operation == "worktree_add":
+                branch = str(parameters["branch"])
+                path = str(parameters["path"])
+                self._validate_branch(branch)
+                self._require_clean_path(path)
+                if branch in self._protected:
+                    return {"status": "failed", "summary": "protected branch worktree denied",
+                            "exit_classification": "denied"}
+                if os.path.exists(path) and os.listdir(path):
+                    return {"status": "failed", "summary": "worktree path not empty",
+                            "exit_classification": "denied"}
+                result = self._git("worktree", "add", "-b", branch, path)
+                if result.exit_code != 0:
+                    return {"status": "failed", "summary": "worktree add failed",
+                            "exit_classification": "failed"}
+                return {"status": "succeeded", "summary": "worktree added: %s" % branch,
+                        "exit_classification": "clean", "data": {"branch": branch, "path": path}}
+            if operation == "worktree_list":
+                result = self._git("worktree", "list")
+                return {"status": "succeeded", "summary": "worktree list",
+                        "exit_classification": "clean", "output": result.stdout}
+            if operation == "worktree_remove":
+                branch = str(parameters["branch"])
+                path = str(parameters["path"])
+                self._validate_branch(branch)
+                self._require_clean_path(path)
+                result = self._git("worktree", "remove", "--force", path)
+                if result.exit_code != 0:
+                    return {"status": "failed", "summary": "worktree remove failed",
+                            "exit_classification": "failed"}
+                self._git("branch", "-D", branch)
+                return {"status": "succeeded", "summary": "worktree removed: %s" % branch,
+                        "exit_classification": "clean"}
+            if operation == "ff_integrate":
+                branch = str(parameters["branch"])
+                self._validate_branch(branch)
+                if branch in self._protected:
+                    return {"status": "failed", "summary": "protected branch integrate denied",
+                            "exit_classification": "denied"}
+                if self._secret_scan is not None and not self._secret_scan(self._root):
+                    return {"status": "failed", "summary": "secret scan failed; integrate blocked",
+                            "exit_classification": "denied"}
+                result = self._git("merge", "--ff-only", branch)
+                if result.exit_code != 0:
+                    return {"status": "failed", "summary": "ff-integrate failed",
+                            "exit_classification": "failed"}
+                commit_id = self._git("rev-parse", "HEAD").stdout.strip()
+                return {"status": "succeeded", "summary": "ff-integrated %s" % branch,
+                        "exit_classification": "clean", "data": {"commit": commit_id}}
             return {"status": "failed", "summary": "unsupported git operation",
                     "exit_classification": "denied"}
         except GitSafetyError as error:
             return {"status": "failed", "summary": str(error), "exit_classification": "denied"}
+
+    def _require_clean_path(self, path: str) -> None:
+        if not isinstance(path, str) or not path or len(path) > 1024:
+            raise GitSafetyError("invalid worktree path")
+        if not os.path.isabs(path):
+            raise GitSafetyError("worktree path must be absolute")
+        if any(ord(c) < 32 for c in path):
+            raise GitSafetyError("worktree path contains control characters")
+        for token in ("/etc", "/usr", "/boot", "/sys", "/proc", "/dev", "/var/lib"):
+            if path.startswith(token):
+                raise GitSafetyError("worktree path is outside the safe root")
 
     def _ok(self, summary: str, result: ProcessResult) -> dict:
         return {"status": "succeeded" if result.exit_code == 0 else "failed",
@@ -432,6 +499,141 @@ def _within(root: str, candidate: str) -> bool:
     root_real = os.path.realpath(root)
     candidate_real = os.path.realpath(candidate)
     return candidate_real == root_real or candidate_real.startswith(root_real + os.sep)
+
+
+class AppleBuildExecutor:
+    """Typed iOS build-host executor.
+
+    Reuses the proven P3F-A Mac build-host setup (rsync VPS->Mac over Tailscale
+    SSH with an explicit key, then xcodebuild on the Mac) but exposes only a
+    fixed set of allowlisted operations. No arbitrary shell, no raw SSH flags:
+    the host, user, key path, and mirror directory all come from configuration,
+    and parameters never become shell tokens."""
+
+    key = "joeos.apple.build"
+
+    ALLOWED_OPERATIONS = ("sync_source", "build_simulator", "build_device", "test_simulator", "verify_health")
+
+    def __init__(
+        self,
+        *,
+        host: str,
+        user: str,
+        identity_file: str,
+        mirror_dir: str,
+        source_root: str,
+        project_path: str,
+        scheme: str = "JoeOSClient",
+        destination: str = "platform=iOS Simulator,name=iPhone 16 Pro",
+        ssh_port: str = "22",
+        adapter: Optional[Callable[[list, dict], dict]] = None,
+        progress: Optional[Callable[[str], None]] = None,
+    ) -> None:
+        self._host = host
+        self._user = user
+        self._identity_file = identity_file
+        self._mirror_dir = mirror_dir.rstrip("/")
+        self._source_root = os.path.realpath(source_root)
+        self._project_path = project_path
+        self._scheme = scheme
+        self._destination = destination
+        self._ssh_port = ssh_port
+        self._adapter = adapter
+        self._progress = progress
+
+    def _ssh_command(self) -> list:
+        return [
+            "ssh",
+            "-i", self._identity_file,
+            "-o", "BatchMode=yes",
+            "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "ConnectTimeout=15",
+            "-p", self._ssh_port,
+            "%s@%s" % (self._user, self._host),
+        ]
+
+    def _validate_parameters(self, parameters: Dict) -> None:
+        for value in parameters.values():
+            if isinstance(value, str) and any(c in value for c in (";", "|", "&&", "`", "$(")):
+                raise GitSafetyError("unsafe value rejected")
+
+    def execute(self, parameters: Dict, target: str, *, root: str,
+                environment: Optional[Dict[str, str]] = None,
+                timeout_ms: int = 60_000) -> dict:
+        operation = str(parameters.get("operation") or "")
+        if operation not in self.ALLOWED_OPERATIONS:
+            return {"status": "failed", "summary": "unsupported apple build operation",
+                    "exit_classification": "denied"}
+        if operation == "verify_health":
+            if self._adapter is not None:
+                return self._adapter(["echo", "health"], {})
+            return {"status": "succeeded", "summary": "apple build host configured",
+                    "exit_classification": "clean"}
+        try:
+            self._validate_parameters(parameters)
+        except GitSafetyError as error:
+            return {"status": "failed", "summary": str(error), "exit_classification": "denied"}
+        if self._adapter is not None:
+            args = [operation, self._mirror_dir, self._project_path, self._scheme]
+            return self._adapter(args, {})
+        if operation == "sync_source":
+            return self._sync_source(timeout_ms)
+        return self._remote_build(operation, timeout_ms)
+
+    def _sync_source(self, timeout_ms: int) -> dict:
+        if not self._mirror_dir:
+            return {"status": "failed", "summary": "mirror directory not configured",
+                    "exit_classification": "denied"}
+        rsync = [
+            "rsync", "-az", "--delete",
+            "--exclude", ".git",
+            "--exclude", ".venv",
+            "--exclude", "node_modules",
+            "--exclude", "__pycache__",
+            "-e", "ssh -i %s -o BatchMode=yes -p %s" % (self._identity_file, self._ssh_port),
+            self._source_root.rstrip("/") + "/",
+            "%s@%s:%s/" % (self._user, self._host, self._mirror_dir),
+        ]
+        result = run_process(executable="rsync", arguments=rsync, cwd="/",
+                             timeout_ms=timeout_ms)
+        if result.exit_code != 0:
+            return {"status": "failed", "summary": "apple sync failed",
+                    "exit_classification": "failed"}
+        return {"status": "succeeded", "summary": "apple source synced to build host",
+                "exit_classification": "clean"}
+
+    def _remote_build(self, operation: str, timeout_ms: int) -> dict:
+        if operation == "build_simulator":
+            command = (
+                "cd %s && xcodebuild -project %s -scheme %s "
+                "-destination '%s' -configuration Debug "
+                "ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build 2>&1 | tail -40"
+                % (self._mirror_dir, self._project_path, self._scheme, self._destination)
+            )
+        elif operation == "test_simulator":
+            command = (
+                "cd %s && xcodebuild -project %s -scheme %s "
+                "-destination '%s' -configuration Debug test 2>&1 | tail -60"
+                % (self._mirror_dir, self._project_path, self._scheme, self._destination)
+            )
+        elif operation == "build_device":
+            command = (
+                "cd %s && xcodebuild -project %s -scheme %s "
+                "-configuration Debug "
+                "CODE_SIGNING_ALLOWED=NO build 2>&1 | tail -40"
+                % (self._mirror_dir, self._project_path, self._scheme)
+            )
+        else:  # pragma: no cover - guarded above
+            return {"status": "failed", "summary": "unsupported operation",
+                    "exit_classification": "denied"}
+        args = self._ssh_command() + [command]
+        result = run_process(executable="ssh", arguments=args, cwd="/",
+                             timeout_ms=timeout_ms)
+        if result.exit_code != 0:
+            return {"status": "failed", "summary": "apple build failed",
+                    "exit_classification": "failed"}
+        return {"status": "succeeded", "summary": "apple build succeeded",
+                "exit_classification": "clean", "output": result.stdout[-2000:]}
 
 
 def _sha256_file(path: str) -> str:

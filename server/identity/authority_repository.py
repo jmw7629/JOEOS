@@ -1435,6 +1435,9 @@ CAPABILITY_RISK_BY_NAME: Dict[str, tuple] = {
     "conversation.cancel": ("standard", "workspace"),
     "principal.read": ("standard", "workspace"),
     "diagnostics.read": ("standard", "workspace"),
+    # engineering campaign read surfaces are standard, non-privileged
+    "engineering.campaign.read": ("standard", "workspace"),
+    "engineering.package.read": ("standard", "workspace"),
     # privileged / critical capabilities are NOT granted by default
     "approval.sign": ("privileged", "workspace"),
     "repository.write": ("privileged", "workspace"),
@@ -1443,4 +1446,12 @@ CAPABILITY_RISK_BY_NAME: Dict[str, tuple] = {
     "shell.execute": ("critical", "organization"),
     "git.mutate": ("privileged", "workspace"),
     "external.send": ("critical", "organization"),
+    # engineering campaign orchestration is privileged; blocker resolution is
+    # the only critical campaign capability and requires explicit grant
+    "engineering.campaign.manage": ("privileged", "workspace"),
+    "engineering.campaign.start": ("privileged", "workspace"),
+    "engineering.campaign.pause": ("privileged", "workspace"),
+    "engineering.campaign.cancel": ("privileged", "workspace"),
+    "engineering.package.manage": ("privileged", "workspace"),
+    "engineering.blocker.resolve": ("critical", "workspace"),
 }

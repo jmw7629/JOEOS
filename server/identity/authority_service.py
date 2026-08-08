@@ -66,6 +66,10 @@ class AuthorityService:
         "conversation.cancel",
         "principal.read",
         "diagnostics.read",
+        "engineering.campaign.read",
+        "engineering.package.read",
+        "engineering.campaign.manage",
+        "engineering.package.manage",
     ]
 
     def __init__(

@@ -21,6 +21,7 @@
 		A1B2C3D4E5F600000000020C /* JoeOSColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000010C /* JoeOSColors.swift */; };
 		A1B2C3D4E5F600000000020D /* JoeOSWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000010D /* JoeOSWebView.swift */; };
 		A1B2C3D4E5F600000000020E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000010E /* Assets.xcassets */; };
+		A1B2C3D4E5F6000000000221 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000220 /* PrivacyInfo.xcprivacy */; };
 		A1B2C3D4E5F6000000000211 /* libJoeOSCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000112 /* libJoeOSCore.a */; };
 		A1B2C3D4E5F6000000000212 /* libJoeOSIntelligence.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000113 /* libJoeOSIntelligence.a */; };
 		A1B2C3D4E5F6000000000213 /* BootstrapDiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000115 /* BootstrapDiscoveryTests.swift */; };
@@ -49,6 +50,7 @@
 		A1B2C3D4E5F600000000010D /* JoeOSWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoeOSWebView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000010E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000010F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1B2C3D4E5F6000000000220 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000110 /* JoeOSClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JoeOSClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1B2C3D4E5F6000000000111 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000112 /* libJoeOSCore.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = "PrebuiltModules/libJoeOSCore.a"; sourceTree = "$(OBJROOT)"; };
@@ -79,6 +81,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D4E5F600000000020E /* Assets.xcassets in Resources */,
+				A1B2C3D4E5F6000000000221 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,6 +192,7 @@
 			children = (
 				A1B2C3D4E5F600000000010E /* Assets.xcassets */,
 				A1B2C3D4E5F600000000010F /* Info.plist */,
+				A1B2C3D4E5F6000000000220 /* PrivacyInfo.xcprivacy */,
 			);
 			path = "../JoeOSClient/Resources";
 			sourceTree = "<group>";
@@ -425,6 +430,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = A1B2C3D4E5F6000000000111 /* Base.xcconfig */;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -447,6 +453,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = A1B2C3D4E5F6000000000111 /* Base.xcconfig */;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

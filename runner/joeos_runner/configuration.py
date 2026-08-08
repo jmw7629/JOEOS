@@ -84,6 +84,10 @@ class RunnerConfiguration:
     secret_provider: SecretProviderConfig = field(default_factory=SecretProviderConfig)
     protocol_version: int = 1
     allowed_env_overrides: str = "JOEOS_RUNNER_LOG_LEVEL"
+    apple_build_host: str = ""
+    apple_build_user: str = ""
+    apple_build_identity: str = ""
+    apple_build_mirror: str = ""
 
     @classmethod
     def load(cls, path: str, environ: Optional[Dict[str, str]] = None) -> "RunnerConfiguration":
@@ -192,6 +196,7 @@ class RunnerConfiguration:
             "protocol_version": self.protocol_version,
             "repository_registrations": [repo.id for repo in self.repository_registrations],
             "service_registrations": [svc.id for svc in self.service_registrations],
+            "apple_build_host": self.apple_build_host,
         }
 
 

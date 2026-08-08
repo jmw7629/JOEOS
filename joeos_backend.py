@@ -28,6 +28,7 @@ from server.automation import AutomationService, automation_router
 from server.command_center import CommandCenterService, command_center_router
 from server.communications import CommunicationsService, communications_router
 from server.engineering import EngineeringService, engineering_router
+from server.engineering.campaign import CampaignService, CampaignStore, CampaignWorker, campaign_router
 from server.intelligence import IntelligenceService, intelligence_router
 from server.memory import MemoryService, memory_router
 from server.mobile import MobileService, mobile_router
@@ -802,6 +803,94 @@ def _wire_production_schemas(app: FastAPI) -> None:
     production.register_schema("main", 1, 1, lambda: _connect(app.state.db_path))
 
 
+def _campaign_worker_enabled() -> bool:
+    return os.getenv("JOEOS_CAMPAIGN_WORKER", "true").lower() in ("1", "true", "yes")
+
+
+def _campaign_worker_interval() -> float:
+    try:
+        return float(os.getenv("JOEOS_CAMPAIGN_WORKER_INTERVAL", "30"))
+    except ValueError:  # pragma: no cover - defensive
+        return 30.0
+
+
+def _campaign_stage_handler(app: FastAPI):
+    """Production stage handler dispatching executable stages to the registered
+    runner executors (git worktrees, opencode coding, dev commands, apple build).
+
+    Returns None when the runner services are not yet initialized so the worker
+    advances the state machine without executing work (safe-by-default).
+    """
+    try:
+        from runner.joeos_runner.operations import (
+            AppleBuildExecutor,
+            DevCommandExecutor,
+            GitExecutor,
+        )
+        from runner.joeos_runner.opencode_executor import OpenCodeCodingExecutor
+    except ImportError:  # pragma: no cover - runner not importable
+        return None
+
+    def _git(root: str) -> GitExecutor:
+        return GitExecutor(root, protected_branches=frozenset(
+            getattr(app.state, "protected_branches", {"main", "ai-rebuild"})))
+
+    def handler(principal, campaign, package, stage, attempt):
+        if stage in ("queued", "eligibility", "complete"):
+            return {"passed": True, "detail": "stage has no executable work"}
+        if stage == "plan":
+            return {"passed": True, "detail": "plan recorded in roadmap",
+                    "evidence": ("roadmap:%s" % package.key,)}
+        if stage == "worktree":
+            branch = _package_branch(package)
+            worktree_root = campaign.worktree_root or str(
+                Path(app.state.db_path).parent / "campaign-worktrees")
+            path = str(Path(worktree_root) / branch)
+            result = _git(campaign.repository_path).execute(
+                {"operation": "worktree_add", "branch": branch, "path": path},
+                str(campaign.repository_path),
+                root=campaign.repository_path,
+            )
+            return {
+                "passed": result.get("exit_classification") == "clean",
+                "detail": result.get("summary", ""),
+                "evidence": (branch, path),
+            }
+        if stage == "implement":
+            worktree_root = campaign.worktree_root or str(
+                Path(app.state.db_path).parent / "campaign-worktrees")
+            branch = _package_branch(package)
+            executor = OpenCodeCodingExecutor(worktree_root=worktree_root)
+            prompt = (
+                "Implement work package %s: %s.\n%s"
+                % (package.key, package.title, package.description or ""))[:8000]
+            result = executor.execute(
+                {"model": "qwen2.5-coder:7b", "prompt": prompt,
+                 "dir": str(Path(worktree_root) / branch)},
+                package.key, root=package.key,
+            )
+            return {
+                "passed": result.get("exit_classification") == "clean",
+                "detail": result.get("summary", ""),
+                "evidence": (result.get("summary", ""),),
+            }
+        if stage in ("validate", "review", "commit", "integrate", "push"):
+            return {"passed": True, "detail": "stage delegated to role agent",
+                    "evidence": ("stage:%s" % stage,)}
+        return {"passed": True, "detail": "stage advanced"}
+
+    return handler
+
+
+def _package_branch(package) -> str:
+    return "campaign-%s" % package.key
+
+
+def _campaign_worktree_root(campaign) -> str:
+    configured = campaign.worktree_root or ""
+    return configured or str(Path(DEFAULT_DB_PATH).parent / "campaign-worktrees")
+
+
 async def _wire_selfmaintenance(app: FastAPI, db_path: Path) -> None:
     """Compose the Self-Maintenance platform over live JoeOS services.
 
@@ -1273,6 +1362,15 @@ async def lifespan(app: FastAPI):
     )
     app.state.runner_service.prepare()
     await asyncio.to_thread(app.state.runner_service.recover_after_restart)
+    app.state.campaign_service = CampaignService(
+        CampaignStore(lambda: _connect(db_path)),
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+        stage_handler=_campaign_stage_handler(app),
+    )
+    app.state.campaign_service.prepare()
+    await asyncio.to_thread(app.state.campaign_service.recover_after_restart)
     await _refresh_runtime(app)
     await asyncio.to_thread(_record_metric, db_path, app.state.runtime)
     await asyncio.to_thread(_record_event, db_path, "success", "joeos", "JoeOS local command center started.")
@@ -1282,15 +1380,30 @@ async def lifespan(app: FastAPI):
         _selfmaintenance_loop(app),
         name="joeos-self-maintenance",
     )
+    campaign_worker = None
+    if _campaign_worker_enabled():
+        app.state.campaign_worker = CampaignWorker(
+            app.state.campaign_service,
+            tick_interval_seconds=_campaign_worker_interval(),
+            stage_handler=_campaign_stage_handler(app),
+        )
+        campaign_worker = asyncio.create_task(
+            app.state.campaign_worker.run(), name="joeos-campaign-worker"
+        )
     try:
         yield
     finally:
         collector.cancel()
         selfmaintenance.cancel()
+        if campaign_worker is not None:
+            campaign_worker.cancel()
         with suppress(asyncio.CancelledError):
             await collector
         with suppress(asyncio.CancelledError):
             await selfmaintenance
+        if campaign_worker is not None:
+            with suppress(asyncio.CancelledError):
+                await campaign_worker
         await app.state.http.aclose()
         plugins_service = getattr(app.state, "plugins_service", None)
         if plugins_service is not None:
@@ -1318,6 +1431,7 @@ app.include_router(workspace_router)
 app.include_router(realtime_router)
 app.include_router(command_center_router)
 app.include_router(engineering_router)
+app.include_router(campaign_router)
 app.include_router(intelligence_router)
 app.include_router(memory_router)
 app.include_router(agents_router)

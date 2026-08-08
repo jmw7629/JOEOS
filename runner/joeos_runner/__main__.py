@@ -32,8 +32,65 @@ def _build_secret_provider(config: RunnerConfiguration) -> RunnerLocalSecretProv
 
 
 def _executor_resolver(config: RunnerConfiguration):
-    allowed = config.allowed_executor_ids()
-    return lambda key: REGISTERED_EXECUTORS.get(key) if key in allowed else None
+    """Resolve a registered executor key to an executor instance.
+
+    Base adapters come from REGISTERED_EXECUTORS; the config-aware DevOps
+    executors (constrained git per repository registration, dev command
+    templates, user services, deployments) are built from the typed
+    configuration so the production daemon can actually dispatch them."""
+    from .operations import (
+        AppleBuildExecutor,
+        DeploymentExecutor,
+        DevCommandExecutor,
+        GitExecutor,
+        UserServiceExecutor,
+    )
+
+    def resolve(key: str) -> object:
+        allowed = config.allowed_executor_ids()
+        if key not in allowed:
+            return None
+        if key == DevCommandExecutor.key:
+            return DevCommandExecutor()
+        if key == GitExecutor.key:
+            registrations = {
+                repo.id: repo for repo in config.repository_registrations
+            }
+            first = next(iter(registrations.values()), None)
+            if first is None:
+                return None
+            remotes = tuple(r for r in str(first.allowed_remotes).split(",") if r)
+            protected = tuple(r for r in str(first.protected_branches).split(",") if r)
+            return GitExecutor(
+                root=first.root,
+                allowed_remotes=remotes,
+                protected_branches=protected,
+                secret_scan=None,
+                hooks_path=None,
+            )
+        if key == UserServiceExecutor.key:
+            return UserServiceExecutor(registrations={
+                svc.id: {"unit_name": svc.unit_name, "allowed_operations": svc.allowed_operations}
+                for svc in config.service_registrations
+            })
+        if key == DeploymentExecutor.key:
+            service = UserServiceExecutor(registrations={
+                svc.id: {"unit_name": svc.unit_name, "allowed_operations": svc.allowed_operations}
+                for svc in config.service_registrations
+            })
+            return DeploymentExecutor(release_root=config.work_root, service=service)
+        if key == AppleBuildExecutor.key:
+            return AppleBuildExecutor(
+                host=str(getattr(config, "apple_build_host", "") or ""),
+                user=str(getattr(config, "apple_build_user", "") or ""),
+                identity_file=str(getattr(config, "apple_build_identity", "") or ""),
+                mirror_dir=str(getattr(config, "apple_build_mirror", "") or ""),
+                source_root=config.work_root,
+                project_path="apps/mobile/Xcode/JoeOSClient.xcodeproj",
+            )
+        return REGISTERED_EXECUTORS.get(key)
+
+    return resolve
 
 
 def main(argv: Optional[list] = None) -> int:
