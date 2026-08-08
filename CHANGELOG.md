@@ -3,6 +3,34 @@
 All notable changes to the JoeOS Command Center are documented here, grouped
 by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
 
+## [2.2.0] — 2026-08-08
+
+### Autonomous operations (AUTONOMY-1)
+
+- Durable agent automations over the existing AgentFabric (`server/autonomous/`):
+  AutomationDefinition + AutomationRun state machine with immutable per-run
+  definition snapshots, deterministic occurrence keys (unique index, no
+  duplicate runs), and workspace isolation.
+- Triggers: one_time, recurring (DST-safe timezone-aware schedules reusing the
+  automation schedule service), event, condition_watch (min 5 min interval),
+  manual (Run Now). No shell/cron command execution.
+- AutonomousScheduler: backend-singleton asyncio loop with durable lease
+  claims, expired-lease recovery, bounded retries, and pause/disable
+  prevention (a paused automation is never due and the schedule holds).
+- AgentFabricAutomationExecutor: each occurrence runs through the exact
+  interactive AgentRun path (provider/model/result); background agents default
+  to the stable 1.5B model family.
+- Durable notifications via the NotificationCenter with deep links to the exact
+  AutomationRun (`/os/automations/<id>/runs/<run>`); realtime toasts are a
+  presentation layer only.
+- `/os/automations` browser app: list, New Automation wizard (objective, agent,
+  trigger, schedule, timezone, review), detail, run detail, Run Now, Pause,
+  Resume, Archive.
+- API at `/api/v1/automations/*`.
+- Live canaries passed: one-time background run with the browser closed,
+  recurring (distinct occurrences, no duplicates), restart recovery (ran once
+  after backend restart), pause prevention, durable completion notification.
+
 ## [2.1.0] — 2026-08-07
 
 ### Browser knowledge layer (P4-UI-E)

@@ -25,6 +25,15 @@ The modular native iPhone source now runs the reviewed pairing ceremony with ser
 
 The complete audit, target topology, feature graph, security boundaries, and dependency-ordered backlog are in `docs/architecture/`. Existing root entry points remain supported while domain modules move under `server/`, shared clients and contracts move under `packages/`, and the nested Sites application is migrated without losing its Git history.
 
-Unconnected calendar, email, weather, markets, manufacturing, social, documents, automation, voice, vision, and Even Reality G2 modules are deliberately labeled as integration-required. JoeOS never substitutes fabricated production data.
+Unconnected calendar, email, weather, markets, manufacturing, social, documents, voice, vision, and Even Reality G2 modules are deliberately labeled as integration-required. JoeOS never substitutes fabricated production data.
+
+## Autonomous operations
+
+Local AI agents can run persistently in the background without a browser. Open
+`/os/automations` to create durable agent automations (objective + agent +
+schedule), which the backend scheduler executes through the same AgentFabric,
+ProviderRegistry, ModelRegistry, Ollama, ToolBroker, and approval boundaries as
+interactive agents. Results and notifications persist server-side; a closed
+browser never stops scheduled work. See `docs/automations/GETTING_STARTED.md`.
 
 Current project and repository intelligence status is tracked in `STATUS.md` and the [Project and Repository Intelligence architecture](docs/architecture/PROJECT_INTELLIGENCE.md).

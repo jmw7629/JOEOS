@@ -1,10 +1,30 @@
 # JoeOS Status
 
-Generated: 2026-08-05.
+Generated: 2026-08-08.
 
 ## Current phase
 
-Phase 19 — Self-Maintenance and Continuous Improvement (delivered).
+Autonomous Operations (AUTONOMY-1) — persistent background agents, automations,
+schedules, triggers, recovery, and notifications (delivered).
+
+## Live agent + autonomy status
+
+- Local AI agents operational end-to-end from the deployed browser (`/os/agents`):
+  WebCrypto device enrollment/session, principal resolution, ProviderRegistry
+  (Ollama local/private/healthy), ModelRegistry (10 models), AgentRun execution,
+  real delegation, real TaskGraph, Council, ToolBroker (5 safe read-only tools).
+  Ollama is loopback-only (`127.0.0.1:11434`); the browser never contacts it.
+- Durable autonomous operations (`server/autonomous/`): AutomationDefinition +
+  AutomationRun over the AgentFabric; one_time/recurring/event/condition_watch/
+  manual triggers; DST-safe timezone-aware schedules; deterministic occurrence
+  keys (no duplicates); durable lease claims + expired-lease recovery; bounded
+  retries; pause/resume/archive; `/os/automations` browser app; durable
+  notifications with deep links via the NotificationCenter. Background agents
+  default to the stable 1.5B model family. Browser is never the scheduler.
+- Live canaries passed: one-time background run (browser closed), recurring
+  (multiple distinct occurrences, no duplicates), restart recovery (ran once
+  after backend restart), pause prevention, durable completion notification with
+  deep link to the exact AutomationRun.
 ## What works
 
 - Mission Control, workspace configuration, widget catalog, telemetry, private Lemonade chat, PWA/native pairing, device enrollment.
@@ -26,9 +46,11 @@ Phase 19 — Self-Maintenance and Continuous Improvement (delivered).
 
 ## Test status
 
-- Python: 714 passed, 61 subtests passed.
-- Runner: 35 passed (process safety + P3D daemon/executor suite + HTTP transport).
-- Frontend: 27/27 passed.
+- Python: 837 passed, 61 subtests passed (includes 22 autonomous tests).
+  One pre-existing time-dependent communications quiet-hours failure remains
+  (unchanged by this work; it depends on the host clock/timezone).
+- Runner: 57 passed (process safety + P3D daemon/executor suite + HTTP transport).
+- Frontend: 35/35 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 
 ## Phase P3D status
