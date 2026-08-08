@@ -60,6 +60,10 @@ def _resolve_docs_path(path: str) -> Path:
     if cleaned.startswith("/") or len(cleaned) >= 2 and cleaned[1] == ":":
         raise ActionDeniedError(400, "absolute_path_denied",
                                 "Absolute documentation paths are not allowed.")
+    # Normalize an optional leading docs/ so both `agents/GETTING_STARTED.md`
+    # and `docs/agents/GETTING_STARTED.md` are accepted.
+    if cleaned.startswith("docs/") or cleaned == "docs":
+        cleaned = cleaned[len("docs/"):] if len(cleaned) > len("docs/") else ""
     parts = cleaned.split("/")
     if any(part in ("", ".", "..") for part in parts):
         raise ActionDeniedError(400, "traversal_denied",
@@ -165,6 +169,15 @@ def parse_tool_calls(content: str) -> List[Dict[str, Any]]:
     text = content.strip()
     if not text:
         return []
+    # Strip markdown code fences (```json\n ... \n```) when present.
+    if text.startswith("```"):
+        opening = text.find("\n")
+        if opening != -1:
+            body = text[opening + 1:]
+            closing = body.rfind("```")
+            if closing != -1:
+                body = body[:closing]
+            text = body.strip()
     try:
         data = json.loads(text)
     except json.JSONDecodeError:

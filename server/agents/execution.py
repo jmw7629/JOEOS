@@ -62,14 +62,16 @@ class OllamaAgentExecutor:
                     working, model=model, max_tokens=self._max_tokens,
                 )
             token_usage += result.tokens_used or 0
-            if result.finish_reason != "tool_calls":
+            # qwen2.5 emits tool calls as structured JSON in the content even
+            # when the provider does not flag finish_reason=tool_calls, so we
+            # detect parseable tool-call JSON whenever tools were offered.
+            calls = parse_tool_calls(result.reply) if tools else []
+            if not calls:
                 return {
                     "content": result.reply,
                     "token_usage": token_usage,
                     "model": result.model,
                 }
-            calls = parse_tool_calls(result.reply)
-            if not calls:
                 # The provider flagged tool_calls but returned no parseable
                 # call; return the text as-is rather than fabricating.
                 return {
