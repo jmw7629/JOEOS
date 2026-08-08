@@ -33,16 +33,46 @@ class OllamaAgentExecutor:
 
     async def __call__(self, messages: List[Dict[str, str]], tools: List[Dict], decision: Dict) -> Dict[str, Any]:
         model = decision.get("model") or self._default_model
+        last_error = None
+        # Bounded retry for transient model-load/connection races on the
+        # memory-constrained VPS. Never retries semantic failures.
+        for attempt in range(3):
+            try:
+                if tools:
+                    result = await self._ai.ollama_provider.infer_tool_call(
+                        messages, model=model, tools=tools, max_tokens=self._max_tokens,
+                    )
+                else:
+                    result = await self._ai.ollama_provider.infer(
+                        messages, model=model, max_tokens=self._max_tokens,
+                    )
+                return {
+                    "content": result.reply,
+                    "token_usage": result.tokens_used or 0,
+                    "model": result.model,
+                }
+            except Exception as error:  # noqa: BLE001
+                import logging as _logging
+                _logging.getLogger("joeos.agent-executor").warning(
+                    "ollama executor attempt %d failed: %s", attempt + 1, repr(error)[:300])
+                last_error = error
+                text = str(error).lower()
+                transient = (
+                    "not reachable" in text or "connect" in text or "connection" in text
+                    or "disconnected" in text or "timeout" in text
+                    or "load" in text or "loading" in text
+                    or "terminated" in text or "killed" in text
+                    or "server error" in text
+                )
+                if transient and attempt < 2:
+                    await asyncio.sleep(2.0 * (attempt + 1))
+                    continue
+                raise
+        error = last_error or RuntimeError("inference failed")
         try:
-            if tools:
-                result = await self._ai.ollama_provider.infer_tool_call(
-                    messages, model=model, tools=tools, max_tokens=self._max_tokens,
-                )
-            else:
-                result = await self._ai.ollama_provider.infer(
-                    messages, model=model, max_tokens=self._max_tokens,
-                )
-        except Exception as error:  # noqa: BLE001
+            raise error
+        except Exception as exc:  # noqa: BLE001
+            error = exc
             # Raise a typed, normalized failure the control plane can map.
             import logging as _logging
             _logging.getLogger("joeos.agent-executor").warning(

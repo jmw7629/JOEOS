@@ -1624,7 +1624,13 @@ def frontend() -> FileResponse:
 
 @app.get("/os/{rest:path}", include_in_schema=False)
 def os_frontend(rest: str) -> FileResponse:
-    """Serve the browser OS shell for /os/* deep links so a refresh keeps the route."""
+    """Serve the browser OS shell for /os/* deep links so a refresh keeps the route.
+
+    The Agent Fabric console owns the agent-operations routes (/os/agents,
+    /os/providers, /os/models); all other /os/* deep links resolve to the shell."""
+    head = (rest or "").split("/", 1)[0]
+    if head in ("agents", "providers", "models"):
+        return FileResponse(AGENT_FABRIC_PAGE_PATH, media_type="text/html")
     return FileResponse(INDEX_PATH, media_type="text/html")
 
 
@@ -1646,6 +1652,9 @@ def app_icon() -> FileResponse:
 @app.get("/sdk/index.js", include_in_schema=False)
 def browser_sdk() -> FileResponse:
     return FileResponse(SDK_PATH, media_type="application/javascript")
+
+
+AGENT_FABRIC_PAGE_PATH = _package_asset("agent_fabric.html")
 
 
 @app.get("/healthz")

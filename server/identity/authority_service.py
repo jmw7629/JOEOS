@@ -265,7 +265,7 @@ class AuthorityService:
     # ------------------------------------------------------------------
 
     def create_authentication_challenge(
-        self, device_id: UUID, user_id: UUID
+        self, device_id: UUID, user_id: Optional[UUID] = None
     ) -> Dict[str, object]:
         device = self._device_repository.get_device(device_id)
         if device is None:
@@ -275,6 +275,21 @@ class AuthorityService:
         if device.state != "active_unassigned" and not self._is_assigned(device_id):
             raise AuthorityAuthenticationError(
                 403, "device_not_active", "The device is not active."
+            )
+        # Resolve the principal user from the device assignment. A browser that
+        # holds an assigned device key may omit the user id; when provided, the
+        # value must match the assignment (no cross-principal impersonation).
+        assignment = self._repository.get_device_assignment(device_id)
+        assigned_user = assignment.user_id if assignment is not None else None
+        if user_id is None:
+            if assigned_user is None:
+                raise AuthorityAuthenticationError(
+                    403, "device_not_assigned", "The device is not assigned to a principal."
+                )
+            user_id = assigned_user
+        elif assigned_user is not None and user_id != assigned_user:
+            raise AuthorityAuthenticationError(
+                403, "device_user_mismatch", "The requested user does not match the device assignment."
             )
         try:
             record = self._repository.create_authentication_challenge(
