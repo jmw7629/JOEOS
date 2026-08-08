@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050912">
+  <title>JoeOS — Automations</title>
+  <style>
+    :root { color-scheme: dark; --canvas:#050912; --surface:rgba(10,22,39,0.82); --line:rgba(139,212,255,0.14);
+      --text:#eaf6ff; --muted:#91a6ba; --cyan:#31d7ff; --success:#3de3a4; --warning:#ffb45c; --danger:#ff647c; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--canvas); color:var(--text); font:14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+    header { padding:14px 22px; border-bottom:1px solid var(--line); display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+    header strong { font-size:16px; } header .sub { color:var(--muted); }
+    main { padding:20px 22px; max-width:1100px; margin:0 auto; }
+    button { background:rgba(49,215,255,0.12); color:var(--text); border:1px solid rgba(49,215,255,0.4); border-radius:10px; padding:8px 14px; cursor:pointer; font-size:13px; }
+    button:hover { background:rgba(49,215,255,0.22); }
+    button.primary { background:var(--cyan); color:#04121c; border-color:var(--cyan); font-weight:600; }
+    button.danger { border-color:rgba(255,100,124,0.5); color:var(--danger); background:rgba(255,100,124,0.08); }
+    input, select, textarea { background:rgba(8,18,32,0.9); color:var(--text); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-size:13px; width:100%; }
+    textarea { min-height:80px; resize:vertical; }
+    label { display:block; color:var(--muted); font-size:12px; margin:10px 0 5px; }
+    .panel { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:16px; }
+    .card { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
+    .badge { font-size:11px; padding:2px 8px; border-radius:20px; border:1px solid var(--line); color:var(--muted); }
+    .badge.green{color:var(--success);border-color:rgba(61,227,164,0.5);} .badge.amber{color:var(--warning);border-color:rgba(255,180,92,0.5);}
+    .badge.red{color:var(--danger);border-color:rgba(255,100,124,0.5);} .badge.cyan{color:var(--cyan);border-color:rgba(49,215,255,0.5);}
+    .muted{color:var(--muted);} .mono{font-family:ui-monospace,Consolas,monospace;font-size:12px;}
+    .msg{white-space:pre-wrap;background:rgba(0,0,0,0.3);border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px;max-height:220px;overflow:auto;}
+    .pill{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;}
+    .pill.green{background:var(--success);} .pill.amber{background:var(--warning);} .pill.red{background:var(--danger);} .pill.gray{background:var(--muted);}
+    .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;} .tabs button.active{background:rgba(49,215,255,0.28);border-color:var(--cyan);}
+    a{color:var(--cyan);text-decoration:none;} table{width:100%;border-collapse:collapse;font-size:13px;}
+    th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top;} th{color:var(--muted);font-weight:600;}
+    .hidden{display:none;}
+    @media (max-width:600px){ main{padding:14px;}.grid{grid-template-columns:1fr;} }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>JoeOS Automations</strong>
+    <span class="sub" id="conn-status">Not connected</span>
+    <span style="flex:1"></span>
+    <button id="new-btn" class="primary hidden">New Automation</button>
+    <button id="refresh-btn" class="hidden">Refresh</button>
+    <button id="logout-btn" class="hidden">Logout</button>
+    <button id="pair-btn">Connect / Pair</button>
+  </header>
+  <main>
+    <section id="pairing-panel" class="panel hidden">
+      <h3 style="margin-top:0">Connect this browser to JoeOS</h3>
+      <p class="muted">Enter the pairing code from
+        <span class="mono">python -m server.identity.cli --database data/joeos.db issue --origin https://mcso9tqzb9.tailb9395f.ts.net</span>,
+        pair, then assign the device to the owner. Then click Check status.</p>
+      <label for="pair-code">Pairing code</label>
+      <input id="pair-code" placeholder="JOEOS1|https://...|uuid|SECRET" autocomplete="off">
+      <div class="row" style="margin-top:12px">
+        <button id="pair-submit" class="primary">Pair browser</button>
+        <button id="pair-check">Check status</button>
+      </div>
+      <p id="pair-message" class="muted"></p>
+    </section>
+
+    <section id="list-view" class="hidden">
+      <div class="tabs">
+        <button data-tab="all" class="active">All</button>
+        <button data-tab="active">Active</button>
+        <button data-tab="paused">Paused</button>
+        <button data-tab="recent">Recent runs</button>
+      </div>
+      <div id="tab-all" class="tab-panel"></div>
+      <div id="tab-active" class="tab-panel hidden"></div>
+      <div id="tab-paused" class="tab-panel hidden"></div>
+      <div id="tab-recent" class="tab-panel hidden"></div>
+    </section>
+
+    <section id="wizard-view" class="hidden">
+      <h3 style="margin-top:0">New Automation</h3>
+      <div class="panel">
+        <label for="w-name">Name</label>
+        <input id="w-name" placeholder="Daily health check">
+        <label for="w-objective">Objective</label>
+        <textarea id="w-objective" placeholder="What should JoeOS do? e.g. Report the health of the local agent system in three bullets."></textarea>
+        <label for="w-agent">Agent</label>
+        <select id="w-agent">
+          <option value="auto">Auto (Joe decides)</option>
+          <option value="joe">Joe</option>
+          <option value="architect">Architect</option>
+          <option value="builder">Builder</option>
+          <option value="researcher">Researcher</option>
+          <option value="verifier">Verifier</option>
+          <option value="security">Security</option>
+        </select>
+        <label for="w-trigger-kind">Trigger</label>
+        <select id="w-trigger-kind">
+          <option value="one_time">One time</option>
+          <option value="recurring" selected>Recurring</option>
+          <option value="condition_watch">Condition watch</option>
+        </select>
+        <div id="w-onetime-fields" class="hidden">
+          <label for="w-scheduled-for">Run at (ISO UTC)</label>
+          <input id="w-scheduled-for" placeholder="2026-08-08T12:00:00+00:00">
+        </div>
+        <div id="w-recurring-fields">
+          <label for="w-recurrence-kind">Recurrence</label>
+          <select id="w-recurrence-kind">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="interval">Every N seconds</option>
+          </select>
+          <label for="w-at-time">At time (HH:MM)</label>
+          <input id="w-at-time" value="08:00" placeholder="08:00">
+          <div id="w-weekdays-field" class="hidden">
+            <label for="w-weekdays">Weekdays (0=Mon..6=Sun, comma separated)</label>
+            <input id="w-weekdays" value="0,1,2,3,4" placeholder="0,1,2,3,4">
+          </div>
+          <label for="w-interval">Interval seconds (if interval)</label>
+          <input id="w-interval" type="number" value="3600" min="60">
+        </div>
+        <div id="w-condition-fields" class="hidden">
+          <label for="w-condition-key">Condition key (e.g. runner_healthy)</label>
+          <input id="w-condition-key" placeholder="runner_healthy">
+          <label for="w-check-interval">Check interval seconds (min 300)</label>
+          <input id="w-check-interval" type="number" value="900" min="300">
+        </div>
+        <label for="w-timezone">Timezone</label>
+        <input id="w-timezone" value="America/New_York" placeholder="America/New_York">
+        <label for="w-retry">Max retries</label>
+        <input id="w-retry" type="number" value="3" min="1" max="10">
+        <label for="w-notify">Notify on failure</label>
+        <select id="w-notify"><option value="true">Yes</option><option value="false">No</option></select>
+        <div class="row" style="margin-top:14px">
+          <button id="w-create" class="primary">Create Automation</button>
+          <button id="w-cancel">Cancel</button>
+        </div>
+        <p id="w-message" class="muted"></p>
+      </div>
+    </section>
+
+    <section id="detail-view" class="hidden">
+      <h3 id="d-title" style="margin-top:0"></h3>
+      <div id="d-body"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="d-run-now">Run Now</button>
+        <button id="d-pause">Pause</button>
+        <button id="d-resume">Resume</button>
+        <button id="d-archive" class="danger">Archive</button>
+        <button id="d-back">Back</button>
+      </div>
+      <h4>History</h4>
+      <div id="d-history"></div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+    // ---- pairing ceremony (same as Agent Fabric console) ----
+    function b64encode(b){let s="";for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
+    function b64decode(t){let s=t.replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";let bin=atob(s),o=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)o[i]=bin.charCodeAt(i);return o;}
+    function concatBytes(a){let n=0;a.forEach(x=>n+=x.length);let o=new Uint8Array(n),p=0;a.forEach(x=>{o.set(x,p);p+=x.length});return o;}
+    const textBytes=v=>new TextEncoder().encode(v);
+    function lenPrefixed(b){let o=new Uint8Array(4+b.length);new DataView(o.buffer).setUint32(0,b.length,false);o.set(b,4);return o;}
+    async function sha256(b){return new Uint8Array(await crypto.subtle.digest("SHA-256",b));}
+    async function hmacSha256(k,m){let key=await crypto.subtle.importKey("raw",k,{name:"HMAC",hash:"SHA-256"},false,["sign"]);return new Uint8Array(await crypto.subtle.sign("HMAC",key,m));}
+    function base32Decode(e){let a="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567",clean=e.replace(/=+$/,"").toUpperCase(),bytes=[],buf=0,bits=0;for(let i=0;i<clean.length;i++){let idx=a.indexOf(clean[i]);if(idx===-1)throw new Error("bad code");buf=(buf<<5)|idx;bits+=5;if(bits>=8){bytes.push((buf>>>(bits-8))&0xff);bits-=8;}}return new Uint8Array(bytes);}
+    function parsePairingCode(c){let p=c.trim().split("|");if(p.length!==4||p[0]!=="JOEOS1")throw new Error("Invalid pairing code");return{origin:p[1],offer_id:p[2],secret:base32Decode(p[3])};}
+    function uuidv4(){return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));}
+    function rand32(){let o=new Uint8Array(32);crypto.getRandomValues(o);return o;}
+    var DOMAINS={PAIRING_KEY_INFO:new Uint8Array(concatBytes([textBytes("joeos.device-enrollment.pairing-key.v1"),new Uint8Array([1])])),
+      CLAIM:textBytes("JOEOS-DEVICE-ENROLLMENT-CLAIM-V1\0"),CLIENT_PROOF:textBytes("JOEOS-DEVICE-ENROLLMENT-CLIENT-PROOF-V1\0")};
+    async function genP256(){return await crypto.subtle.generateKey({name:"ECDSA",namedCurve:"P-256"},true,["sign","verify"]);}
+    async function exportSPKI(kp){return b64encode(new Uint8Array(await crypto.subtle.exportKey("spki",kp.publicKey)));}
+    async function derivePairingKey(secret,offerId){let ob=new Uint8Array(16),hex=offerId.replace(/-/g,"");for(let i=0;i<16;i++)ob[i]=parseInt(hex.substr(i*2,2),16);let ex=await hmacSha256(ob,secret);return await hmacSha256(ex,DOMAINS.PAIRING_KEY_INFO);}
+    async function claimProof(pk,f){let vals=[textBytes(f.observed_server_id),textBytes(f.audience_origin),textBytes(f.offer_id),textBytes(f.request_id),textBytes(f.client_instance_id),f.client_nonce,textBytes(f.display_name),textBytes(f.platform),textBytes(f.os_version),textBytes(f.app_version),f.auth_spki,f.approval_spki];let tr=DOMAINS.CLAIM;for(let i=0;i<vals.length;i++)tr=concatBytes([tr,lenPrefixed(vals[i])]);return await hmacSha256(pk,tr);}
+    async function ecdsaSignDER(kp,msg){let key=(kp&&kp.privateKey)?kp.privateKey:kp;let raw=await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},key,msg);function di(be){let i=0;while(i<be.length&&be[i]===0)i++;let v=be.slice(i);let body=new Uint8Array(((v[0]&0x80)?[0]:[]).concat(Array.from(v)));let len=body.length;return new Uint8Array([0x02].concat(len<128?[len]:[0x81,len],Array.from(body)));}
+      let r=new Uint8Array(raw.slice(0,32)),s=new Uint8Array(raw.slice(32,64));let seq=concatBytes([di(r),di(s)]);return b64encode(concatBytes([new Uint8Array([0x30].concat(seq.length<128?[seq.length]:[0x81,seq.length])),seq]));}
+    var SESSION_KEY="joeos:session",DEVICE_KEY_PAIR="joeos:device-keypair";
+    function loadSession(){try{return JSON.parse(sessionStorage.getItem(SESSION_KEY)||"null");}catch(e){return null;}}
+    function saveSession(s){try{sessionStorage.setItem(SESSION_KEY,JSON.stringify(s));}catch(e){}}
+    function clearSession(){try{sessionStorage.removeItem(SESSION_KEY);localStorage.removeItem(DEVICE_KEY_PAIR);}catch(e){}}
+    async function api(url,options){options=options||{};let headers=Object.assign({},options.headers||{});headers["Accept"]="application/json";let s=loadSession();if(s&&s.session_id)headers["X-Joeos-Session"]=s.session_id;if(options.body)headers["Content-Type"]="application/json";let ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),90000);try{let r=await fetch(url,Object.assign({},options,{headers,signal:ctl.signal}));let p=null;try{p=await r.json();}catch(e){}if(!r.ok){let d=p&&(p.detail||p.message),m=d&&typeof d==="object"?d.message:d;throw new Error(m||("status "+r.status));}return p;}finally{clearTimeout(tm);}}
+    async function pairDevice(code){let parsed=parsePairingCode(code),ap=await genP256(),kp=await genP256(),rid=uuidv4(),cid=uuidv4(),cn=rand32();let authSPKI=await exportSPKI(ap),apprSPKI=await exportSPKI(kp);let boot=await api("/api/v1/bootstrap"),sid=boot.server.server_id,pk=await derivePairingKey(parsed.secret,parsed.offer_id);let f={observed_server_id:sid,audience_origin:parsed.origin,offer_id:parsed.offer_id,request_id:rid,client_instance_id:cid,client_nonce:cn,display_name:"JoeOS Browser",platform:"linux",os_version:"browser",app_version:"2.0.0",auth_spki:b64decode(authSPKI),approval_spki:b64decode(apprSPKI)};let proof=await claimProof(pk,f);let chal=await api("/api/v1/device-enrollment/challenges",{method:"POST",body:JSON.stringify({schema_version:1,request_id:rid,offer_id:parsed.offer_id,observed_server_id:sid,audience_origin:parsed.origin,client_nonce:b64encode(cn),device:{client_instance_id:cid,display_name:"JoeOS Browser",platform:"linux",os_version:"browser",app_version:"2.0.0"},device_authentication_key:{algorithm:"ES256",format:"spki_der_base64url",value:authSPKI},approval_key:{algorithm:"ES256",format:"spki_der_base64url",value:apprSPKI},claim_proof:b64encode(proof)})});let td=b64decode(chal.transcript_sha256),cp=await hmacSha256(pk,concatBytes([DOMAINS.CLIENT_PROOF,td]));let rec=await api("/api/v1/device-enrollment/challenges/"+chal.challenge_id+"/complete",{method:"POST",body:JSON.stringify({schema_version:1,idempotency_key:uuidv4(),transcript_sha256:chal.transcript_sha256,client_proof:b64encode(cp),device_authentication_signature:await ecdsaSignDER(ap,b64decode(chal.device_authentication_payload)),approval_signature:await ecdsaSignDER(kp,b64decode(chal.approval_payload))})});let authJwk=await crypto.subtle.exportKey("jwk",ap.privateKey),apprJwk=await crypto.subtle.exportKey("jwk",kp.privateKey);try{localStorage.setItem(DEVICE_KEY_PAIR,JSON.stringify({device_id:rec.device_id,auth:authJwk,approval:apprJwk}));}catch(e){}return rec;}
+    async function establishSession(){let st=null;try{st=JSON.parse(localStorage.getItem(DEVICE_KEY_PAIR)||"null");}catch(e){}if(!st)throw new Error("No paired device keys");let ap=await crypto.subtle.importKey("jwk",st.auth,{name:"ECDSA",namedCurve:"P-256"},false,["sign"]);let ac=await api("/api/v1/auth/challenge",{method:"POST",body:JSON.stringify({device_id:st.device_id})});let sig=await ecdsaSignDER(ap,textBytes(ac.message));let sr=await api("/api/v1/auth/session",{method:"POST",body:JSON.stringify({challenge_id:ac.challenge_id,signature:sig})});saveSession(sr.session);return sr;}
+    function $(id){return document.getElementById(id);}
+    function esc(v){return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+    function stateBadge(s){let t=s==="active"?"green":s==="paused"?"amber":s==="succeeded"?"green":s==="failed"||s==="cancelled"?"red":"gray";return "<span class='badge "+t+"'>"+esc(s)+"</span>";}
+    function runBadge(s){let t=s==="succeeded"?"green":s==="failed"||s==="cancelled"?"red":s==="running"||s==="queued"||s==="retry_wait"?"amber":"gray";return "<span class='badge "+t+"'>"+esc(s)+"</span>";}
+    function triggerText(t){if(t.kind==="one_time")return "Once at "+esc(t.scheduled_for);if(t.kind==="condition_watch")return "Watch "+esc(t.condition_key)+" every "+t.check_interval_seconds+"s";if(t.kind==="recurring"&&t.schedule){let s=t.schedule;if(s.kind==="interval")return "Every "+s.interval_seconds+"s";return s.kind+" at "+s.at_time+(s.weekdays&&s.weekdays.length?" ("+s.weekdays.join(",")+")":"")+" ("+esc(t.timezone)+")";}return t.kind;}
+    async function refreshAll(){let data=await api("/api/v1/automations");renderLists(data.automations||[]);let recent=[],auto=data.automations||[];for(let a of auto.slice(0,5)){try{let r=await api("/api/v1/automations/"+a.id+"/runs?limit=5");(r.runs||[]).forEach(x=>recent.push({auto:a,x}));}catch(e){}}recent.sort((a,b)=>(b.x.created_at||"").localeCompare(a.x.created_at||""));renderRecent(recent.slice(0,20));}
+    function renderLists(autos){let byState={all:autos,active:autos.filter(a=>a.state==="active"),paused:autos.filter(a=>a.state==="paused")};
+      ["all","active","paused"].forEach(k=>{let el=$("tab-"+k);el.innerHTML=byState[k].map(a=>"<div class='card'><div class='row'><b>"+esc(a.name)+"</b> "+stateBadge(a.state)+" <span class='badge cyan'>"+esc(a.agent_ref)+"</span></div>"+
+        "<div class='muted' style='margin:6px 0'>"+esc(a.objective).slice(0,120)+"</div>"+
+        "<div class='row'><span class='badge'>"+triggerText(a.trigger)+"</span> <span class='badge'>next: "+(a.next_run_at?esc(a.next_run_at):"—")+"</span></div>"+
+        "<div class='row' style='margin-top:8px'><button data-open='"+a.id+"'>Open</button> <button data-run='"+a.id+"'>Run Now</button></div></div>").join("")||"<p class='muted'>No automations here yet.</p>";});
+    }
+    function renderRecent(items){$("tab-recent").innerHTML=items.map(i=>"<div class='card'><div class='row'><b>"+esc(i.auto.name)+"</b> "+runBadge(i.x.state)+" <span class='badge cyan'>"+esc(i.x.model_key||"—")+"</span></div>"+
+      "<div class='muted' style='margin:6px 0'>"+esc(i.x.result_summary||"").slice(0,120)+"</div>"+
+      "<div class='row'><button data-openrun='"+i.auto.id+"|"+i.x.id+"'>View run</button></div></div>").join("")||"<p class='muted'>No recent runs.</p>";}
+    async function openDetail(id){$("list-view").classList.add("hidden");$("detail-view").classList.remove("hidden");let a=await api("/api/v1/automations/"+id);$("d-title").textContent=a.name;$("d-body").innerHTML="<div class='panel'><div class='row'><b>"+esc(a.name)+"</b> "+stateBadge(a.state)+"</div>"+
+      "<div class='muted' style='margin:8px 0'>"+esc(a.description||"")+"</div>"+
+      "<div class='muted' style='margin:8px 0'><b>Objective:</b> "+esc(a.objective)+"</div>"+
+      "<div class='row'><span class='badge cyan'>agent: "+esc(a.agent_ref)+"</span> <span class='badge'>"+triggerText(a.trigger)+"</span></div>"+
+      "<div class='row' style='margin-top:6px'><span class='badge'>next: "+(a.next_run_at?esc(a.next_run_at):"—")+"</span> <span class='badge'>last: "+(a.last_run_at?esc(a.last_run_at):"—")+"</span></div>"+
+      "<div class='row' style='margin-top:6px'><span class='badge'>retries: "+a.retry_policy.max_attempts+"</span> <span class='badge'>concurrency: "+esc(a.concurrency_policy)+"</span></div></div>";
+      $("d-run-now").setAttribute("data-id",id);$("d-pause").setAttribute("data-id",id);$("d-resume").setAttribute("data-id",id);$("d-archive").setAttribute("data-id",id);
+      let runs=await api("/api/v1/automations/"+id+"/runs?limit=20");$("d-history").innerHTML=runs.runs.map(r=>"<div class='card'><div class='row'><span class='mono'>"+esc(r.id)+"</span> "+runBadge(r.state)+" <span class='badge cyan'>"+esc(r.model_key||"—")+"</span></div>"+
+        "<div class='muted' style='margin:6px 0'>"+(r.result_summary?esc(r.result_summary).slice(0,160):"")+"</div>"+
+        (r.error_category?"<div class='badge red'>"+esc(r.error_category)+"</div>":"")+
+        "<div class='row' style='margin-top:6px'><button data-openrun='"+id+"|"+r.id+"'>View run</button></div></div>").join("")||"<p class='muted'>No runs yet.</p>";}
+    async function openRun(autoId,runId){let r=await api("/api/v1/automations/"+autoId+"/runs/"+runId);$("list-view").classList.add("hidden");$("detail-view").classList.remove("hidden");$("d-title").textContent="Automation Run "+runId;$("d-body").innerHTML="<div class='panel'>"+runBadge(r.state)+
+      "<div class='row' style='margin-top:8px'><span class='badge'>trigger: "+esc(r.trigger_kind)+"</span> <span class='badge'>scheduled: "+esc(r.scheduled_for||"—")+"</span></div>"+
+      "<div class='row' style='margin-top:6px'><span class='badge cyan'>provider: "+esc(r.provider_key||"—")+"</span> <span class='badge cyan'>model: "+esc(r.model_key||"—")+"</span></div>"+
+      "<div class='row' style='margin-top:6px'><span class='badge'>agent run: "+esc(r.agent_run_id||"—")+"</span> <span class='badge'>attempts: "+r.attempt+"</span></div>"+
+      (r.approval_id?"<div class='row' style='margin-top:6px'><span class='badge amber'>approval: "+esc(r.approval_id)+"</span></div>":"")+
+      (r.result_summary?"<div class='msg'><b>Result:</b><br>"+esc(r.result_summary)+"</div>":"")+
+      (r.error_category?"<div class='msg' style='color:var(--danger)'><b>"+esc(r.error_category)+"</b></div>":"")+"</div>";
+      $("d-back").onclick=()=>{location.hash="#/";showList();};}
+    function showList(){$("detail-view").classList.add("hidden");$("wizard-view").classList.add("hidden");$("list-view").classList.remove("hidden");refreshAll();}
+    function showWizard(){$("list-view").classList.add("hidden");$("detail-view").classList.add("hidden");$("wizard-view").classList.remove("hidden");}
+    function toggleWizardFields(){let k=$("w-trigger-kind").value;$("w-onetime-fields").classList.toggle("hidden",k!=="one_time");$("w-recurring-fields").classList.toggle("hidden",k!=="recurring");$("w-condition-fields").classList.toggle("hidden",k!=="condition_watch");let rk=$("w-recurrence-kind").value;$("w-weekdays-field").classList.toggle("hidden",rk!=="weekly");}
+    async function createFromWizard(){let kind=$("w-trigger-kind").value,trigger={kind:kind,timezone:$("w-timezone").value.trim()||"UTC"};
+      if(kind==="one_time"){trigger.scheduled_for=$("w-scheduled-for").value.trim();}
+      if(kind==="recurring"){let rk=$("w-recurrence-kind").value;trigger.schedule={kind:rk,at_time:$("w-at-time").value||"08:00",interval_seconds:parseInt($("w-interval").value)||3600};
+        if(rk==="weekly"){trigger.schedule.weekdays=($("w-weekdays").value.split(",").map(x=>parseInt(x.trim())).filter(x=>!isNaN(x)));}
+        if(rk==="monthly"){trigger.schedule.month_days=[1];}}
+      if(kind==="condition_watch"){trigger.condition_key=$("w-condition-key").value.trim();trigger.check_interval_seconds=parseInt($("w-check-interval").value)||900;}
+      let payload={name:$("w-name").value.trim(),description:"",objective:$("w-objective").value.trim(),agent_ref:$("w-agent").value,trigger:trigger,timezone:$("w-timezone").value.trim()||"UTC",
+        retry_policy:{max_attempts:parseInt($("w-retry").value)||3},notification_policy:{on_success:false,on_failure:$("w-notify").value==="true",on_approval_required:true,on_retry:false,on_blocked:true},concurrency_policy:"skip_if_running",missed_run_policy:"skip"};
+      try{let created=await api("/api/v1/automations",{method:"POST",body:JSON.stringify(payload)});$("w-message").textContent="Created "+created.id+" (next: "+(created.next_run_at||"manual")+").";showList();}
+      catch(e){$("w-message").textContent="Error: "+e.message;}}
+    async function boot(){let s=loadSession();if(s){$("pairing-panel").classList.add("hidden");$("list-view").classList.remove("hidden");$("new-btn").classList.remove("hidden");$("refresh-btn").classList.remove("hidden");$("logout-btn").classList.remove("hidden");$("pair-btn").classList.add("hidden");setStatus("Connected");try{await refreshAll();}catch(e){setStatus("Session expired");$("pairing-panel").classList.remove("hidden");}}
+      else{$("pairing-panel").classList.remove("hidden");setStatus("Not connected");}}
+    function setStatus(t){$("conn-status").textContent=t;}
+    $("pair-btn").onclick=()=>$("pairing-panel").classList.remove("hidden");
+    $("pair-submit").onclick=async()=>{try{await pairDevice($("pair-code").value.trim());$("pair-message").textContent="Paired. Assign the device, then click Check status.";}catch(e){$("pair-message").textContent="Pairing failed: "+e.message;}};
+    $("pair-check").onclick=async()=>{try{let r=await establishSession();saveSession(r.session);$("pairing-panel").classList.add("hidden");$("list-view").classList.remove("hidden");$("new-btn").classList.remove("hidden");$("refresh-btn").classList.remove("hidden");$("logout-btn").classList.remove("hidden");$("pair-btn").classList.add("hidden");setStatus("Connected");await refreshAll();}catch(e){$("pair-message").textContent="Not ready: "+e.message;}};
+    $("refresh-btn").onclick=refreshAll; $("logout-btn").onclick=()=>{clearSession();location.reload();};
+    $("new-btn").onclick=showWizard; $("w-cancel").onclick=showList; $("w-create").onclick=createFromWizard;
+    $("w-trigger-kind").onchange=toggleWizardFields; $("w-recurrence-kind").onchange=toggleWizardFields;
+    document.addEventListener("click",async(e)=>{
+      let o=e.target.closest("[data-open]");if(o){await openDetail(o.getAttribute("data-open"));return;}
+      let r=e.target.closest("[data-openrun]");if(r){let p=r.getAttribute("data-openrun").split("|");await openRun(p[0],p[1]);return;}
+      let rn=e.target.closest("[data-run]");if(rn){try{await api("/api/v1/automations/"+rn.getAttribute("data-run")+"/run-now",{method:"POST",body:"{}"});await refreshAll();}catch(err){alert(err.message);}return;}
+      let act=e.target.closest("#d-run-now,#d-pause,#d-resume,#d-archive");if(!act)return;let id=act.getAttribute("data-id");let path=act.id==="d-run-now"?"run-now":act.id==="d-pause"?"pause":act.id==="d-resume"?"resume":"archive";
+      try{await api("/api/v1/automations/"+id+"/"+path,{method:"POST",body:"{}"});await openDetail(id);}catch(err){alert(err.message);}
+    });
+    toggleWizardFields(); boot();
+  </script>
+</body>
+</html>
