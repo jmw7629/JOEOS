@@ -229,6 +229,31 @@ class TaskGraphTests(AgentFixture):
         children = self.store.list_child_runs(run["id"])
         self.assertGreaterEqual(len(children), 3)
 
+    def test_task_graph_accepts_http_wire_models(self):
+        # The HTTP router passes pydantic model objects (not dicts); the service
+        # must normalize them (regression for the live task-graph path).
+        from server.actions.models import TaskGraphRequest, TaskNodeRequest
+        self._install_executor("done")
+        joe_id = self._agent_id("joeos.joe")
+        arch_id = self._agent_id("joeos.architect")
+        verify_id = self._agent_id("joeos.verifier")
+        run = self.service.start_agent_run(
+            self.p, agent_id=joe_id, conversation_id=uuid4(), message_id=uuid4(),
+            objective="graph",
+        )
+        request = TaskGraphRequest(tasks=[
+            TaskNodeRequest(key="a", title="Analyze", objective="analyze",
+                            assigned_agent_id=arch_id, dependencies=""),
+            TaskNodeRequest(key="b", title="Verify", objective="verify",
+                            assigned_agent_id=verify_id, dependencies="a"),
+        ])
+        graph = self.service.create_task_graph(self.p, run_id=run["id"], tasks=request.tasks)
+        self.assertEqual(len(graph["tasks"]), 2)
+        result = asyncio.run(self.service.execute_task_graph(self.p, run["id"]))
+        states = {t["title"]: t["state"] for t in result["tasks"]}
+        self.assertEqual(states["Analyze"], "succeeded")
+        self.assertEqual(states["Verify"], "succeeded")
+
     def test_task_graph_failure_propagates(self):
         async def failing(messages, tools, decision):
             raise RuntimeError("server error")

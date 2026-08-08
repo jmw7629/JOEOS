@@ -455,6 +455,7 @@ class ActionService:
         self._require(principal, AGENT_RUN_CAP)
         created = []
         by_key = {}
+        tasks = [self._task_as_dict(t) for t in tasks]
         for task in tasks:
             deps = [d.strip() for d in (task.get("dependencies") or "").split(",") if d.strip()]
             resolved_deps = []
@@ -570,6 +571,15 @@ class ActionService:
             "run_id": str(run_id),
             "tasks": [task_payload(t) for t in self._store.list_tasks(run_id)],
         }
+
+    @staticmethod
+    def _task_as_dict(task) -> Dict:
+        if isinstance(task, dict):
+            return task
+        if hasattr(task, "model_dump"):
+            return task.model_dump()
+        return {k: getattr(task, k) for k in (
+            "key", "title", "objective", "assigned_agent_id", "dependencies")}
 
     def _build_agent_messages(self, agent, objective: str) -> List[Dict[str, str]]:
         messages: List[Dict[str, str]] = []
