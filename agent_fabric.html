@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#050912">
-  <title>JoeOS — Agent Fabric</title>
+  <title>JoeOS — Agents</title>
   <style>
     :root {
       color-scheme: dark;
@@ -13,57 +13,105 @@
       --warning: #ffb45c; --danger: #ff647c;
     }
     * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body { margin: 0; background: var(--canvas); color: var(--text);
-      font: 14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
-    header { padding: 14px 22px; border-bottom: 1px solid var(--line); display: flex; gap: 14px;
-      align-items: center; flex-wrap: wrap; }
-    header strong { font-size: 16px; }
-    header .sub { color: var(--muted); }
-    main { padding: 20px 22px; max-width: 1280px; margin: 0 auto; }
+      font: 15px/1.55 Inter, ui-sans-serif, system-ui, sans-serif; }
+    header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; gap: 14px;
+      align-items: center; flex-wrap: wrap; position: sticky; top: 0; z-index: 20;
+      background: rgba(5,9,18,0.86); backdrop-filter: blur(10px); }
+    header strong { font-size: 17px; letter-spacing: 0.2px; }
+    header .accent { color: var(--cyan); }
+    header .sub { color: var(--muted); font-size: 12px; }
+    main { padding: 22px 20px 60px; max-width: 1100px; margin: 0 auto; }
     button { background: rgba(49,215,255,0.12); color: var(--text); border: 1px solid rgba(49,215,255,0.4);
-      border-radius: 10px; padding: 8px 14px; cursor: pointer; font-size: 13px; }
+      border-radius: 10px; padding: 9px 15px; cursor: pointer; font-size: 14px; transition: background .15s ease; }
     button:hover { background: rgba(49,215,255,0.22); }
+    button:disabled { opacity: 0.55; cursor: default; }
     button.primary { background: var(--cyan); color: #04121c; border-color: var(--cyan); font-weight: 600; }
-    button.danger { border-color: rgba(255,100,124,0.5); color: var(--danger); background: rgba(255,100,124,0.08); }
+    button.primary:hover { background: #6fe3ff; }
+    button.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+    button.ghost:hover { color: var(--text); background: rgba(139,212,255,0.08); }
     input, textarea { background: rgba(8,18,32,0.9); color: var(--text); border: 1px solid var(--line);
-      border-radius: 10px; padding: 9px 12px; font-size: 13px; width: 100%; }
-    textarea { min-height: 74px; resize: vertical; }
-    label { display: block; color: var(--muted); font-size: 12px; margin: 10px 0 5px; }
-    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
-      padding: 16px; margin-bottom: 16px; }
+      border-radius: 12px; padding: 12px 14px; font-size: 15px; width: 100%; }
+    textarea { min-height: 90px; resize: vertical; }
+    textarea:focus, input:focus { outline: none; border-color: rgba(49,215,255,0.55); }
+    label { display: block; color: var(--muted); font-size: 13px; margin: 10px 0 5px; }
+    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+      padding: 18px; margin-bottom: 18px; }
+    .hero { border-color: rgba(49,215,255,0.3); }
+    .hero h2 { margin: 0 0 4px; font-size: 22px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
-    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
-    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--line); color: var(--muted); }
+    .agent-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+      padding: 15px 16px; display: flex; flex-direction: column; gap: 9px; }
+    .agent-card .name { font-size: 16px; font-weight: 600; }
+    .agent-card .desc { color: var(--muted); font-size: 13px; min-height: 38px; }
+    .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+    .actions button { padding: 7px 12px; font-size: 13px; }
+    .actions .link { color: var(--cyan); font-size: 13px; text-decoration: none; padding: 7px 8px;
+      cursor: pointer; display: inline-flex; align-items: center; }
+    .badge { font-size: 11px; padding: 2px 9px; border-radius: 20px; border: 1px solid var(--line); color: var(--muted); }
     .badge.green { color: var(--success); border-color: rgba(61,227,164,0.5); }
     .badge.amber { color: var(--warning); border-color: rgba(255,180,92,0.5); }
     .badge.red { color: var(--danger); border-color: rgba(255,100,124,0.5); }
     .badge.cyan { color: var(--cyan); border-color: rgba(49,215,255,0.5); }
     .muted { color: var(--muted); }
+    .small { font-size: 12px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
     .msg { white-space: pre-wrap; background: rgba(0,0,0,0.3); border: 1px solid var(--line);
-      border-radius: 10px; padding: 10px; margin-top: 8px; max-height: 260px; overflow: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
-    th { color: var(--muted); font-weight: 600; font-size: 12px; }
-    .hidden { display: none; }
-    .pill { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+      border-radius: 12px; padding: 12px 14px; margin-top: 12px; max-height: 320px; overflow: auto; }
+    .msg.err { color: var(--danger); }
+    .pill { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; flex: none; }
     .pill.green { background: var(--success); } .pill.amber { background: var(--warning); }
     .pill.red { background: var(--danger); } .pill.gray { background: var(--muted); }
     a { color: var(--cyan); text-decoration: none; }
-    .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
-    .tabs button.active { background: rgba(49,215,255,0.28); border-color: var(--cyan); }
-    .status-bar { color: var(--muted); font-size: 12px; }
+    .section-title { display: flex; align-items: baseline; gap: 10px; margin: 26px 0 12px; }
+    .section-title h3 { margin: 0; font-size: 17px; }
+    .run-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+      padding: 13px 15px; margin-bottom: 10px; cursor: pointer; transition: border-color .15s ease; }
+    .run-card:hover { border-color: rgba(49,215,255,0.35); }
+    .run-detail { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+    .deleg { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px;
+      background: rgba(8,18,32,0.55); margin-top: 6px; font-size: 13px; }
+    .activity-group h4 { margin: 18px 0 8px; font-size: 14px; color: var(--muted); display: flex;
+      align-items: center; gap: 8px; }
+    .hidden { display: none !important; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .spacer { flex: 1; }
+    .help summary { cursor: pointer; font-weight: 600; outline: none; }
+    .help p { color: var(--muted); font-size: 14px; margin: 10px 0 4px; }
+    .help ol { color: var(--muted); font-size: 14px; margin: 6px 0 0; padding-left: 22px; }
+    .help ol li { margin: 5px 0; }
+
+    .modal { position: fixed; inset: 0; background: rgba(2,5,10,0.72); z-index: 40;
+      display: flex; align-items: center; justify-content: center; padding: 18px; }
+    .modal-box { background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+      padding: 20px; width: 100%; max-width: 540px; max-height: 86vh; overflow: auto; }
+    .modal-box h3 { margin: 0 0 6px; }
+    .modal-x { position: absolute; right: 8px; top: 8px; background: transparent; border: none;
+      color: var(--muted); font-size: 20px; padding: 6px 10px; }
+
+    .orb { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px;
+      border-radius: 50%; background: rgba(49,215,255,0.14); border: 1px solid rgba(49,215,255,0.4);
+      color: var(--cyan); font-weight: 700; font-size: 18px; flex: none; }
+
+    @media (max-width: 640px) {
+      main { padding: 16px 14px 80px; }
+      header { padding: 12px 14px; }
+      .grid { grid-template-columns: 1fr; }
+      .modal { align-items: flex-end; padding: 0; }
+      .modal-box { max-width: 100%; max-height: 90vh; border-radius: 18px 18px 0 0; }
+    }
   </style>
 </head>
 <body>
   <header>
-    <strong>JoeOS Agent Fabric</strong>
+    <strong>JoeOS <span class="accent">Agents</span></strong>
     <span class="sub" id="conn-status">Not connected</span>
-    <span style="flex:1"></span>
+    <span class="spacer"></span>
     <button id="refresh-btn" class="hidden">Refresh</button>
     <button id="logout-btn" class="hidden">Logout</button>
-    <button id="pair-btn">Connect / Pair</button>
+    <button id="pair-btn">Connect</button>
   </header>
 
   <main>
@@ -83,23 +131,66 @@
     </section>
 
     <section id="dashboard" class="hidden">
-      <div class="tabs">
-        <button data-tab="overview" class="active">Overview</button>
-        <button data-tab="agents">Agents</button>
-        <button data-tab="providers">Providers</button>
-        <button data-tab="models">Models</button>
-        <button data-tab="runs">Runs</button>
-        <button data-tab="tools">Tools</button>
+
+      <div class="panel hero">
+        <div class="row" style="align-items:flex-start">
+          <span class="orb">J</span>
+          <div>
+            <h2>Ask Joe</h2>
+            <p class="muted" style="margin:2px 0 0">Tell Joe what you need. He plans, delegates to the team, verifies the work, and reports back.</p>
+          </div>
+        </div>
+        <textarea id="ask-input" placeholder="e.g. Scan the repository for open security TODOs and propose a plan."></textarea>
+        <div class="row" style="margin-top:12px">
+          <button id="ask-btn" class="primary">Ask Joe</button>
+          <span class="muted small">Joe plans, delegates, verifies, and reports.</span>
+        </div>
+        <div id="ask-reply"></div>
       </div>
 
-      <div id="tab-overview" class="tab-panel"></div>
-      <div id="tab-agents" class="tab-panel hidden"></div>
-      <div id="tab-providers" class="tab-panel hidden"></div>
-      <div id="tab-models" class="tab-panel hidden"></div>
-      <div id="tab-runs" class="tab-panel hidden"></div>
-      <div id="tab-tools" class="tab-panel hidden"></div>
+      <div class="section-title">
+        <h3>Your team</h3>
+        <span class="muted small" id="team-status"></span>
+      </div>
+      <div id="specialists" class="grid"></div>
+
+      <div class="section-title"><h3>Team council</h3></div>
+      <div id="council-panel" class="panel"></div>
+
+      <div class="section-title"><h3>Activity</h3></div>
+      <div id="activity"></div>
+
+      <details class="panel help">
+        <summary>How JoeOS agents work</summary>
+        <p>Each agent is a configured specialist with a defined role. They run on your local
+          model provider inside this machine, and every run records the provider and model
+          that was used.</p>
+        <ol>
+          <li><b>Ask Joe</b> — give Joe an objective; he plans, delegates to the right specialist, verifies, and reports.</li>
+          <li><b>Talk</b> — send a single message to any specialist and read its reply.</li>
+          <li><b>Start a task</b> — give one specialist a concrete objective to execute.</li>
+          <li><b>Team council</b> — bring the whole team together to deliberate on a question.</li>
+          <li><b>Activity</b> — every run appears here with its status and the provider/model that performed it.</li>
+        </ol>
+        <p class="small muted">Runs you start are authenticated, bounded, and recorded in the Agent Fabric.
+          Nothing runs without an active session, and no external provider is contacted.</p>
+      </details>
+
     </section>
   </main>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-box">
+      <h3 id="modal-title"></h3>
+      <p class="muted" id="modal-desc"></p>
+      <textarea id="modal-input" placeholder="What should this agent do?"></textarea>
+      <div class="row" style="margin-top:12px; justify-content:flex-end">
+        <button id="modal-cancel">Cancel</button>
+        <button id="modal-go" class="primary">Send</button>
+      </div>
+      <div id="modal-result"></div>
+    </div>
+  </div>
 
   <script>
     "use strict";
@@ -174,7 +265,7 @@
       if (session && session.session_id) headers["X-Joeos-Session"] = session.session_id;
       if (options.body) headers["Content-Type"] = "application/json";
       var controller = new AbortController();
-      var defaultTimeout = 90000;
+      var defaultTimeout = options.timeout || 90000;
       if (url.indexOf("/execute") !== -1 || url.indexOf("/delegate") !== -1) defaultTimeout = 300000;
       var timer = window.setTimeout(function () { controller.abort(); }, defaultTimeout);
       try {
@@ -425,38 +516,14 @@
     // UI
     // ------------------------------------------------------------------
     function $(id) { return document.getElementById(id); }
+    function esc(value) {
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
     function setStatus(text, tone) {
       $("conn-status").textContent = text;
       $("conn-status").style.color = tone === "good" ? "var(--success)" : tone === "bad" ? "var(--danger)" : "var(--muted)";
-    }
-    function renderOverview(data) {
-      var el = $("tab-overview");
-      el.innerHTML =
-        '<div class="grid">' +
-        card("Agents", data.agents.total + " total · " + data.agents.active + " active",
-          data.agents.items.slice(0, 8).map(function (a) {
-            return "<div class='row'><span class='pill " + (a.status === "active" ? "green" : "gray") + "'></span><b>" +
-              esc(a.display_name) + "</b> <span class='badge cyan'>" + esc(a.default_model_policy || "backend") +
-              "</span></div>";
-          }).join("")) +
-        card("Providers", data.providers.total + " total · " + data.providers.active + " active",
-          data.providers.items.map(function (p) {
-            return "<div class='row'><span class='pill " + (p.status === "active" ? "green" : "red") + "'></span><b>" +
-              esc(p.display_name) + "</b> <span class='badge'>" + esc(p.health || "unknown") +
-              "</span> <span class='badge'>" + esc(p.location) + "</span></div>";
-          }).join("")) +
-        card("Models", data.models.total + " total · " + data.models.active + " active",
-          data.models.items.slice(0, 8).map(function (m) {
-            return "<div class='row'><span class='pill " + (m.status === "active" ? "green" : "amber") + "'></span><b>" +
-              esc(m.key) + "</b> <span class='badge'>" + (m.reasoning ? "reasoning" : "gen") + "</span></div>";
-          }).join("")) +
-        card("Recent runs", (data.recent_runs || []).length + " recent",
-          (data.recent_runs || []).slice(0, 5).map(function (r) {
-            return "<div class='row'><span class='pill " + runTone(r.status) + "'></span>" +
-              esc(r.objective || "").slice(0, 60) + " <span class='badge'>" + esc(r.status) +
-              "</span> <span class='badge cyan'>" + esc(r.model_key || "—") + "</span></div>";
-          }).join("") || "<span class='muted'>No runs yet.</span>") +
-        "</div>";
     }
     function runTone(status) {
       if (status === "succeeded") return "green";
@@ -464,133 +531,316 @@
       if (status === "failed" || status === "cancelled") return "red";
       return "gray";
     }
-    function card(title, subtitle, body) {
-      return "<div class='card'><h4 style='margin:0 0 2px'>" + esc(title) +
-        "</h4><div class='muted' style='margin-bottom:10px'>" + esc(subtitle) + "</div>" + body + "</div>";
+    function friendlyStatus(status) {
+      var map = { succeeded: "Completed", failed: "Failed", cancelled: "Cancelled",
+        running: "Working now", queued: "Waiting to start", waiting_for_tool: "Waiting on a tool",
+        waiting_for_approval: "Waiting for approval" };
+      return map[status] || status;
     }
-    function esc(value) {
-      return String(value == null ? "" : value)
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    function timeAgo(iso) {
+      if (!iso) return "";
+      var then = new Date(iso).getTime();
+      if (isNaN(then)) return "";
+      var diff = Math.max(0, Date.now() - then);
+      var mins = Math.floor(diff / 60000);
+      if (mins < 1) return "just now";
+      if (mins < 60) return mins + "m ago";
+      var hours = Math.floor(mins / 60);
+      if (hours < 24) return hours + "h ago";
+      return Math.floor(hours / 24) + "d ago";
     }
 
-    function renderAgents(data) {
-      var el = $("tab-agents");
-      el.innerHTML = "<h3 style='margin-top:0'>Agents</h3>" +
-        data.agents.items.map(function (a) {
-          return "<div class='card' style='margin-bottom:10px'>" +
-            "<div class='row'><b>" + esc(a.display_name) + "</b> <span class='badge'>" + esc(a.key) +
-            "</span> <span class='badge " + (a.status === "active" ? "green" : "red") + "'>" + esc(a.status) +
-            "</span></div>" +
-            "<div class='muted' style='margin:6px 0'>" + esc(a.description || a.purpose || "") + "</div>" +
-            "<div class='row'><span class='badge cyan'>provider: " + esc(a.default_provider_policy || "backend") +
-            "</span> <span class='badge cyan'>model: " + esc(a.default_model_policy || "backend") +
-            "</span> <span class='badge'>depth: " + a.max_delegation_depth + "</span></div>" +
-            "<div class='row' style='margin-top:10px'>" +
-            "<button data-action='run' data-agent='" + a.id + "'>Start run</button>" +
-            "<button data-action='runs' data-agent='" + a.id + "'>Recent runs</button>" +
+    var agentsById = {}, agentsByKey = {}, providersById = {}, modelsById = {}, councils = [];
+    var activeRuns = {};
+
+    function renderTeam(data) {
+      var ordered = [];
+      var keys = ["joeos.joe", "joeos.architect", "joeos.builder", "joeos.researcher", "joeos.verifier", "joeos.security"];
+      keys.forEach(function (key) {
+        var match = (data.agents.items || []).find(function (a) { return a.key === key; });
+        if (match) ordered.push(match);
+      });
+      (data.agents.items || []).forEach(function (a) {
+        if (!ordered.some(function (o) { return o.id === a.id; })) ordered.push(a);
+      });
+
+      agentsById = {}; agentsByKey = {};
+      ordered.forEach(function (a) { agentsById[a.id] = a; agentsByKey[a.key] = a; });
+
+      $("team-status").textContent = data.agents.active + " of " + data.agents.total + " active";
+      $("specialists").innerHTML = ordered.map(function (a) {
+        var model = a.default_model_policy && a.default_model_policy !== "backend" ? a.default_model_policy : "auto";
+        var provider = a.default_provider_policy && a.default_provider_policy !== "backend" ? a.default_provider_policy : "local";
+        return "<div class='agent-card'>" +
+          "<div class='row'><span class='pill " + (a.status === "active" ? "green" : "red") + "'></span>" +
+          "<span class='name'>" + esc(a.display_name) + "</span>" +
+          "<span class='badge " + (a.status === "active" ? "green" : "red") + "'>" + esc(a.status) + "</span></div>" +
+          "<div class='desc'>" + esc(a.purpose || a.description || "") + "</div>" +
+          "<div class='badges'><span class='badge cyan'>model " + esc(model) + "</span>" +
+          "<span class='badge'>" + esc(provider) + "</span></div>" +
+          "<div class='actions'>" +
+          "<button data-talk='" + a.id + "'>Talk</button>" +
+          "<button data-task='" + a.id + "'>Start a task</button>" +
+          "<button data-runs='" + a.id + "'>Activity</button>" +
+          "<a class='link' data-auto='" + a.id + "'>Automate</a>" +
+          "</div>" +
+          "<div data-agent-runs='" + a.id + "'></div>" +
+          "</div>";
+      }).join("");
+    }
+
+    function renderActivity(data) {
+      var groups = { working: [], waiting: [], done: [], attention: [] };
+      (data.recent_runs || []).forEach(function (r) {
+        if (r.status === "running" || r.status === "queued") groups.working.push(r);
+        else if (r.status === "waiting_for_tool" || r.status === "waiting_for_approval") groups.waiting.push(r);
+        else if (r.status === "succeeded") groups.done.push(r);
+        else groups.attention.push(r);
+      });
+      activeRuns = {};
+      groups.working.forEach(function (r) { activeRuns[r.id] = true; });
+
+      var sections = [
+        { key: "working", title: "Working now", icon: "●", runs: groups.working },
+        { key: "waiting", title: "Waiting for you", icon: "●", runs: groups.waiting },
+        { key: "done", title: "Recently completed", icon: "●", runs: groups.done },
+        { key: "attention", title: "Needs attention", icon: "●", runs: groups.attention },
+      ];
+      var html = "";
+      var hasAny = false;
+      sections.forEach(function (sec) {
+        if (!sec.runs.length) return;
+        hasAny = true;
+        html += "<div class='activity-group'><h4><span class='pill " + (sec.key === "working" || sec.key === "waiting" ? "amber" : sec.key === "done" ? "green" : "red") + "'></span>" + esc(sec.title) + "</h4>";
+        html += sec.runs.map(function (r) {
+          var agent = agentsById[r.agent_id];
+          var provider = r.provider_id && providersById[r.provider_id] ? providersById[r.provider_id].key : "";
+          var model = r.model_id && modelsById[r.model_id] ? modelsById[r.model_id].key : "";
+          return "<div class='run-card' data-run='" + r.id + "'>" +
+            "<div class='row'>" +
+            "<span class='pill " + runTone(r.status) + "'></span>" +
+            "<b>" + esc(agent ? agent.display_name : "Agent") + "</b>" +
+            "<span class='badge " + runTone(r.status) + "'>" + esc(friendlyStatus(r.status)) + "</span>" +
+            (model ? "<span class='badge cyan'>" + esc(model) + "</span>" : "") +
+            "<span class='spacer'></span>" +
+            "<span class='muted small'>" + esc(timeAgo(r.started_at || r.completed_at)) + "</span>" +
             "</div>" +
-            "<div data-agent-runs='" + a.id + "'></div>" +
+            "<div class='muted small' style='margin-top:5px'>" + esc((r.objective || "").slice(0, 120)) + "</div>" +
+            "<div class='run-detail hidden'></div>" +
             "</div>";
         }).join("");
+        html += "</div>";
+      });
+      $("activity").innerHTML = hasAny ? html :
+        "<div class='muted small'>Nothing yet. Ask Joe or send a message to a specialist to get started.</div>";
     }
 
-    function renderProviders(data) {
-      $("tab-providers").innerHTML = "<h3 style='margin-top:0'>Providers</h3>" +
-        "<table><tr><th>Name</th><th>Type</th><th>Status</th><th>Health</th><th>Location</th><th>Streaming</th><th>Tools</th></tr>" +
-        data.providers.items.map(function (p) {
-          return "<tr><td><b>" + esc(p.display_name) + "</b> <span class='mono muted'>" + esc(p.key) + "</span></td>" +
-            "<td>" + esc(p.provider_type) + "</td>" +
-            "<td><span class='badge " + (p.status === "active" ? "green" : "red") + "'>" + esc(p.status) + "</span></td>" +
-            "<td><span class='badge " + healthTone(p.health) + "'>" + esc(p.health || "unknown") + "</span></td>" +
-            "<td>" + esc(p.location) + "</td>" +
-            "<td>" + (p.streaming ? "yes" : "no") + "</td>" +
-            "<td>" + (p.tool_calling ? "yes" : "no") + "</td></tr>";
-        }).join("") + "</table>";
-    }
-    function healthTone(h) {
-      if (h === "healthy") return "green";
-      if (h === "unavailable" || h === "disabled") return "red";
-      return "amber";
-    }
-
-    function renderModels(data) {
-      $("tab-models").innerHTML = "<h3 style='margin-top:0'>Models</h3>" +
-        "<table><tr><th>Key</th><th>Status</th><th>Provider</th><th>Streaming</th><th>Structured</th><th>Tools</th><th>Reasoning</th></tr>" +
-        data.models.items.map(function (m) {
-          return "<tr><td class='mono'><b>" + esc(m.key) + "</b></td>" +
-            "<td><span class='badge " + (m.status === "active" ? "green" : "amber") + "'>" + esc(m.status) + "</span></td>" +
-            "<td>" + esc(m.provider_id) + "</td>" +
-            "<td>" + (m.streaming ? "yes" : "no") + "</td>" +
-            "<td>" + (m.structured_output ? "yes" : "no") + "</td>" +
-            "<td>" + (m.tool_calling ? "yes" : "no") + "</td>" +
-            "<td>" + (m.reasoning ? "yes" : "no") + "</td></tr>";
-        }).join("") + "</table>";
+    function renderAskReply(run, delegations) {
+      var agent = agentsById[run.agent_id];
+      var box = "<div class='msg'>";
+      if (run.status === "succeeded") {
+        box += "<div class='muted small'>" + esc(agent ? agent.display_name : "Joe") + " · " +
+          esc(run.provider_key || "local") + " · " + esc(run.model_key || "auto") + "</div>";
+        box += "<div style='margin-top:8px'>" + esc(run.result || "(no text returned)") + "</div>";
+      } else {
+        box += "<div class='err'>" + esc(run.failure || run.status || "Could not complete") + "</div>";
+      }
+      if (delegations && delegations.length) {
+        box += "<div class='muted small' style='margin-top:12px'>Delegated to:</div>" +
+          delegations.map(function (d) {
+            var da = agentsById[d.agent_id];
+            return "<div class='deleg'><span class='pill " + runTone(d.status) + "'></span>" +
+              "<b>" + esc(da ? da.display_name : "Specialist") + "</b>" +
+              "<span class='badge " + runTone(d.status) + "'>" + esc(d.status) + "</span>" +
+              "<span class='muted small'>" + esc((d.objective || "").slice(0, 70)) + "</span></div>";
+          }).join("");
+      }
+      box += "</div>";
+      $("ask-reply").innerHTML = box;
     }
 
-    function renderTools(data) {
-      $("tab-tools").innerHTML = "<h3 style='margin-top:0'>Tools</h3>" +
-        "<table><tr><th>Key</th><th>Category</th><th>Risk</th><th>Status</th></tr>" +
-        data.tools.items.map(function (t) {
-          return "<tr><td class='mono'><b>" + esc(t.key) + "</b></td><td>" + esc(t.category) +
-            "</td><td><span class='badge " + (t.risk === "informational" ? "green" : "amber") + "'>" +
-            esc(t.risk) + "</span></td><td>" + esc(t.status) + "</td></tr>";
-        }).join("") + "</table>";
+    // ------------------------------------------------------------------
+    // Actions
+    // ------------------------------------------------------------------
+    var modalAgent = null;
+
+    function openModal(agent, mode) {
+      modalAgent = agent;
+      $("modal-title").textContent = mode === "task" ? "Start a task · " + agent.display_name : "Talk to " + agent.display_name;
+      $("modal-desc").textContent = agent.purpose || agent.description || "";
+      $("modal-input").value = "";
+      $("modal-result").innerHTML = "";
+      $("modal").classList.remove("hidden");
+      window.setTimeout(function () { $("modal-input").focus(); }, 50);
     }
 
-    function renderRuns(data) {
-      var el = $("tab-runs");
-      el.innerHTML = "<h3 style='margin-top:0'>Agent runs</h3>" +
-        (data.recent_runs || []).map(function (r) {
-          return "<div class='card' style='margin-bottom:10px'>" +
-            "<div class='row'><b>" + esc(r.agent_id) + "</b> <span class='badge " + runTone(r.status) + "'>" +
-            esc(r.status) + "</span> <span class='badge cyan'>" + esc(r.model_key || "—") +
-            "</span> <span class='mono muted'>" + esc(r.id) + "</span></div>" +
-            "<div class='muted' style='margin:6px 0'>" + esc(r.objective || "") + "</div>" +
-            (r.result ? "<div class='msg'>" + esc(r.result) + "</div>" : "") +
-            (r.failure ? "<div class='msg' style='color:var(--danger)'>" + esc(r.failure) + "</div>" : "") +
-            "</div>";
-        }).join("") || "<span class='muted'>No runs yet.</span>";
+    function closeModal() {
+      $("modal").classList.add("hidden");
+      modalAgent = null;
+    }
+
+    async function runAgent(agent, objective, resultEl) {
+      if (!objective.trim()) return;
+      resultEl.innerHTML = "<div class='msg muted'>" + esc(agent.display_name) + " is working…</div>";
+      var run = await api("/api/v1/control/agents/" + agent.id + "/runs", {
+        method: "POST",
+        body: JSON.stringify({ conversation_id: uuidv4(), message_id: uuidv4(), objective: objective }),
+      });
+      var executed = await api("/api/v1/control/runs/" + run.id + "/execute", {
+        method: "POST", body: JSON.stringify({}),
+      });
+      var delegations = [];
+      try {
+        delegations = (await api("/api/v1/control/runs/" + run.id + "/delegations")).delegations || [];
+      } catch (e) {}
+      var box = "<div class='msg'>";
+      if (executed.status === "succeeded") {
+        box += "<div class='muted small'>" + esc(executed.provider_key || "local") + " · " +
+          esc(executed.model_key || "auto") + "</div>";
+        box += "<div style='margin-top:8px'>" + esc(executed.result || "(no text returned)") + "</div>";
+      } else {
+        box += "<div class='err'>" + esc(executed.failure || executed.status || "Could not complete") + "</div>";
+      }
+      if (delegations.length) {
+        box += "<div class='muted small' style='margin-top:12px'>Delegated to:</div>" +
+          delegations.map(function (d) {
+            var da = agentsById[d.agent_id];
+            return "<div class='deleg'><span class='pill " + runTone(d.status) + "'></span>" +
+              "<b>" + esc(da ? da.display_name : "Specialist") + "</b>" +
+              "<span class='badge " + runTone(d.status) + "'>" + esc(d.status) + "</span></div>";
+          }).join("");
+      }
+      box += "</div>";
+      resultEl.innerHTML = box;
+      await refreshAll();
+      return executed;
+    }
+
+    // ------------------------------------------------------------------
+    // Councils
+    // ------------------------------------------------------------------
+    async function loadCouncils() {
+      try {
+        councils = (await api("/api/v1/control/councils")).councils || [];
+      } catch (e) { councils = []; }
+      renderCouncil();
+    }
+
+    function renderCouncil() {
+      var html = "<p class='muted'>Bring the whole team together to deliberate on a question. " +
+        "Each specialist gives its view, and the council reports the outcome.</p>";
+      if (councils.length) {
+        html += "<div class='row' style='margin:10px 0'>" + councils.map(function (c) {
+          return "<span class='badge cyan'>" + esc(c.name) + " · " + esc(c.status) + "</span>";
+        }).join(" ") + "</div>";
+      } else {
+        html += "<div class='muted small' style='margin:8px 0'>No council defined yet — one will be created automatically with your full team.</div>";
+      }
+      html += "<textarea id='council-input' placeholder='What should the team deliberate on?'></textarea>" +
+        "<div class='row' style='margin-top:12px'><button id='council-btn' class='primary'>Run council</button></div>" +
+        "<div id='council-result'></div>";
+      $("council-panel").innerHTML = html;
+    }
+
+    async function runCouncil() {
+      var objective = $("council-input").value.trim();
+      if (!objective) return;
+      var resultEl = $("council-result");
+      resultEl.innerHTML = "<div class='msg muted'>The team is deliberating…</div>";
+      var btn = $("council-btn");
+      btn.disabled = true;
+      try {
+        var council = councils[0];
+        if (!council) {
+          var members = Object.keys(agentsByKey).map(function (k) { return agentsByKey[k].id; });
+          var joe = agentsByKey["joeos.joe"];
+          council = await api("/api/v1/control/councils", {
+            method: "POST",
+            body: JSON.stringify({
+              name: "Team Council",
+              purpose: "General deliberation across JoeOS specialists.",
+              member_agent_ids: members,
+              chair_agent_id: joe ? joe.id : null,
+              quorum_rule: "majority",
+              maximum_rounds: 1,
+              disagreement_policy: "record",
+            }),
+          });
+          councils = [council];
+        }
+        var run = await api("/api/v1/control/councils/" + council.id + "/runs", {
+          method: "POST", timeout: 300000,
+          body: JSON.stringify({ objective: objective }),
+        });
+        var box = "<div class='msg'>";
+        if (run.state === "completed") {
+          box += "<div class='muted small'>Council completed</div>";
+          box += "<div style='margin-top:8px'>" + esc(run.final_recommendation || "(no recommendation)") + "</div>";
+        } else {
+          box += "<div class='err'>Council " + esc(run.state || "could not complete") + "</div>";
+        }
+        box += "</div>";
+        resultEl.innerHTML = box;
+        $("council-input").value = "";
+      } catch (e) {
+        resultEl.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+      } finally {
+        btn.disabled = false;
+        await refreshAll();
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // Run details
+    // ------------------------------------------------------------------
+    async function expandRun(runId, detailEl) {
+      if (!detailEl.classList.contains("hidden")) { detailEl.classList.add("hidden"); return; }
+      detailEl.classList.remove("hidden");
+      detailEl.innerHTML = "<div class='muted small'>Loading…</div>";
+      try {
+        var run = await api("/api/v1/control/runs/" + runId);
+        var html = "<div class='muted small'>provider <b>" + esc(run.provider_key || "local") +
+          "</b> · model <b>" + esc(run.model_key || "auto") + "</b></div>";
+        if (run.result) html += "<div class='msg' style='max-height:180px'>" + esc(run.result) + "</div>";
+        if (run.failure) html += "<div class='msg err'>" + esc(run.failure) + "</div>";
+        try {
+          var del = (await api("/api/v1/control/runs/" + runId + "/delegations")).delegations || [];
+          if (del.length) {
+            html += "<div class='muted small' style='margin-top:10px'>Delegations</div>" +
+              del.map(function (d) {
+                var da = agentsById[d.agent_id];
+                return "<div class='deleg'><span class='pill " + runTone(d.status) + "'></span>" +
+                  "<b>" + esc(da ? da.display_name : "Specialist") + "</b>" +
+                  "<span class='badge " + runTone(d.status) + "'>" + esc(d.status) + "</span>" +
+                  "<span class='muted small'>" + esc((d.objective || "").slice(0, 60)) + "</span></div>";
+              }).join("");
+          }
+        } catch (e) {}
+        html += "<div class='row' style='margin-top:10px'><button data-cancel='" + runId + "' class='ghost'>Cancel run</button></div>";
+        detailEl.innerHTML = html;
+      } catch (e) {
+        detailEl.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+      }
+    }
+
+    async function cancelRun(runId) {
+      try {
+        await api("/api/v1/control/runs/" + runId + "/cancel", { method: "POST", body: JSON.stringify({}) });
+      } catch (e) {}
+      await refreshAll();
     }
 
     // ------------------------------------------------------------------
     // Data loading
     // ------------------------------------------------------------------
     async function refreshAll() {
-      var overview = await api("/api/v1/control/overview");
-      renderOverview(overview);
-      renderAgents(overview);
-      renderProviders(overview);
-      renderModels(overview);
-      renderTools(overview);
-      renderRuns(overview);
-    }
-
-    async function startRun(agentId) {
-      var objective = window.prompt("Objective for this agent:", "Describe your configured role. Do not modify anything.");
-      if (!objective) return;
-      var run = await api("/api/v1/control/agents/" + agentId + "/runs", {
-        method: "POST",
-        body: JSON.stringify({
-          conversation_id: uuidv4(), message_id: uuidv4(), objective: objective,
-        }),
-      });
-      var executed = await api("/api/v1/control/runs/" + run.id + "/execute", {
-        method: "POST", body: JSON.stringify({}),
-      });
-      alert("Run " + executed.status + "\nModel: " + (executed.model_key || "?") +
-        "\n\n" + (executed.result || executed.failure || "").slice(0, 400));
-      await refreshAll();
-    }
-
-    async function showAgentRuns(agentId) {
-      var runs = await api("/api/v1/control/agents/" + agentId + "/runs");
-      var container = document.querySelector("[data-agent-runs='" + agentId + "']");
-      container.innerHTML = runs.runs.slice(0, 5).map(function (r) {
-        return "<div class='row' style='margin-top:6px'><span class='badge " + runTone(r.status) + "'>" +
-          esc(r.status) + "</span> <span class='mono muted'>" + esc(r.id) + "</span> " +
-          esc(r.objective || "").slice(0, 50) + "</div>";
-      }).join("") || "<span class='muted'>No runs.</span>";
+      var data = await api("/api/v1/control/overview");
+      providersById = {}; modelsById = {};
+      (data.providers.items || []).forEach(function (p) { providersById[p.id] = p; });
+      (data.models.items || []).forEach(function (m) { modelsById[m.id] = m; });
+      renderTeam(data);
+      renderActivity(data);
+      await loadCouncils();
     }
 
     // ------------------------------------------------------------------
@@ -651,22 +901,92 @@
       clearSession();
       window.location.reload();
     });
+    $("modal-cancel").addEventListener("click", closeModal);
+
+    $("ask-btn").addEventListener("click", async function () {
+      var objective = $("ask-input").value.trim();
+      if (!objective) return;
+      var joe = agentsByKey["joeos.joe"];
+      if (!joe) { $("ask-reply").innerHTML = "<div class='msg err'>Joe isn't available right now.</div>"; return; }
+      var btn = $("ask-btn");
+      btn.disabled = true;
+      $("ask-reply").innerHTML = "<div class='msg muted'>Joe is planning and delegating…</div>";
+      try {
+        var run = await api("/api/v1/control/agents/" + joe.id + "/runs", {
+          method: "POST",
+          body: JSON.stringify({ conversation_id: uuidv4(), message_id: uuidv4(), objective: objective }),
+        });
+        var executed = await api("/api/v1/control/runs/" + run.id + "/execute", {
+          method: "POST", body: JSON.stringify({}),
+        });
+        var delegations = [];
+        try {
+          delegations = (await api("/api/v1/control/runs/" + run.id + "/delegations")).delegations || [];
+        } catch (e) {}
+        renderAskReply(executed, delegations);
+        $("ask-input").value = "";
+      } catch (e) {
+        $("ask-reply").innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+      } finally {
+        btn.disabled = false;
+        await refreshAll();
+      }
+    });
+
+    $("modal-go").addEventListener("click", async function () {
+      if (!modalAgent) return;
+      var btn = $("modal-go");
+      btn.disabled = true;
+      try {
+        await runAgent(modalAgent, $("modal-input").value, $("modal-result"));
+      } catch (e) {
+        $("modal-result").innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+      } finally {
+        btn.disabled = false;
+      }
+    });
 
     document.addEventListener("click", async function (event) {
-      var runBtn = event.target.closest("[data-action='run']");
-      if (runBtn) { event.preventDefault(); await startRun(runBtn.getAttribute("data-agent")); return; }
-      var runsBtn = event.target.closest("[data-action='runs']");
-      if (runsBtn) { event.preventDefault(); await showAgentRuns(runsBtn.getAttribute("data-agent")); return; }
+      var talkBtn = event.target.closest("[data-talk]");
+      if (talkBtn) { event.preventDefault(); openModal(agentsById[talkBtn.getAttribute("data-talk")], "talk"); return; }
+      var taskBtn = event.target.closest("[data-task]");
+      if (taskBtn) { event.preventDefault(); openModal(agentsById[taskBtn.getAttribute("data-task")], "task"); return; }
+      var runsBtn = event.target.closest("[data-runs]");
+      if (runsBtn) {
+        event.preventDefault();
+        var agentId = runsBtn.getAttribute("data-runs");
+        var container = document.querySelector("[data-agent-runs='" + agentId + "']");
+        if (container.classList.contains("hidden") === false) { container.classList.add("hidden"); return; }
+        container.classList.remove("hidden");
+        container.innerHTML = "<div class='muted small'>Loading…</div>";
+        try {
+          var data = await api("/api/v1/control/agents/" + agentId + "/runs");
+          container.innerHTML = data.runs.slice(0, 6).map(function (r) {
+            return "<div class='deleg'><span class='pill " + runTone(r.status) + "'></span>" +
+              "<span class='badge " + runTone(r.status) + "'>" + esc(r.status) + "</span>" +
+              "<span class='muted small'>" + esc((r.objective || "").slice(0, 60)) + "</span></div>";
+          }).join("") || "<div class='muted small'>No runs yet.</div>";
+        } catch (e) {
+          container.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+        }
+        return;
+      }
+      var autoBtn = event.target.closest("[data-auto]");
+      if (autoBtn) { event.preventDefault(); window.location.href = "/os/automations"; return; }
+      var cancelBtn = event.target.closest("[data-cancel]");
+      if (cancelBtn) { event.preventDefault(); await cancelRun(cancelBtn.getAttribute("data-cancel")); return; }
+      var runCard = event.target.closest("[data-run]");
+      if (runCard) {
+        var detailEl = runCard.querySelector(".run-detail");
+        if (detailEl) await expandRun(runCard.getAttribute("data-run"), detailEl);
+      }
     });
 
-    document.querySelectorAll(".tabs button").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        document.querySelectorAll(".tabs button").forEach(function (b) { b.classList.remove("active"); });
-        btn.classList.add("active");
-        document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.add("hidden"); });
-        $("tab-" + btn.getAttribute("data-tab")).classList.remove("hidden");
-      });
-    });
+    window.setInterval(function () {
+      if (Object.keys(activeRuns).length) {
+        refreshAll().catch(function () {});
+      }
+    }, 15000);
 
     boot();
   </script>

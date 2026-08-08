@@ -9284,6 +9284,14 @@
         }
 
         function selectSection(id) {
+          if (id === "agents") {
+            // The user-facing Agents experience lives on the Agent Fabric page.
+            try { window.localStorage.setItem("joeos:last-section", "agents"); } catch (error) {}
+            if (window.location.pathname !== "/os/agents") {
+              window.location.href = "/os/agents";
+            }
+            return;
+          }
           setActive(id);
           setNotificationsOpen(false);
           try { window.localStorage.setItem("joeos:last-section", id); } catch (error) {}
