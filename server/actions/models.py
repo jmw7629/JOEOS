@@ -94,6 +94,18 @@ class DelegateRequest(WireModel):
     objective: str = Field(min_length=1, max_length=4000)
 
 
+class TaskNodeRequest(WireModel):
+    key: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=240)
+    objective: str = Field(min_length=1, max_length=4000)
+    assigned_agent_id: Optional[UUID] = None
+    dependencies: str = ""
+
+
+class TaskGraphRequest(WireModel):
+    tasks: List[TaskNodeRequest] = Field(min_length=1, max_length=64)
+
+
 class ToolRequest(WireModel):
     key: str = Field(min_length=1, max_length=120)
     display_name: str = Field(min_length=1, max_length=160)

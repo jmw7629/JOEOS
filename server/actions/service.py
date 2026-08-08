@@ -421,7 +421,11 @@ class ActionService:
         depth = parent.delegation_depth + 1
         parent_agent = self._store.get_agent(parent.agent_id)
         max_depth = int(parent_agent.max_delegation_depth) if parent_agent else 0
-        if max_depth and depth > max_depth:
+        if max_depth < 0:
+            # Negative is invalid configuration; treat as no delegation.
+            raise ActionDeniedError(403, "delegation_disabled",
+                                    "This agent does not permit delegation.")
+        if max_depth == 0 or depth > max_depth:
             raise ActionDeniedError(403, "delegation_limit_reached",
                                     "The delegation depth limit is reached.")
         child = self.start_agent_run(
@@ -434,6 +438,138 @@ class ActionService:
                    data={"child_run": str(child["id"]), "agent": str(child_agent_id)})
         await self.execute_agent_run(principal, child["id"])
         return run_payload(self._store.get_run(child["id"]))
+
+    def create_task_graph(
+        self,
+        principal: Dict,
+        *,
+        run_id: UUID,
+        tasks: List[Dict],
+    ) -> Dict:
+        """Create a real TaskGraph for a run.
+
+        Each task carries title/objective/assigned_agent_id/dependencies
+        (a comma-separated list of parent task ids within this graph). Tasks are
+        created in `ready`/`waiting_for_dependency` state based on whether their
+        dependencies exist; execution is driven by `execute_task_graph`."""
+        self._require(principal, AGENT_RUN_CAP)
+        created = []
+        by_key = {}
+        for task in tasks:
+            deps = [d.strip() for d in (task.get("dependencies") or "").split(",") if d.strip()]
+            resolved_deps = []
+            for dep in deps:
+                if dep not in by_key:
+                    raise ActionDeniedError(400, "unknown_task_dependency",
+                                            "Task dependency %s does not exist." % dep)
+                resolved_deps.append(str(by_key[dep]))
+            task_id = uuid4()
+            by_key[task["key"]] = task_id
+            state = "ready" if not resolved_deps else "waiting_for_dependency"
+            raw_agent = task.get("assigned_agent_id")
+            assigned = None
+            if raw_agent:
+                assigned = raw_agent if isinstance(raw_agent, UUID) else UUID(str(raw_agent))
+            record = self._store.create_task(
+                id=task_id, run_id=run_id, parent_task_id=None,
+                title=task.get("title") or task.get("key"),
+                objective=task.get("objective") or "",
+                assigned_agent_id=assigned,
+                dependencies=",".join(resolved_deps),
+                now=self._now(),
+            )
+            if state == "waiting_for_dependency":
+                self._store.update_task_state(task_id, state="waiting_for_dependency", now=self._now())
+            created.append(task_payload(record))
+            self._emit(principal, "agent.task.created", run_id=run_id, task_id=task_id,
+                       data={"title": task.get("title") or task.get("key")})
+        return {"tasks": created}
+
+    def _task_dependencies_met(self, task) -> bool:
+        deps = [d for d in task.dependencies.split(",") if d]
+        if not deps:
+            return True
+        for dep in deps:
+            parent = self._store.get_task(UUID(dep))
+            if parent is None or parent.state != "succeeded":
+                return False
+        return True
+
+    async def execute_task_graph(self, principal: Dict, run_id: UUID) -> Dict:
+        """Execute a real TaskGraph: compute ready tasks, run each ready task
+        through the assigned agent (a real child AgentRun per task), persist
+        results, and propagate failure/cancellation through dependencies.
+
+        Bounded: tasks execute sequentially (this VPS runs model calls one at a
+        time), and the graph terminates when all tasks are terminal."""
+        self._require(principal, AGENT_RUN_CAP)
+        tasks = self._store.list_tasks(run_id)
+        if not tasks:
+            raise ActionNotFoundError(404, "no_tasks", "The run has no tasks.")
+        remaining = [t for t in tasks if t.state in ("ready", "waiting_for_dependency", "running")]
+        guard = 0
+        while remaining and guard < 64:
+            guard += 1
+            progressed = False
+            for task in list(remaining):
+                if task.state == "waiting_for_dependency":
+                    if self._task_dependencies_met(task):
+                        self._store.update_task_state(task.id, state="ready", now=self._now())
+                        task = self._store.get_task(task.id)
+                        progressed = True
+                    continue
+                if task.state != "ready":
+                    continue
+                if task.assigned_agent_id is None:
+                    self._store.update_task_state(task.id, state="failed", now=self._now(),
+                                                  failure="no_agent_assigned")
+                    progressed = True
+                    continue
+                self._store.update_task_state(task.id, state="running", now=self._now())
+                try:
+                    child = await self.delegate_agent_run(
+                        principal, parent_run_id=run_id,
+                        child_agent_id=task.assigned_agent_id,
+                        objective=task.objective,
+                    )
+                    if child["status"] == "succeeded":
+                        self._store.update_task_state(
+                            task.id, state="succeeded", now=self._now(),
+                            output_reference=child.get("result", "")[:2000],
+                        )
+                    else:
+                        self._store.update_task_state(
+                            task.id, state="failed", now=self._now(),
+                            failure=child.get("failure") or "task_agent_failed",
+                        )
+                except Exception as error:  # noqa: BLE001
+                    self._store.update_task_state(
+                        task.id, state="failed", now=self._now(),
+                        failure=_normalize_agent_error(error),
+                    )
+                self._emit(principal, "agent.task.completed", run_id=run_id, task_id=task.id,
+                           data={"state": self._store.get_task(task.id).state})
+                progressed = True
+            if not progressed:
+                # Only dependency-failure cycles should stall; mark them blocked.
+                for task in remaining:
+                    if task.state == "waiting_for_dependency":
+                        blocked = any(
+                            self._store.get_task(UUID(d)) is not None
+                            and self._store.get_task(UUID(d)).state == "failed"
+                            for d in task.dependencies.split(",") if d
+                        )
+                        if blocked:
+                            self._store.update_task_state(task.id, state="blocked", now=self._now())
+                            progressed = True
+                if not progressed:
+                    break
+            remaining = [t for t in self._store.list_tasks(run_id)
+                         if t.state in ("ready", "waiting_for_dependency", "running")]
+        return {
+            "run_id": str(run_id),
+            "tasks": [task_payload(t) for t in self._store.list_tasks(run_id)],
+        }
 
     def _build_agent_messages(self, agent, objective: str) -> List[Dict[str, str]]:
         messages: List[Dict[str, str]] = []

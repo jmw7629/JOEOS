@@ -25,6 +25,7 @@ from .models import (
     CouncilRunRequest,
     DelegateRequest,
     ModelRequest,
+    TaskGraphRequest,
     ModelStateRequest,
     ProposeRequest,
     ProviderRequest,
@@ -283,6 +284,29 @@ def list_run_tasks(
     service: ActionService = Depends(get_action_service),
 ):
     return _run(service, principal, lambda p: {"tasks": service.list_run_tasks(p, run_id)})
+
+
+@router.post("/runs/{run_id}/tasks")
+def create_task_graph(
+    run_id: UUID,
+    payload: TaskGraphRequest,
+    principal: Dict = Depends(require_application_session),
+    service: ActionService = Depends(get_action_service),
+):
+    return _run(service, principal, lambda p: service.create_task_graph(
+        p, run_id=run_id, tasks=payload.tasks))
+
+
+@router.post("/runs/{run_id}/tasks/execute", status_code=status.HTTP_200_OK)
+async def execute_task_graph(
+    run_id: UUID,
+    principal: Dict = Depends(require_application_session),
+    service: ActionService = Depends(get_action_service),
+):
+    try:
+        return await service.execute_task_graph(principal, run_id)
+    except ActionError as error:
+        _raise_action_error(error)
 
 
 # ---------------------------------------------------------------------------
