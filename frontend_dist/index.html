@@ -3933,6 +3933,975 @@
       outline: 2px solid var(--color-focus-ring);
       outline-offset: 2px;
     }
+
+    /* ---- OS foundation: agents workspace ---- */
+    .agents-layout {
+      display: grid;
+      grid-template-columns: 268px minmax(0, 1fr);
+      gap: var(--workspace-gap);
+      align-items: start;
+    }
+
+    .agents-sidebar-card {
+      position: sticky;
+      top: calc(var(--topbar) + 16px);
+    }
+
+    .agents-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .agents-search {
+      flex: 1 1 220px;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-control);
+      padding: 8px 12px;
+      color: var(--text);
+    }
+
+    .agents-search input {
+      flex: 1;
+      min-width: 0;
+      background: transparent;
+      border: 0;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .agents-search input::placeholder {
+      color: var(--faint);
+    }
+
+    .agent-card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: var(--workspace-gap);
+    }
+
+    .agent-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .agent-card-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .agent-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, rgba(49, 215, 255, 0.18), rgba(167, 139, 250, 0.16));
+      border: 1px solid var(--line-strong);
+      color: var(--cyan);
+      flex: none;
+    }
+
+    .agent-card h3 {
+      margin: 0 0 2px;
+      font-size: 15px;
+      color: var(--text);
+    }
+
+    .agent-card p {
+      margin: 0;
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .agent-meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .agent-meta-row span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .agent-capabilities {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .agent-capability {
+      font-size: 11px;
+      color: var(--cyan-soft);
+      background: rgba(49, 215, 255, 0.08);
+      border: 1px solid rgba(49, 215, 255, 0.18);
+      border-radius: 999px;
+      padding: 3px 9px;
+    }
+
+    .agent-card-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+
+    .agents-subnav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .agents-subnav button {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 7px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      transition: border-color var(--duration-fast) var(--motion-ease), color var(--duration-fast) var(--motion-ease), background var(--duration-fast) var(--motion-ease);
+    }
+
+    .agents-subnav button.active {
+      color: var(--text);
+      border-color: var(--line-strong);
+      background: rgba(49, 215, 255, 0.08);
+    }
+
+    .agents-subnav button:focus-visible {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 2px;
+    }
+
+    .agents-count {
+      font-size: 11px;
+      color: var(--faint);
+      font-weight: 600;
+    }
+
+    .agent-detail-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .agent-detail-head .agent-avatar {
+      width: 54px;
+      height: 54px;
+      font-size: 20px;
+    }
+
+    .agent-detail-head h2 {
+      margin: 0;
+      font-size: 20px;
+      color: var(--text);
+    }
+
+    .agent-detail-head p {
+      margin: 2px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .agent-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: var(--workspace-gap);
+    }
+
+    .os-property-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .os-property {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 13px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .os-property:last-child {
+      border-bottom: 0;
+    }
+
+    .os-property dt {
+      color: var(--faint);
+      flex: none;
+    }
+
+    .os-property dd {
+      margin: 0;
+      color: var(--text);
+      text-align: right;
+      overflow-wrap: anywhere;
+    }
+
+    .os-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .os-list-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-control);
+      cursor: pointer;
+      transition: border-color var(--duration-fast) var(--motion-ease);
+    }
+
+    .os-list-row:hover {
+      border-color: var(--line-strong);
+    }
+
+    .os-list-row:focus-visible {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 2px;
+    }
+
+    .os-list-row-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .os-list-row-main strong {
+      display: block;
+      color: var(--text);
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+
+    .os-list-row-main span {
+      display: block;
+      color: var(--muted);
+      font-size: 12.5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .os-list-row-side {
+      flex: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ---- Task graph ---- */
+    .task-graph-wrap {
+      position: relative;
+      overflow-x: auto;
+      overflow-y: auto;
+      max-height: 520px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-control);
+      background:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px),
+        var(--canvas-2);
+      background-size: 26px 26px;
+    }
+
+    .task-graph {
+      position: relative;
+      min-width: 640px;
+      padding: 24px;
+    }
+
+    .graph-node {
+      position: absolute;
+      width: 178px;
+      background: var(--surface-strong);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-control);
+      padding: 10px 12px;
+      box-shadow: var(--elevation-popover);
+      cursor: pointer;
+      z-index: 1;
+      transition: border-color var(--duration-fast) var(--motion-ease);
+    }
+
+    .graph-node:hover,
+    .graph-node.selected {
+      border-color: var(--cyan);
+    }
+
+    .graph-node.critical {
+      border-color: var(--warning);
+    }
+
+    .graph-node .graph-node-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .graph-node .graph-node-meta {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .graph-edge {
+      position: absolute;
+      height: 2px;
+      background: var(--line-strong);
+      transform-origin: left center;
+      z-index: 0;
+    }
+
+    .graph-edge.critical {
+      background: var(--warning);
+    }
+
+    .graph-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    .graph-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .graph-legend i {
+      color: var(--muted);
+    }
+
+    /* ---- Council ---- */
+    .council-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: var(--workspace-gap);
+    }
+
+    .council-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .council-card h3 {
+      margin: 0;
+      font-size: 15px;
+      color: var(--text);
+    }
+
+    .council-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .council-card .participants {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--cyan-soft);
+    }
+
+    .os-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-align: center;
+      color: var(--muted);
+      padding: 40px 20px;
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--radius-control);
+    }
+
+    .os-empty i {
+      font-size: 26px;
+      color: var(--faint);
+    }
+
+    .os-spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--line);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: os-spin 0.8s linear infinite;
+    }
+
+    @keyframes os-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .os-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      color: var(--cyan-soft);
+      background: rgba(49, 215, 255, 0.07);
+      border: 1px solid rgba(49, 215, 255, 0.14);
+      border-radius: 6px;
+      padding: 2px 7px;
+    }
+
+    .os-section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--faint);
+      margin: 0 0 10px;
+    }
+
+    .os-section-title i {
+      color: var(--cyan);
+    }
+
+    .os-panel-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .os-inline-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .os-inline-form label {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+
+    .os-inline-form label span {
+      color: var(--faint);
+      font-size: 11px;
+    }
+
+    .os-field {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-control);
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 13.5px;
+    }
+
+    .os-textarea {
+      min-height: 84px;
+      resize: vertical;
+    }
+
+    .os-subnote {
+      font-size: 12px;
+      color: var(--faint);
+      line-height: 1.45;
+    }
+
+    .os-button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .os-health-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .os-health-bar .os-health-fill {
+      height: 8px;
+      flex: 1;
+      border-radius: 999px;
+      background: var(--line);
+      overflow: hidden;
+      min-width: 120px;
+    }
+
+    .os-health-bar .os-health-fill span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: var(--color-status-success);
+      transition: width var(--duration-standard) var(--motion-ease);
+    }
+
+    .os-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .os-chip {
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--surface-soft);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 9px;
+    }
+
+    .os-thread {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 380px;
+      overflow-y: auto;
+    }
+
+    .os-thread-item {
+      display: flex;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-control);
+    }
+
+    .os-thread-item strong {
+      font-size: 12.5px;
+      color: var(--text);
+    }
+
+    .os-thread-item span {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .os-thread-icon {
+      flex: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: rgba(167, 139, 250, 0.12);
+      color: var(--purple);
+    }
+
+    .os-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-control);
+    }
+
+    .os-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 560px;
+    }
+
+    .os-table th,
+    .os-table td {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    .os-table th {
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: var(--surface-soft);
+    }
+
+    .os-table td {
+      color: var(--text);
+    }
+
+    .os-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    @media (max-width: 1024px) {
+      .agents-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .agents-sidebar-card {
+        position: static;
+      }
+    }
+
+    /* ---- Knowledge layer (Memory / Files / Search / Context) ---- */
+    .knowledge-layout {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .knowledge-sidebar {
+      position: sticky;
+      top: 72px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .knowledge-panel {
+      min-width: 0;
+    }
+
+    .os-property-list.knowledge-dense .os-property {
+      padding: 7px 0;
+    }
+
+    .knowledge-record {
+      padding: 14px;
+      margin-bottom: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: rgba(10, 22, 39, 0.5);
+      cursor: pointer;
+      transition: border-color var(--duration-fast) var(--motion-ease), background var(--duration-fast) var(--motion-ease);
+    }
+
+    .knowledge-record:hover,
+    .knowledge-record.selected {
+      border-color: var(--line-strong);
+      background: rgba(49, 215, 255, 0.06);
+    }
+
+    .knowledge-record-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .knowledge-record-head strong {
+      color: var(--text);
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .knowledge-record p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .knowledge-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .knowledge-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(17, 34, 55, 0.5);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .knowledge-chip.tone-success { color: var(--success); border-color: rgba(61, 227, 164, 0.28); }
+    .knowledge-chip.tone-warning { color: var(--warning); border-color: rgba(255, 180, 92, 0.28); }
+    .knowledge-chip.tone-critical { color: var(--danger); border-color: rgba(255, 100, 124, 0.28); }
+    .knowledge-chip.tone-info { color: var(--cyan); border-color: rgba(49, 215, 255, 0.28); }
+    .knowledge-chip.tone-purple { color: var(--purple); border-color: rgba(167, 139, 250, 0.28); }
+
+    .knowledge-search-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .knowledge-search-row .os-field {
+      flex: 1;
+    }
+
+    .knowledge-results {
+      margin-top: 4px;
+    }
+
+    .knowledge-group-title {
+      margin: 18px 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--faint);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .knowledge-group-title i {
+      color: var(--cyan);
+    }
+
+    .knowledge-result-card {
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: rgba(10, 22, 39, 0.5);
+    }
+
+    .knowledge-result-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .knowledge-result-card-head strong {
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .knowledge-score {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--cyan);
+    }
+
+    .knowledge-result-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .knowledge-snippet {
+      font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+      font-size: 11px;
+      color: var(--muted);
+      background: rgba(5, 9, 18, 0.6);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-top: 8px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .knowledge-files-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    .knowledge-file-card {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: rgba(10, 22, 39, 0.5);
+      cursor: pointer;
+      transition: border-color var(--duration-fast) var(--motion-ease), background var(--duration-fast) var(--motion-ease);
+    }
+
+    .knowledge-file-card:hover {
+      border-color: var(--line-strong);
+      background: rgba(49, 215, 255, 0.06);
+    }
+
+    .knowledge-file-card i {
+      color: var(--cyan);
+      margin-right: 6px;
+    }
+
+    .knowledge-file-card strong {
+      display: block;
+      color: var(--text);
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .knowledge-file-card small {
+      display: block;
+      margin-top: 4px;
+      color: var(--faint);
+      font-size: 11px;
+    }
+
+    .knowledge-breadcrumb {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+      color: var(--faint);
+      font-size: 12px;
+    }
+
+    .knowledge-breadcrumb button {
+      appearance: none;
+      border: 0;
+      background: none;
+      color: var(--cyan);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .knowledge-breadcrumb button:hover {
+      text-decoration: underline;
+    }
+
+    .knowledge-breadcrumb span {
+      color: var(--faint);
+    }
+
+    .knowledge-code {
+      font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+      font-size: 12px;
+      color: var(--text);
+      line-height: 1.55;
+      background: rgba(5, 9, 18, 0.7);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      overflow: auto;
+      max-height: 560px;
+      white-space: pre;
+      tab-size: 2;
+    }
+
+    .knowledge-masked-note {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      border: 1px solid rgba(255, 180, 92, 0.3);
+      border-radius: var(--radius-sm);
+      background: rgba(255, 180, 92, 0.08);
+      color: var(--warning);
+      font-size: 12px;
+    }
+
+    .knowledge-context-item {
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: rgba(10, 22, 39, 0.5);
+    }
+
+    .knowledge-context-item-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .knowledge-context-item-head strong {
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .knowledge-context-item p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .knowledge-empty {
+      padding: 28px 16px;
+      text-align: center;
+      color: var(--faint);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1024px) {
+      .knowledge-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .knowledge-sidebar {
+        position: static;
+      }
+    }
   </style>
 </head>
 <body>
@@ -3962,6 +4931,11 @@
         { id: "pipeline", label: "CI/CD Pipeline", short: "Pipeline", icon: "fa-code-branch" },
         { id: "infrastructure", label: "Infrastructure Health", short: "Infrastructure", icon: "fa-server" },
         { id: "security", label: "Security & Logs", short: "Security", icon: "fa-shield-halved" },
+        { id: "agents", label: "Agents", short: "Agents", icon: "fa-user-astronaut" },
+        { id: "memory", label: "Memory", short: "Memory", icon: "fa-brain" },
+        { id: "files", label: "Files", short: "Files", icon: "fa-folder-open" },
+        { id: "search", label: "Search", short: "Search", icon: "fa-magnifying-glass" },
+        { id: "context", label: "Context", short: "Context", icon: "fa-layer-group" },
         { id: "plugins", label: "Plugin Manager", short: "Plugins", icon: "fa-puzzle-piece" },
         { id: "automation", label: "Automation", short: "Automation", icon: "fa-robot" },
         { id: "communications", label: "Communications", short: "Inbox", icon: "fa-envelope" },
@@ -3975,6 +4949,59 @@
         { id: "settings", label: "Settings", short: "Settings", icon: "fa-sliders" },
         { id: "bots", label: "Bot Fleet", short: "Bot Fleet", icon: "fa-robot" }
       ];
+
+      /* ---- OS foundation: app registry + deep-link routing ---- */
+      var OS_APPS = {
+        mission: { id: "mission", name: "Mission Control", icon: "fa-compass", section: "mission", singleton: true, description: "Persistent customizable widget workspace." },
+        dashboard: { id: "dashboard", name: "Executive Dashboard", icon: "fa-chart-line", section: "dashboard", singleton: true, description: "Live VPS telemetry and briefings." },
+        pipeline: { id: "pipeline", name: "CI/CD Pipeline", icon: "fa-code-branch", section: "pipeline", singleton: true, description: "Runs, commits, and deployment status." },
+        infrastructure: { id: "infrastructure", name: "Infrastructure Health", icon: "fa-server", section: "infrastructure", singleton: true, description: "Compute nodes and local fabric health." },
+        security: { id: "security", name: "Security & Logs", icon: "fa-shield-halved", section: "security", singleton: true, description: "Event stream and audit log." },
+        agents: { id: "agents", name: "Agents", icon: "fa-user-astronaut", section: "agents", singleton: true, description: "Multi-agent organization, missions, task graphs, and councils." },
+        memory: { id: "memory", name: "Memory", icon: "fa-brain", section: "memory", singleton: true, description: "Recorded knowledge, provenance, evidence, and memory health." },
+        files: { id: "files", name: "Files", icon: "fa-folder-open", section: "files", singleton: true, description: "Registered project files and artifacts." },
+        search: { id: "search", name: "Search", icon: "fa-magnifying-glass", section: "search", singleton: true, description: "Universal search across memory, files, and the knowledge base." },
+        context: { id: "context", name: "Context", icon: "fa-layer-group", section: "context", singleton: true, description: "Context packs, sources, and provenance." },
+        plugins: { id: "plugins", name: "Plugin Manager", icon: "fa-puzzle-piece", section: "plugins", singleton: true, description: "Versioned plugin catalog with isolated hosts." },
+        automation: { id: "automation", name: "Automation", icon: "fa-robot", section: "automation", singleton: true, description: "Workflow engine and schedules." },
+        communications: { id: "communications", name: "Communications", icon: "fa-envelope", section: "communications", singleton: true, description: "Inbox, outbox, and delivery state." },
+        wearables: { id: "wearables", name: "Device Manager", icon: "fa-glasses", section: "wearables", singleton: true, description: "Paired wearable devices." },
+        mobile: { id: "mobile", name: "Mobile Companion", icon: "fa-mobile-screen", section: "mobile", singleton: true, description: "Paired mobile clients." },
+        "security-center": { id: "security-center", name: "Security Center", icon: "fa-user-shield", section: "security-center", singleton: true, description: "Incidents, approvals, and lockdown." },
+        performance: { id: "performance", name: "Performance Center", icon: "fa-gauge-high", section: "performance", singleton: true, description: "Measured resource and workload health." },
+        ai: { id: "ai", name: "Models & AI", icon: "fa-brain", section: "ai", singleton: true, description: "Local model runtime and routing." },
+        production: { id: "production", name: "Production & Release", icon: "fa-rocket", section: "production", singleton: true, description: "Release gates and verified backups." },
+        selfmaintenance: { id: "selfmaintenance", name: "Maintenance & Improvement", icon: "fa-gears", section: "selfmaintenance", singleton: true, description: "Self-maintenance checks and proposals." },
+        settings: { id: "settings", name: "Settings", icon: "fa-sliders", section: "settings", singleton: true, description: "Appearance, accessibility, and behavior." },
+        bots: { id: "bots", name: "Bot Fleet", icon: "fa-robot", section: "bots", singleton: true, description: "Deployed automation bots." }
+      };
+
+      function osRoutePath(appId, segments) {
+        var base = "/os/" + String(appId || "").toLowerCase();
+        if (Array.isArray(segments) && segments.length) {
+          return base + "/" + segments.map(function (segment) { return encodeURIComponent(String(segment)); }).join("/");
+        }
+        return base;
+      }
+
+      function parseOsRoute(pathname) {
+        var raw = String(pathname || window.location.pathname || "");
+        var match = raw.match(/^\/os\/([a-z0-9-]+)(?:\/(.*))?$/i);
+        if (!match) return null;
+        var appId = match[1].toLowerCase();
+        var segments = [];
+        if (match[2]) {
+          segments = match[2].split("/").filter(Boolean).map(function (segment) {
+            try { return decodeURIComponent(segment); } catch (error) { return segment; }
+          });
+        }
+        if (!OS_APPS[appId]) return { appId: appId, unknown: true, segments: segments };
+        return { appId: appId, app: OS_APPS[appId], segments: segments };
+      }
+
+      function osRouteFromSegments(appId, segments) {
+        return { appId: appId, app: OS_APPS[appId] || null, segments: Array.isArray(segments) ? segments : [] };
+      }
 
       var METRIC_DEFINITIONS = [
         { id: "cpu", label: "CPU Load", unit: "%", icon: "fa-microchip" },
@@ -6157,6 +7184,862 @@
         );
       }
 
+      /* ---- Agents workspace ---- */
+      function agentTone(availability) {
+        if (availability === "available") return "success";
+        if (availability === "busy" || availability === "blocked") return "warning";
+        if (availability === "offline" || availability === "unavailable") return "critical";
+        return "";
+      }
+
+      function agentAvailabilityLabel(availability) {
+        var labels = { available: "Available", busy: "Busy", blocked: "Blocked", paused: "Paused", offline: "Offline", unavailable: "Unavailable" };
+        return labels[availability] || "Unknown";
+      }
+
+      function missionStateLabel(state) {
+        var labels = { draft: "Draft", pending_approval: "Pending approval", approved: "Approved", active: "Active", running: "Running", paused: "Paused", completed: "Completed", failed: "Failed", cancelled: "Cancelled", blocked: "Blocked" };
+        return labels[state] || state || "Unknown";
+      }
+
+      function missionTone(state) {
+        if (state === "completed") return "success";
+        if (state === "failed" || state === "cancelled") return "critical";
+        if (state === "active" || state === "running" || state === "approved") return "running";
+        return "warning";
+      }
+
+      function taskStateTone(state) {
+        var tones = { not_started: "", ready: "", in_progress: "running", completed: "success", done: "success", blocked: "warning", failed: "critical", cancelled: "critical", waiting: "warning" };
+        return tones[state] || "";
+      }
+
+      function formatWhen(stamp) {
+        if (!stamp) return "—";
+        var date = new Date(stamp);
+        if (Number.isNaN(date.getTime())) return "—";
+        return date.toLocaleString();
+      }
+
+      function AgentCard(props) {
+        var agent = props.agent;
+        var caps = Array.isArray(agent.capabilities) ? agent.capabilities.slice(0, 4) : [];
+        return h(
+          "article",
+          { className: "glass-card interactive-card agent-card" },
+          h(
+            "div",
+            { className: "agent-card-top" },
+            h("div", { className: "agent-avatar" }, icon("fa-user-astronaut")),
+            h("div", { style: { flex: 1, minWidth: 0 } }, h("h3", null, agent.display_name || "Unnamed agent"), h("p", null, agent.role_id ? "Role " + agent.role_id : "No role assigned"))
+          ),
+          h(
+            "div",
+            { className: "agent-meta-row" },
+            h("span", null, h(StatusBadge, { label: agentAvailabilityLabel(agent.availability), tone: agentTone(agent.availability) })),
+            h("span", null, icon("fa-layer-group"), "v" + (agent.config_version || 1)),
+            h("span", null, icon("fa-arrow-trend-up"), "Load " + (agent.maximum_workload || 0))
+          ),
+          caps.length ? h("div", { className: "agent-capabilities" }, caps.map(function (cap) { return h("span", { className: "agent-capability", key: cap }, cap); })) : h("p", { className: "os-subnote" }, "No capabilities declared."),
+          h(
+            "div",
+            { className: "agent-card-actions" },
+            h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(agent); } }, "Open workspace")
+          )
+        );
+      }
+
+      function AgentsDirectoryView(props) {
+        var query = (props.search || "").toLowerCase();
+        var filtered = props.agents.filter(function (agent) {
+          if (!query) return true;
+          var name = String(agent.display_name || "").toLowerCase();
+          var role = String(agent.role_id || "").toLowerCase();
+          var caps = (Array.isArray(agent.capabilities) ? agent.capabilities : []).join(" ").toLowerCase();
+          return name.indexOf(query) >= 0 || role.indexOf(query) >= 0 || caps.indexOf(query) >= 0;
+        });
+        return h(
+          React.Fragment,
+          null,
+          h(
+            "div",
+            { className: "agents-toolbar" },
+            h(
+              "div",
+              { className: "agents-search" },
+              icon("fa-magnifying-glass"),
+              h("input", { type: "search", value: props.search, onChange: function (event) { props.onSearch(event.target.value); }, placeholder: "Search agents, roles, or capabilities…", "aria-label": "Search agents" })
+            ),
+            h("span", { className: "agents-count" }, filtered.length + " of " + props.agents.length + " agents")
+          ),
+          filtered.length ? h("div", { className: "agent-card-grid" }, filtered.map(function (agent) { return h(AgentCard, { agent: agent, key: agent.agent_id, onOpen: props.onOpen }); })) : h("div", { className: "os-empty" }, icon("fa-user-astronaut"), h("p", null, "No agents match this filter. Agents you configure appear here."), h("p", { className: "os-subnote" }, "Create an agent profile through the agent API, then refresh."))
+        );
+      }
+
+      function AgentDetailView(props) {
+        var agent = props.agent;
+        if (!agent) return h("div", { className: "os-empty" }, icon("fa-user-astronaut"), h("p", null, "Select an agent to open its workspace."));
+        var caps = Array.isArray(agent.capabilities) ? agent.capabilities : [];
+        var skills = Array.isArray(agent.skills) ? agent.skills : [];
+        var availabilityOptions = ["available", "busy", "paused", "offline"];
+        return h(
+          React.Fragment,
+          null,
+          h(
+            "div",
+            { className: "agent-detail-head" },
+            h("div", { className: "agent-avatar" }, icon("fa-user-astronaut")),
+            h("div", { style: { flex: 1 } }, h("h2", null, agent.display_name || "Unnamed agent"), h("p", null, agent.agent_id + " · role " + agent.role_id)),
+            h("div", { className: "os-button-row" }, availabilityOptions.map(function (option) {
+              return h("button", {
+                type: "button",
+                key: option,
+                className: "os-chip" + (agent.availability === option ? " active" : ""),
+                onClick: function () { props.onAvailability(agent.agent_id, option); }
+              }, agentAvailabilityLabel(option));
+            }))
+          ),
+          h(
+            "div",
+            { className: "agent-detail-grid" },
+            h(
+              "article",
+              { className: "glass-card" },
+              h("p", { className: "os-section-title" }, icon("fa-id-card"), "Profile"),
+              h("dl", { className: "os-property-list" },
+                h("div", { className: "os-property" }, h("dt", null, "Status"), h("dd", null, agent.status || "configured")),
+                h("div", { className: "os-property" }, h("dt", null, "Availability"), h("dd", null, agentAvailabilityLabel(agent.availability))),
+                h("div", { className: "os-property" }, h("dt", null, "Memory scope"), h("dd", null, agent.memory_scope || "mission_scoped")),
+                h("div", { className: "os-property" }, h("dt", null, "Max workload"), h("dd", null, String(agent.maximum_workload != null ? agent.maximum_workload : 0))),
+                h("div", { className: "os-property" }, h("dt", null, "Enabled"), h("dd", null, agent.enabled ? "Yes" : "No"))
+              )
+            ),
+            h(
+              "article",
+              { className: "glass-card" },
+              h("p", { className: "os-section-title" }, icon("fa-microchip"), "Capabilities"),
+              caps.length ? h("div", { className: "agent-capabilities" }, caps.map(function (cap) { return h("span", { className: "agent-capability", key: cap }, cap); })) : h("p", { className: "os-subnote" }, "No capabilities declared."),
+              skills.length ? h("div", { className: "os-list", style: { marginTop: 12 } }, skills.map(function (skill) {
+                return h("div", { className: "os-list-row", key: skill.capability || skill.skill }, h("div", { className: "os-list-row-main" }, h("strong", null, skill.capability || skill.skill), h("span", null, "Skill " + (skill.skill || "—") + " · confidence " + (skill.confidence || "unverified"))));
+              })) : null
+            ),
+            h(
+              "article",
+              { className: "glass-card" },
+              h("p", { className: "os-section-title" }, icon("fa-user-shield"), "Permissions"),
+              h("dl", { className: "os-property-list" },
+                h("div", { className: "os-property" }, h("dt", null, "Tool permissions"), h("dd", null, (Array.isArray(agent.tool_permissions) ? agent.tool_permissions : []).join(", ") || "—")),
+                h("div", { className: "os-property" }, h("dt", null, "Runtime restrictions"), h("dd", null, (Array.isArray(agent.runtime_restrictions) ? agent.runtime_restrictions : []).join(", ") || "—")),
+                h("div", { className: "os-property" }, h("dt", null, "Privacy restrictions"), h("dd", null, (Array.isArray(agent.privacy_restrictions) ? agent.privacy_restrictions : []).join(", ") || "—"))
+              )
+            )
+          )
+        );
+      }
+
+      function MissionRow(props) {
+        var mission = props.mission;
+        var progress = mission.progress || mission.status || "not_started";
+        return h(
+          "div",
+          { className: "os-list-row", tabIndex: 0, role: "button", onClick: function () { props.onOpen(mission); }, onKeyDown: function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); props.onOpen(mission); } } },
+          h("div", { className: "os-list-row-main" }, h("strong", null, mission.title || mission.objective || "Untitled mission"), h("span", null, mission.mission_id + " · " + missionStateLabel(progress))),
+          h("div", { className: "os-list-row-side" }, h(StatusBadge, { label: missionStateLabel(progress), tone: missionTone(progress) }), h("span", { className: "os-subnote" }, formatWhen(mission.updated_at)))
+        );
+      }
+
+      function MissionsView(props) {
+        var missions = props.missions || [];
+        var sorted = missions.slice().sort(function (a, b) { return String(b.updated_at || "").localeCompare(String(a.updated_at || "")); });
+        return h(
+          React.Fragment,
+          null,
+          h(
+            "div",
+            { className: "agents-toolbar" },
+            h("div", { style: { flex: 1 } }, h("h3", { className: "os-section-title", style: { margin: 0 } }, icon("fa-rocket"), "Missions")),
+            h("button", { type: "button", className: "primary-button", disabled: props.busy, onClick: props.onCreate }, icon("fa-plus"), props.busy ? "Creating…" : "Start run")
+          ),
+          sorted.length ? h("div", { className: "os-list" }, sorted.map(function (mission) { return h(MissionRow, { mission: mission, key: mission.mission_id, onOpen: props.onOpen }); })) : h("div", { className: "os-empty" }, icon("fa-rocket"), h("p", null, "No missions yet. Missions you draft appear here."), h("p", { className: "os-subnote" }, "Use “Start run” to draft a mission, then approve and start it."))
+        );
+      }
+
+      function MissionDetailView(props) {
+        var mission = props.mission;
+        var envelope = props.envelope;
+        if (!mission) return h("div", { className: "os-empty" }, icon("fa-rocket"), h("p", null, "Select a mission to open its run workspace."));
+        var objective = envelope && envelope.charter ? envelope.charter.objective : mission.objective;
+        return h(
+          React.Fragment,
+          null,
+          h(
+            "div",
+            { className: "agent-detail-head" },
+            h("div", { className: "agent-avatar" }, icon("fa-rocket")),
+            h("div", { style: { flex: 1 } }, h("h2", null, mission.title || "Untitled mission"), h("p", null, mission.mission_id + " · " + missionStateLabel(mission.progress || mission.status))),
+            h("div", { className: "os-button-row" },
+              h(StatusBadge, { label: missionStateLabel(mission.progress || mission.status), tone: missionTone(mission.progress || mission.status) }),
+              h("button", { type: "button", className: "secondary-button", onClick: function () { props.onAdvance("approve"); } }, "Approve"),
+              h("button", { type: "button", className: "primary-button", onClick: function () { props.onAdvance("start"); } }, "Start"),
+              h("button", { type: "button", className: "secondary-button", onClick: function () { props.onAdvance("plan"); } }, "Plan")
+            )
+          ),
+          h(
+            "div",
+            { className: "agent-detail-grid" },
+            h(
+              "article",
+              { className: "glass-card" },
+              h("p", { className: "os-section-title" }, icon("fa-bullseye"), "Objective"),
+              h("p", { className: "os-subnote", style: { color: "var(--text)", fontSize: 14, lineHeight: 1.55 } }, objective || "No objective set yet.")
+            ),
+            h(
+              "article",
+              { className: "glass-card" },
+              h("p", { className: "os-section-title" }, icon("fa-clipboard-check"), "Run details"),
+              h("dl", { className: "os-property-list" },
+                h("div", { className: "os-property" }, h("dt", null, "Progress"), h("dd", null, missionStateLabel(mission.progress || mission.status))),
+                h("div", { className: "os-property" }, h("dt", null, "Health"), h("dd", null, mission.health || "—")),
+                h("div", { className: "os-property" }, h("dt", null, "Priority"), h("dd", null, mission.priority || "normal")),
+                h("div", { className: "os-property" }, h("dt", null, "Risk"), h("dd", null, mission.risk || "low")),
+                h("div", { className: "os-property" }, h("dt", null, "Owner"), h("dd", null, mission.owner || "user"))
+              )
+            )
+          ),
+          h(
+            "article",
+            { className: "glass-card", style: { marginTop: 14 } },
+            h("p", { className: "os-section-title" }, icon("fa-diagram-project"), "Task graph"),
+            envelope && envelope.graph ? h(TaskGraphView, { graph: envelope.graph, selectedTaskId: props.selectedTaskId, selectedTask: props.selectedTask, onSelectTask: props.onSelectTask }) : h("div", { className: "os-empty", style: { padding: 20 } }, icon("fa-diagram-project"), h("p", null, "No task graph yet. Approve and start the mission, then request a plan to generate tasks."))
+          )
+        );
+      }
+
+      function graphLayout(graph) {
+        var tasks = Array.isArray(graph.tasks) ? graph.tasks : [];
+        var deps = Array.isArray(graph.dependencies) ? graph.dependencies : [];
+        var indexById = {};
+        tasks.forEach(function (task, index) { indexById[task.task_id] = index; });
+        var layers = {};
+        var byId = {};
+        tasks.forEach(function (task) { byId[task.task_id] = task; layers[task.task_id] = 0; });
+        var changed = true;
+        var guard = 0;
+        while (changed && guard < 64) {
+          changed = false;
+          guard += 1;
+          deps.forEach(function (dep) {
+            if (byId[dep.source_task_id] && byId[dep.target_task_id]) {
+              var next = layers[dep.source_task_id] + 1;
+              if (next > layers[dep.target_task_id]) {
+                layers[dep.target_task_id] = next;
+                changed = true;
+              }
+            }
+          });
+        }
+        var columnCount = 0;
+        tasks.forEach(function (task) { columnCount = Math.max(columnCount, layers[task.task_id]); });
+        var rowsByLayer = {};
+        tasks.forEach(function (task) {
+          var layer = layers[task.task_id];
+          if (!rowsByLayer[layer]) rowsByLayer[layer] = [];
+          rowsByLayer[layer].push(task.task_id);
+        });
+        var positions = {};
+        var nodeWidth = 178;
+        var nodeHeight = 58;
+        var gapX = 44;
+        var gapY = 26;
+        Object.keys(rowsByLayer).forEach(function (layer) {
+          var ids = rowsByLayer[layer];
+          var count = ids.length;
+          var startY = 24 - (count - 1) * (nodeHeight + gapY) / 2;
+          ids.forEach(function (taskId, rowIndex) {
+            positions[taskId] = {
+              x: 24 + Number(layer) * (nodeWidth + gapX),
+              y: startY + rowIndex * (nodeHeight + gapY)
+            };
+          });
+        });
+        return { tasks: tasks, deps: deps, positions: positions, layers: layers, width: 24 + (columnCount + 1) * (nodeWidth + gapX), height: 200 };
+      }
+
+      function edgeLine(a, b) {
+        var dx = b.x - a.x;
+        var dy = b.y - a.y;
+        var length = Math.sqrt(dx * dx + dy * dy);
+        var angle = Math.atan2(dy, dx) * 180 / Math.PI;
+        return { left: a.x, top: a.y, width: length, angle: angle };
+      }
+
+      function TaskGraphView(props) {
+        var graph = props.graph;
+        var layout = graphLayout(graph);
+        var critical = new Set(Array.isArray(graph.critical_path) ? graph.critical_path : []);
+        var edges = [];
+        layout.deps.forEach(function (dep) {
+          var source = layout.positions[dep.source_task_id];
+          var target = layout.positions[dep.target_task_id];
+          if (!source || !target) return;
+          edges.push({ dep: dep, line: edgeLine(source, target), critical: critical.has(dep.source_task_id) && critical.has(dep.target_task_id) });
+        });
+        return h(
+          React.Fragment,
+          null,
+          h(
+            "div",
+            { className: "task-graph-wrap" },
+            h(
+              "div",
+              { className: "task-graph", style: { width: layout.width + 48, height: layout.height + 48 } },
+              edges.map(function (edge, index) {
+                return h("div", {
+                  key: "edge-" + index,
+                  className: "graph-edge" + (edge.critical ? " critical" : ""),
+                  style: { left: edge.line.left + 89 + "px", top: edge.line.top + 29 + "px", width: edge.line.width + "px", transform: "rotate(" + edge.line.angle + "deg)" }
+                });
+              }),
+              layout.tasks.map(function (task) {
+                var pos = layout.positions[task.task_id];
+                var isCritical = critical.has(task.task_id);
+                return h(
+                  "div",
+                  {
+                    key: task.task_id,
+                    className: "graph-node" + (isCritical ? " critical" : "") + (props.selectedTaskId === task.task_id ? " selected" : ""),
+                    style: { left: pos.x + "px", top: pos.y + "px" },
+                    role: "button",
+                    tabIndex: 0,
+                    title: task.title + (isCritical ? " · critical path" : ""),
+                    onClick: function () { props.onSelectTask(task); },
+                    onKeyDown: function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); props.onSelectTask(task); } }
+                  },
+                  h("div", { className: "graph-node-title" }, h(StatusBadge, { label: task.status || "not_started", tone: taskStateTone(task.status) }), h("span", { style: { overflow: "hidden", textOverflow: "ellipsis" } }, task.title || task.task_id)),
+                  h("div", { className: "graph-node-meta" }, h("span", null, task.task_id.slice(0, 8)), h("span", null, task.assigned_agent ? task.assigned_agent : "unassigned"))
+                );
+              })
+            )
+          ),
+          h(
+            "div",
+            { className: "graph-legend" },
+            h("span", null, h("i", { className: "fa-solid fa-route" }), "Critical path highlighted"),
+            h("span", null, h("i", { className: "fa-solid fa-code-branch" }), (Array.isArray(graph.cycles) ? graph.cycles : []).length ? (graph.cycles.length + " cycle(s) detected") : "No dependency cycles"),
+            h("span", null, h("i", { className: "fa-solid fa-layer-group" }), "Deterministic layered layout")
+          ),
+          props.selectedTask ? h(
+            "article",
+            { className: "glass-card", style: { marginTop: 12 } },
+            h("p", { className: "os-section-title" }, icon("fa-list-check"), "Task details"),
+            h("div", { className: "os-table-wrap" }),
+            h("dl", { className: "os-property-list" },
+              h("div", { className: "os-property" }, h("dt", null, "Task"), h("dd", null, props.selectedTask.title || props.selectedTask.task_id)),
+              h("div", { className: "os-property" }, h("dt", null, "Status"), h("dd", null, props.selectedTask.status || "not_started")),
+              h("div", { className: "os-property" }, h("dt", null, "Assigned"), h("dd", null, props.selectedTask.assigned_agent || "unassigned")),
+              h("div", { className: "os-property" }, h("dt", null, "Risk"), h("dd", null, props.selectedTask.risk || "low")),
+              h("div", { className: "os-property" }, h("dt", null, "Objective"), h("dd", null, props.selectedTask.objective || "—"))
+            )
+          ) : null
+        );
+      }
+
+      function CouncilView(props) {
+        var overview = props.overview;
+        var debates = Array.isArray(overview && overview.debates) ? overview.debates : [];
+        var consultations = Array.isArray(overview && overview.consultations) ? overview.consultations : [];
+        var disagreements = Array.isArray(overview && overview.disagreements) ? overview.disagreements : [];
+        var consensus = Array.isArray(overview && overview.consensus) ? overview.consensus : [];
+        return h(
+          React.Fragment,
+          null,
+          h(
+            "div",
+            { className: "agents-toolbar" },
+            h("div", { style: { flex: 1 } }, h("h3", { className: "os-section-title", style: { margin: 0 } }, icon("fa-people-group"), "Council")),
+            h("button", { type: "button", className: "secondary-button", disabled: props.busy, onClick: function () { props.onThread("debate"); } }, "Debate"),
+            h("button", { type: "button", className: "secondary-button", disabled: props.busy, onClick: function () { props.onThread("consultation"); } }, "Consultation"),
+            h("button", { type: "button", className: "secondary-button", disabled: props.busy, onClick: function () { props.onThread("disagreement"); } }, "Disagreement"),
+            h("button", { type: "button", className: "secondary-button", disabled: props.busy, onClick: function () { props.onThread("consensus"); } }, "Consensus")
+          ),
+          debates.length || consultations.length || disagreements.length || consensus.length ? h(
+            "div",
+            { className: "council-grid" },
+            debates.slice(0, 3).map(function (debate) {
+              return h("article", { className: "glass-card council-card", key: debate.debate_id }, h("h3", null, "Debate"), h("p", null, debate.question || "No question recorded."), h("div", { className: "participants" }, h("span", null, "Round " + (debate.round_count || 0) + " of " + (debate.max_rounds || 4)), h("span", null, debate.state || "open")));
+            }),
+            consultations.slice(0, 3).map(function (consultation) {
+              return h("article", { className: "glass-card council-card", key: consultation.consultation_id }, h("h3", null, "Consultation"), h("p", null, consultation.question || "No question recorded."), h("div", { className: "participants" }, h("span", null, consultation.requester || "—"), h("span", null, "→"), h("span", null, consultation.specialist || "—"), h("span", null, consultation.state || "requested")));
+            }),
+            disagreements.slice(0, 3).map(function (disagreement) {
+              return h("article", { className: "glass-card council-card", key: disagreement.disagreement_id }, h("h3", null, "Disagreement"), h("p", null, disagreement.subject || "No subject recorded."), h("div", { className: "participants" }, h("span", null, (disagreement.participants || []).join(", ") || "—"), h("span", null, disagreement.state || "open")));
+            }),
+            consensus.slice(0, 3).map(function (result) {
+              return h("article", { className: "glass-card council-card", key: result.consensus_id }, h("h3", null, "Consensus"), h("p", null, result.subject || "No subject recorded."), h("div", { className: "participants" }, h("span", null, result.method || "—"), h("span", null, result.authority || "advisory")));
+            })
+          ) : h("div", { className: "os-empty" }, icon("fa-people-group"), h("p", null, "No council threads yet. Debates, consultations, disagreements, and consensus records appear here."), h("p", { className: "os-subnote" }, "Council data is loaded from the real agent collaboration endpoints."))
+        );
+      }
+
+      function memoryStateLabel(record) {
+        if (!record) return { label: "unknown", tone: "info" };
+        if (record.deletion_state && record.deletion_state !== "active") return { label: String(record.deletion_state), tone: "critical" };
+        if (record.claim_state === "rejected") return { label: "rejected", tone: "critical" };
+        if (record.conflict_state && record.conflict_state !== "none") return { label: "conflict", tone: "warning" };
+        if (record.superseded_state && record.superseded_state !== "none") return { label: "superseded", tone: "info" };
+        if (record.review_state === "proposed" || record.review_state === "in_review") return { label: "proposed", tone: "warning" };
+        if (record.claim_state === "accepted" || record.review_state === "accepted") return { label: "accepted", tone: "success" };
+        return { label: String(record.claim_state || "proposed"), tone: "info" };
+      }
+
+      function MemoryRecordCard(props) {
+        var record = props.record;
+        var state = memoryStateLabel(record);
+        return h(
+          "button",
+          { type: "button", className: "knowledge-record" + (props.selected ? " selected" : ""), onClick: props.onOpen, key: record.memory_id },
+          h("div", { className: "knowledge-record-head" }, h("strong", null, record.title || record.memory_id), h("span", { className: "knowledge-chip tone-" + state.tone }, state.label)),
+          h("p", null, record.content || "No content recorded."),
+          h(
+            "div",
+            { className: "knowledge-meta" },
+            h("span", { className: "knowledge-chip" }, icon("fa-layer-group"), record.primary_scope || "unknown"),
+            record.memory_type ? h("span", { className: "knowledge-chip" }, record.memory_type) : null,
+            record.confidence ? h("span", { className: "knowledge-chip" }, record.confidence) : null,
+            record.authority ? h("span", { className: "knowledge-chip" }, String(record.authority).replace(/_/g, " ")) : null
+          )
+        );
+      }
+
+      function MemoryDetail(props) {
+        var record = props.record;
+        if (!record) return h("div", { className: "os-empty" }, icon("fa-brain"), h("p", null, "Select a memory record to inspect its provenance, evidence, and lifecycle."));
+        var state = memoryStateLabel(record);
+        var provenance = record.source || {};
+        return h(
+          React.Fragment,
+          null,
+          h("div", { className: "agent-detail-head" }, h("div", { className: "agent-avatar" }, icon("fa-brain")), h("div", null, h("h2", null, record.title), h("p", { className: "os-subnote" }, record.memory_id + " · " + (record.memory_type || "memory") + " · v" + String(record.version || 1)))),
+          h("div", { className: "knowledge-meta", style: { marginBottom: 12 } }, h("span", { className: "knowledge-chip tone-" + state.tone }, state.label), h("span", { className: "knowledge-chip" }, icon("fa-lock"), record.privacy_classification || "private"), h("span", { className: "knowledge-chip" }, "embedding: " + String(record.embedding_state || "not_embedded"))),
+          h("div", { className: "os-code", style: { whiteSpace: "pre-wrap" } }, record.content),
+          h("p", { className: "os-section-title", style: { marginTop: 16 } }, icon("fa-circle-info"), "Provenance"),
+          h("dl", { className: "os-property-list" },
+            h("div", { className: "os-property" }, h("dt", null, "Kind"), h("dd", null, String(provenance.kind || "unknown"))),
+            h("div", { className: "os-property" }, h("dt", null, "Source"), h("dd", null, String(provenance.source || "unknown"))),
+            h("div", { className: "os-property" }, h("dt", null, "Method"), h("dd", null, String(provenance.method || "unknown"))),
+            h("div", { className: "os-property" }, h("dt", null, "Learned at"), h("dd", null, record.learned_at ? new Date(record.learned_at).toLocaleString() : "—")),
+            h("div", { className: "os-property" }, h("dt", null, "Authority"), h("dd", null, String(record.authority || "unknown"))),
+            h("div", { className: "os-property" }, h("dt", null, "Scope"), h("dd", null, String(record.primary_scope || "unknown")))
+          ),
+          h("p", { className: "os-section-title", style: { marginTop: 16 } }, icon("fa-link"), "Evidence"),
+          (record.evidence_ids && record.evidence_ids.length) ? h("div", { className: "os-list" }, record.evidence_ids.map(function (id, index) { return h("div", { className: "os-list-row", key: index }, h("div", { className: "os-list-row-main" }, h("strong", null, id), h("span", null, "evidence reference"))); })) : h("p", { className: "os-subnote" }, "No evidence references recorded."),
+          h("p", { className: "os-section-title", style: { marginTop: 16 } }, icon("fa-clock-rotate-left"), "Lifecycle"),
+          h("dl", { className: "os-property-list" },
+            h("div", { className: "os-property" }, h("dt", null, "Claim state"), h("dd", null, String(record.claim_state || "proposed"))),
+            h("div", { className: "os-property" }, h("dt", null, "Review state"), h("dd", null, String(record.review_state || "proposed"))),
+            h("div", { className: "os-property" }, h("dt", null, "Conflict"), h("dd", null, String(record.conflict_state || "none"))),
+            h("div", { className: "os-property" }, h("dt", null, "Superseded"), h("dd", null, String(record.superseded_state || "none"))),
+            h("div", { className: "os-property" }, h("dt", null, "Temporal"), h("dd", null, String(record.temporal_state || "currently_valid"))),
+            h("div", { className: "os-property" }, h("dt", null, "Retention"), h("dd", null, String(record.retention_mode || "indefinite"))),
+            record.expires_at ? h("div", { className: "os-property" }, h("dt", null, "Expires"), h("dd", null, new Date(record.expires_at).toLocaleString())) : null
+          ),
+          props.onForget ? h(
+            "div",
+            { className: "os-button-row", style: { marginTop: 16 } },
+            h("button", { type: "button", className: "secondary-button", onClick: function () { props.onCorrect(); } }, icon("fa-pen"), "Correct"),
+            h("button", { type: "button", className: "danger-button", onClick: function () { props.onForget(); } }, icon("fa-eraser"), "Forget")
+          ) : null
+        );
+      }
+
+      function MemoryView(props) {
+        var records = props.records || [];
+        var query = props.query || "";
+        var scope = props.scope || "";
+        var sub = props.subView;
+        var filtered = records;
+        if (query) {
+          var needle = query.toLowerCase();
+          filtered = filtered.filter(function (record) {
+            return (record.title || "").toLowerCase().indexOf(needle) >= 0 || (record.content || "").toLowerCase().indexOf(needle) >= 0;
+          });
+        }
+        if (scope) {
+          filtered = filtered.filter(function (record) { return record.primary_scope === scope; });
+        }
+        return h(
+          React.Fragment,
+          null,
+          h("div", { className: "agents-subnav", role: "tablist", "aria-label": "Memory workspaces" },
+            h("button", { type: "button", className: sub === "records" || sub === "detail" ? "active" : "", onClick: function () { props.onNavigate("records"); } }, icon("fa-list"), "Records"),
+            h("button", { type: "button", className: sub === "search" ? "active" : "", onClick: function () { props.onNavigate("search"); } }, icon("fa-magnifying-glass"), "Search"),
+            h("button", { type: "button", className: sub === "review" ? "active" : "", onClick: function () { props.onNavigate("review"); } }, icon("fa-clipboard-check"), "Review")
+          ),
+          sub === "search" ? h(SearchPanel, { onSearch: props.onSearch, results: props.searchResults, searching: props.searching, onOpen: props.onOpenRecord }) :
+          sub === "review" ? h(ReviewPanel, { items: props.reviewItems, onResolve: props.onResolve, busy: props.busy }) :
+          h(
+            "div",
+            { className: "knowledge-layout" },
+            h(
+              "div",
+              { className: "knowledge-sidebar" },
+              h(
+                "article",
+                { className: "glass-card" },
+                h("p", { className: "os-section-title" }, icon("fa-brain"), "Memory health"),
+                props.health ? h(
+                  "div",
+                  null,
+                  h(StatusBadge, { label: props.health.state || "unknown", tone: props.health.state === "healthy" ? "success" : "warning" }),
+                  h("dl", { className: "os-property-list knowledge-dense", style: { marginTop: 10 } },
+                    h("div", { className: "os-property" }, h("dt", null, "Accepted"), h("dd", null, String(props.health.diagnostics ? props.health.diagnostics.accepted : 0))),
+                    h("div", { className: "os-property" }, h("dt", null, "Proposed"), h("dd", null, String(props.health.diagnostics ? props.health.diagnostics.proposed : 0))),
+                    h("div", { className: "os-property" }, h("dt", null, "Conflicts"), h("dd", null, String(props.health.diagnostics ? props.health.diagnostics.unresolved_conflicts : 0))),
+                    h("div", { className: "os-property" }, h("dt", null, "Stale"), h("dd", null, String(props.health.diagnostics ? props.health.diagnostics.stale : 0)))
+                  )
+                ) : h("p", { className: "os-subnote" }, "Health data unavailable.")
+              ),
+              h(
+                "article",
+                { className: "glass-card" },
+                h("p", { className: "os-section-title" }, icon("fa-satellite-dish"), "Scope filter"),
+                h("select", { className: "os-field", value: scope, onChange: function (event) { props.onScope(event.target.value); }, "aria-label": "Filter by memory scope" },
+                  h("option", { value: "" }, "All scopes"),
+                  ["user", "workspace", "project", "repository", "agent", "mission", "task", "conversation", "organization"].map(function (item) { return h("option", { value: item, key: item }, item); })
+                )
+              ),
+              props.overview ? h(
+                "article",
+                { className: "glass-card" },
+                h("p", { className: "os-section-title" }, icon("fa-bell"), "Attention"),
+                h("div", { className: "os-property-list knowledge-dense" },
+                  h("div", { className: "os-property" }, h("dt", null, "Awaiting review"), h("dd", null, String(props.overview.awaiting_review || 0))),
+                  h("div", { className: "os-property" }, h("dt", null, "Expiring soon"), h("dd", null, String(props.overview.expiring_soon || 0))),
+                  h("div", { className: "os-property" }, h("dt", null, "Documents indexed"), h("dd", null, String(props.overview.documents_indexed || 0)))
+                )
+              ) : null
+            ),
+            h(
+              "div",
+              { className: "knowledge-panel glass-card", style: { padding: 16 } },
+              sub === "detail" && props.selectedRecord ? h(MemoryDetail, { record: props.selectedRecord, onCorrect: function () { props.onCorrect(props.selectedRecord); }, onForget: function () { props.onForget(props.selectedRecord); } }) :
+              h(
+                React.Fragment,
+                null,
+                h("div", { className: "knowledge-search-row" }, h("input", { className: "os-field", type: "search", placeholder: "Filter memory records by title or content", value: query, onChange: function (event) { props.onFilter(event.target.value); }, "aria-label": "Filter memory records" }), h("button", { type: "button", className: "primary-button", onClick: function () { props.onRefresh(); } }, icon("fa-rotate"), "Refresh")),
+                filtered.length ? h("div", null, filtered.slice(0, 200).map(function (record) { return h(MemoryRecordCard, { record: record, selected: props.selectedRecord && props.selectedRecord.memory_id === record.memory_id, onOpen: function () { props.onOpenRecord(record); } }); })) : h("div", { className: "knowledge-empty" }, "No memory records match. The memory platform records verified knowledge as agents and conversations produce it.")
+              )
+            )
+          )
+        );
+      }
+
+      function SearchPanel(props) {
+        var results = props.results || {};
+        var rows = results.results || [];
+        var queryPair = useState("");
+        var query = queryPair[0];
+        var setQuery = queryPair[1];
+        return h(
+          React.Fragment,
+          null,
+          h("div", { className: "knowledge-search-row" },
+            h("input", { className: "os-field", type: "search", placeholder: "Search the memory platform (token-overlap relevance)", value: query, onChange: function (event) { setQuery(event.target.value); }, onKeyDown: function (event) { if (event.key === "Enter") props.onSearch(query); }, "aria-label": "Search memory" }),
+            h("button", { type: "button", className: "primary-button", onClick: function () { props.onSearch(query); } }, icon("fa-magnifying-glass"), "Search")
+          ),
+          props.searching ? h("div", { className: "os-spinner" }, "Searching memory…") :
+          rows.length ? h(
+            "div",
+            { className: "knowledge-results" },
+            rows.map(function (result) {
+              return h("div", { className: "knowledge-result-card", key: result.result_id },
+                h("div", { className: "knowledge-result-card-head" }, h("strong", null, result.reason || result.memory_id), h("span", { className: "knowledge-score" }, Math.round((result.score || 0) * 100) + "%")),
+                h("p", null, "Scope: " + result.scope + " · Authority: " + result.authority + " · Confidence: " + result.confidence),
+                result.excerpt ? h("div", { className: "knowledge-snippet" }, result.excerpt) : null,
+                h("button", { type: "button", className: "text-button", style: { marginTop: 8 }, onClick: function () { props.onOpen(result); } }, icon("fa-eye"), "Open record")
+              );
+            })
+          ) : query ? h("div", { className: "knowledge-empty" }, "No memory results for that query.") : h("div", { className: "knowledge-empty" }, "Search uses the bounded token-overlap index on the real memory platform.")
+        );
+      }
+
+      function ReviewPanel(props) {
+        var items = props.items || [];
+        return h(
+          "div",
+          null,
+          items.length ? items.slice(0, 100).map(function (item) {
+            return h("div", { className: "knowledge-context-item", key: item.review_id },
+              h("div", { className: "knowledge-context-item-head" }, h("strong", null, item.reason || item.kind), h("span", { className: "knowledge-chip tone-" + (item.state === "open" ? "warning" : "info") }, String(item.state || "open"))),
+              h("p", null, "Kind: " + item.kind + " · Affected: " + (item.affected_ids || []).join(", ") + " · Proposed: " + String(item.proposed_action || "accept")),
+              h("div", { className: "os-button-row", style: { marginTop: 10 } },
+                h("button", { type: "button", className: "secondary-button", onClick: function () { props.onResolve(item.review_id, "accept"); } }, icon("fa-check"), "Accept"),
+                h("button", { type: "button", className: "secondary-button", onClick: function () { props.onResolve(item.review_id, "reject"); } }, icon("fa-xmark"), "Reject"),
+                h("button", { type: "button", className: "secondary-button", onClick: function () { props.onResolve(item.review_id, "defer"); } }, icon("fa-clock"), "Defer")
+              )
+            );
+          }) : h("div", { className: "knowledge-empty" }, "No review items are open. Review items surface proposals, conflicts, and corrections awaiting decision.")
+        );
+      }
+
+      function FilesView(props) {
+        var projects = props.projects || [];
+        var artifacts = props.artifacts || [];
+        var sub = props.subView;
+        return h(
+          React.Fragment,
+          null,
+          h("div", { className: "agents-subnav", role: "tablist", "aria-label": "Files workspaces" },
+            h("button", { type: "button", className: sub === "projects" || sub === "browse" ? "active" : "", onClick: function () { props.onNavigate("projects"); } }, icon("fa-diagram-project"), "Projects"),
+            h("button", { type: "button", className: sub === "artifacts" ? "active" : "", onClick: function () { props.onNavigate("artifacts"); } }, icon("fa-box"), "Artifacts")
+          ),
+          sub === "artifacts" ? h(
+            "div",
+            { className: "glass-card", style: { padding: 16 } },
+            h("p", { className: "os-section-title" }, icon("fa-box"), "Agent artifacts"),
+            artifacts.length ? artifacts.slice(0, 100).map(function (artifact) {
+              return h("div", { className: "knowledge-result-card", key: artifact.artifact_id },
+                h("div", { className: "knowledge-result-card-head" }, h("strong", null, artifact.title), h("span", { className: "knowledge-chip" }, String(artifact.artifact_type || "artifact"))),
+                h("p", null, "Producer: " + artifact.producer + " · Version: " + String(artifact.version || 1) + " · Review: " + String(artifact.review_state || "unreviewed")),
+                artifact.project ? h("p", { style: { marginTop: 4 } }, "Project: " + artifact.project) : null
+              );
+            }) : h("div", { className: "knowledge-empty" }, "No artifacts registered yet. Artifacts are produced by agent missions.")
+          ) : h(
+            "div",
+            { className: "knowledge-layout" },
+            h(
+              "div",
+              { className: "knowledge-sidebar" },
+              h(
+                "article",
+                { className: "glass-card" },
+                h("p", { className: "os-section-title" }, icon("fa-diagram-project"), "Registered projects"),
+                projects.length ? h("div", { className: "os-list" }, projects.map(function (project) {
+                  return h("button", { type: "button", className: "os-list-row" + (props.selectedProject && props.selectedProject.project_id === project.project_id ? " selected" : ""), key: project.project_id, onClick: function () { props.onOpenProject(project); } },
+                    h("div", { className: "os-list-row-main" }, h("strong", null, project.name), h("span", null, project.path)));
+                })) : h("p", { className: "os-subnote" }, "No engineering projects registered.")
+              ),
+              h(
+                "article",
+                { className: "glass-card" },
+                h("p", { className: "os-section-title" }, icon("fa-lock"), "Privacy"),
+                h("p", { className: "os-subnote" }, "File content is served through the engineering API with secret masking. The browser never reads the VPS filesystem directly.")
+              )
+            ),
+            h(
+              "div",
+              { className: "knowledge-panel glass-card", style: { padding: 16 } },
+              props.selectedProject && props.selectedProject.project_id ? h(FilesBrowse, { project: props.selectedProject, listing: props.listing, content: props.content, loading: props.loading, onOpen: props.onOpenFile, onBack: props.onUp, path: props.path, onOpenContent: props.onOpenContent }) :
+              h("div", { className: "knowledge-empty" }, "Select a registered project to browse its files.")
+            )
+          )
+        );
+      }
+
+      function FilesBrowse(props) {
+        var listing = props.listing;
+        var entries = listing && Array.isArray(listing.entries) ? listing.entries : [];
+        return h(
+          React.Fragment,
+          null,
+          h("p", { className: "os-section-title" }, icon("fa-folder-open"), props.project.name),
+          props.content ? h(
+            React.Fragment,
+            null,
+            props.content.masked_secrets > 0 ? h("div", { className: "knowledge-masked-note" }, icon("fa-shield-halved"), "This document had " + props.content.masked_secrets + " secret value(s) masked by the engineering API.") : null,
+            h("div", { className: "knowledge-code" }, props.content.content)
+          ) : props.loading ? h("div", { className: "os-spinner" }, "Loading…") : (
+            entries.length ? h("div", { className: "knowledge-files-grid" }, entries.map(function (entry) {
+              var isDir = entry.kind === "directory";
+              return h("button", { type: "button", className: "knowledge-file-card", key: entry.path, onClick: function () { props.onOpen(entry); } },
+                icon(isDir ? "fa-folder" : "fa-file-lines"),
+                h("strong", null, entry.name),
+                h("small", null, isDir ? "directory" : (entry.size || 0) + " bytes" + (entry.language ? " · " + entry.language : "") + (entry.is_secret ? " · masked" : "")));
+            })) : h("div", { className: "knowledge-empty" }, "This directory is empty.")
+          ),
+          h("button", { type: "button", className: "text-button", style: { marginTop: 12 }, onClick: props.onBack }, icon("fa-arrow-left"), "Back")
+        );
+      }
+
+      function SearchView(props) {
+        var queryPair = useState("");
+        var query = queryPair[0];
+        var setQuery = queryPair[1];
+        var results = props.results || null;
+        return h(
+          React.Fragment,
+          null,
+          h("div", { className: "knowledge-search-row" },
+            h("input", { className: "os-field", type: "search", placeholder: "Search memory, project files, agents, and artifacts", value: query, onChange: function (event) { setQuery(event.target.value); }, onKeyDown: function (event) { if (event.key === "Enter") props.onSearch(query); }, "aria-label": "Universal search" }),
+            h("button", { type: "button", className: "primary-button", onClick: function () { props.onSearch(query); } }, icon("fa-magnifying-glass"), "Search")
+          ),
+          props.searching ? h("div", { className: "os-spinner" }, "Searching across JoeOS…") :
+          results ? h(
+            "div",
+            { className: "knowledge-results" },
+            results.groups.map(function (group, groupIndex) {
+              return h("div", { key: groupIndex },
+                h("div", { className: "knowledge-group-title" }, icon(group.icon), group.label + " (" + group.items.length + ")"),
+                group.items.map(function (item) {
+                  return h("div", { className: "knowledge-result-card", key: item.id },
+                    h("div", { className: "knowledge-result-card-head" }, h("strong", null, item.title), item.score != null ? h("span", { className: "knowledge-score" }, Math.round(item.score * 100) + "%") : null),
+                    h("p", null, item.detail),
+                    item.snippet ? h("div", { className: "knowledge-snippet" }, item.snippet) : null
+                  );
+                })
+              );
+            })
+          ) : h("div", { className: "knowledge-empty" }, "Universal search runs against the real memory search API and registered project indexes. Results respect scope and permissions.")
+        );
+      }
+
+      function ContextView(props) {
+        var pack = props.pack;
+        return h(
+          React.Fragment,
+          null,
+          h("div", { className: "agents-subnav", role: "tablist", "aria-label": "Context workspaces" },
+            h("button", { type: "button", className: "active", onClick: function () {} }, icon("fa-layer-group"), "Knowledge workspace")
+          ),
+          h(
+            "div",
+            { className: "knowledge-layout" },
+            h(
+              "div",
+              { className: "knowledge-sidebar" },
+              h(
+                "article",
+                { className: "glass-card" },
+                h("p", { className: "os-section-title" }, icon("fa-shield-halved"), "Knowledge boundaries"),
+                h("div", { className: "os-list" },
+                  h("div", { className: "os-list-row" }, h("div", { className: "os-list-row-main" }, h("strong", null, "Secrets excluded"), h("span", null, "Hidden reasoning and secrets are never stored."))),
+                  h("div", { className: "os-list-row" }, h("div", { className: "os-list-row-main" }, h("strong", null, "Chain-of-thought excluded"), h("span", null, "Reasoning traces are not surfaced."))),
+                  h("div", { className: "os-list-row" }, h("div", { className: "os-list-row-main" }, h("strong", null, "Scope bounded"), h("span", null, "Context is limited to your approved workspaces.")))
+                )
+              ),
+              h(
+                "article",
+                { className: "glass-card" },
+                h("p", { className: "os-section-title" }, icon("fa-circle-info"), "Sources"),
+                h("p", { className: "os-subnote" }, "Each context item carries its memory id, reason, authority, confidence, and evidence references."),
+                props.overview ? h("dl", { className: "os-property-list knowledge-dense", style: { marginTop: 10 } },
+                  h("div", { className: "os-property" }, h("dt", null, "Active context"), h("dd", null, String(props.overview.active_context_count || 0))),
+                  h("div", { className: "os-property" }, h("dt", null, "Stale memories"), h("dd", null, String(props.overview.stale_memories || 0)))
+                ) : null
+              )
+            ),
+            h(
+              "div",
+              { className: "knowledge-panel glass-card", style: { padding: 16 } },
+              h("p", { className: "os-section-title" }, icon("fa-layer-group"), "Recent memory context"),
+              (pack && Array.isArray(pack) && pack.length) ? pack.map(function (record, index) {
+                return h("div", { className: "knowledge-context-item", key: record.memory_id || index },
+                  h("div", { className: "knowledge-context-item-head" }, h("strong", null, record.title || record.memory_id), h("span", { className: "knowledge-chip tone-info" }, String(record.primary_scope || "memory"))),
+                  h("p", null, (record.content || "").slice(0, 220))
+                );
+              }) : h("div", { className: "knowledge-empty" }, "Context surfaces the highest-authority memory records available to your workspaces.")
+            )
+          )
+        );
+      }
+
+      function KnowledgeSection(props) {
+        var kind = props.kind || "memory";
+        var subtitle = kind === "files" ? "Registered projects, files, and artifacts" : kind === "search" ? "Universal search across memory and project files" : kind === "context" ? "Knowledge workspace and sources" : "Recorded knowledge, provenance, and evidence";
+        var title = kind === "files" ? "Files" : kind === "search" ? "Search" : kind === "context" ? "Context" : "Memory";
+        var kicker = kind === "files" ? "Knowledge layer" : kind === "search" ? "Knowledge layer" : kind === "context" ? "Knowledge layer" : "Knowledge layer";
+        var iconName = kind === "files" ? "fa-folder-open" : kind === "search" ? "fa-magnifying-glass" : kind === "context" ? "fa-layer-group" : "fa-brain";
+        var actions = h("button", { type: "button", className: "primary-button", onClick: function () { props.onRefresh(); } }, icon("fa-rotate"), "Refresh");
+        return h(
+          React.Fragment,
+          null,
+          h(SectionHeader, { kicker: kicker, title: title, description: subtitle + ". All data is loaded from the live /api/v1 memory, engineering, and agents contracts.", actions: actions }),
+          kind === "files" ? h(FilesView, props) :
+          kind === "search" ? h(SearchView, props) :
+          kind === "context" ? h(ContextView, props) :
+          h(MemoryView, props)
+        );
+      }
+
+      function AgentsSection(props) {
+        var overview = props.overview;
+        var health = props.health;
+        var attention = Array.isArray(overview && overview.attention) ? overview.attention : [];
+        var subView = props.subView;
+        var subtitle = subView === "agent" ? (props.selectedAgent ? props.selectedAgent.display_name : "Agent workspace") : subView === "mission" ? (props.selectedMission ? props.selectedMission.title : "Run workspace") : subView === "missions" ? "Missions and runs" : subView === "council" ? "Council threads" : "Agent directory";
+        return h(
+          React.Fragment,
+          null,
+          h(SectionHeader, {
+            kicker: "Multi-agent organization",
+            title: "Agents",
+            description: subtitle + ". All data is loaded from the live /api/v1/agents contracts.",
+            actions: h(
+              React.Fragment,
+              null,
+              h("button", { type: "button", className: "primary-button", onClick: function () { props.onRefresh(); } }, icon("fa-rotate"), "Refresh"),
+              h("button", { type: "button", className: "secondary-button", onClick: function () { props.onCreate(); } }, icon("fa-plus"), "Start run")
+            )
+          }),
+          h("div", { className: "agents-subnav", role: "tablist", "aria-label": "Agents workspaces" },
+            h("button", { type: "button", className: (subView === "directory" || subView === "agent") ? "active" : "", onClick: function () { props.onNavigate("directory"); } }, icon("fa-user-astronaut"), "Directory"),
+            h("button", { type: "button", className: (subView === "missions" || subView === "mission") ? "active" : "", onClick: function () { props.onNavigate("missions"); } }, icon("fa-rocket"), "Missions"),
+            h("button", { type: "button", className: subView === "council" ? "active" : "", onClick: function () { props.onNavigate("council"); } }, icon("fa-people-group"), "Council")
+          ),
+          h(
+            "div",
+            { className: "agents-layout" },
+            h(
+              "div",
+              { className: "agents-sidebar-card" },
+              h(
+                "article",
+                { className: "glass-card" },
+                h("p", { className: "os-section-title" }, icon("fa-heart-pulse"), "Organization health"),
+                health ? h(
+                  "div",
+                  { className: "os-health-bar" },
+                  h(StatusBadge, { label: health.state || "unknown", tone: health.state === "healthy" ? "success" : health.state === "attention_required" ? "warning" : "critical" }),
+                  h("div", { className: "os-health-fill" }, h("span", { style: { width: (health.active_missions > 0 ? Math.min(100, 100 - health.blocked_missions / Math.max(1, health.active_missions) * 100) : 0) + "%" } }))
+                ) : h("p", { className: "os-subnote" }, "Health data unavailable."),
+                health ? h(
+                  "dl",
+                  { className: "os-property-list", style: { marginTop: 10 } },
+                  h("div", { className: "os-property" }, h("dt", null, "Active missions"), h("dd", null, String(health.active_missions || 0))),
+                  h("div", { className: "os-property" }, h("dt", null, "Blocked"), h("dd", null, String(health.blocked_missions || 0))),
+                  h("div", { className: "os-property" }, h("dt", null, "Available agents"), h("dd", null, String(health.available_agents || 0))),
+                  h("div", { className: "os-property" }, h("dt", null, "Approval backlog"), h("dd", null, String(health.approval_backlog || 0))),
+                  h("div", { className: "os-property" }, h("dt", null, "Open escalations"), h("dd", null, String(health.open_escalations || 0)))
+                ) : null
+              ),
+              attention.length ? h(
+                "article",
+                { className: "glass-card", style: { marginTop: 14 } },
+                h("p", { className: "os-section-title" }, icon("fa-bell"), "Attention"),
+                h("div", { className: "os-chips" }, attention.map(function (item, index) { return h("span", { className: "os-chip", key: index }, item); }))
+              ) : null,
+              h(
+                "article",
+                { className: "glass-card", style: { marginTop: 14 } },
+                h("p", { className: "os-section-title" }, icon("fa-activity"), "Recent activity"),
+                props.activity.length ? h("div", { className: "os-list" }, props.activity.slice(0, 5).map(function (item, index) {
+                  return h("div", { className: "os-list-row", key: index }, h("div", { className: "os-list-row-main" }, h("strong", null, item.title || item.message || "Agent activity"), h("span", null, item.detail || item.detail || "")));
+                })) : h("p", { className: "os-subnote" }, "No agent activity recorded yet.")
+              )
+            ),
+            h(
+              "div",
+              { className: "glass-card", style: { padding: 16 } },
+              subView === "agent" ? h(AgentDetailView, { agent: props.selectedAgent, onAvailability: props.onAvailability, onOpen: props.onNavigate }) :
+              subView === "missions" ? h(MissionsView, { missions: props.missions, busy: props.busy, onCreate: props.onCreate, onOpen: props.onOpenMission }) :
+              subView === "mission" ? h(MissionDetailView, { mission: props.selectedMission, envelope: props.envelope, onAdvance: props.onAdvance, onOpen: props.onOpenMission, onSelectTask: props.onSelectTask, selectedTaskId: props.selectedTaskId, selectedTask: props.selectedTask }) :
+              subView === "council" ? h(CouncilView, { overview: props.overview, busy: props.busy, onThread: props.onThread }) :
+              h(AgentsDirectoryView, { agents: props.agents, search: props.search, onSearch: props.onSearch, onOpen: props.onOpenAgent })
+            )
+          )
+        );
+      }
+
       function App() {
         var activePair = useState(function () {
           try {
@@ -6384,6 +8267,103 @@
         var dropPair = useState(null);
         var dropTarget = dropPair[0];
         var setDropTarget = dropPair[1];
+        var agentsOverviewPair = useState(null);
+        var agentsOverview = agentsOverviewPair[0];
+        var setAgentsOverview = agentsOverviewPair[1];
+        var agentsAgentsPair = useState([]);
+        var agentsAgents = agentsAgentsPair[0];
+        var setAgentsAgents = agentsAgentsPair[1];
+        var agentsMissionsPair = useState([]);
+        var agentsMissions = agentsMissionsPair[0];
+        var setAgentsMissions = agentsMissionsPair[1];
+        var agentsHealthPair = useState(null);
+        var agentsHealth = agentsHealthPair[0];
+        var setAgentsHealth = agentsHealthPair[1];
+        var agentsActivityPair = useState([]);
+        var agentsActivity = agentsActivityPair[0];
+        var setAgentsActivity = agentsActivityPair[1];
+        var agentsSubViewPair = useState("directory");
+        var agentsSubView = agentsSubViewPair[0];
+        var setAgentsSubView = agentsSubViewPair[1];
+        var selectedAgentPair = useState(null);
+        var selectedAgent = selectedAgentPair[0];
+        var setSelectedAgent = selectedAgentPair[1];
+        var selectedMissionPair = useState(null);
+        var selectedMission = selectedMissionPair[0];
+        var setSelectedMission = selectedMissionPair[1];
+        var missionEnvelopePair = useState(null);
+        var missionEnvelope = missionEnvelopePair[0];
+        var setMissionEnvelope = missionEnvelopePair[1];
+        var agentSearchPair = useState("");
+        var agentSearch = agentSearchPair[0];
+        var setAgentSearch = agentSearchPair[1];
+        var agentBusyPair = useState(false);
+        var agentBusy = agentBusyPair[0];
+        var setAgentBusy = agentBusyPair[1];
+        var selectedGraphTaskPair = useState(null);
+        var selectedGraphTask = selectedGraphTaskPair[0];
+        var setSelectedGraphTask = selectedGraphTaskPair[1];
+
+        var memoryOverviewPair = useState(null);
+        var memoryOverview = memoryOverviewPair[0];
+        var setMemoryOverview = memoryOverviewPair[1];
+        var memoryHealthPair = useState(null);
+        var memoryHealth = memoryHealthPair[0];
+        var setMemoryHealth = memoryHealthPair[1];
+        var memoryRecordsPair = useState([]);
+        var memoryRecords = memoryRecordsPair[0];
+        var setMemoryRecords = memoryRecordsPair[1];
+        var memorySubViewPair = useState("records");
+        var memorySubView = memorySubViewPair[0];
+        var setMemorySubView = memorySubViewPair[1];
+        var memoryFilterPair = useState("");
+        var memoryFilter = memoryFilterPair[0];
+        var setMemoryFilter = memoryFilterPair[1];
+        var memoryScopePair = useState("");
+        var memoryScope = memoryScopePair[0];
+        var setMemoryScope = memoryScopePair[1];
+        var memorySelectedPair = useState(null);
+        var memorySelected = memorySelectedPair[0];
+        var setMemorySelected = memorySelectedPair[1];
+        var memorySearchResultsPair = useState(null);
+        var memorySearchResults = memorySearchResultsPair[0];
+        var setMemorySearchResults = memorySearchResultsPair[1];
+        var memorySearchingPair = useState(false);
+        var memorySearching = memorySearchingPair[0];
+        var setMemorySearching = memorySearchingPair[1];
+        var memoryReviewItemsPair = useState([]);
+        var memoryReviewItems = memoryReviewItemsPair[0];
+        var setMemoryReviewItems = memoryReviewItemsPair[1];
+        var filesProjectsPair = useState([]);
+        var filesProjects = filesProjectsPair[0];
+        var setFilesProjects = filesProjectsPair[1];
+        var filesSelectedProjectPair = useState(null);
+        var filesSelectedProject = filesSelectedProjectPair[0];
+        var setFilesSelectedProject = filesSelectedProjectPair[1];
+        var filesListingPair = useState(null);
+        var filesListing = filesListingPair[0];
+        var setFilesListing = filesListingPair[1];
+        var filesContentPair = useState(null);
+        var filesContent = filesContentPair[0];
+        var setFilesContent = filesContentPair[1];
+        var filesLoadingPair = useState(false);
+        var filesLoading = filesLoadingPair[0];
+        var setFilesLoading = filesLoadingPair[1];
+        var filesSubViewPair = useState("projects");
+        var filesSubView = filesSubViewPair[0];
+        var setFilesSubView = filesSubViewPair[1];
+        var filesArtifactsPair = useState([]);
+        var filesArtifacts = filesArtifactsPair[0];
+        var setFilesArtifacts = filesArtifactsPair[1];
+        var searchResultsPair = useState(null);
+        var searchResults = searchResultsPair[0];
+        var setSearchResults = searchResultsPair[1];
+        var searchSearchingPair = useState(false);
+        var searchSearching = searchSearchingPair[0];
+        var setSearchSearching = searchSearchingPair[1];
+        var contextPackPair = useState([]);
+        var contextPack = contextPackPair[0];
+        var setContextPack = contextPackPair[1];
 
         var menuButtonRef = useRef(null);
         var firstNavRef = useRef(null);
@@ -6553,6 +8533,381 @@
           }
         }
 
+        async function loadAgentsFromApi() {
+          try {
+            var overviewPayload = await requestJson("/api/v1/agents/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (overviewPayload && typeof overviewPayload === "object") {
+              setAgentsOverview(overviewPayload);
+              if (overviewPayload.health) setAgentsHealth(overviewPayload.health);
+              if (Array.isArray(overviewPayload.agents)) setAgentsAgents(overviewPayload.agents);
+              if (Array.isArray(overviewPayload.missions)) setAgentsMissions(overviewPayload.missions);
+            }
+          } catch (error) {
+            setAgentsOverview({ agents: [], missions: [], health: null, units: [], roles: [], attention: [], generated_at: null });
+            setAgentsAgents([]);
+            setAgentsMissions([]);
+          }
+          try {
+            var healthPayload = await requestJson("/api/v1/agents/health", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (healthPayload && typeof healthPayload === "object") setAgentsHealth(healthPayload);
+          } catch (error) {
+            if (!agentsHealth) setAgentsHealth(null);
+          }
+          try {
+            var activityPayload = await requestJson("/api/v1/agents/activity?limit=50", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (Array.isArray(activityPayload)) setAgentsActivity(activityPayload);
+          } catch (error) {
+            setAgentsActivity([]);
+          }
+        }
+
+        async function loadAgentsListFromApi() {
+          try {
+            var payload = await requestJson("/api/v1/agents/agents", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (Array.isArray(payload)) setAgentsAgents(payload);
+          } catch (error) {
+            setAgentsAgents([]);
+          }
+        }
+
+        async function loadMissionsFromApi() {
+          try {
+            var payload = await requestJson("/api/v1/agents/missions", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (Array.isArray(payload)) setAgentsMissions(payload);
+          } catch (error) {
+            setAgentsMissions([]);
+          }
+        }
+
+        async function loadMissionEnvelope(missionId) {
+          if (!missionId) return null;
+          try {
+            var payload = await requestJson("/api/v1/agents/missions/" + encodeURIComponent(missionId) + "/envelope", { cache: "no-store", headers: { Accept: "application/json" } });
+            setMissionEnvelope(payload);
+            return payload;
+          } catch (error) {
+            setMissionEnvelope(null);
+            notify("Mission envelope unavailable: " + error.message);
+            return null;
+          }
+        }
+
+        async function startAgentMission() {
+          if (agentBusy) return;
+          setAgentBusy(true);
+          try {
+            var created = await requestJson("/api/v1/agents/missions", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ title: "New mission", objective: "", owner: "user", sponsoring_user: "user", workspace: "personal", priority: "normal", status: "draft", scope: [], constraints: [], privacy_classification: "private", risk: "low", approved_tools: [], prohibited_tools: [], model_policy: "local_first", progress: "not_started", health: "healthy" }) });
+            if (created && created.mission_id) {
+              setSelectedMission(created);
+              setMissionEnvelope({ mission: created });
+              setAgentsSubView("mission");
+              loadMissionsFromApi();
+              notify("Mission drafted. Fill the objective, then approve and start it.");
+            }
+          } catch (error) {
+            notify("Mission creation failed: " + error.message);
+          } finally {
+            setAgentBusy(false);
+          }
+        }
+
+        async function updateMissionObjective(missionId, objective) {
+          try {
+            var payload = await requestJson("/api/v1/agents/missions/" + encodeURIComponent(missionId) + "/charter", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ objective: objective, risk: "low", budget: {}, proposed_agents: [], proposed_tools: [], expected_artifacts: [], expected_validation: [], expected_user_decisions: [] }) });
+            loadMissionEnvelope(missionId);
+            notify("Charter saved. Approve and start to begin planning.");
+            return payload;
+          } catch (error) {
+            notify("Charter save failed: " + error.message);
+            return null;
+          }
+        }
+
+        async function advanceMission(missionId, action) {
+          if (!missionId) return;
+          try {
+            if (action === "approve") {
+              await requestJson("/api/v1/agents/missions/" + encodeURIComponent(missionId) + "/approve", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: "{}" });
+              notify("Mission approved.");
+            } else if (action === "start") {
+              await requestJson("/api/v1/agents/missions/" + encodeURIComponent(missionId) + "/start", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: "{}" });
+              notify("Mission started.");
+            } else if (action === "plan") {
+              await requestJson("/api/v1/agents/missions/" + encodeURIComponent(missionId) + "/plan", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ mission_id: missionId }) });
+              notify("Planning pass requested.");
+            }
+            loadMissionEnvelope(missionId);
+            loadMissionsFromApi();
+          } catch (error) {
+            notify("Mission " + action + " failed: " + error.message);
+          }
+        }
+
+        async function selectAgentFromApi(agentId) {
+          try {
+            var payload = await requestJson("/api/v1/agents/agents/" + encodeURIComponent(agentId), { cache: "no-store", headers: { Accept: "application/json" } });
+            setSelectedAgent(payload);
+            return payload;
+          } catch (error) {
+            notify("Agent profile unavailable: " + error.message);
+            return null;
+          }
+        }
+
+        async function setAgentAvailability(agentId, availability) {
+          try {
+            var payload = await requestJson("/api/v1/agents/agents/" + encodeURIComponent(agentId) + "/availability", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ availability: availability }) });
+            setSelectedAgent(payload);
+            setAgentsAgents(function (current) {
+              return current.map(function (agent) { return agent.agent_id === agentId ? Object.assign({}, agent, { availability: availability }) : agent; });
+            });
+            notify("Agent availability set to " + availability + ".");
+            return payload;
+          } catch (error) {
+            notify("Availability update failed: " + error.message);
+            return null;
+          }
+        }
+
+        async function openCouncilThread(kind) {
+          setAgentBusy(true);
+          try {
+            var body = { subject: "New " + kind + " thread", participants: [], mission_id: null, task_id: null };
+            var url = "/api/v1/agents/";
+            if (kind === "debate") url += "debates";
+            else if (kind === "consultation") url += "consultations";
+            else if (kind === "disagreement") url += "disagreements";
+            else url += "consensus";
+            body.kind = kind;
+            var payload = await requestJson(url, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify(body) });
+            notify((kind.charAt(0).toUpperCase() + kind.slice(1)) + " opened.");
+            loadAgentsFromApi();
+            return payload;
+          } catch (error) {
+            notify("Council thread failed: " + error.message);
+            return null;
+          } finally {
+            setAgentBusy(false);
+          }
+        }
+
+        function openAgentDirectory() {
+          setSelectedAgent(null);
+          setSelectedMission(null);
+          setMissionEnvelope(null);
+          setAgentsSubView("directory");
+        }
+
+        function openAgentDetail(agent) {
+          setSelectedAgent(agent);
+          setAgentsSubView("agent");
+          if (agent && agent.agent_id) selectAgentFromApi(agent.agent_id);
+        }
+
+        function openMission(mission) {
+          setSelectedMission(mission);
+          setAgentsSubView("mission");
+          if (mission && mission.mission_id) loadMissionEnvelope(mission.mission_id);
+        }
+
+        async function loadMemoryFromApi() {
+          try {
+            var overviewPayload = await requestJson("/api/v1/memory/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (overviewPayload && typeof overviewPayload === "object") {
+              setMemoryOverview(overviewPayload);
+              if (overviewPayload.health) setMemoryHealth(overviewPayload.health);
+            }
+          } catch (error) {
+            setMemoryOverview(null);
+            setMemoryHealth(null);
+          }
+          try {
+            var recordsPayload = await requestJson("/api/v1/memory/records?limit=500", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (Array.isArray(recordsPayload)) setMemoryRecords(recordsPayload);
+          } catch (error) {
+            setMemoryRecords([]);
+          }
+          try {
+            var reviewPayload = await requestJson("/api/v1/memory/review?state=open&limit=100", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (reviewPayload && Array.isArray(reviewPayload.items)) setMemoryReviewItems(reviewPayload.items);
+          } catch (error) {
+            setMemoryReviewItems([]);
+          }
+        }
+
+        async function searchMemoryRecords(query) {
+          if (!query || !String(query).trim()) {
+            setMemorySearchResults(null);
+            return;
+          }
+          setMemorySearching(true);
+          try {
+            var scopeQuery = memoryScope ? "&scope=" + encodeURIComponent(memoryScope) : "";
+            var payload = await requestJson("/api/v1/memory/search?q=" + encodeURIComponent(query) + scopeQuery + "&limit=25", { cache: "no-store", headers: { Accept: "application/json" } });
+            setMemorySearchResults(payload || { results: [] });
+          } catch (error) {
+            setMemorySearchResults({ results: [], error: error.message });
+          } finally {
+            setMemorySearching(false);
+          }
+        }
+
+        function openMemoryRecord(record) {
+          setMemorySelected(record);
+          setMemorySubView("detail");
+        }
+
+        async function correctMemoryRecord(record) {
+          var content = window.prompt("Corrected content for this memory record:", record ? record.content : "");
+          if (content === null || content === undefined) return;
+          if (!String(content).trim()) { notify("Corrected content cannot be empty."); return; }
+          try {
+            var payload = await requestJson("/api/v1/memory/records/" + encodeURIComponent(record.memory_id) + "/correct", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ content: content, reason: "corrected from browser workspace", changed_by: "browser-operator" }) });
+            setMemorySelected(payload);
+            loadMemoryFromApi();
+            notify("Memory corrected and versioned.");
+          } catch (error) {
+            notify("Correction failed: " + error.message);
+          }
+        }
+
+        async function forgetMemoryRecord(record) {
+          if (!window.confirm("Permanently delete this memory record? Evidence refs are marked for deletion.")) return;
+          try {
+            var payload = await requestJson("/api/v1/memory/records/" + encodeURIComponent(record.memory_id) + "/delete", { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ reason: "explicit browser forget" }) });
+            setMemorySelected(null);
+            setMemorySubView("records");
+            loadMemoryFromApi();
+            notify("Memory record marked for deletion.");
+          } catch (error) {
+            notify("Forget failed: " + error.message);
+          }
+        }
+
+        async function resolveMemoryReview(reviewId, action) {
+          try {
+            var payload = await requestJson("/api/v1/memory/review/" + encodeURIComponent(reviewId), { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ action: action, note: "resolved from browser workspace" }) });
+            notify("Review item " + (payload && payload.resolved ? "resolved." : "updated."));
+            loadMemoryFromApi();
+          } catch (error) {
+            notify("Review resolution failed: " + error.message);
+          }
+        }
+
+        async function loadFilesFromApi() {
+          try {
+            var projectsPayload = await requestJson("/api/v1/engineering/projects", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (projectsPayload && Array.isArray(projectsPayload.projects)) setFilesProjects(projectsPayload.projects);
+          } catch (error) {
+            setFilesProjects([]);
+          }
+          try {
+            var artifactsPayload = await requestJson("/api/v1/agents/artifacts?limit=200", { cache: "no-store", headers: { Accept: "application/json" } });
+            if (Array.isArray(artifactsPayload)) setFilesArtifacts(artifactsPayload);
+          } catch (error) {
+            setFilesArtifacts([]);
+          }
+        }
+
+        async function openProjectFiles(project) {
+          setFilesSelectedProject(project);
+          setFilesSubView("browse");
+          setFilesContent(null);
+          setFilesListing(null);
+          setFilesLoading(true);
+          try {
+            var listing = await requestJson("/api/v1/engineering/projects/" + encodeURIComponent(project.project_id) + "/files?path=", { cache: "no-store", headers: { Accept: "application/json" } });
+            setFilesListing(listing);
+          } catch (error) {
+            setFilesListing(null);
+            notify("Project file listing failed: " + error.message);
+          } finally {
+            setFilesLoading(false);
+          }
+        }
+
+        async function openFileEntry(entry) {
+          if (!entry) return;
+          if (entry.kind === "directory") {
+            setFilesContent(null);
+            setFilesLoading(true);
+            try {
+              var listing = await requestJson("/api/v1/engineering/projects/" + encodeURIComponent(filesSelectedProject.project_id) + "/files?path=" + encodeURIComponent(entry.path), { cache: "no-store", headers: { Accept: "application/json" } });
+              setFilesListing(listing);
+            } catch (error) {
+              notify("Directory listing failed: " + error.message);
+            } finally {
+              setFilesLoading(false);
+            }
+            return;
+          }
+          setFilesContent({ loading: true });
+          setFilesLoading(true);
+          try {
+            var content = await requestJson("/api/v1/engineering/projects/" + encodeURIComponent(filesSelectedProject.project_id) + "/files/content?path=" + encodeURIComponent(entry.path), { cache: "no-store", headers: { Accept: "application/json" } });
+            setFilesContent(content);
+          } catch (error) {
+            setFilesContent({ error: error.message });
+            notify("File read failed: " + error.message);
+          } finally {
+            setFilesLoading(false);
+          }
+        }
+
+        function backFileListing() {
+          setFilesContent(null);
+          setFilesListing(null);
+          setFilesSubView("projects");
+          setFilesSelectedProject(null);
+        }
+
+        async function runUniversalSearch(query) {
+          if (!query || !String(query).trim()) {
+            setSearchResults(null);
+            return;
+          }
+          setSearchSearching(true);
+          var groups = [];
+          try {
+            var memoryPayload = await requestJson("/api/v1/memory/search?q=" + encodeURIComponent(query) + "&limit=10", { cache: "no-store", headers: { Accept: "application/json" } });
+            var memoryItems = ((memoryPayload && memoryPayload.results) || []).map(function (result) {
+              return { id: result.result_id, title: result.reason || result.memory_id, detail: "Scope: " + result.scope + " · " + result.authority, score: result.score, snippet: result.excerpt };
+            });
+            groups.push({ label: "Memory", icon: "fa-brain", items: memoryItems });
+          } catch (error) {
+            groups.push({ label: "Memory", icon: "fa-brain", items: [] });
+          }
+          try {
+            var projectsPayload = await requestJson("/api/v1/engineering/projects", { cache: "no-store", headers: { Accept: "application/json" } });
+            var projects = (projectsPayload && Array.isArray(projectsPayload.projects)) ? projectsPayload.projects.slice(0, 5) : [];
+            var fileItems = [];
+            for (var i = 0; i < projects.length; i++) {
+              try {
+                var searchPayload = await requestJson("/api/v1/engineering/projects/" + encodeURIComponent(projects[i].project_id) + "/search?q=" + encodeURIComponent(query), { cache: "no-store", headers: { Accept: "application/json" } });
+                var results = (searchPayload && Array.isArray(searchPayload.results)) ? searchPayload.results.slice(0, 5) : [];
+                results.forEach(function (result) {
+                  fileItems.push({ id: projects[i].project_id + ":" + result.path + ":" + result.line, title: result.path, detail: projects[i].name + " · line " + result.line, snippet: result.snippet });
+                });
+              } catch (error) {}
+            }
+            groups.push({ label: "Project files", icon: "fa-file-lines", items: fileItems.slice(0, 20) });
+          } catch (error) {
+            groups.push({ label: "Project files", icon: "fa-file-lines", items: [] });
+          }
+          setSearchResults({ query: query, groups: groups.filter(function (group) { return group.items.length; }) });
+          setSearchSearching(false);
+        }
+
+        function openContextWorkspace() {
+          try {
+            requestJson("/api/v1/memory/records?scope=user&limit=50", { cache: "no-store", headers: { Accept: "application/json" } }).then(function (payload) {
+              if (Array.isArray(payload)) setContextPack(payload.slice(0, 20));
+            }).catch(function () { setContextPack([]); });
+          } catch (error) {
+            setContextPack([]);
+          }
+        }
+
         async function loadProductionFromApi() {
           try {
             var statusPayload = await requestJson("/api/v1/production/status", { cache: "no-store", headers: { Accept: "application/json" } });
@@ -6694,7 +9049,7 @@
           if (remoteRefreshRef.current) return;
           remoteRefreshRef.current = true;
           try {
-            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi(), loadSecurityFromApi(), loadPerformanceFromApi(), loadAiFromApi(), loadProductionFromApi(), loadSelfmaintenanceFromApi()]);
+            var results = await Promise.allSettled([loadMetricsFromApi(), loadBotsFromApi(), loadEventsFromApi(), loadPluginsFromApi(), loadAutomationFromApi(), loadCommunicationsFromApi(), loadWearablesFromApi(), loadMobileFromApi(), loadSecurityFromApi(), loadPerformanceFromApi(), loadAiFromApi(), loadProductionFromApi(), loadSelfmaintenanceFromApi(), loadAgentsFromApi(), loadMemoryFromApi(), loadFilesFromApi()]);
             var failures = results.filter(function (result) { return result.status === "rejected"; });
             if (failures.length) {
               if (results[0].status === "rejected") setRuntime({ online: false, status: "offline", model: null, version: null, message: "JoeOS telemetry API is unavailable" });
@@ -6932,9 +9287,90 @@
           setActive(id);
           setNotificationsOpen(false);
           try { window.localStorage.setItem("joeos:last-section", id); } catch (error) {}
+          if (window.history && window.history.pushState && OS_APPS[id]) {
+            var target = osRoutePath(id, []);
+            if (window.location.pathname !== target) {
+              try { window.history.pushState({ osApp: id }, "", target); } catch (error) {}
+            }
+          }
           if (mobileOpen) closeMobile();
           if (window.scrollTo) window.scrollTo({ top: 0, behavior: "smooth" });
         }
+
+        function applyOsRoute(route) {
+          if (!route) return;
+          if (route.unknown) return;
+          var appId = route.appId;
+          if (appId === "agents") {
+            setActive("agents");
+            try { window.localStorage.setItem("joeos:last-section", "agents"); } catch (error) {}
+            setSelectedAgent(null);
+            setSelectedMission(null);
+            setMissionEnvelope(null);
+            var first = route.segments[0] || "";
+            if (first === "council") setAgentsSubView("council");
+            else if (first === "missions") setAgentsSubView("missions");
+            else if (first === "agents" && route.segments[1]) {
+              setAgentsSubView("agent");
+              selectAgentFromApi(route.segments[1]);
+            } else if (first === "missions" && route.segments[1]) {
+              setAgentsSubView("mission");
+              loadMissionEnvelope(route.segments[1]);
+              loadMissionsFromApi().then(function () {
+                var mission = agentsMissions.find(function (item) { return item.mission_id === route.segments[1]; });
+                setSelectedMission(mission || { mission_id: route.segments[1] });
+              });
+            } else if (first === "agents") {
+              setAgentsSubView("directory");
+            } else {
+              setAgentsSubView("directory");
+            }
+          } else if (appId === "memory") {
+            setActive("memory");
+            try { window.localStorage.setItem("joeos:last-section", "memory"); } catch (error) {}
+            setMemorySelected(null);
+            setMemorySearchResults(null);
+            var memorySeg = route.segments[0] || "";
+            if (memorySeg === "search") setMemorySubView("search");
+            else if (memorySeg === "review") setMemorySubView("review");
+            else if (memorySeg && route.segments[1]) {
+              setMemorySubView("detail");
+              var matchRecord = memoryRecords.find(function (item) { return item.memory_id === memorySeg; });
+              setMemorySelected(matchRecord || { memory_id: memorySeg, title: "Memory record" });
+            } else setMemorySubView("records");
+          } else if (appId === "files") {
+            setActive("files");
+            try { window.localStorage.setItem("joeos:last-section", "files"); } catch (error) {}
+            setFilesContent(null);
+            setFilesSelectedProject(null);
+            setFilesListing(null);
+            setFilesSubView(route.segments[0] === "artifacts" ? "artifacts" : "projects");
+          } else if (appId === "search") {
+            setActive("search");
+            try { window.localStorage.setItem("joeos:last-section", "search"); } catch (error) {}
+            setSearchResults(null);
+            var searchQuery = route.segments[0] || "";
+            if (searchQuery) runUniversalSearch(searchQuery);
+          } else if (appId === "context") {
+            setActive("context");
+            try { window.localStorage.setItem("joeos:last-section", "context"); } catch (error) {}
+            openContextWorkspace();
+          } else if (OS_APPS[appId]) {
+            setActive(appId);
+            try { window.localStorage.setItem("joeos:last-section", appId); } catch (error) {}
+          }
+        }
+
+        useEffect(function () {
+          var initialRoute = parseOsRoute(window.location.pathname);
+          if (initialRoute) applyOsRoute(initialRoute);
+          function onPop() {
+            var route = parseOsRoute(window.location.pathname);
+            if (route) applyOsRoute(route);
+          }
+          window.addEventListener("popstate", onPop);
+          return function () { window.removeEventListener("popstate", onPop); };
+        }, []);
 
         function setWorkspaceWidgets(mutator) {
           setWorkspace(function (current) {
@@ -7306,6 +9742,16 @@
           { id: "settings", label: "Open Settings", detail: "Appearance, accessibility, and interface behavior", icon: "fa-sliders", shortcut: "Ctrl+,", category: "Navigation", run: function () { selectSection("settings"); } },
           { id: "shortcuts", label: "Open keyboard shortcuts", detail: "View the registered shortcut registry", icon: "fa-keyboard", shortcut: "?", category: "Help", run: function () { setShortcutsOpen(true); } },
           { id: "refresh", label: "Refresh VPS state", detail: "Reload telemetry, profiles, and local events", icon: "fa-rotate", category: "Commands", run: function () { refreshRemoteData(true); } },
+          { id: "agents-directory", label: "Open Agents directory", detail: "Browse agent profiles and availability", icon: "fa-user-astronaut", category: "Navigation", run: function () { selectSection("agents"); openAgentDirectory(); } },
+          { id: "agents-missions", label: "Open Agents missions", detail: "Browse mission runs and task graphs", icon: "fa-rocket", category: "Navigation", run: function () { selectSection("agents"); setSelectedAgent(null); setSelectedMission(null); setMissionEnvelope(null); setAgentsSubView("missions"); } },
+          { id: "agents-council", label: "Open Agents council", detail: "Debates, consultations, and consensus", icon: "fa-people-group", category: "Navigation", run: function () { selectSection("agents"); setSelectedAgent(null); setSelectedMission(null); setMissionEnvelope(null); setAgentsSubView("council"); } },
+          { id: "agents-refresh", label: "Refresh agent state", detail: "Reload the agent organization, missions, and activity", icon: "fa-rotate", category: "Commands", run: function () { loadAgentsFromApi(); loadAgentsListFromApi(); loadMissionsFromApi(); } },
+          { id: "memory-open", label: "Open Memory", detail: "Browse recorded knowledge, provenance, and evidence", icon: "fa-brain", category: "Navigation", run: function () { selectSection("memory"); } },
+          { id: "memory-search", label: "Search memory", detail: "Run a token-overlap query against the memory platform", icon: "fa-magnifying-glass", category: "Knowledge", run: function () { selectSection("memory"); setMemorySubView("search"); } },
+          { id: "files-open", label: "Open Files", detail: "Browse registered project files and artifacts", icon: "fa-folder-open", category: "Navigation", run: function () { selectSection("files"); } },
+          { id: "search-open", label: "Universal search", detail: "Search memory, project files, agents, and artifacts", icon: "fa-magnifying-glass", category: "Navigation", run: function () { selectSection("search"); } },
+          { id: "context-open", label: "Open Context", detail: "Knowledge workspace and sources", icon: "fa-layer-group", category: "Navigation", run: function () { selectSection("context"); openContextWorkspace(); } },
+          { id: "knowledge-refresh", label: "Refresh knowledge", detail: "Reload memory, files, and artifacts", icon: "fa-rotate", category: "Commands", run: function () { loadMemoryFromApi(); loadFilesFromApi(); } },
           { id: "stop", label: "Stop current operation", detail: "Cancel the active AI generation", icon: "fa-stop", shortcut: "Esc", category: "Commands", run: function () { cancelAssistant(); } },
           { id: "focus-content", label: "Focus main content", detail: "Move keyboard focus to the primary workspace", icon: "fa-up-right-and-down-left-from-center", category: "Commands", run: function () { var node = document.getElementById("main-content"); if (node) { node.setAttribute("tabindex", "-1"); node.focus(); } } },
           { id: "lockdown", label: "Open Security Center", detail: "Reach Lockdown and Emergency Stop", icon: "fa-shield-halved", risk: "security", category: "Security", run: function () { selectSection("security-center"); } }
@@ -7322,6 +9768,99 @@
           section = h(InfrastructureSection, { nodes: nodes, onInspect: setSelectedNode, onRefresh: refreshFleet });
         } else if (active === "security") {
           section = h(SecuritySection, { security: security, logs: logs, streamStatus: streamStatus, paused: logsPaused, logFilter: logFilter, onLogFilter: setLogFilter, onPause: toggleLogs, onClear: clearVisibleLogs, onExport: exportLogs, logRef: logRef });
+        } else if (active === "agents") {
+          section = h(AgentsSection, {
+            overview: agentsOverview,
+            health: agentsHealth,
+            agents: agentsAgents,
+            missions: agentsMissions,
+            activity: agentsActivity,
+            subView: agentsSubView,
+            selectedAgent: selectedAgent,
+            selectedMission: selectedMission,
+            envelope: missionEnvelope,
+            search: agentSearch,
+            busy: agentBusy,
+            onSearch: setAgentSearch,
+            onRefresh: loadAgentsFromApi,
+            onCreate: startAgentMission,
+            onNavigate: function (view) {
+              if (view === "directory") openAgentDirectory();
+              else if (view === "missions") { setSelectedAgent(null); setSelectedMission(null); setMissionEnvelope(null); setAgentsSubView("missions"); }
+              else if (view === "council") { setSelectedAgent(null); setSelectedMission(null); setMissionEnvelope(null); setAgentsSubView("council"); }
+            },
+            onOpenAgent: function (agent) { openAgentDetail(agent); },
+            onOpenMission: function (mission) { openMission(mission); },
+            onAvailability: setAgentAvailability,
+            onAdvance: function (action) { advanceMission(selectedMission && selectedMission.mission_id, action); },
+            onSelectTask: setSelectedGraphTask,
+            selectedTaskId: selectedGraphTask ? selectedGraphTask.task_id : null,
+            selectedTask: selectedGraphTask,
+            onThread: openCouncilThread
+          });
+        } else if (active === "memory") {
+          section = h(KnowledgeSection, {
+            kind: "memory",
+            overview: memoryOverview,
+            health: memoryHealth,
+            records: memoryRecords,
+            subView: memorySubView,
+            query: memoryFilter,
+            scope: memoryScope,
+            searchResults: memorySearchResults,
+            searching: memorySearching,
+            reviewItems: memoryReviewItems,
+            selectedRecord: memorySelected,
+            onRefresh: loadMemoryFromApi,
+            onNavigate: function (view) {
+              setMemorySelected(null);
+              setMemorySearchResults(null);
+              setMemorySubView(view);
+            },
+            onFilter: setMemoryFilter,
+            onScope: setMemoryScope,
+            onOpenRecord: openMemoryRecord,
+            onSearch: searchMemoryRecords,
+            onResolve: resolveMemoryReview,
+            onCorrect: correctMemoryRecord,
+            onForget: forgetMemoryRecord
+          });
+        } else if (active === "files") {
+          section = h(KnowledgeSection, {
+            kind: "files",
+            projects: filesProjects,
+            artifacts: filesArtifacts,
+            subView: filesSubView,
+            selectedProject: filesSelectedProject,
+            listing: filesListing,
+            content: filesContent,
+            loading: filesLoading,
+            path: "",
+            onRefresh: loadFilesFromApi,
+            onNavigate: function (view) {
+              setFilesSubView(view);
+              if (view === "projects") { setFilesContent(null); setFilesSelectedProject(null); setFilesListing(null); }
+            },
+            onOpenProject: openProjectFiles,
+            onOpen: openFileEntry,
+            onOpenContent: openFileEntry,
+            onUp: backFileListing
+          });
+        } else if (active === "search") {
+          section = h(KnowledgeSection, {
+            kind: "search",
+            results: searchResults,
+            searching: searchSearching,
+            onSearch: runUniversalSearch,
+            onRefresh: function () { loadMemoryFromApi(); loadFilesFromApi(); }
+          });
+        } else if (active === "context") {
+          section = h(KnowledgeSection, {
+            kind: "context",
+            pack: contextPack,
+            overview: memoryOverview,
+            onRefresh: openContextWorkspace
+          });
         } else if (active === "plugins") {
           section = h(PluginsSection, { plugins: plugins, safeMode: pluginSafeMode, onInspect: setSelectedPlugin });
         } else if (active === "automation") {

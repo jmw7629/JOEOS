@@ -1404,26 +1404,32 @@ async def lifespan(app: FastAPI):
     await asyncio.to_thread(app.state.conversation_service.recover_after_restart)
     from server.agents.execution import build_agent_executor
 
-    app.state.agent_executor = build_agent_executor(
-        app.state.ai_service,
-        default_model=_default_agent_model(app.state.ollama_state),
-    )
     app.state.action_service = ActionService(
         SQLiteControlStore(lambda: _connect(db_path)),
         device_repository=device_identity_repository,
-        agent_executor=app.state.agent_executor,
         event_sink=lambda level, source, message: _record_event(
             db_path, level, source, message
         ),
     )
     app.state.action_service.prepare()
     await asyncio.to_thread(app.state.action_service.recover_after_restart)
+    try:
+        activation_principal = await asyncio.to_thread(_activation_principal, app)
+    except Exception:  # noqa: BLE001 - pre-bootstrap/scratch DBs boot without activation
+        activation_principal = {}
+    app.state.activation_principal = activation_principal
+    app.state.agent_executor = build_agent_executor(
+        app.state.ai_service,
+        default_model=_default_agent_model(app.state.ollama_state),
+        principal=activation_principal,
+        control_service=app.state.action_service,
+    )
+    app.state.action_service._executor = app.state.agent_executor
     # Activate the production Agent Fabric: register Ollama, sync live models,
     # create the agent team bound to real models, and register safe read tools.
     try:
         from server.agents.activation import activate_agent_fabric
 
-        activation_principal = await asyncio.to_thread(_activation_principal, app)
         ollama_models = list((app.state.ollama_state or {}).get("models", []))
         app.state.agent_fabric_summary = await asyncio.to_thread(
             activate_agent_fabric,

@@ -287,3 +287,63 @@ class OverviewTests(AgentFixture):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ToolRunnerTests(unittest.TestCase):
+    def test_read_documentation_inside_docs(self):
+        from server.agents.tool_runner import tool_read_documentation
+        # A real doc path exists; input is docs-relative (no docs/ prefix).
+        text = tool_read_documentation("architecture/RELEASING.md")
+        self.assertIsInstance(text, str)
+        self.assertGreater(len(text), 0)
+
+    def test_read_documentation_valid_nested_path(self):
+        from server.agents.tool_runner import tool_read_documentation
+        text = tool_read_documentation("agents/GETTING_STARTED.md")
+        self.assertGreater(len(text), 0)
+        self.assertIn("getting started", text.lower())
+
+    def test_read_documentation_rejects_absolute_and_traversal(self):
+        from server.agents.tool_runner import tool_read_documentation
+        from server.actions.service import ActionDeniedError
+        for bad in ("/etc/passwd", "../README.md", "../../etc/passwd",
+                    "docs/../README.md", ".", ".."):
+            with self.assertRaises(ActionDeniedError, msg=bad):
+                tool_read_documentation(bad)
+
+    def test_read_documentation_not_found(self):
+        from server.agents.tool_runner import tool_read_documentation
+        from server.actions.service import ActionDeniedError
+        with self.assertRaises(ActionDeniedError):
+            tool_read_documentation("agents/definitely-not-a-real-file.md")
+
+    def test_parse_tool_calls(self):
+        from server.agents.execution import parse_tool_calls
+        calls = parse_tool_calls('{"name":"joeos.read_documentation","arguments":{"path":"agents/GETTING_STARTED.md"}}')
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["name"], "joeos.read_documentation")
+        self.assertEqual(parse_tool_calls("just plain text"), [])
+
+    def test_validate_and_execute_rejects_unknown_and_unsafe(self):
+        from server.agents.tool_runner import validate_and_execute
+        from server.actions.service import ActionDeniedError
+        with self.assertRaises(ActionDeniedError):
+            validate_and_execute("joeos.unknown", {}, principal={}, service=None)
+        with self.assertRaises(ActionDeniedError):
+            validate_and_execute("joeos.read_documentation", {"path": "$(rm -rf /)"},
+                                 principal={}, service=None)
+        with self.assertRaises(ActionDeniedError):
+            validate_and_execute("joeos.read_documentation", {"path": "x", "extra": 1},
+                                 principal={}, service=None)
+
+    def test_validate_and_execute_reads_doc(self):
+        from server.agents.tool_runner import validate_and_execute
+        text = validate_and_execute(
+            "joeos.read_documentation", {"path": "agents/GETTING_STARTED.md"},
+            principal={}, service=None,
+        )
+        self.assertGreater(len(text), 0)
+
+
+if __name__ == "__main__":
+    unittest.main()
