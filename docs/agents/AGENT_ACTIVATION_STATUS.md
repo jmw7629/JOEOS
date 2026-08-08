@@ -1,6 +1,6 @@
 # Agent Fabric Activation Status
 
-Date: 2026-08-08. Branch: `feature/agent-live-repair`.
+Date: 2026-08-08. Branch: `ai-rebuild` (merged from `feature/agent-live-repair`).
 
 ## Goal
 
@@ -79,12 +79,24 @@ Deferred browser audit findings (not agent blockers) remain on the backlog:
 CI/CD fabricated data, notification-center hardcoding, Back/Forward routing,
 HSTS, and the older shell's other cosmetic issues.
 
-## Deployment status
+## Deployment status — LIVE
 
-The feature branch `feature/agent-live-repair` is complete and pushed. The
-canonical `ai-rebuild` checkout carries unrelated uncommitted P3G work in files
-this branch also modifies (`joeos_backend.py`, `server/identity/*`). A safe
-merge requires that P3G work to be committed or set aside first; the live
-uvicorn on :8080 is the pre-activation backend and has not been restarted with
-this code. Until then the new console runs on the scratch/dev backend; the
-browser path is proven and reproducible.
+Deployed 2026-08-08 on `ai-rebuild` (HEAD `bbc3769`):
+
+- P3G in-progress work committed as `8bb28d6` (preserved, not discarded).
+- `feature/agent-live-repair` merged into `ai-rebuild` (`18cc289`); capability
+  conflicts resolved additively (kept both Agent Fabric and campaign sets).
+- Modern frontend built (`frontend_dist/index.html`, 445,332 bytes) and served
+  from the repo root.
+- Live uvicorn restarted with the new code (`:8080`, tmux session
+  `joeos-backend`); rollback manifest at `data/deploy/agent-deploy-rollback.txt`.
+- Runner daemon restarted (tmux session `joeos-runner`), active + heartbeating.
+- Ollama verified loopback-only (`127.0.0.1:11434`), healthy, public port closed.
+- Live routes verified: `/`, `/os/agents`, `/os/providers`, `/os/models` all 200.
+- Live canaries passed through the deployed browser:
+  - Architect run `fb2f4e73-…` succeeded (ollama / qwen2.5-coder:1.5b).
+  - Joe→Architect delegation parent `57baf316-…` + child `e29d7771-…` succeeded;
+    parent refresh preserves the result.
+  - TaskGraph run `66d4f702-…`: Analyze + Verify tasks succeeded with 2 child runs.
+  - ToolBroker `read_documentation` executed and returned real doc content.
+- Browser never contacts Ollama; zero console/page errors during canaries.
