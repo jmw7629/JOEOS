@@ -29,32 +29,36 @@ JOEOS_PROVIDER_DISPLAY = "Ollama (local)"
 # not used (the selection layer reports the actually-used model).
 #
 # Resource constraint (measured on the 2-vCPU / 7.8 GiB VPS): 14B models are
-# OOM-killed at load, so every binding uses a model that actually runs here.
-# The selection layer always reports the model actually used.
+# OOM-killed at load, and the 7B family only stays resident in isolation. Under
+# the combined backend+runtime load (e.g. a real run while the server is up)
+# the 7B llama-server is evicted/crashes, so the ACTIVE bindings use models
+# that reliably run on this host. The 7B family remains registered and can be
+# bound when more RAM is available. The selection layer always reports the
+# model actually used, so attribution stays honest.
 AGENT_MODELS = {
     "joeos.joe": {
-        "preferred": "qwen2.5-coder:7b-opencode-safe",
-        "fallback": "qwen2.5-coder:7b",
+        "preferred": "qwen2.5-coder:1.5b-opencode-safe",
+        "fallback": "qwen2.5-coder:1.5b",
     },
     "joeos.architect": {
-        "preferred": "qwen2.5-coder:7b-agentic",
-        "fallback": "qwen2.5-coder:7b",
+        "preferred": "qwen2.5-coder:1.5b",
+        "fallback": "qwen2.5-coder:1.5b-fast",
     },
     "joeos.builder": {
-        "preferred": "qwen2.5-coder:7b-opencode-safe",
+        "preferred": "qwen2.5-coder:1.5b-opencode-safe",
         "fallback": "qwen2.5-coder:1.5b-fast",
     },
     "joeos.researcher": {
-        "preferred": "qwen2.5-coder:7b",
-        "fallback": "qwen2.5-coder:1.5b",
+        "preferred": "qwen2.5-coder:1.5b",
+        "fallback": "qwen2.5-coder:1.5b-fast",
     },
     "joeos.verifier": {
-        "preferred": "qwen2.5-coder:7b-agentic",
-        "fallback": "qwen2.5-coder:7b",
+        "preferred": "qwen2.5-coder:1.5b",
+        "fallback": "qwen2.5-coder:1.5b-fast",
     },
     "joeos.security": {
-        "preferred": "qwen2.5-coder:7b-agentic",
-        "fallback": "qwen2.5-coder:1.5b",
+        "preferred": "qwen2.5-coder:1.5b",
+        "fallback": "qwen2.5-coder:1.5b-fast",
     },
 }
 

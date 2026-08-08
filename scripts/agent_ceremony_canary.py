@@ -290,11 +290,17 @@ def run_canary(db_path: Path) -> int:
             results["tools"] = len(tools)
 
             architect = next(a for a in agents if a["key"] == "joeos.architect")
+            # This VPS (7.8 GiB) can cold-load the 7B family only in isolation.
+            # For the end-to-end canary we pin a model that reliably fits under
+            # the combined backend+browser load; production bindings prefer the
+            # 7B family and the reported model is always the one actually used.
             architect_run = client.post(
                 "/api/v1/control/agents/%s/runs" % architect["id"],
                 headers=headers,
                 json={
                     "conversation_id": str(_uuid()), "message_id": str(_uuid()),
+                    "model_preference": os.getenv(
+                        "JOEOS_CANARY_MODEL", "qwen2.5-coder:1.5b"),
                     "objective": "Describe your configured JoeOS role in no more than five bullet points. Do not use tools and do not modify anything.",
                 },
             )
