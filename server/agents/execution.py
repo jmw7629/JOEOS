@@ -43,6 +43,18 @@ class OllamaAgentExecutor:
     def _run_tool(self, tool_key: str, arguments: Dict) -> str:
         if self._control_service is None:
             raise RuntimeError("control service unavailable for tool execution")
+        # qwen2.5 sometimes emits the bare tool name (read_documentation) instead
+        # of the registered key (joeos.read_documentation). Resolve unambiguously
+        # when exactly one registered tool matches the short name.
+        if tool_key not in ("joeos.read_documentation", "joeos.system_status",
+                            "joeos.list_agents", "joeos.read_memory", "joeos.search_knowledge"):
+            candidates = [
+                t for t in ("joeos.read_documentation", "joeos.system_status",
+                            "joeos.list_agents", "joeos.read_memory", "joeos.search_knowledge")
+                if t.endswith("." + tool_key)
+            ]
+            if len(candidates) == 1:
+                tool_key = candidates[0]
         return validate_and_execute(
             tool_key, arguments, principal=self._principal or {}, service=self._control_service,
         )
@@ -51,6 +63,17 @@ class OllamaAgentExecutor:
         """One model call; if the model proposes safe tool calls, execute them
         and continue (bounded rounds), then return the final answer."""
         working = list(messages)
+        if tools and not any(m.get("role") == "system" for m in working):
+            working = [{
+                "role": "system",
+                "content": (
+                    "You may call the provided tools. To request a tool call, "
+                    "respond with ONLY a JSON object of the form "
+                    '{"name": "<tool>", "arguments": {...}}. When you have a '
+                    "tool result, reply in plain natural language with the "
+                    "answer; do not emit JSON."
+                ),
+            }] + working
         token_usage = 0
         for _round in range(MAX_TOOL_ROUNDS + 1):
             if tools and _round < MAX_TOOL_ROUNDS:
@@ -94,7 +117,7 @@ class OllamaAgentExecutor:
                                  {"role": "user", "content": (
                                      "Tool results:\n" + "\n".join(
                                          "%s: %s" % (m["name"], m["content"]) for m in tool_messages
-                                     )
+                                     ) + "\n\nNow answer the original request in plain natural language only. Do not emit JSON or a tool call."
                                  )}]
         # Final non-tool call to produce the answer.
         result = await self._ai.ollama_provider.infer(
