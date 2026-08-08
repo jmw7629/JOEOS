@@ -17,17 +17,21 @@ capabilities are never asserted.
 | deepseek-r1:14b | 14.8B | Q4_K_M | 9.0GB | completion, thinking | **OOM on this VPS** |
 | deepseek-r1:14b-agentic | 14.8B | Q4_K_M | 9.0GB | completion, thinking | **OOM on this VPS** |
 
-## Production bindings (7.8 GiB constraint)
+## Production bindings (7.8 GiB constraint, measured)
+
+The 7B family stays resident only in isolation; under the combined
+backend+runtime load its llama-server is evicted/crashes (OOM-thrash). The
+ACTIVE bindings therefore use the 1.5B family, which runs reliably end-to-end.
+The 7B family remains registered and can be bound when more RAM is available.
 
 | Agent | Preferred | Fallback |
 | --- | --- | --- |
-| Joe | qwen2.5-coder:7b-opencode-safe | qwen2.5-coder:7b |
-| Architect | qwen2.5-coder:7b-agentic | qwen2.5-coder:7b |
-| Builder | qwen2.5-coder:7b-opencode-safe | qwen2.5-coder:1.5b-fast |
-| Researcher | qwen2.5-coder:7b | qwen2.5-coder:1.5b |
-| Verifier | qwen2.5-coder:7b-agentic | qwen2.5-coder:7b |
-| Security | qwen2.5-coder:7b-agentic | qwen2.5-coder:1.5b |
+| Joe | qwen2.5-coder:1.5b-opencode-safe | qwen2.5-coder:1.5b |
+| Architect | qwen2.5-coder:1.5b | qwen2.5-coder:1.5b-fast |
+| Builder | qwen2.5-coder:1.5b-opencode-safe | qwen2.5-coder:1.5b-fast |
+| Researcher | qwen2.5-coder:1.5b | qwen2.5-coder:1.5b-fast |
+| Verifier | qwen2.5-coder:1.5b | qwen2.5-coder:1.5b-fast |
+| Security | qwen2.5-coder:1.5b | qwen2.5-coder:1.5b-fast |
 
-The 14B models are registered but disabled-by-constraint; if more RAM is added
-they can be enabled and bound. The ModelRegistry reports the model actually
-used per run (`model_key`), never a claim.
+The 14B and 7B models are registered but resource-constrained; the ModelRegistry
+reports the model actually used per run (`model_key`), never a claim.
