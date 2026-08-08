@@ -29,6 +29,14 @@ from server.command_center import CommandCenterService, command_center_router
 from server.communications import CommunicationsService, communications_router
 from server.engineering import EngineeringService, engineering_router
 from server.engineering.campaign import CampaignService, CampaignStore, CampaignWorker, campaign_router
+from server.autonomous import (
+    AgentFabricAutomationExecutor,
+    AutomationNotifier,
+    AutonomousScheduler,
+    AutonomousService,
+    AutonomousStore,
+    autonomous_router,
+)
 from server.intelligence import IntelligenceService, intelligence_router
 from server.memory import MemoryService, memory_router
 from server.mobile import MobileService, mobile_router
@@ -423,6 +431,41 @@ def _default_agent_model(ollama_state: Optional[Dict[str, Any]]) -> str:
         if candidate in models:
             return candidate
     return "qwen2.5-coder:7b"
+
+
+def _principal_for_owner(app: FastAPI, owner_id: str) -> Dict[str, Any]:
+    """Resolve a principal for the automation owner from authoritative identity.
+
+    Used so background automations run with the SAME principal, capabilities,
+    tools, and policy boundaries as an interactive run by that owner."""
+    authority = getattr(app.state, "authority_service", None)
+    if authority is None:
+        return {}
+    users = authority.list_users()
+    if not any(str(u["id"]) == owner_id for u in users):
+        return {}
+    orgs = authority.list_organizations()
+    workspaces = authority.list_workspaces()
+    if not orgs or not workspaces:
+        return {}
+    try:
+        resolved = authority._repository.principal_roles_and_capabilities(
+            owner_id, orgs[0]["id"], workspaces[0]["id"]
+        )
+        capabilities = resolved.get("capabilities", [])
+        roles = resolved.get("roles", ["joeos.owner"])
+    except Exception:  # noqa: BLE001 - fall back to owner role only
+        capabilities = []
+        roles = ["joeos.owner"]
+    return {
+        "session_id": None,
+        "device_id": None,
+        "user": {"id": owner_id, "display_name": "Automation owner", "status": "active"},
+        "organization": {"id": orgs[0]["id"]},
+        "workspace": {"id": workspaces[0]["id"], "name": workspaces[0]["name"]},
+        "roles": roles,
+        "capabilities": sorted(capabilities),
+    }
 
 
 def _activation_principal(app: FastAPI) -> Dict[str, Any]:
@@ -861,6 +904,24 @@ def _campaign_worker_interval() -> float:
         return float(os.getenv("JOEOS_CAMPAIGN_WORKER_INTERVAL", "30"))
     except ValueError:  # pragma: no cover - defensive
         return 30.0
+
+
+def _autonomous_worker_enabled() -> bool:
+    return os.getenv("JOEOS_AUTONOMOUS_WORKER", "true").lower() in ("1", "true", "yes")
+
+
+def _autonomous_worker_interval() -> float:
+    try:
+        return float(os.getenv("JOEOS_AUTONOMOUS_WORKER_INTERVAL", "20"))
+    except ValueError:  # pragma: no cover - defensive
+        return 20.0
+
+
+def _autonomous_lease_seconds() -> int:
+    try:
+        return max(30, int(os.getenv("JOEOS_AUTONOMOUS_LEASE_SECONDS", "300")))
+    except ValueError:  # pragma: no cover - defensive
+        return 300
 
 
 def _campaign_stage_handler(app: FastAPI):
@@ -1447,6 +1508,24 @@ async def lifespan(app: FastAPI):
     except Exception as error:  # noqa: BLE001 - activation failure must not crash startup
         _record_event(db_path, "error", "agents",
                       "Agent Fabric activation failed: %s" % type(error).__name__)
+    # Autonomous operations: durable agent automations over the AgentFabric.
+    app.state.autonomous_service = AutonomousService(
+        AutonomousStore(str(db_path.parent / "autonomous")),
+        principal_resolver=lambda owner_id: _principal_for_owner(app, owner_id),
+        notification_sink=AutomationNotifier(
+            app.state.communications_service,
+        ).handle,
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+    )
+    app.state.autonomous_service.prepare()
+    await asyncio.to_thread(app.state.autonomous_service.recover_after_restart)
+    app.state.autonomous_executor = AgentFabricAutomationExecutor(
+        app.state.action_service,
+        principal_resolver=lambda owner_id: _principal_for_owner(app, owner_id),
+        default_model=_default_agent_model(app.state.ollama_state),
+    )
     app.state.runner_service = RunnerService(
         SQLiteRunnerStore(lambda: _connect(db_path)),
         installation_id=server_identity_repository.get_or_create_server_id,
@@ -1486,6 +1565,17 @@ async def lifespan(app: FastAPI):
         campaign_worker = asyncio.create_task(
             app.state.campaign_worker.run(), name="joeos-campaign-worker"
         )
+    autonomous_worker = None
+    if _autonomous_worker_enabled():
+        app.state.autonomous_scheduler = AutonomousScheduler(
+            app.state.autonomous_service,
+            app.state.autonomous_executor,
+            tick_interval_seconds=_autonomous_worker_interval(),
+            lease_seconds=_autonomous_lease_seconds(),
+        )
+        autonomous_worker = asyncio.create_task(
+            app.state.autonomous_scheduler.run(), name="joeos-autonomous-scheduler"
+        )
     try:
         yield
     finally:
@@ -1493,6 +1583,8 @@ async def lifespan(app: FastAPI):
         selfmaintenance.cancel()
         if campaign_worker is not None:
             campaign_worker.cancel()
+        if autonomous_worker is not None:
+            autonomous_worker.cancel()
         with suppress(asyncio.CancelledError):
             await collector
         with suppress(asyncio.CancelledError):
@@ -1500,6 +1592,9 @@ async def lifespan(app: FastAPI):
         if campaign_worker is not None:
             with suppress(asyncio.CancelledError):
                 await campaign_worker
+        if autonomous_worker is not None:
+            with suppress(asyncio.CancelledError):
+                await autonomous_worker
         await app.state.http.aclose()
         plugins_service = getattr(app.state, "plugins_service", None)
         if plugins_service is not None:
@@ -1528,6 +1623,7 @@ app.include_router(realtime_router)
 app.include_router(command_center_router)
 app.include_router(engineering_router)
 app.include_router(campaign_router)
+app.include_router(autonomous_router)
 app.include_router(intelligence_router)
 app.include_router(memory_router)
 app.include_router(agents_router)
@@ -1747,10 +1843,13 @@ def os_frontend(rest: str) -> FileResponse:
     """Serve the browser OS shell for /os/* deep links so a refresh keeps the route.
 
     The Agent Fabric console owns the agent-operations routes (/os/agents,
-    /os/providers, /os/models); all other /os/* deep links resolve to the shell."""
+    /os/providers, /os/models); the Automations console owns /os/automations;
+    all other /os/* deep links resolve to the shell."""
     head = (rest or "").split("/", 1)[0]
     if head in ("agents", "providers", "models"):
         return FileResponse(AGENT_FABRIC_PAGE_PATH, media_type="text/html")
+    if head == "automations":
+        return FileResponse(AUTOMATIONS_PAGE_PATH, media_type="text/html")
     return FileResponse(INDEX_PATH, media_type="text/html")
 
 
@@ -1775,6 +1874,7 @@ def browser_sdk() -> FileResponse:
 
 
 AGENT_FABRIC_PAGE_PATH = _package_asset("agent_fabric.html")
+AUTOMATIONS_PAGE_PATH = _package_asset("automations.html")
 
 
 @app.get("/healthz")

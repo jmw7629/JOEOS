@@ -54,6 +54,8 @@ class NotificationCenter:
         deduplication_key: str = "",
         grouping_key: str = "",
         source_type: str = "",
+        related_entity: str = "",
+        action_links: Tuple[str, ...] = (),
     ) -> NotificationRecord:
         notification_id = "notif_" + uuid.uuid4().hex[:16]
         now = _now()
@@ -62,16 +64,18 @@ class NotificationCenter:
         # A notification is never suppressed into nothing; DND only affects
         # interruption channels, never inbox persistence.
         channels = self._route_channels(category, severity, priority, urgency)
+        links_blob = "\n".join(link[:300] for link in action_links if link)
         with self._lock, self._connection_factory() as connection:
             connection.execute(
                 """
                 INSERT INTO comms_notifications (
                     notification_id, source, source_type, category, title, message,
                     severity, priority, urgency, privacy, project, mission, task, workflow,
-                    plugin, action_links, created_at, updated_at, delivery_channels,
-                    delivery_state, read_state, archive_state, mute_state, snooze_until,
-                    deduplication_key, grouping_key, escalation_policy, trace_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'private', ?, ?, ?, ?, ?, '', ?, ?, ?, 'created', 'delivered', 0, 0, '', ?, ?, '', '')
+                    plugin, related_entity, action_links, created_at, updated_at,
+                    delivery_channels, delivery_state, read_state, archive_state,
+                    mute_state, snooze_until, deduplication_key, grouping_key,
+                    escalation_policy, trace_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'private', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'created', 'delivered', 0, 0, '', ?, ?, '', '')
                 """,
                 (
                     notification_id,
@@ -88,6 +92,8 @@ class NotificationCenter:
                     task,
                     workflow,
                     plugin,
+                    related_entity[:300],
+                    links_blob,
                     now,
                     now,
                     json.dumps(channels),
