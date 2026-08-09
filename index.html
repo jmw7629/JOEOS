@@ -7085,7 +7085,7 @@
             h("div", { className: "assistant-head-copy" }, h("strong", null, "JoeOS Local AI"), h("span", null, runtimeLabel(props.runtime))),
             h("div", { className: "assistant-head-actions" }, h("button", { type: "button", onClick: props.onClear, "aria-label": "Clear assistant conversation", title: "Clear conversation" }, icon("fa-eraser")), h("button", { type: "button", onClick: props.onClose, "aria-label": "Close AI assistant", title: "Close assistant" }, icon("fa-xmark")))
           ),
-          h("div", { className: "assistant-context", title: modelLabel }, icon("fa-lock"), "Private Lemonade · " + modelLabel),
+          h("div", { className: "assistant-context", title: modelLabel }, icon("fa-lock"), "Private Ollama · " + (props.assistantModel || modelLabel)),
           h(
             "div",
             { className: "assistant-messages", "aria-live": "polite" },
@@ -7125,14 +7125,14 @@
                 ref: props.inputRef,
                 value: props.input,
                 onChange: function (event) { props.onInput(event.target.value); },
-                placeholder: "Ask your local model about this VPS…",
+                placeholder: "Chat naturally with your local model…",
                 autoComplete: "off",
                 enterKeyHint: "send",
                 spellCheck: true
               }),
               h("button", { type: "submit", className: "send-button", disabled: props.thinking || !props.input.trim(), "aria-label": "Execute command" }, icon("fa-arrow-up"))
             ),
-            h("div", { className: "assistant-hint" }, h("span", null, "Enter to send"), h("span", null, "Read-only local assistant"))
+            h("div", { className: "assistant-hint" }, h("span", null, "Enter to send"), h("span", null, "Local Ollama · agentic"))
           )
         );
       }
@@ -8055,6 +8055,9 @@
         var assistantPair = useState(function () { return window.innerWidth >= 1370; });
         var assistantOpen = assistantPair[0];
         var setAssistantOpen = assistantPair[1];
+        var assistantModelPair = useState("");
+        var assistantModel = assistantModelPair[0];
+        var setAssistantModel = assistantModelPair[1];
         var nowPair = useState(new Date());
         var now = nowPair[0];
         var setNow = nowPair[1];
@@ -8233,7 +8236,7 @@
         var thinking = thinkingPair[0];
         var setThinking = thinkingPair[1];
         var messagesPair = useState([
-          { id: "msg-1", role: "assistant", text: "I’m your private JoeOS copilot. Once Lemonade is online, ask me about this VPS’s live health, local events, or agent profiles." }
+          { id: "msg-1", role: "assistant", text: "I’m your private JoeOS local AI, running on your own Ollama. Chat naturally — I can inspect the system, agents, memory, and docs, then answer in plain language." }
         ]);
         var messages = messagesPair[0];
         var setMessages = messagesPair[1];
@@ -8383,6 +8386,7 @@
         var remoteErrorRef = useRef(false);
         var thinkingRef = useRef(false);
         var assistantAbortRef = useRef(null);
+        var assistantModelRef = useRef("");
         var pendingBotRef = useRef(new Set());
         var dragWidgetRef = useRef(null);
 
@@ -9192,6 +9196,10 @@
         }, [messages, thinking, assistantOpen]);
 
         useEffect(function () {
+          loadAssistantConfig();
+        }, []);
+
+        useEffect(function () {
           if (assistantOpen && assistantInputRef.current) {
             addManagedTimeout(function () {
               if (assistantInputRef.current) assistantInputRef.current.focus();
@@ -9657,6 +9665,51 @@
           }
         }
 
+        function loadAssistantConfig() {
+          requestJson("/api/v1/ai/chat/config", { cache: "no-store", headers: { Accept: "application/json" }, timeoutMs: 15000 })
+            .then(function (cfg) {
+              if (cfg && cfg.model) {
+                assistantModelRef.current = cfg.model;
+                setAssistantModel(cfg.model);
+              }
+            })
+            .catch(function () {});
+        }
+
+        async function streamAssistantEvents(history, signal, onEvent) {
+          var response = await window.fetch("/api/v1/ai/chat/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages: history, model: assistantModelRef.current }),
+            signal: signal
+          });
+          if (!response.ok) {
+            var detail = null;
+            try { detail = await response.json(); } catch (error) {}
+            var requestError = new Error((detail && (detail.detail || detail.message)) || ("Request failed with status " + response.status));
+            throw requestError;
+          }
+          if (!response.body || !response.body.getReader) throw new Error("Streaming is not supported in this browser.");
+          var reader = response.body.getReader();
+          var decoder = new TextDecoder();
+          var buffer = "";
+          while (true) {
+            var chunk = await reader.read();
+            if (chunk.done) break;
+            buffer += decoder.decode(chunk.value, { stream: true });
+            var lines = buffer.split("\n");
+            buffer = lines.pop();
+            for (var i = 0; i < lines.length; i++) {
+              var line = lines[i].trim();
+              if (line.indexOf("data:") === 0) {
+                var raw = line.slice(5).trim();
+                if (!raw) continue;
+                try { onEvent(JSON.parse(raw)); } catch (error) {}
+              }
+            }
+          }
+        }
+
         async function runAssistant(command) {
           var clean = String(command || "").trim();
           if (!clean || thinkingRef.current) return;
@@ -9667,28 +9720,40 @@
           setMessages(function (current) { return current.concat([userMessage]).slice(-30); });
           setAssistantInput("");
           setThinking(true);
-          try {
-            var payload = await requestJson("/api/chat", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                message: clean,
-                context: {
-                  active_section: active,
-                  history: messages.slice(-10).map(function (message) { return { role: message.role, text: message.text }; })
-                }
-              }),
-              timeoutMs: 120000,
-              signal: controller.signal
+          var history = messages.concat([{ role: "user", text: clean }]).slice(-12).map(function (message) {
+            return { role: message.role === "user" ? "user" : "assistant", content: String(message.text || "") };
+          });
+          var assistantMessage = { id: "msg-" + messageIdRef.current++, role: "assistant", text: "" };
+          setMessages(function (current) { return current.concat([assistantMessage]).slice(-30); });
+          function patchAssistant(text) {
+            assistantMessage.text = text;
+            setMessages(function (current) {
+              return current.map(function (message) {
+                return message.id === assistantMessage.id ? Object.assign({}, message, { text: text }) : message;
+              });
             });
-            var reply = payload && (payload.reply || payload.response || payload.message);
-            if (!reply) throw new Error("The assistant returned an empty response.");
-            setMessages(function (current) { return current.concat([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: String(reply) }]).slice(-30); });
+          }
+          try {
+            if (!assistantModelRef.current) {
+              try {
+                var cfg = await requestJson("/api/v1/ai/chat/config", { cache: "no-store", headers: { Accept: "application/json" }, timeoutMs: 15000 });
+                if (cfg && cfg.model) { assistantModelRef.current = cfg.model; setAssistantModel(cfg.model); }
+              } catch (error) {}
+            }
+            if (!assistantModelRef.current) throw new Error("No local Ollama model is available. Check the Models & AI workspace.");
+            await streamAssistantEvents(history, controller.signal, function (event) {
+              if (event.kind === "delta") {
+                patchAssistant(assistantMessage.text + (event.content || ""));
+              } else if (event.kind === "tool") {
+                patchAssistant(assistantMessage.text + "\n" + "[used " + (event.name || "tool") + "]");
+              }
+            });
+            if (!assistantMessage.text.trim()) patchAssistant("I couldn't produce a response from the local model.");
           } catch (error) {
             if (error && error.name === "AbortError") {
-              setMessages(function (current) { return current.concat([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: "Generation stopped by the operator." }]).slice(-30); });
+              patchAssistant(assistantMessage.text + (assistantMessage.text ? "\n" : "") + "Generation stopped by the operator.");
             } else {
-              setMessages(function (current) { return current.concat([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: "I couldn’t complete that local request: " + error.message }]).slice(-30); });
+              patchAssistant(assistantMessage.text + (assistantMessage.text ? "\n" : "") + "I couldn't complete that request: " + (error.message || String(error)));
             }
           } finally {
             thinkingRef.current = false;
@@ -9732,7 +9797,7 @@
           banners.push({ id: "lockdown", tone: "security", icon: "fa-lock", text: "Lockdown is active — privileged operations are blocked until reauthentication.", action: function () { selectSection("security-center"); }, actionLabel: "Open Security Center" });
         }
         if (!runtime || !runtime.online) {
-          banners.push({ id: "offline", tone: "warning", icon: "fa-plug-circle-xmark", text: "Lemonade Server is offline — local AI and model telemetry are unavailable.", action: function () { selectSection("dashboard"); }, actionLabel: "View dashboard" });
+          banners.push({ id: "offline", tone: "warning", icon: "fa-plug-circle-xmark", text: "Lemonade Server is offline — inference telemetry and model views are unavailable. The local AI assistant still runs on Ollama.", action: function () { selectSection("dashboard"); }, actionLabel: "View dashboard" });
         }
         if (performanceSettings && (performanceSettings.low_power_mode || performanceSettings.metered_network)) {
           banners.push({ id: "low-resource", tone: "info", icon: "fa-battery-quarter", text: "Low-resource mode is active — background work is reduced and visual effects are flattened." });
@@ -9973,11 +10038,12 @@
             onSubmit: submitAssistant,
             onQuick: runAssistant,
             onClose: function () { setAssistantOpen(false); },
-            onClear: function () { setMessages([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: "Conversation cleared. I’m ready for the next operational command." }]); },
+            onClear: function () { setMessages([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: "Conversation cleared. I’m ready for the next message." }]); },
             runtime: runtime,
+            assistantModel: assistantModel,
             inputRef: assistantInputRef,
             endRef: assistantEndRef
-          }) : h("button", { type: "button", className: "assistant-fab", onClick: function () { setAssistantOpen(true); }, "aria-label": "Open JoeOS AI assistant", title: "Ask JoeOS AI" }, icon("fa-wand-magic-sparkles")),
+          }) : h("button", { type: "button", className: "assistant-fab", onClick: function () { setAssistantOpen(true); }, "aria-label": "Open JoeOS local AI", title: "Chat with JoeOS local AI (Ollama)" }, icon("fa-wand-magic-sparkles")),
           deployOpen ? h(DeployModal, { name: agentName, role: agentRole, onName: setAgentName, onRole: setAgentRole, onClose: function () { setDeployOpen(false); }, onSubmit: deployAgent }) : null,
           selectedNode ? h(NodeModal, { node: selectedNode, onClose: function () { setSelectedNode(null); }, onRefresh: refreshNode }) : null,
           h(ShortcutsDialog, { open: shortcutsOpen, onClose: function () { setShortcutsOpen(false); } }),

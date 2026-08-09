@@ -6,7 +6,7 @@ import vm from "node:vm";
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 
 test("uses only same-origin JoeOS API routes", () => {
-  for (const endpoint of ["/api/metrics", "/api/bots", "/api/events", "/api/chat"]) {
+  for (const endpoint of ["/api/metrics", "/api/bots", "/api/events", "/api/v1/ai/chat/stream"]) {
     assert.match(html, new RegExp(`["']${endpoint.replaceAll("/", "\\/")}`));
   }
   assert.doesNotMatch(html, /API_BASE_URL\s*\+/);

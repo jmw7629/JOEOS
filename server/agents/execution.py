@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Sequence
 
 from server.ai.service import AIService
 from .tool_runner import parse_tool_calls, validate_and_execute
@@ -130,6 +130,73 @@ class OllamaAgentExecutor:
             "model": result.model,
         }
 
+    async def stream_events(self, messages: List[Dict[str, str]], tools: List[Dict], decision: Dict) -> AsyncIterator[Dict]:
+        """Agentic chat stream for the persistent local assistant.
+
+        Mirrors the bounded ``_complete`` tool loop but yields machine-readable
+        events to the browser: ``{"kind": "tool", ...}`` when a safe tool runs,
+        ``{"kind": "delta", "content": ...}`` while the final answer streams from
+        Ollama, and ``{"kind": "done", ...}``. All tool execution is the same
+        schema-validated read-only ToolBroker path; nothing arbitrary runs."""
+        model = decision.get("model") or self._default_model
+        working = list(messages)
+        if tools and not any(m.get("role") == "system" for m in working):
+            working = [{
+                "role": "system",
+                "content": (
+                    "You are the JoeOS local assistant running entirely on the "
+                    "user's own Ollama runtime. Be concise, clear, and natural. "
+                    "You may call the provided tools. To request a tool call, "
+                    "respond with ONLY a JSON object of the form "
+                    '{"name": "<tool>", "arguments": {...}}. When you have a '
+                    "tool result, reply in plain natural language with the "
+                    "answer; do not emit JSON."
+                ),
+            }] + working
+        token_usage = 0
+        for _round in range(MAX_TOOL_ROUNDS):
+            if tools:
+                result = await self._ai.ollama_provider.infer_tool_call(
+                    working, model=model, tools=tools, max_tokens=self._max_tokens,
+                )
+            else:
+                result = await self._ai.ollama_provider.infer(
+                    working, model=model, max_tokens=self._max_tokens,
+                )
+            token_usage += result.tokens_used or 0
+            calls = parse_tool_calls(result.reply) if tools else []
+            if not calls:
+                break
+            tool_messages = []
+            for call in calls:
+                try:
+                    outcome = self._run_tool(call["name"], call["arguments"])
+                except Exception as error:  # noqa: BLE001
+                    outcome = "tool error: %s" % str(error)[:200]
+                yield {
+                    "kind": "tool",
+                    "name": call["name"],
+                    "arguments": call["arguments"],
+                    "result": outcome[:1500],
+                }
+                tool_messages.append({
+                    "role": "tool",
+                    "content": outcome[:4000],
+                    "name": call["name"],
+                })
+            working = working + [{"role": "assistant", "content": result.reply},
+                                 {"role": "user", "content": (
+                                     "Tool results:\n" + "\n".join(
+                                         "%s: %s" % (m["name"], m["content"]) for m in tool_messages
+                                     ) + "\n\nNow answer the original request in plain natural language only. Do not emit JSON or a tool call."
+                                 )}]
+        # Stream the final answer token-by-token so the assistant feels natural.
+        async for delta in self._ai.ollama_provider.stream_infer(
+            working, model=model, temperature=0.4, max_tokens=self._max_tokens,
+        ):
+            yield {"kind": "delta", "content": delta}
+        yield {"kind": "done", "model": model, "provider": "ollama", "tokens_used": token_usage}
+
     async def __call__(self, messages: List[Dict[str, str]], tools: List[Dict], decision: Dict) -> Dict[str, Any]:
         model = decision.get("model") or self._default_model
         last_error = None
@@ -188,3 +255,19 @@ def build_agent_executor(
         ai_service, default_model=default_model,
         principal=principal, control_service=control_service,
     )
+
+
+def build_ollama_tool_schemas(definitions: Sequence[Dict]) -> List[Dict]:
+    """Convert safe tool definitions into Ollama ``tools`` schemas."""
+    schemas = []
+    for definition in definitions or ():
+        schema = definition.get("input_schema") or {"type": "object", "properties": {}}
+        schemas.append({
+            "type": "function",
+            "function": {
+                "name": definition.get("key", ""),
+                "description": definition.get("description", ""),
+                "parameters": schema,
+            },
+        })
+    return [s for s in schemas if s["function"]["name"]]

@@ -107,6 +107,77 @@ class AiServiceTests(unittest.TestCase):
         service.providers.register_cloud(FakeCloud(), approved=True)
         self.assertIsNotNone(service.providers.get("cloud-x"))
 
+    def _assistant_online(self, service, model="qwen2.5-coder:7b"):
+        service.providers.set_ollama_health(
+            available=True, reason="ok", model=model, version="0.32.5",
+            supports_streaming=True,
+        )
+
+    def test_assistant_config_offline_is_honest(self):
+        service, http = self._service(_runtime_online())
+        config = asyncio.run(service.assistant_config())
+        self.assertFalse(config["available"])
+        self.assertNotIn("qwen", config["model"])
+
+    def test_assistant_config_reports_model_from_runtime(self):
+        def handler(request):
+            if str(request.url).endswith("/api/tags"):
+                return _json_response({"models": [
+                    {"name": "qwen2.5-coder:1.5b", "details": {"family": "qwen2"}},
+                    {"name": "qwen2.5-coder:7b", "details": {"family": "qwen2"}},
+                    {"name": "deepseek-r1:14b-agentic", "details": {"family": "qwen2"}},
+                ]})
+            return _json_response({})
+
+        service, http = self._service(_runtime_online(), handler)
+        self._assistant_online(service)
+        config = asyncio.run(service.assistant_config())
+        self.assertTrue(config["available"])
+        self.assertEqual(config["provider"], "ollama")
+        self.assertEqual(config["model"], "qwen2.5-coder:7b")
+        self.assertIn("qwen2.5-coder:7b", config["models"])
+
+    def test_assistant_chat_stream_delegates_and_rounds_history(self):
+        async def fake_executor(messages, tools, decision):
+            self.assertEqual(decision["model"], "qwen2.5-coder:7b")
+            self.assertTrue(any(m.get("role") == "user" for m in messages))
+            yield {"kind": "tool", "name": "joeos.system_status", "arguments": {}, "result": "ok"}
+            yield {"kind": "delta", "content": "Hello from Ollama."}
+            yield {"kind": "done", "model": "qwen2.5-coder:7b"}
+
+        service, http = self._service(_runtime_online())
+        self._assistant_online(service)
+        service.assistant_executor = FakeExecutor(fake_executor)
+        service.assistant_tools = [{"type": "function", "function": {"name": "joeos.system_status"}}]
+
+        events = []
+        async def collect():
+            async for event in service.assistant_chat_stream(
+                [{"role": "user", "content": "hi"}] * 20, model="qwen2.5-coder:7b"
+            ):
+                events.append(event)
+        asyncio.run(collect())
+        kinds = [e["kind"] for e in events]
+        self.assertEqual(kinds, ["tool", "delta", "done"])
+        self.assertLessEqual(len(events), 20)
+
+    def test_assistant_chat_stream_raises_when_offline(self):
+        service, http = self._service(_runtime_online())
+        with self.assertRaises(RuntimeError):
+            async def collect():
+                async for _event in service.assistant_chat_stream([{"role": "user", "content": "hi"}]):
+                    pass
+            asyncio.run(collect())
+
+
+class FakeExecutor:
+    def __init__(self, generator):
+        self._generator = generator
+
+    async def stream_events(self, messages, tools, decision):
+        async for event in self._generator(messages, tools, decision):
+            yield event
+
 
 class EmbeddingTests(unittest.TestCase):
     def setUp(self):

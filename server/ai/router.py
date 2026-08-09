@@ -8,9 +8,11 @@ governance (Lockdown/Emergency Stop).
 
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 router = APIRouter(prefix="/api/v1/ai", tags=["ai"])
 
@@ -42,6 +44,50 @@ def overview(request: Request) -> Dict[str, Any]:
 def providers(request: Request) -> Dict[str, Any]:
     service = _get_service(request)
     return {"providers": [_provider(record) for record in service.providers_records()]}
+
+
+@router.get("/chat/config")
+async def chat_config(request: Request) -> Dict[str, Any]:
+    service = _get_service(request)
+    try:
+        return await service.assistant_config()
+    except Exception as error:  # noqa: BLE001 - never fabricate assistant state
+        return {
+            "provider": "ollama",
+            "available": False,
+            "reason": str(error)[:300],
+            "model": "",
+            "models": [],
+            "streaming": False,
+            "tools": [],
+        }
+
+
+@router.post("/chat/stream")
+async def chat_stream(request: Request):
+    service = _get_service(request)
+    payload = await request.json()
+    messages = payload.get("messages")
+    if not isinstance(messages, list):
+        raise HTTPException(status_code=400, detail="messages must be an array.")
+    model = str(payload.get("model") or "").strip()
+
+    async def event_stream():
+        try:
+            async for event in service.assistant_chat_stream(messages, model=model):
+                yield "data: " + json.dumps(event) + "\n\n"
+        except Exception as error:  # noqa: BLE001 - surfaced as an SSE error event
+            yield "data: " + json.dumps({"kind": "error", "message": str(error)[:500]}) + "\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 @router.post("/inference")

@@ -53,6 +53,27 @@ def _prefer_ollama_model(models: List[str]) -> Optional[str]:
     return ranked[0]
 
 
+def _prefer_assistant_model(models: List[str]) -> Optional[str]:
+    """Pick a proven conversational model for the local assistant.
+
+    Prefers plain qwen2.5-coder variants (verified working on the VPS Ollama)
+    over reasoning/custom ``-agentic`` Modelfiles that are not guaranteed to
+    load. Unknown inventory returns None (never guessed)."""
+    if not models:
+        return None
+    for candidate in (
+        "qwen2.5-coder:7b",
+        "qwen2.5-coder:7b-opencode-safe",
+        "qwen2.5-coder:14b",
+        "qwen2.5-coder:1.5b",
+        "qwen2.5-coder:1.5b-fast",
+        "qwen2.5-coder:1.5b-opencode-safe",
+    ):
+        if candidate in models:
+            return candidate
+    return _prefer_ollama_model(models)
+
+
 class AIService:
     def __init__(
         self,
@@ -67,6 +88,8 @@ class AIService:
         record_metric: Optional[Callable[[str, float], None]] = None,
         version: str = "2.0.0",
         ollama_api_base: str = "http://127.0.0.1:11434",
+        assistant_executor: Optional[Any] = None,
+        assistant_tools: Optional[Sequence[Dict]] = None,
     ) -> None:
         from pathlib import Path as _Path
 
@@ -100,6 +123,8 @@ class AIService:
         self._governance_blocked = governance_blocked or (lambda: (False, ""))
         self._record_metric = record_metric
         self._version = version
+        self.assistant_executor = assistant_executor
+        self.assistant_tools = list(assistant_tools or ())
 
     def providers_records(self) -> List[ProviderRecord]:
         return self.providers.records()
@@ -226,6 +251,66 @@ class AIService:
             tokens_used=result.tokens_used,
             done=True,
         )
+
+    async def assistant_config(self) -> Dict[str, Any]:
+        """Safe, honest assistant configuration for the browser widget.
+
+        Model inventory and default come from the measured Ollama runtime;
+        nothing is guessed when unmeasured."""
+        record = self.ollama_provider.availability()
+        models: List[str] = []
+        try:
+            discovered = await self.ollama_provider.list_models()
+            models = [str(m["name"]) for m in discovered if m.get("name")]
+        except Exception:  # noqa: BLE001 - never fabricate
+            models = []
+        default = _prefer_assistant_model(models) or record.model or ""
+        return {
+            "provider": "ollama",
+            "available": record.available,
+            "reason": record.reason,
+            "model": default or "",
+            "models": models,
+            "streaming": record.supports_streaming,
+            "tools": [t["function"]["name"] for t in self.assistant_tools if isinstance(t, dict)],
+        }
+
+    async def assistant_chat_stream(self, messages: List[dict], *, model: str = "") -> AsyncIterator[Dict]:
+        """Agentic, streaming local assistant chat over Ollama (never Lemonade).
+
+        When the backend has wired an agent executor, the bounded safe-tool loop
+        runs and the final answer streams token-by-token. Otherwise it falls
+        back to plain Ollama streaming so the assistant always works. Yields
+        event dicts: ``tool``, ``delta``, and ``done``."""
+        record = self.ollama_provider.availability()
+        if not record.available:
+            raise RuntimeError(record.reason or "Ollama is not reachable on the local loopback.")
+        chosen = model or record.model or ""
+        if not chosen:
+            raise RuntimeError("No Ollama model is available for the assistant.")
+
+        history: List[Dict[str, str]] = []
+        for message in (messages or [])[-12:]:
+            if not isinstance(message, dict):
+                continue
+            role = str(message.get("role") or "")
+            content = str(message.get("content") or "")[:4000]
+            if role in ("user", "assistant") and content.strip():
+                history.append({"role": role, "content": content})
+
+        if self.assistant_executor is not None:
+            decision = {"model": chosen}
+            async for event in self.assistant_executor.stream_events(
+                history, list(self.assistant_tools), decision
+            ):
+                yield event
+            return
+
+        async for delta in self.ollama_provider.stream_infer(
+            history, model=chosen, temperature=0.4, max_tokens=2000
+        ):
+            yield {"kind": "delta", "content": delta}
+        yield {"kind": "done", "model": chosen, "provider": "ollama", "tokens_used": None}
 
     async def embed(self, texts: List[str], *, project: str = "", source_refs: Optional[List[str]] = None, privacy_class: str = "restricted") -> EmbeddingResult:
         if not self.embeddings.available():

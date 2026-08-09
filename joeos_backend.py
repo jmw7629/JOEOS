@@ -1555,6 +1555,17 @@ async def lifespan(app: FastAPI):
         control_service=app.state.action_service,
     )
     app.state.action_service._executor = app.state.agent_executor
+    # Wire the persistent local AI assistant to the agentic executor + safe
+    # ToolBroker tools, so chat is agentic and always routed to Ollama.
+    try:
+        from server.agents.activation import SAFE_TOOL_DEFINITIONS
+        from server.agents.execution import build_ollama_tool_schemas
+
+        app.state.ai_service.assistant_executor = app.state.agent_executor
+        app.state.ai_service.assistant_tools = build_ollama_tool_schemas(SAFE_TOOL_DEFINITIONS)
+    except Exception as error:  # noqa: BLE001 - assistant stays plain-streaming fallback
+        _record_event(db_path, "warning", "ai",
+                      "Assistant executor wiring failed: %s" % type(error).__name__)
     # Activate the production Agent Fabric: register Ollama, sync live models,
     # create the agent team bound to real models, and register safe read tools.
     try:
