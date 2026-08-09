@@ -1,0 +1,52 @@
+# Halo Runner Enrollment (Section F) + Provider Readiness
+
+## Runner (enrolled `2026-08-09`)
+
+- Halo runner: `5299c2ea-b4d4-4214-9f8f-642705364201` (`halo-amd-ryzen-ai`)
+- Machine fingerprint: `1fe8a0e16582a1b65246719420d251a2` (P-256 key, generated
+  on Halo; private key at `/var/lib/joeos-runner/runner-key.pem` mode 0600,
+  owner `joeos-runner`, never transmitted)
+- Enrolled against the **authoritative VPS backend** via the two-sided
+  ceremony (`server.runners.cli enroll-challenge` → `joeos_runner.cli
+  enrollment-sign` → `server.runners.cli enroll`).
+- Staging connectivity verified: with the Halo backend running on loopback
+  (`JOEOS_CAMPAIGN_WORKER=false JOEOS_AUTONOMOUS_WORKER=false`), the runner
+  connected, authenticated, and leased jobs (`POST /api/v1/runner/lease` →
+  `200`), and its DB record flipped to **active / healthy**.
+- Deployment: `joeos-runner.service` (systemd, hardened unit, user
+  `joeos-runner`, `NoNewPrivileges`, private tmp, read-only repo).
+  `backend_url` = `http://127.0.0.1:8080` (loopback-only policy; will connect
+  once the Halo backend is authoritative at cutover).
+- Config mirrors the VPS runner pattern (executors
+  `joeos.test.deterministic,joeos.runner.diagnostics,joeos.workspace.filesystem`,
+  5s heartbeat).
+- Note: `joeos-runner` daemon entrypoint is `python -m joeos_runner`
+  (`__main__.py`); the CLI (identity/enrollment) is `python -m joeos_runner.cli`.
+  The runner checkout lives at `/opt/joeos` (owner `joeos-runner`); the Halo
+  authoritative backend checkout is `/home/joewillis/JOEOS` (owner `joewillis`).
+
+## Provider readiness
+
+- Ollama provider: `control_providers` row is `key=ollama`, `status=active`,
+  `health=healthy`, `endpoint_reference=loopback` → resolves to Halo's local
+  Ollama (`http://127.0.0.1:11434`, v0.32.5) when the Halo backend is
+  authoritative. No code/config change needed.
+- Lemonade provider: `LocalLemonadeProvider` already wired in
+  `server/ai/providers.py` (chat/stream/embed), driven by `LEMONADE_BASE_URL`
+  (default `http://127.0.0.1:13305/v1`). Reachable on Halo.
+- Model registry: 8 Ollama models on Halo are registered `active`; the VPS-only
+  qwen2.5 models are `disabled`. `endpoint_reference` never exposes a private
+  host; browsers reach models only through the backend.
+
+## Canary results (Section AX, bounded)
+
+| Model | Provider | Result |
+|---|---|---|
+| `llama3.2:3b` | Ollama | OK (1.8 s) |
+| `qwen3-coder:30b-a3b-q8_0` | Ollama | OK (7.4 s) |
+| `qwen3-coder-next:latest` | Ollama | OK (11 s) |
+| `Qwen3-Coder-30B-A3B-Instruct-Q4_K_M` | Lemonade | **FAILED** — checkpoint dir is an empty stub (4 KB); loader queries Hugging Face → 404 `model_load_error`. Real weights not on disk (pre-existing Halo state). |
+| `gpt-oss-120b-Q4_K_M` | Lemonade | **FAILED** — same stub-checkpoint cause. |
+
+Action for Lemonade: either download real weights (`lemonade pull`) or rely on
+Ollama for inference post-cutover. Ollama alone satisfies the coder workload.
