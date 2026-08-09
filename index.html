@@ -3987,6 +3987,15 @@
       }
     }
 
+    /* ---- Mobile Command Center (focused drill-down, no tiny columns) ---- */
+    @media (max-width: 760px) {
+      .cc-grid { grid-template-columns: 1fr !important; gap: 10px; }
+      .cc-module { padding: 13px 14px; }
+      .cc-module-value { font-size: 19px; }
+      .cc-module-actions button { padding: 11px 12px; font-size: 13px; flex: 1; }
+      .cc-focus-mode { min-height: calc(100vh - 140px); }
+    }
+
     /* Reassert visible focus on inputs that previously suppressed outlines.
        Placed last so it wins the specificity/source-order tie. */
     input:focus-visible,
