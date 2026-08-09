@@ -15,14 +15,21 @@ from typing import Callable, Dict, List, Optional
 
 from .process import ProcessResult, run_process
 
-# The `opencode` binary is only discoverable on the VPS; the executor is inert
-# (denied) when the binary is absent so a missing integration is never reported
-# as a success.
-DEFAULT_OPENCODE_BIN = "/home/joewillisny/.opencode/bin/opencode"
+# The `opencode` binary is only discoverable on the runtime host; the executor is
+# inert (denied) when the binary is absent so a missing integration is never
+# reported as a success. Override per-host with JOEOS_OPENCODE_BIN (VPS default
+# retained for backward compatibility).
+DEFAULT_OPENCODE_BIN = os.getenv(
+    "JOEOS_OPENCODE_BIN", "/home/joewillisny/.opencode/bin/opencode")
 
+# Allowlist of model keys the executor may drive. Operators may extend the set
+# at deploy time with JOEOS_OPENCODE_ALLOWED_MODELS (comma-separated) so hosts
+# with local providers (e.g. Halo's Ollama) do not require a code change.
 ALLOWED_MODELS = {
     "openrouter/deepseek-v4-flash",
     "opencode/deepseek-v4-flash-free",
+    *(m.strip() for m in os.getenv("JOEOS_OPENCODE_ALLOWED_MODELS", "").split(",")
+      if m.strip()),
 }
 
 MAX_TRANSCRIPT_BYTES = 64 * 1024

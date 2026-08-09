@@ -1042,7 +1042,9 @@ def _campaign_stage_handler(app: FastAPI):
                 "Implement work package %s: %s.\n%s"
                 % (package.key, package.title, package.description or ""))[:8000]
             result = executor.execute(
-                {"model": "qwen2.5-coder:7b", "prompt": prompt,
+                {"model": os.getenv("JOEOS_IMPLEMENT_MODEL",
+                                    "qwen2.5-coder:7b"),
+                 "prompt": prompt,
                  "dir": str(Path(worktree_root) / branch)},
                 package.key, root=package.key,
             )
