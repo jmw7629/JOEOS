@@ -72,6 +72,19 @@ security blocks, or when the roadmap is exhausted. Default autonomy: Level 2
 - Local AI Runtime platform (`server/ai/`): a provider-neutral inference registry over the private local Lemonade server (cloud providers require explicit policy approval and are never enabled silently), local-first semantic embeddings with content-hash deduplication, dimension validation, and honest availability (vectors are never fabricated), bounded context construction with full decision tracking (deduplication, token budget, privacy exclusion), and AI-assisted interpretation records that are always labeled AI-assisted with provenance — never presented as parsed facts — plus a Models & AI workspace in the Command Center.
 - Self-Maintenance and Continuous Improvement platform (`server/selfmaintenance/`): a real health-check battery over live services (local database, event store, telemetry freshness, disk, schema migrations, verified backups, recovery flags), safe self-hygiene that never touches authority (bounded retention of its own registry), an evidence-based improvement proposal registry that never self-applies and never accepts memory or changes authority without operator approval, approval-gated improvement application through real executors bound to the Production (backup/safe-mode/repair-mode) and Memory (expiry) platforms, a periodic maintenance loop, honest `unknown`/`skipped` states whenever a signal is unmeasured, and a Maintenance & Improvement workspace (18th Command Center service). No maintenance state, improvement, or availability is ever fabricated.
 
+## JOEOS-COMPLETION-LOOP-1 progress (2026-08-09)
+
+- **Halo migration completed**: Halo is the authoritative host (source + state
+  migrated, runner reconnected, secure Tailscale endpoint, agents re-bound to
+  large models by capability, autonomous run validated). VPS intact as rollback.
+- **Module-scoped Joe** delivered (JoeContextScope; "JOE IS FOCUSED ON" banner;
+  Ask Joe on agent cards; scoped terminal context).
+- **Secure interactive terminal** delivered at `/os/terminal` (PTY gateway,
+  authenticated WebSocket, xterm.js, mobile keys, scoped Joe).
+- **Agent Command Center** surfaces (org map, work, schedule, pipelines,
+  memory, activity, live panel) enhanced with ClawPort-inspired UX.
+- Completion matrix: `docs/engineering/JOEOS_COMPLETION_MATRIX.md`.
+
 ## Test status
 
 - Python: 918 passed, 61 subtests passed (includes 22 autonomous tests).

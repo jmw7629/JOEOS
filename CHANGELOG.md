@@ -37,6 +37,35 @@ by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
   continuation, repair loop, campaign completion, restart recovery, human gates,
   secret-scan blocking, and worker non-escalation.
 
+## [2.4.0] — 2026-08-09
+
+### Halo migration completion (authoritative host = Halo)
+
+- Halo (`amd-halo`, AMD Ryzen AI MAX+ 395, 125 GiB unified RAM) is now the
+  authoritative JoeOS intelligence/engineering host: source synced, persistent
+  state migrated (cutover swap), runner `5299c2ea` reconnected, secure Tailscale
+  Serve HTTPS endpoint live. VPS remains the rollback node.
+- Agents re-bound to Halo large models by capability (joeos.joe →
+  qwen3-coder-next, architect/builder/verifier → qwen3-coder:30b-a3b-q8_0,
+  researcher → qwen3.6:35b, security → llama3.3:70b). Fixed a real bug where
+  `update_agent` did not persist provider/model policy.
+- Autonomous execution validated on Halo (joeos.joe run → qwen3-coder-next).
+
+### Module-scoped Joe
+
+- `JoeContextScope` contract: the assistant stream accepts a bounded
+  module/object context and injects it as a scoped system block; the assistant
+  panel shows a "JOE IS FOCUSED ON" banner with clear-focus. Agent cards expose
+  "Ask Joe". Scope carries no extra authority.
+
+### Secure interactive terminal
+
+- Authenticated human-terminal workspace at `/os/terminal`: bounded PTY gateway
+  (posix_spawn, backend-user shell, never root), REST + WebSocket endpoints
+  behind `require_application_session` with per-session tokens, xterm.js UI
+  with tabs/resize/copy/paste/fullscreen/mobile keys, scoped Ask Joe with
+  bounded recent-output context. Agents have no terminal access.
+
 ## [2.2.0] — 2026-08-08
 
 ### Autonomous operations (AUTONOMY-1)
