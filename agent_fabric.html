@@ -173,6 +173,23 @@
     .act-detail.open { display: block; }
     .act-detail pre { margin: 4px 0 0; max-height: 240px; overflow: auto; font-size: 11px; }
 
+    /* pipeline DAG */
+    .pipeline-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+      padding: 12px 14px; margin-bottom: 10px; }
+    .pipe-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .pipe-strip { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .pipe-node { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px;
+      border: 1px solid var(--line); background: rgba(8,18,32,0.6); font-size: 12px; color: var(--muted); }
+    .pipe-node .pipe-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .pipe-node.succeeded { border-color: rgba(61,227,164,0.5); color: var(--success); }
+    .pipe-node.succeeded .pipe-dot { background: var(--success); }
+    .pipe-node.failed { border-color: rgba(255,100,124,0.6); color: var(--danger); }
+    .pipe-node.failed .pipe-dot { background: var(--danger); }
+    .pipe-node.running { border-color: rgba(49,215,255,0.6); color: var(--cyan); }
+    .pipe-node.running .pipe-dot { background: var(--cyan); animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+    .pipe-arrow { color: var(--muted); font-size: 12px; }
+
     @media (max-width: 640px) {
       main { padding: 16px 14px 80px; }
       header { padding: 12px 14px; }
@@ -1490,23 +1507,55 @@
       return "<div class='cc-stat'><div class='k'>" + esc(k) + "</div><div class='v " + (tone || "") + "'>" + (v == null ? "—" : esc(String(v))) + "</div></div>";
     }
 
+    function pipelineNodeState(nodeId, run) {
+      var states = {};
+      try { states = JSON.parse(run.node_states || "{}") || {}; } catch (e) {}
+      if (states[nodeId]) return "succeeded";
+      if (run.state === "succeeded") return "succeeded";
+      if (nodeId === run.current_node) return run.state === "failed" ? "failed" : "running";
+      return "waiting";
+    }
+
     async function loadPipelines() {
       var box = $("cc-pipelines-body");
       box.innerHTML = "<div class='muted'>Loading…</div>";
       var html = "";
+      var workflowNodes = {};
+      try {
+        var workflows = (await api("/api/v1/automation/workflows")) || [];
+        (Array.isArray(workflows) ? workflows : []).forEach(function (wf) {
+          var nodes = [];
+          try {
+            var def = JSON.parse(wf.definition || "{}");
+            (def.nodes || []).forEach(function (node) {
+              nodes.push({ id: node.id, title: node.title || node.id });
+            });
+          } catch (e) {}
+          workflowNodes[wf.workflow_id] = nodes;
+        });
+      } catch (e) {}
       try {
         var runs = (await api("/api/v1/automation/runs")).runs || [];
         if (!runs.length) { box.innerHTML = "<div class='empty-note'>No automation runs yet.</div>"; return; }
-        html += "<table class='matrix'><tr><th>Run</th><th>Workflow</th><th>State</th><th>Node</th><th>When</th><th>Duration</th></tr>";
-        html += runs.slice(0, 15).map(function (r) {
-          return "<tr><td class='mono'>" + esc((r.run_id || "").slice(0, 12)) + "</td>" +
-            "<td>" + esc(r.workflow_id || "") + "</td>" +
-            "<td><span class='chip " + statusChip(r.state) + "'>" + esc(r.state) + "</span></td>" +
-            "<td>" + esc(r.current_node || "—") + "</td>" +
-            "<td class='muted small'>" + esc(timeAgo(r.started_at)) + "</td>" +
-            "<td class='muted small'>" + (r.duration_seconds ? r.duration_seconds + "s" : "—") + "</td></tr>";
+        html += "<div class='section-title'><h3>Recent pipelines</h3></div>";
+        html += runs.slice(0, 8).map(function (r) {
+          var nodes = workflowNodes[r.workflow_id] || [];
+          if (!nodes.length) {
+            return "<div class='deleg'><span class='pill " + statusChip(r.state) + "'></span>" +
+              "<b>" + esc(r.workflow_id || "Run") + "</b><span class='muted small'>" +
+              esc(r.state) + " · " + esc(r.current_node || "—") + " · " +
+              esc(timeAgo(r.started_at)) + "</span></div>";
+          }
+          var strip = nodes.map(function (node) {
+            var st = pipelineNodeState(node.id, r);
+            return "<div class='pipe-node " + st + "' title='" + esc(node.id) + "'>" +
+              "<span class='pipe-dot'></span>" + esc(node.title || node.id) + "</div>";
+          }).join("<span class='pipe-arrow'>→</span>");
+          return "<div class='pipeline-card'><div class='pipe-head'><b>" + esc(r.workflow_id) + "</b>" +
+            "<span class='chip " + statusChip(r.state) + "'>" + esc(r.state) + "</span>" +
+            "<span class='muted small'>" + esc(timeAgo(r.started_at)) + (r.duration_seconds ? " · " + r.duration_seconds + "s" : "") + "</span></div>" +
+            "<div class='pipe-strip'>" + strip + "</div></div>";
         }).join("");
-        html += "</table>";
       } catch (e) {
         html += "<div class='msg err'>" + esc(e.message) + "</div>";
       }
