@@ -122,6 +122,19 @@ class ActivationTests(AgentFixture):
         self.assertIn("qwen2.5-coder:7b", models)
         self.assertEqual(models["qwen2.5-coder:7b"]["status"], "disabled")
 
+    def test_rebind_persists_model_policy(self):
+        # A capability reassignment must persist the new model/provider policy on
+        # the authoritative profile row, not just create a version.
+        joe = next(a for a in self.service.list_agents(self.p) if a["key"] == "joeos.joe")
+        updated = self.service.update_agent(
+            self.p, joe["id"], joe["revision"],
+            default_provider_policy="ollama",
+            default_model_policy="qwen3-coder-next:latest",
+        )
+        self.assertEqual(updated["default_model_policy"], "qwen3-coder-next:latest")
+        refreshed = next(a for a in self.service.list_agents(self.p) if a["key"] == "joeos.joe")
+        self.assertEqual(refreshed["default_model_policy"], "qwen3-coder-next:latest")
+
 
 class AgentRunExecutionTests(AgentFixture):
     def test_architect_run_executes_and_persists(self):

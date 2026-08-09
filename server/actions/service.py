@@ -249,13 +249,22 @@ class ActionService:
             "key", "display_name", "description", "system_instructions", "allowed_tools",
             "denied_tools", "required_capabilities", "max_delegation_depth",
             "max_parallel_tasks", "max_runtime_ms", "max_token_budget", "data_boundary",
-            "approval_policy",
+            "approval_policy", "default_provider_policy", "default_model_policy",
         )}))
         with self._store._connection_factory() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            # Persist policy changes on the authoritative profile row so runtime
+            # model/provider binding actually takes effect (the version digest
+            # records them too).
             connection.execute(
-                "UPDATE control_agents SET revision=revision+1, updated_at=? WHERE id=?",
-                (self._now(), str(agent_id)),
+                "UPDATE control_agents SET revision=revision+1, updated_at=?, "
+                "default_provider_policy=?, default_model_policy=? WHERE id=?",
+                (
+                    self._now(),
+                    changes.get("default_provider_policy", agent.default_provider_policy),
+                    changes.get("default_model_policy", agent.default_model_policy),
+                    str(agent_id),
+                ),
             )
             connection.execute(
                 "UPDATE control_agent_versions SET superseded=1 WHERE agent_id=? AND superseded=0",
