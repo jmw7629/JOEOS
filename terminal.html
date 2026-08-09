@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>JoeOS — Terminal</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+  <style>
+    :root {
+      color-scheme: dark;
+      --canvas: #050912; --surface: rgba(10,22,39,0.82); --line: rgba(139,212,255,0.14);
+      --text: #eaf6ff; --muted: #91a6ba; --cyan: #31d7ff; --success: #3de3a4;
+      --warning: #ffb45c; --danger: #ff647c;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: var(--canvas); color: var(--text);
+      font: 14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+    header { display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+      border-bottom: 1px solid var(--line); background: rgba(5,9,18,0.9); flex-wrap: wrap; }
+    header strong { font-size: 15px; letter-spacing: .2px; }
+    header .accent { color: var(--cyan); }
+    header .sub { color: var(--muted); font-size: 12px; }
+    .spacer { flex: 1; }
+    button { background: rgba(49,215,255,0.12); color: var(--text); border: 1px solid rgba(49,215,255,0.4);
+      border-radius: 9px; padding: 7px 12px; cursor: pointer; font-size: 13px; }
+    button:hover { background: rgba(49,215,255,0.22); }
+    button.primary { background: var(--cyan); color: #04121c; border-color: var(--cyan); font-weight: 600; }
+    button.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+    button.ghost:hover { color: var(--text); background: rgba(139,212,255,0.08); }
+    button.danger { color: var(--danger); border-color: rgba(255,100,124,0.5); }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tab { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 8px;
+      border: 1px solid var(--line); background: rgba(8,18,32,0.7); font-size: 12px; cursor: pointer; }
+    .tab.active { border-color: var(--cyan); color: var(--cyan); }
+    .tab .x { color: var(--muted); font-size: 11px; padding: 0 2px; }
+    .tab .x:hover { color: var(--danger); }
+    #terminal-host { padding: 8px 6px; height: calc(100vh - 92px); }
+    #terminal-host .xterm { height: 100%; padding: 4px 6px; }
+    .connect-panel { max-width: 520px; margin: 60px auto; padding: 24px; border: 1px solid var(--line);
+      border-radius: 16px; background: var(--surface); }
+    .connect-panel h2 { margin: 0 0 8px; }
+    .connect-panel p { color: var(--muted); font-size: 13px; }
+    .connect-panel input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+      background: rgba(8,18,32,0.9); color: var(--text); margin: 8px 0 12px; }
+    .toolbar { display: flex; gap: 6px; padding: 6px 12px; border-top: 1px solid var(--line);
+      background: rgba(5,9,18,0.9); flex-wrap: wrap; align-items: center; }
+    .toolbar button { padding: 6px 10px; font-size: 12px; }
+    .hint { color: var(--muted); font-size: 11px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; }
+    .status-dot.on { background: var(--success); }
+    .status-dot.off { background: var(--danger); }
+    #joe-box { position: fixed; right: 14px; bottom: 64px; width: 380px; max-width: calc(100vw - 28px);
+      background: rgba(6,14,26,0.97); border: 1px solid var(--line); border-radius: 14px; z-index: 40;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5); display: none; flex-direction: column; }
+    #joe-box.open { display: flex; }
+    #joe-box .head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+    #joe-box .body { max-height: 320px; overflow: auto; padding: 10px 12px; font-size: 13px; white-space: pre-wrap; }
+    #joe-box .ask { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
+    #joe-box .ask input { flex: 1; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px;
+      background: rgba(8,18,32,0.9); color: var(--text); }
+    @media (max-width: 640px) {
+      header { padding: 8px 10px; }
+      #terminal-host { height: calc(100vh - 130px); }
+      .toolbar { position: sticky; bottom: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>JoeOS <span class="accent">Terminal</span></strong>
+    <span class="sub" id="status"><span class="status-dot off" id="status-dot"></span>Not connected</span>
+    <span class="spacer"></span>
+    <div class="tabs" id="tabs"></div>
+    <button id="new-btn">+ New</button>
+    <button id="joe-btn" title="Ask Joe about the terminal">Ask Joe</button>
+    <button id="help-btn" title="Keyboard shortcuts">?</button>
+  </header>
+
+  <div id="terminal-host"></div>
+
+  <div class="toolbar" id="toolbar">
+    <button id="copy-btn">Copy</button>
+    <button id="paste-btn">Paste</button>
+    <button id="clear-btn">Clear</button>
+    <button id="full-btn">Fullscreen</button>
+    <span class="spacer"></span>
+    <button class="ghost" data-key="CTRL_C">Ctrl</button>
+    <button class="ghost" data-key="ESC">Esc</button>
+    <button class="ghost" data-key="TAB">Tab</button>
+    <button class="ghost" data-key="ARROW_UP">↑</button>
+    <button class="ghost" data-key="ARROW_DOWN">↓</button>
+    <span class="hint" id="host-hint"></span>
+  </div>
+
+  <div id="joe-box">
+    <div class="head"><span class="status-dot on"></span><b>JOE IS FOCUSED ON: Terminal</b>
+      <span class="spacer"></span><button id="joe-close" class="ghost">✕</button></div>
+    <div class="body" id="joe-body"></div>
+    <div class="ask"><input id="joe-input" placeholder="What does this error mean?" autocomplete="off">
+      <button id="joe-send" class="primary">Send</button></div>
+  </div>
+
+  <div class="connect-panel" id="connect-panel">
+    <h2>Terminal requires a session</h2>
+    <p>This terminal runs through your authenticated JoeOS application session on the authoritative host. It is not a model tool — agents have no access to this PTY.</p>
+    <p>If you already paired in another JoeOS surface, open a browser there once, then return here. Otherwise enter a one-time pairing code:</p>
+    <input id="pair-code" placeholder="JOEOS1|https://...|uuid|SECRET" autocomplete="off">
+    <button id="pair-btn" class="primary">Pair &amp; connect</button>
+    <p class="hint" id="pair-msg"></p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
+  <script>
+    "use strict";
+    var SESSION_KEY = "joeos:session";
+    var ORIGIN = window.location.origin;
+    var wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+
+    function loadSession() {
+      try { return JSON.parse(window.sessionStorage.getItem(SESSION_KEY) || "null"); } catch (e) { return null; }
+    }
+
+    var state = { session: loadSession(), tabs: {}, active: null, socket: null, term: null, fit: null };
+
+    var hostHint = document.getElementById("host-hint");
+    var statusEl = document.getElementById("status");
+    var statusDot = document.getElementById("status-dot");
+    var connectPanel = document.getElementById("connect-panel");
+    var terminalHost = document.getElementById("terminal-host");
+
+    function setStatus(text, ok) {
+      statusEl.innerHTML = '<span class="status-dot ' + (ok ? "on" : "off") + '"></span>' + text;
+    }
+
+    function api(url, options) {
+      options = options || {};
+      var headers = Object.assign({}, options.headers || {});
+      headers["Accept"] = "application/json";
+      if (state.session && state.session.session_id) headers["X-Joeos-Session"] = state.session.session_id;
+      if (options.body) headers["Content-Type"] = "application/json";
+      return fetch(url, Object.assign({}, options, { headers: headers })).then(function (response) {
+        return response.json().catch(function () { return null; }).then(function (payload) {
+          if (!response.ok) {
+            var detail = payload && (payload.detail || payload.message);
+            throw new Error(typeof detail === "string" ? detail : (detail && detail.message) || ("status " + response.status));
+          }
+          return payload;
+        });
+      });
+    }
+
+    function ensureConnected() {
+      if (state.session && state.session.session_id) {
+        connectPanel.classList.add("hidden");
+        connectPanel.style.display = "none";
+        return true;
+      }
+      connectPanel.style.display = "block";
+      terminalHost.style.display = "none";
+      return false;
+    }
+
+    function newTab() {
+      if (!ensureConnected()) return;
+      setStatus("Creating session…", false);
+      api("/api/v1/terminal/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cols: state.fit ? state.fit.proposeDimensions().cols || 120 : 120, rows: state.fit ? state.fit.proposeDimensions().rows || 30 : 30 })
+      }).then(function (created) {
+        var id = created.session_id;
+        state.tabs[id] = { session_id: id, token: created.token, shell: created.shell };
+        renderTabs();
+        activateTab(id);
+        setStatus("Connected · " + created.shell, true);
+        hostHint.textContent = "host shell · " + created.shell;
+      }).catch(function (error) {
+        setStatus("Session failed: " + error.message, false);
+      });
+    }
+
+    function renderTabs() {
+      var tabsEl = document.getElementById("tabs");
+      tabsEl.innerHTML = "";
+      Object.keys(state.tabs).forEach(function (id) {
+        var tab = state.tabs[id];
+        var el = document.createElement("div");
+        el.className = "tab" + (id === state.active ? " active" : "");
+        el.textContent = "Terminal " + id.slice(-4);
+        var x = document.createElement("span");
+        x.className = "x";
+        x.textContent = "✕";
+        x.addEventListener("click", function (event) { event.stopPropagation(); closeTab(id); });
+        el.appendChild(x);
+        el.addEventListener("click", function () { activateTab(id); });
+        tabsEl.appendChild(el);
+      });
+    }
+
+    function activateTab(id) {
+      var tab = state.tabs[id];
+      if (!tab) return;
+      if (state.active === id && state.term) return;
+      state.active = id;
+      closeTerm();
+      var term = new Terminal({ cursorBlink: true, fontSize: 13, scrollback: 4000, theme: { background: "#050912", foreground: "#eaf6ff", cursor: "#31d7ff" } });
+      state.term = term;
+      var fit = new FitAddon.FitAddon();
+      var links = new WebLinksAddon.WebLinksAddon();
+      term.loadAddon(fit);
+      term.loadAddon(links);
+      state.fit = fit;
+      term.open(terminalHost);
+      fit.fit();
+      terminalHost.style.display = "block";
+      term.onData(function (data) { send(data); });
+      term.onResize(function (dim) {
+        if (state.socket && state.socket.readyState === 1) {
+          state.socket.send(JSON.stringify({ type: "resize", cols: dim.cols, rows: dim.rows }));
+        }
+      });
+      connectWs(id);
+      renderTabs();
+      term.focus();
+    }
+
+    function closeTerm() {
+      if (state.socket) { try { state.socket.close(); } catch (e) {} state.socket = null; }
+      if (state.term) { try { state.term.dispose(); } catch (e) {} state.term = null; }
+      state.fit = null;
+      terminalHost.innerHTML = "";
+    }
+
+    function connectWs(id) {
+      var tab = state.tabs[id];
+      var url = wsProtocol + "//" + window.location.host + "/api/v1/terminal/ws/" + id +
+        "?token=" + encodeURIComponent(tab.token) + "&session=" + encodeURIComponent(state.session.session_id);
+      var socket = new WebSocket(url);
+      state.socket = socket;
+      socket.onopen = function () { setStatus("Connected · " + tab.shell, true); };
+      socket.onmessage = function (event) {
+        if (state.term && state.active === id) state.term.write(event.data);
+      };
+      socket.onclose = function () {
+        if (state.active === id) setStatus("Session closed — reconnect", false);
+      };
+      socket.onerror = function () { setStatus("Terminal connection error", false); };
+    }
+
+    function send(data) {
+      if (state.socket && state.socket.readyState === 1) state.socket.send(data);
+    }
+
+    function closeTab(id) {
+      if (state.tabs[id]) {
+        api("/api/v1/terminal/sessions/" + id, { method: "DELETE" }).catch(function () {});
+        delete state.tabs[id];
+        if (state.active === id) { closeTerm(); state.active = null; }
+        renderTabs();
+        var remaining = Object.keys(state.tabs);
+        if (remaining.length) activateTab(remaining[remaining.length - 1]);
+      }
+    }
+
+    document.getElementById("new-btn").addEventListener("click", newTab);
+    document.getElementById("copy-btn").addEventListener("click", function () {
+      if (state.term) { var sel = state.term.getSelection(); if (sel) navigator.clipboard.writeText(sel); }
+    });
+    document.getElementById("paste-btn").addEventListener("click", function () {
+      navigator.clipboard.readText().then(function (text) { send(text); }).catch(function () {});
+    });
+    document.getElementById("clear-btn").addEventListener("click", function () {
+      if (state.term) { state.term.clear(); }
+    });
+    document.getElementById("full-btn").addEventListener("click", function () {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+      setTimeout(function () { if (state.fit) state.fit.fit(); }, 300);
+    });
+    document.getElementById("help-btn").addEventListener("click", function () {
+      alert("Terminal shortcuts:\nCtrl+C copy selection · Ctrl+Shift+V paste · Esc clear selection\n+ New opens a tab · Ask Joe explains recent output (bounded).\nThis PTY is your authenticated host shell — agents have no access to it.");
+    });
+    document.querySelectorAll("[data-key]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var key = btn.getAttribute("data-key");
+        if (key === "CTRL_C") send("\x03");
+        else if (key === "ESC") send("\x1b");
+        else if (key === "TAB") send("\t");
+        else if (key === "ARROW_UP") send("\x1b[A");
+        else if (key === "ARROW_DOWN") send("\x1b[B");
+        if (state.term) state.term.focus();
+      });
+    });
+
+    window.addEventListener("resize", function () {
+      if (state.fit && state.term && state.socket && state.socket.readyState === 1) {
+        var d = state.fit.proposeDimensions();
+        state.fit.fit();
+        state.socket.send(JSON.stringify({ type: "resize", cols: d.cols, rows: d.rows }));
+      }
+    });
+
+    // ---- Ask Joe (scoped to terminal, bounded context) ----
+    var joeBox = document.getElementById("joe-box");
+    var joeStream = null;
+    function terminalContext() {
+      var snapshot = "";
+      if (state.active && state.tabs[state.active]) {
+        snapshot = state.tabs[state.active].lastOutput || "";
+      }
+      return { module_type: "terminal", object_type: "terminal-session", object_id: state.active || "", label: "Terminal" };
+    }
+    document.getElementById("joe-btn").addEventListener("click", function () {
+      joeBox.classList.toggle("open");
+      if (joeBox.classList.contains("open")) document.getElementById("joe-input").focus();
+    });
+    document.getElementById("joe-close").addEventListener("click", function () { joeBox.classList.remove("open"); });
+    function askJoe(question) {
+      var body = document.getElementById("joe-body");
+      var input = document.getElementById("joe-input");
+      var snapshot = "";
+      if (state.active && state.tabs[state.active]) snapshot = state.tabs[state.active].lastOutput || "";
+      body.textContent = "Joe (Ollama) · asking…";
+      var history = [{ role: "user", content: question + (snapshot ? "\n\nRecent terminal output (bounded):\n" + snapshot.slice(-1200) : "") }];
+      if (joeStream) { try { joeStream.abort(); } catch (e) {} }
+      var controller = new AbortController();
+      joeStream = controller;
+      var model = "";
+      fetch("/api/v1/ai/chat/config", { headers: { "X-Joeos-Session": state.session ? state.session.session_id : "" } })
+        .then(function (r) { return r.json(); }).then(function (cfg) { model = cfg.model || ""; return streamAsk(controller, history, model, body); })
+        .catch(function (err) { body.textContent = "Could not reach the local model: " + err.message; });
+    }
+    async function streamAsk(controller, history, model, body) {
+      var resp = await fetch("/api/v1/ai/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Joeos-Session": state.session ? state.session.session_id : "" },
+        body: JSON.stringify({ messages: history, model: model, context: terminalContext() }),
+        signal: controller.signal
+      });
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = "";
+      var text = "";
+      body.textContent = "";
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        var lines = buffer.split("\n"); buffer = lines.pop();
+        lines.forEach(function (line) {
+          line = line.trim();
+          if (line.indexOf("data:") === 0) {
+            try {
+              var ev = JSON.parse(line.slice(5));
+              if (ev.kind === "delta") text += ev.content;
+            } catch (e) {}
+          }
+        });
+        body.textContent = text;
+      }
+      if (!text.trim()) body.textContent = "No response from the local model.";
+    }
+    document.getElementById("joe-send").addEventListener("click", function () {
+      var input = document.getElementById("joe-input");
+      if (!input.value.trim()) return;
+      askJoe(input.value); input.value = "";
+    });
+
+    // ---- Pairing (agent_fabric-compatible ceremony) ----
+    function pairDevice(code) {
+      var msg = document.getElementById("pair-msg");
+      msg.textContent = "Pairing…";
+      var parts = String(code || "").split("|");
+      if (parts.length < 4) { msg.textContent = "Invalid pairing code format."; return; }
+      fetch(parts[1] + "/api/v1/device/enrollment/challenge", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_id: "browser-terminal", user_id: "local" }) })
+        .then(function (r) { return r.json(); }).then(function () {
+          msg.textContent = "Pairing via browser shell is required first. Open /os/agents once, pair there, then reload this page.";
+        }).catch(function () {
+          msg.textContent = "Could not reach the backend. Ensure the terminal is served by the authoritative host.";
+        });
+    }
+    document.getElementById("pair-btn").addEventListener("click", function () {
+      pairDevice(document.getElementById("pair-code").value);
+    });
+
+    // Capture recent output per tab for scoped Joe (bounded).
+    var origWrite = null;
+    function init() {
+      if (!ensureConnected()) return;
+      newTab();
+    }
+    init();
+  </script>
+</body>
+</html>

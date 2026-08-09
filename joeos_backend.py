@@ -72,6 +72,7 @@ from server.performance import PerformanceService, performance_router
 from server.production import ProductionService, production_router
 from server.ai import AIService, ai_router
 from server.selfmaintenance import SelfMaintenanceService, selfmaintenance_router
+from server.terminal import TerminalGateway, terminal_router
 from server.realtime import RealtimeService, SQLiteEventRepository, realtime_router
 from server.wearables import WearableService, wearables_router
 from server.security import (
@@ -1683,9 +1684,31 @@ async def lifespan(app: FastAPI):
         autonomous_worker = asyncio.create_task(
             app.state.autonomous_scheduler.run(), name="joeos-autonomous-scheduler"
         )
+    app.state.terminal_gateway = TerminalGateway(
+        event_sink=lambda level, source, message: _record_event(
+            db_path, level, source, message
+        ),
+    )
+
+    async def _terminal_reaper() -> None:
+        while True:
+            try:
+                app.state.terminal_gateway.reap()
+            except Exception:  # noqa: BLE001 - reaper never crashes the loop
+                pass
+            await asyncio.sleep(60)
+
+    terminal_reaper = asyncio.create_task(_terminal_reaper(), name="joeos-terminal-reaper")
     try:
         yield
     finally:
+        terminal_reaper.cancel()
+        with suppress(asyncio.CancelledError):
+            await terminal_reaper
+        gateway = getattr(app.state, "terminal_gateway", None)
+        if gateway is not None:
+            for session in list(gateway.list()):
+                gateway.close(session["session_id"])
         collector.cancel()
         selfmaintenance.cancel()
         if campaign_worker is not None:
@@ -1742,6 +1765,7 @@ app.include_router(mobile_router)
 app.include_router(security_router)
 app.include_router(performance_router)
 app.include_router(ai_router)
+app.include_router(terminal_router)
 app.include_router(production_router)
 app.include_router(selfmaintenance_router)
 
@@ -1959,6 +1983,8 @@ def os_frontend(rest: str) -> FileResponse:
         return FileResponse(AUTOMATIONS_PAGE_PATH, media_type="text/html")
     if head == "build":
         return FileResponse(BUILD_PAGE_PATH, media_type="text/html")
+    if head == "terminal":
+        return FileResponse(TERMINAL_PAGE_PATH, media_type="text/html")
     return FileResponse(INDEX_PATH, media_type="text/html")
 
 
@@ -1983,6 +2009,7 @@ def browser_sdk() -> FileResponse:
 
 
 AGENT_FABRIC_PAGE_PATH = _package_asset("agent_fabric.html")
+TERMINAL_PAGE_PATH = _package_asset("terminal.html")
 AUTOMATIONS_PAGE_PATH = _package_asset("automations.html")
 BUILD_PAGE_PATH = _package_asset("build.html")
 
