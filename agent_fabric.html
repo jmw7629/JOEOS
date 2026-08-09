@@ -95,12 +95,65 @@
       border-radius: 50%; background: rgba(49,215,255,0.14); border: 1px solid rgba(49,215,255,0.4);
       color: var(--cyan); font-weight: 700; font-size: 18px; flex: none; }
 
+    /* ---- Agent Command Center shell ---- */
+    .cc-nav { display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+      border-bottom: 1px solid var(--line); padding: 6px 20px; position: sticky; top: 54px; z-index: 15;
+      background: rgba(5,9,18,0.9); backdrop-filter: blur(10px); }
+    .cc-nav button { background: transparent; border: 1px solid transparent; color: var(--muted);
+      padding: 7px 12px; border-radius: 9px; font-size: 13px; font-weight: 500; }
+    .cc-nav button:hover { color: var(--text); background: rgba(139,212,255,0.08); }
+    .cc-nav button.active { color: var(--cyan); border-color: rgba(49,215,255,0.45); background: rgba(49,215,255,0.1); }
+    .cc-view { display: none; }
+    .cc-view.active { display: block; }
+    .cc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+    .cc-stat { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 13px 15px; }
+    .cc-stat .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .cc-stat .v { font-size: 22px; font-weight: 700; margin-top: 3px; }
+    .cc-stat .v.sm { font-size: 15px; }
+    .kanban { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 10px; align-items: flex-start; }
+    .kanban-col { flex: 0 0 250px; min-width: 250px; background: rgba(8,18,32,0.5); border: 1px solid var(--line);
+      border-radius: 14px; padding: 10px; }
+    .kanban-col h5 { margin: 2px 4px 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+    .kb-card { background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px;
+      margin-bottom: 8px; cursor: pointer; transition: border-color .15s ease; }
+    .kb-card:hover { border-color: rgba(49,215,255,0.35); }
+    .kb-card .t { font-weight: 600; font-size: 13px; }
+    .kb-card .s { color: var(--muted); font-size: 11px; margin-top: 4px; }
+    .orgline { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; white-space: pre; overflow-x: auto; }
+    .matrix { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    .matrix th, .matrix td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .matrix th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 2px 8px; border-radius: 20px;
+      border: 1px solid var(--line); color: var(--muted); margin: 1px 3px 1px 0; }
+    .chip.green { color: var(--success); border-color: rgba(61,227,164,0.5); }
+    .chip.amber { color: var(--warning); border-color: rgba(255,180,92,0.5); }
+    .chip.red { color: var(--danger); border-color: rgba(255,100,124,0.5); }
+    .chip.cyan { color: var(--cyan); border-color: rgba(49,215,255,0.5); }
+    .bar { height: 6px; border-radius: 4px; background: rgba(139,212,255,0.12); overflow: hidden; margin-top: 6px; }
+    .bar > span { display: block; height: 100%; background: var(--cyan); border-radius: 4px; }
+    .live-panel { position: fixed; right: 14px; bottom: 14px; width: 320px; max-width: calc(100vw - 28px);
+      background: rgba(6,14,26,0.96); border: 1px solid var(--line); border-radius: 14px; z-index: 60;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5); overflow: hidden; }
+    .live-panel.hidden { display: none; }
+    .live-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--line);
+      cursor: pointer; font-size: 12px; color: var(--muted); }
+    .live-body { max-height: 260px; overflow: auto; padding: 8px 10px; font-size: 12.5px; }
+    .live-row { padding: 4px 2px; border-bottom: 1px dashed rgba(139,212,255,0.08); }
+    .live-row .when { color: var(--muted); font-size: 10.5px; margin-left: 6px; }
+    .empty-note { color: var(--muted); font-size: 13px; padding: 14px 0; }
+
     @media (max-width: 640px) {
       main { padding: 16px 14px 80px; }
       header { padding: 12px 14px; }
       .grid { grid-template-columns: 1fr; }
       .modal { align-items: flex-end; padding: 0; }
       .modal-box { max-width: 100%; max-height: 90vh; border-radius: 18px 18px 0 0; }
+      .cc-nav { top: 48px; padding: 5px 10px; }
+      .cc-nav button { padding: 6px 9px; font-size: 12px; }
+      .kanban-col { flex: 0 0 220px; min-width: 220px; }
+      .live-panel { right: 8px; bottom: 8px; width: calc(100vw - 16px); }
+      .matrix { font-size: 11.5px; }
+      .matrix th, .matrix td { padding: 6px 6px; }
     }
   </style>
 </head>
@@ -113,6 +166,18 @@
     <button id="logout-btn" class="hidden">Logout</button>
     <button id="pair-btn">Connect</button>
   </header>
+
+  <nav class="cc-nav hidden" id="cc-nav" aria-label="Agent Command Center">
+    <button data-cc="overview" class="active">Overview</button>
+    <button data-cc="orgmap">Org Map</button>
+    <button data-cc="agents">Agents</button>
+    <button data-cc="work">Work</button>
+    <button data-cc="schedule">Schedule</button>
+    <button data-cc="pipelines">Pipelines</button>
+    <button data-cc="memory">Memory</button>
+    <button data-cc="activity">Activity</button>
+    <button data-cc="models">Models</button>
+  </nav>
 
   <main>
     <section id="pairing-panel" class="panel hidden">
@@ -131,6 +196,8 @@
     </section>
 
     <section id="dashboard" class="hidden">
+
+      <div id="cc-overview" class="cc-view active">
 
       <div class="panel hero">
         <div class="row" style="align-items:flex-start">
@@ -177,8 +244,70 @@
           Nothing runs without an active session, and no external provider is contacted.</p>
       </details>
 
+      </div>
+
+      <div id="cc-orgmap" class="cc-view">
+        <div class="section-title"><h3>Organization map</h3>
+          <span class="muted small">Real delegation and reporting structure from JoeOS state.</span></div>
+        <div class="panel"><div id="orgmap-content" class="orgline">Loading…</div></div>
+      </div>
+
+      <div id="cc-agents" class="cc-view">
+        <div class="section-title"><h3>Agents</h3>
+          <span class="muted small" id="cc-agents-sub"></span></div>
+        <div id="cc-agents-grid" class="grid"></div>
+      </div>
+
+      <div id="cc-work" class="cc-view">
+        <div class="section-title"><h3>Work board</h3>
+          <span class="muted small">Authoritative WorkPackages, AgentRuns, and campaign work.</span></div>
+        <div id="cc-kanban"></div>
+      </div>
+
+      <div id="cc-schedule" class="cc-view">
+        <div class="section-title"><h3>Schedule</h3>
+          <span class="muted small">Automation schedules and runs from the JoeOS scheduler.</span></div>
+        <div id="cc-schedule-body"></div>
+      </div>
+
+      <div id="cc-pipelines" class="cc-view">
+        <div class="section-title"><h3>Pipelines</h3>
+          <span class="muted small">Real automation runs and their node progress.</span></div>
+        <div id="cc-pipelines-body"></div>
+      </div>
+
+      <div id="cc-memory" class="cc-view">
+        <div class="section-title"><h3>Memory</h3>
+          <span class="muted small">Structured agent knowledge from the JoeOS memory platform.</span></div>
+        <div class="row" style="margin:6px 0 12px">
+          <input id="cc-mem-search" placeholder="Search memory…" style="max-width:360px">
+          <button id="cc-mem-go" class="ghost">Search</button>
+        </div>
+        <div id="cc-memory-body"></div>
+      </div>
+
+      <div id="cc-activity" class="cc-view">
+        <div class="section-title"><h3>Activity</h3>
+          <span class="muted small">Agent runs, automations, and campaign events.</span></div>
+        <div id="cc-activity-body"></div>
+      </div>
+
+      <div id="cc-models" class="cc-view">
+        <div class="section-title"><h3>Models & resources</h3>
+          <span class="muted small">Providers, models, and runtime health.</span></div>
+        <div id="cc-models-body"></div>
+      </div>
+
     </section>
   </main>
+
+  <div id="live-panel" class="live-panel hidden">
+    <div class="live-head" id="live-head">
+      <span class="pill green"></span><b>Live activity</b><span class="spacer"></span>
+      <span class="muted small">expand / collapse</span>
+    </div>
+    <div id="live-body" class="live-body hidden"></div>
+  </div>
 
   <div id="modal" class="modal hidden">
     <div class="modal-box">
@@ -856,6 +985,7 @@
         $("logout-btn").classList.remove("hidden");
         $("pair-btn").classList.add("hidden");
         setStatus("Connected · session " + session.session_id.slice(0, 8), "good");
+        showCommandCenter();
         try {
           await refreshAll();
         } catch (e) {
@@ -891,6 +1021,7 @@
         $("logout-btn").classList.remove("hidden");
         $("pair-btn").classList.add("hidden");
         setStatus("Connected · session " + sessionResult.session.session_id.slice(0, 8), "good");
+        showCommandCenter();
         await refreshAll();
       } catch (e) {
         $("pair-message").textContent = "Not ready yet: " + e.message +
@@ -1010,6 +1141,329 @@
         refreshAll().catch(function () {});
       }
     }, 15000);
+
+    // ------------------------------------------------------------------
+    // Agent Command Center: navigation + data surfaces
+    // ------------------------------------------------------------------
+    function showView(name) {
+      Array.prototype.forEach.call(document.querySelectorAll(".cc-view"), function (v) {
+        v.classList.toggle("active", v.id === "cc-" + name);
+      });
+      Array.prototype.forEach.call(document.querySelectorAll(".cc-nav button"), function (b) {
+        b.classList.toggle("active", b.getAttribute("data-cc") === name);
+      });
+      loadView(name);
+    }
+
+    var ccViews = {
+      orgmap: function () { return loadOrgMap(); },
+      agents: function () { return loadAgentsGrid(); },
+      work: function () { return loadWorkBoard(); },
+      schedule: function () { return loadSchedule(); },
+      pipelines: function () { return loadPipelines(); },
+      memory: function () { return loadMemory(); },
+      activity: function () { return loadActivity(); },
+      models: function () { return loadModels(); },
+    };
+
+    function loadView(name) {
+      if (ccViews[name]) ccViews[name]();
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll(".cc-nav button"), function (b) {
+      b.addEventListener("click", function () { showView(b.getAttribute("data-cc")); });
+    });
+
+    function statusChip(state) {
+      var s = String(state || "").toLowerCase();
+      if (["active", "healthy", "succeeded", "available", "configured", "enabled", "ok"].indexOf(s) !== -1) return "green";
+      if (["waiting", "paused", "queued", "proposed", "eligible", "idle"].indexOf(s) !== -1) return "amber";
+      if (["blocked", "failed", "error", "unhealthy", "revoked", "retired"].indexOf(s) !== -1) return "red";
+      return "";
+    }
+
+    function agentStatusTone(status) {
+      return statusChip(status);
+    }
+
+    async function loadOrgMap() {
+      var box = $("orgmap-content");
+      box.innerHTML = "<div class='muted'>Loading…</div>";
+      try {
+        var data = await api("/api/v1/agents/overview");
+        var agents = (data.agents || []).filter(function (a) { return a.status !== "retired"; });
+        var lines = [];
+        var joe = agents.find(function (a) { return /joe/i.test(a.display_name) && /orchestr/i.test((a.description || "") + (a.display_name || "")); });
+        var lead = joe || agents[0];
+        if (!lead) { box.innerHTML = "<div class='empty-note'>No agents configured.</div>"; return; }
+        var others = agents.filter(function (a) { return a.agent_id !== lead.agent_id; });
+        lines.push(lead.display_name + "  [" + (lead.role_id || "lead") + "]");
+        lines.push("├── " + others.map(function (a) { return a.display_name + " [" + (a.status || "unknown") + "]"; }).join("\n├── "));
+        var missions = (data.missions || []).filter(function (m) { return m.status === "active" || m.status === "planning"; });
+        var extra = [];
+        (data.roles || []).slice(0, 6).forEach(function (r) { extra.push(r.title); });
+        if (missions.length) extra.push(missions.length + " active mission(s)");
+        if (extra.length) lines.push("└── team · " + extra.join(" · "));
+        box.innerHTML = lines.join("\n");
+        var subs = [];
+        (data.health || []).forEach(function (h) { subs.push(h.kind + ": " + h.state); });
+        if (subs.length) box.innerHTML += "<div class='muted small' style='margin-top:12px'>" + subs.join(" · ") + "</div>";
+      } catch (e) {
+        box.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+      }
+    }
+
+    async function loadAgentsGrid() {
+      var grid = $("cc-agents-grid");
+      var sub = $("cc-agents-sub");
+      grid.innerHTML = "<div class='muted'>Loading…</div>";
+      try {
+        var data = await api("/api/v1/control/overview");
+        var agents = (data.agents.items || []).filter(function (a) { return a.status === "active"; });
+        var providers = {}; (data.providers.items || []).forEach(function (p) { providers[p.id] = p; });
+        var models = {}; (data.models.items || []).forEach(function (m) { models[m.id] = m; });
+        sub.textContent = agents.length + " active agent(s) · " + (data.agents.active || 0) + " active overall";
+        grid.innerHTML = agents.map(function (a) {
+          var tone = agentStatusTone(a.status);
+          return "<div class='agent-card'>" +
+            "<div class='row'><span class='orb'>" + esc(a.display_name.charAt(0).toUpperCase()) + "</span>" +
+            "<div><div class='name'>" + esc(a.display_name) + "</div>" +
+            "<div class='muted small'>" + esc(a.key || a.id.slice(0, 12)) + "</div></div></div>" +
+            "<div class='badges'><span class='badge " + (tone || "") + "'>" + esc(a.status) + "</span></div>" +
+            "<div class='desc'>" + esc((a.description || a.purpose || "").slice(0, 90)) + "</div>" +
+            "<div class='actions'>" +
+            "<button data-talk='" + a.id + "'>Talk</button>" +
+            "<button data-task='" + a.id + "'>Start a task</button>" +
+            "<button data-runs='" + a.id + "'>Activity</button>" +
+            "</div>" +
+            "<div class='run-detail hidden' data-agent-runs='" + a.id + "'></div>" +
+            "</div>";
+        }).join("") || "<div class='empty-note'>No active agents.</div>";
+      } catch (e) {
+        grid.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+      }
+    }
+
+    async function loadWorkBoard() {
+      var box = $("cc-kanban");
+      box.innerHTML = "<div class='muted'>Loading…</div>";
+      var cards = [];
+      try {
+        var data = await api("/api/v1/control/overview");
+        (data.recent_runs || []).forEach(function (r) {
+          cards.push({ id: r.id, title: (r.objective || "Run").slice(0, 70), agent: r.agent_key || "", status: r.status, when: r.started_at || r.completed_at, type: "run" });
+        });
+      } catch (e) {}
+      try {
+        var campaigns = (await api("/api/v1/engineering/campaigns")).campaigns || [];
+        if (campaigns.length) {
+          var c = campaigns[0];
+          var pkgs = (await api("/api/v1/engineering/campaigns/" + c.campaign_id + "/packages")).packages || [];
+          pkgs.forEach(function (p) {
+            cards.push({ id: p.package_id, title: (p.key || p.package_id).slice(0, 60), agent: "Director", status: p.state, when: p.created_at || p.updated_at, type: "package" });
+          });
+        }
+      } catch (e) {}
+      if (!cards.length) { box.innerHTML = "<div class='empty-note'>No work yet. Ask Joe or start a campaign.</div>"; return; }
+      var cols = [
+        { key: "backlog", title: "Backlog", match: ["queued", "proposed"] },
+        { key: "ready", title: "Ready", match: ["eligible"] },
+        { key: "working", title: "Working", match: ["working", "running", "in_progress", "started", "executing", "planning", "implementing", "validating"] },
+        { key: "verifying", title: "Verifying", match: ["verifying", "verification", "reviewing"] },
+        { key: "waiting", title: "Waiting for Joe", match: ["waiting", "blocked"] },
+        { key: "done", title: "Done", match: ["done", "completed", "succeeded", "complete"] },
+      ];
+      box.innerHTML = "<div class='kanban'>" + cols.map(function (col) {
+        var items = cards.filter(function (c) { return col.match.indexOf(c.status) !== -1; });
+        return "<div class='kanban-col'><h5>" + col.title + " (" + items.length + ")</h5>" +
+          items.map(function (c) {
+            return "<div class='kb-card'><div class='t'>" + esc(c.title) + "</div>" +
+              "<div class='s'><span class='chip " + statusChip(c.status) + "'>" + esc(c.status) + "</span> " +
+              esc(c.agent || "") + " · " + esc(c.type || "") + "</div></div>";
+          }).join("") + "</div>";
+      }).join("") + "</div>";
+    }
+
+    async function loadSchedule() {
+      var box = $("cc-schedule-body");
+      box.innerHTML = "<div class='muted'>Loading…</div>";
+      var html = "";
+      try {
+        var overview = await api("/api/v1/automation/overview");
+        html += "<div class='cc-grid'>" +
+          statCell("Workflows", overview.workflows_total) +
+          statCell("Enabled", overview.workflows_enabled) +
+          statCell("Running", overview.running, overview.running ? "amber" : "") +
+          statCell("Failed recently", overview.failed_recently, overview.failed_recently ? "red" : "") +
+          statCell("Pending approvals", overview.pending_approvals, overview.pending_approvals ? "amber" : "") +
+          "</div>";
+      } catch (e) { html += "<div class='msg err'>" + esc(e.message) + "</div>"; }
+      try {
+        var schedules = (await api("/api/v1/automation/schedules")).schedules || [];
+        if (schedules.length) {
+          html += "<div class='section-title'><h3>Schedules</h3></div><table class='matrix'><tr>" +
+            "<th>Workflow</th><th>Timezone</th><th>Next run</th><th>Last run</th><th>Status</th></tr>" +
+            schedules.map(function (s) {
+              return "<tr><td>" + esc(s.workflow_id) + "</td><td>" + esc(s.timezone || "") + "</td>" +
+                "<td>" + esc(s.next_run || "—") + "</td><td>" + esc(s.last_run || "—") + "</td>" +
+                "<td><span class='chip " + statusChip(s.enabled ? "enabled" : "paused") + "'>" + esc(s.enabled ? "enabled" : "paused") + "</span></td></tr>";
+            }).join("") + "</table>";
+        } else {
+          html += "<div class='empty-note' style='margin-top:12px'>No schedules configured. Schedule from the Automations console.</div>";
+        }
+      } catch (e) {}
+      box.innerHTML = html;
+    }
+
+    function statCell(k, v, tone) {
+      return "<div class='cc-stat'><div class='k'>" + esc(k) + "</div><div class='v " + (tone || "") + "'>" + (v == null ? "—" : esc(String(v))) + "</div></div>";
+    }
+
+    async function loadPipelines() {
+      var box = $("cc-pipelines-body");
+      box.innerHTML = "<div class='muted'>Loading…</div>";
+      var html = "";
+      try {
+        var runs = (await api("/api/v1/automation/runs")).runs || [];
+        if (!runs.length) { box.innerHTML = "<div class='empty-note'>No automation runs yet.</div>"; return; }
+        html += "<table class='matrix'><tr><th>Run</th><th>Workflow</th><th>State</th><th>Node</th><th>When</th><th>Duration</th></tr>";
+        html += runs.slice(0, 15).map(function (r) {
+          return "<tr><td class='mono'>" + esc((r.run_id || "").slice(0, 12)) + "</td>" +
+            "<td>" + esc(r.workflow_id || "") + "</td>" +
+            "<td><span class='chip " + statusChip(r.state) + "'>" + esc(r.state) + "</span></td>" +
+            "<td>" + esc(r.current_node || "—") + "</td>" +
+            "<td class='muted small'>" + esc(timeAgo(r.started_at)) + "</td>" +
+            "<td class='muted small'>" + (r.duration_seconds ? r.duration_seconds + "s" : "—") + "</td></tr>";
+        }).join("");
+        html += "</table>";
+      } catch (e) {
+        html += "<div class='msg err'>" + esc(e.message) + "</div>";
+      }
+      box.innerHTML = html;
+    }
+
+    async function loadMemory(query) {
+      var box = $("cc-memory-body");
+      box.innerHTML = "<div class='muted'>Loading…</div>";
+      try {
+        var url = query ? "/api/v1/memory/search?q=" + encodeURIComponent(query) : "/api/v1/memory/records?limit=25";
+        var data = await api(url);
+        var records = Array.isArray(data) ? data : (data.records || data.results || []);
+        if (!records.length) { box.innerHTML = "<div class='empty-note'>No memory records" + (query ? " matching “" + esc(query) + "”" : "") + ".</div>"; return; }
+        box.innerHTML = "<table class='matrix'><tr><th>Kind</th><th>Agent</th><th>Summary</th><th>State</th><th>Updated</th></tr>" +
+          records.map(function (m) {
+            return "<tr><td>" + esc(m.kind || m.kind_id || "record") + "</td>" +
+              "<td>" + esc(m.agent_id || m.source || "—") + "</td>" +
+              "<td>" + esc((m.summary || m.content || m.payload || "").slice(0, 80)) + "</td>" +
+              "<td><span class='chip " + statusChip(m.state || m.status) + "'>" + esc(m.state || m.status || "—") + "</span></td>" +
+              "<td class='muted small'>" + esc(timeAgo(m.updated_at || m.created_at)) + "</td></tr>";
+          }).join("") + "</table>";
+      } catch (e) {
+        box.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+      }
+    }
+
+    async function loadActivity() {
+      var box = $("cc-activity-body");
+      box.innerHTML = "<div class='muted'>Loading…</div>";
+      var html = "";
+      try {
+        var events = await api("/api/v1/agents/activity");
+        if (events && events.length) {
+          html += "<div class='section-title'><h3>Agents</h3></div>" + events.slice(0, 8).map(function (ev) {
+            return "<div class='deleg'><span class='pill " + statusChip(ev.level || ev.kind) + "'></span>" +
+              "<b>" + esc(ev.kind || "event") + "</b><span class='muted small'>" +
+              esc((ev.summary || "").slice(0, 90)) + "</span>" +
+              "<span class='muted small'>" + esc(timeAgo(ev.created_at)) + "</span></div>";
+          }).join("");
+        }
+      } catch (e) {}
+      try {
+        var a = await api("/api/v1/automation/activity");
+        var events = a.activity || [];
+        if (events.length) {
+          html += "<div class='section-title'><h3>Automations</h3></div>" + events.slice(0, 8).map(function (ev) {
+            return "<div class='deleg'><span class='pill " + statusChip(ev.level) + "'></span>" +
+              "<b>" + esc(ev.kind || "event") + "</b><span class='muted small'>" +
+              esc((ev.message || "").slice(0, 90)) + "</span>" +
+              "<span class='muted small'>" + esc(timeAgo(ev.recorded_at)) + "</span></div>";
+          }).join("");
+        }
+      } catch (e) {}
+      try {
+        var data = await api("/api/v1/control/overview");
+        if (data.recent_runs && data.recent_runs.length) {
+          html += "<div class='section-title'><h3>Agent runs</h3></div>" + data.recent_runs.slice(0, 8).map(function (r) {
+            return "<div class='deleg'><span class='pill " + statusChip(r.status) + "'></span>" +
+              "<b>" + esc(r.agent_key || "Agent") + "</b><span class='muted small'>" +
+              esc((r.objective || "").slice(0, 80)) + "</span>" +
+              "<span class='muted small'>" + esc(timeAgo(r.started_at)) + "</span></div>";
+          }).join("");
+        }
+      } catch (e) {}
+      box.innerHTML = html || "<div class='empty-note'>No activity yet.</div>";
+      feedLive(html);
+    }
+
+    async function loadModels() {
+      var box = $("cc-models-body");
+      box.innerHTML = "<div class='muted'>Loading…</div>";
+      var html = "";
+      try {
+        var svc = await api("/api/v1/command-center/services");
+        var svcs = svc.services || [];
+        if (svcs.length) {
+          html += "<div class='section-title'><h3>Runtimes</h3></div><div class='cc-grid'>" +
+            svcs.slice(0, 6).map(function (s) {
+              return "<div class='cc-stat'><div class='k'>" + esc(s.name) + "</div>" +
+                "<div class='v sm " + statusChip(s.state) + "'>" + esc(s.state) + "</div>" +
+                "<div class='muted small'>" + esc(s.message || "") + "</div></div>";
+            }).join("") + "</div>";
+        }
+      } catch (e) { html += "<div class='msg err'>" + esc(e.message) + "</div>"; }
+      try {
+        var data = await api("/api/v1/control/overview");
+        var providers = (data.providers.items || []).filter(function (p) { return p.status === "active"; });
+        var models = (data.models.items || []).filter(function (m) { return m.status === "active"; });
+        if (providers.length) {
+          html += "<div class='section-title'><h3>Providers</h3></div><table class='matrix'><tr><th>Name</th><th>Type</th><th>Location</th><th>Health</th></tr>" +
+            providers.map(function (p) {
+              return "<tr><td>" + esc(p.key || p.display_name) + "</td><td>" + esc(p.provider_type || p.kind || "") + "</td>" +
+                "<td>" + esc(p.location || "") + "</td>" +
+                "<td><span class='chip " + statusChip(p.health || p.status) + "'>" + esc(p.health || p.status) + "</span></td></tr>";
+            }).join("") + "</table>";
+        }
+        if (models.length) {
+          html += "<div class='section-title'><h3>Models (" + models.length + ")</h3></div><table class='matrix'><tr>" +
+            "<th>Model</th><th>Provider</th><th>Context</th><th>Tools</th><th>Vision</th><th>Reasoning</th></tr>" +
+            models.slice(0, 25).map(function (m) {
+              return "<tr><td>" + esc(m.key || m.model_identifier) + "</td><td class='muted small'>" + esc(m.provider_id || "") + "</td>" +
+                "<td>" + esc(m.context_limit || "") + "</td>" +
+                "<td>" + (m.tool_calling === 1 || m.tool_calling === true || m.tool_calling === "1" ? "yes" : "no") + "</td>" +
+                "<td>" + (m.vision ? "yes" : "no") + "</td>" +
+                "<td>" + (m.reasoning ? "yes" : "no") + "</td></tr>";
+            }).join("") + "</table>";
+        }
+      } catch (e) { html += "<div class='msg err'>" + esc(e.message) + "</div>"; }
+      box.innerHTML = html || "<div class='empty-note'>No provider data.</div>";
+    }
+
+    // ---- Floating live activity panel (Section AJ) ----
+    var liveEnabled = false;
+    function feedLive(html) {
+      if (!liveEnabled) return;
+      var body = $("live-body");
+      body.innerHTML = html || "<div class='empty-note'>No activity yet.</div>";
+    }
+    $("live-head").addEventListener("click", function () {
+      var body = $("live-body");
+      body.classList.toggle("hidden");
+    });
+
+    // nav: expose cc for boot() to reveal
+    function showCommandCenter() {
+      $("cc-nav").classList.remove("hidden");
+    }
 
     boot();
   </script>
