@@ -6106,7 +6106,10 @@
                   { className: "glass-card panel-card", key: workflow.workflow_id },
                   h("div", { className: "plugin-header" }, icon("fa-diagram-project"), h("div", null, h("strong", null, workflow.name), h("span", null, workflow.workflow_id + " v" + workflow.current_version))),
                   h("div", { className: "plugin-meta" }, workflow.enabled ? h(StatusBadge, { state: "running", label: "Enabled", icon: "fa-play" }) : h(StatusBadge, { state: workflow.health_state === "healthy" ? "idle" : "paused", label: workflow.status.toUpperCase(), icon: "fa-pause" }), h("span", null, "Health: " + workflow.health_state)),
-                  h("div", { className: "plugin-actions" }, h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(workflow); } }, "Inspect"))
+                  h("div", { className: "plugin-actions" },
+                    h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(workflow); } }, "Inspect"),
+                    h("button", { type: "button", className: "text-button", "data-joe-focus": "", "data-joe-module": "automation", "data-joe-object-type": "automation", "data-joe-object-id": workflow.workflow_id, "data-joe-label": workflow.name, title: "Ask Joe about this automation" }, icon("fa-wand-magic-sparkles"), " Ask Joe")
+                  )
                 );
               }))
             : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-diagram-project"), h("strong", null, "No workflows defined"), h("p", null, "Create a workflow from a safe template or a validated definition through the API.")))
@@ -6538,7 +6541,8 @@
             title: h("span", { id: "ai-title" }, "Models & AI"),
             description: "The Local AI Runtime reports honest provider, model, embedding, and interpretation state. AI-assisted interpretations are labeled as such with provenance and are never presented as parsed facts. Cloud routing is never silent.",
             actions: [
-              h("span", { className: "live-pill" + (overview.provider_available ? "" : " attention"), key: "ai" }, h("span", { className: "live-dot " + providerState }), overview.provider_available ? "LOCAL MODEL READY" : "RUNTIME OFFLINE")
+              h("span", { className: "live-pill" + (overview.provider_available ? "" : " attention"), key: "ai" }, h("span", { className: "live-dot " + providerState }), overview.provider_available ? "LOCAL MODEL READY" : "RUNTIME OFFLINE"),
+              h("button", { type: "button", className: "text-button", key: "ask-model", "data-joe-focus": "", "data-joe-module": "models", "data-joe-object-type": "model", "data-joe-object-id": modelLabel, "data-joe-label": modelLabel, title: "Ask Joe about this model" }, icon("fa-wand-magic-sparkles"), " Ask Joe")
             ]
           }),
           h(
