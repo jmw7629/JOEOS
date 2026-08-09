@@ -64,6 +64,10 @@ def _prefer_assistant_model(models: List[str]) -> Optional[str]:
     for candidate in (
         "qwen2.5-coder:7b",
         "qwen2.5-coder:7b-opencode-safe",
+        "qwen3-coder:30b-a3b-q8_0",
+        "qwen3-coder-next:latest",
+        "qwen3.6:35b",
+        "llama3.3:70b",
         "qwen2.5-coder:14b",
         "qwen2.5-coder:1.5b",
         "qwen2.5-coder:1.5b-fast",

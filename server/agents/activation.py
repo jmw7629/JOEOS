@@ -37,28 +37,28 @@ JOEOS_PROVIDER_DISPLAY = "Ollama (local)"
 # model actually used, so attribution stays honest.
 AGENT_MODELS = {
     "joeos.joe": {
-        "preferred": "qwen2.5-coder:1.5b-opencode-safe",
-        "fallback": "qwen2.5-coder:1.5b",
+        "preferred": "qwen3-coder-next:latest",
+        "fallback": "qwen2.5-coder:1.5b-opencode-safe",
     },
     "joeos.architect": {
-        "preferred": "qwen2.5-coder:1.5b",
-        "fallback": "qwen2.5-coder:1.5b-fast",
+        "preferred": "qwen3-coder:30b-a3b-q8_0",
+        "fallback": "qwen2.5-coder:1.5b",
     },
     "joeos.builder": {
-        "preferred": "qwen2.5-coder:1.5b-opencode-safe",
-        "fallback": "qwen2.5-coder:1.5b-fast",
+        "preferred": "qwen3-coder:30b-a3b-q8_0",
+        "fallback": "qwen2.5-coder:1.5b-opencode-safe",
     },
     "joeos.researcher": {
-        "preferred": "qwen2.5-coder:1.5b",
-        "fallback": "qwen2.5-coder:1.5b-fast",
+        "preferred": "qwen3.6:35b",
+        "fallback": "qwen2.5-coder:1.5b",
     },
     "joeos.verifier": {
-        "preferred": "qwen2.5-coder:1.5b",
-        "fallback": "qwen2.5-coder:1.5b-fast",
+        "preferred": "qwen3-coder:30b-a3b-q8_0",
+        "fallback": "qwen2.5-coder:1.5b",
     },
     "joeos.security": {
-        "preferred": "qwen2.5-coder:1.5b",
-        "fallback": "qwen2.5-coder:1.5b-fast",
+        "preferred": "llama3.3:70b",
+        "fallback": "qwen2.5-coder:1.5b",
     },
 }
 

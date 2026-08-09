@@ -29,7 +29,8 @@ CAPS = [
 INSTALLED = [
     "qwen2.5-coder:1.5b", "qwen2.5-coder:7b", "qwen2.5-coder:7b-opencode-safe",
     "qwen2.5-coder:14b-agentic", "qwen2.5-coder:7b-agentic",
-    "qwen2.5-coder:1.5b-fast", "deepseek-r1:14b", "qwen2.5-coder:14b",
+    "qwen2.5-coder:1.5b-fast", "qwen2.5-coder:1.5b-opencode-safe",
+    "deepseek-r1:14b", "qwen2.5-coder:14b",
 ]
 
 

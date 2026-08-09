@@ -427,16 +427,33 @@ def _ollama_api_base() -> str:
 
 
 def _default_agent_model(ollama_state: Optional[Dict[str, Any]]) -> str:
+    """Resolve the backend default agent model from the installed inventory.
+
+    Prefers the Halo large coder models (capability-assigned) and falls back to
+    the VPS-era qwen2.5 models so the same code is correct on both the Halo
+    authoritative host and the VPS rollback node."""
     models = list((ollama_state or {}).get("models", []))
-    for candidate in ("qwen2.5-coder:7b", "qwen2.5-coder:1.5b"):
+    for candidate in (
+        "qwen3-coder:30b-a3b-q8_0",
+        "qwen3-coder-next:latest",
+        "qwen3.6:35b",
+        "llama3.3:70b",
+        "qwen2.5-coder:7b",
+        "qwen2.5-coder:1.5b",
+    ):
         if candidate in models:
             return candidate
-    return "qwen2.5-coder:7b"
+    return "qwen3-coder:30b-a3b-q8_0"
 
 
 def _autonomous_default_model(ollama_state: Optional[Dict[str, Any]]) -> str:
     models = list((ollama_state or {}).get("models", []))
-    for candidate in ("qwen2.5-coder:1.5b", "qwen2.5-coder:1.5b-opencode-safe"):
+    for candidate in (
+        "qwen3-coder:30b-a3b-q8_0",
+        "qwen3-coder-next:latest",
+        "qwen2.5-coder:1.5b",
+        "qwen2.5-coder:1.5b-opencode-safe",
+    ):
         if candidate in models:
             return candidate
     return "qwen2.5-coder:1.5b"
