@@ -63,3 +63,24 @@ until real weights are pulled on Halo.**
   deepseek-r1:14b, gpt-oss:120b, qwen3.6:35b.
 - Model registry on Halo: 8 Ollama models `active`; VPS-only qwen2.5 models
   `disabled`. Coder + reasoning + tool-calling workloads are satisfied by Ollama.
+
+## Migration completion (2026-08-09, JOEOS-COMPLETION-LOOP-1)
+
+- **Halo is now the authoritative JoeOS intelligence/engineering host**:
+  `/home/joewillis/JOEOS` synced to `5e30607`, authoritative persistent state
+  migrated (cutover swap; Halo's prior test data preserved at
+  `data.pre-cutover-20260809T212626Z`).
+- Halo backend running on `0.0.0.0:8080`, reachable over Tailscale Serve HTTPS
+  at `https://amd-halo.tailb9395f.ts.net`.
+- Halo runner `5299c2ea` reconnected to the authoritative Halo backend
+  (active/healthy, heartbeat live). VPS runner `213a91d9` continues against the
+  VPS rollback backend.
+- Agents re-bound to Halo large models by capability (fix: `update_agent` now
+  persists provider/model policy):
+  joeos.joe→qwen3-coder-next:latest, architect/builder/verifier→
+  qwen3-coder:30b-a3b-q8_0, researcher→qwen3.6:35b, security→llama3.3:70b.
+  Engineering roles resolve `backend` → qwen3-coder:30b-a3b-q8_0 default.
+- Autonomous execution validated on Halo: joeos.joe run → qwen3-coder-next →
+  succeeded.
+- Remaining: `/opt/joeos` runner checkout refresh requires root on Halo
+  (privileged action). VPS stays intact as rollback.
