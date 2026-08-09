@@ -9080,6 +9080,31 @@
           } catch (error) {
             groups.push({ label: "Project files", icon: "fa-file-lines", items: [] });
           }
+          try {
+            var agentPayload = await requestJson("/api/v1/agents/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            var agentItems = ((agentPayload && agentPayload.agents) || []).filter(function (agent) {
+              return String(agent.display_name || agent.key || "").toLowerCase().indexOf(String(query).toLowerCase()) !== -1;
+            }).slice(0, 8).map(function (agent) {
+              return { id: agent.agent_id, title: agent.display_name, detail: agent.status + (agent.role_id ? " · " + agent.role_id : ""), snippet: agent.purpose || "" };
+            });
+            groups.push({ label: "Agents", icon: "fa-user-astronaut", items: agentItems });
+          } catch (error) {}
+          try {
+            var workflowsPayload = await requestJson("/api/v1/automation/workflows", { cache: "no-store", headers: { Accept: "application/json" } });
+            var workflowItems = (Array.isArray(workflowsPayload) ? workflowsPayload : []).filter(function (workflow) {
+              return String(workflow.name || workflow.workflow_id || "").toLowerCase().indexOf(String(query).toLowerCase()) !== -1;
+            }).slice(0, 8).map(function (workflow) {
+              return { id: workflow.workflow_id, title: workflow.name || workflow.workflow_id, detail: workflow.workflow_id + " · " + workflow.status, snippet: "" };
+            });
+            groups.push({ label: "Automations", icon: "fa-diagram-project", items: workflowItems });
+          } catch (error) {}
+          try {
+            var modelPayload = await requestJson("/api/v1/ai/chat/config", { cache: "no-store", headers: { Accept: "application/json" } });
+            var modelItems = ((modelPayload && modelPayload.models) || []).filter(function (model) {
+              return String(model).toLowerCase().indexOf(String(query).toLowerCase()) !== -1;
+            }).slice(0, 8).map(function (model) { return { id: model, title: model, detail: "Ollama model", snippet: "" }; });
+            groups.push({ label: "Models", icon: "fa-microchip", items: modelItems });
+          } catch (error) {}
           setSearchResults({ query: query, groups: groups.filter(function (group) { return group.items.length; }) });
           setSearchSearching(false);
         }
