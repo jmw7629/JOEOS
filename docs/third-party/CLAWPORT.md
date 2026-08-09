@@ -62,8 +62,24 @@ MIT code may be reused where it materially accelerates implementation, subject t
 
 Reused code/attribution ledger (updated as implementation proceeds):
 
-- No third-party code has been copied yet. Concept-level porting only.
-- If any component/snippet is ported, the MIT copyright notice for clawport-ui (John Rice, 2025) will be recorded here and preserved in the source.
+- No third-party code has been copied. Concept-level porting only — every
+  surface is implemented from scratch in the existing `agent_fabric.html`
+  single-file frontend with the authoritative JoeOS APIs; no React/Next.js, no
+  ClawPort dependencies, and no ClawPort auth/storage assumptions.
+- Ported concepts delivered 2026-08-09 (Section AU/AJ/AX):
+  - **Org Map** — ASCII text tree replaced with an interactive SVG hierarchy
+    (root → teams → agents, status-colored nodes, curved edges, legend,
+    node click → agent profile), rendered from `/api/v1/agents/overview`.
+  - **Activity console** — rows now expand on click to reveal the raw JSON
+    payload (bounded), matching ClawPort's "click a row → expand raw JSON".
+  - **Agent cards** — model + provider shown at a glance from authoritative
+    `control/overview` state.
+  - **Floating live stream** — the previously-inert live panel is now a
+    functional, persistent-across-views feed (header toggle, 15s refresh from
+    authoritative activity endpoints).
+- If any component/snippet is later copied verbatim, the MIT copyright notice
+  for clawport-ui (John Rice, 2025) will be recorded here and preserved in the
+  source.
 
 ## OpenClaw / OpenCode
 

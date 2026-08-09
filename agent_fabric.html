@@ -142,6 +142,37 @@
     .live-row .when { color: var(--muted); font-size: 10.5px; margin-left: 6px; }
     .empty-note { color: var(--muted); font-size: 13px; padding: 14px 0; }
 
+    /* ---- ClawPort-inspired Org Map (visual hierarchy, no external deps) ---- */
+    .orgmap-wrap { position: relative; overflow-x: auto; padding: 6px 2px 12px; }
+    .orgmap-canvas { position: relative; }
+    .orgmap-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+    .orgmap-edge { stroke: rgba(139,212,255,0.28); stroke-width: 1.5; fill: none; }
+    .orgmap-node { position: absolute; display: flex; align-items: center; gap: 9px; padding: 8px 11px;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 12px; cursor: pointer;
+      transition: border-color .15s ease, transform .1s ease, box-shadow .15s ease; white-space: nowrap; }
+    .orgmap-node:hover { border-color: rgba(49,215,255,0.55); transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+    .orgmap-node .om-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+    .orgmap-node .om-name { font-weight: 600; font-size: 13px; line-height: 1.2; }
+    .orgmap-node .om-sub { color: var(--muted); font-size: 11px; line-height: 1.2; }
+    .orgmap-node.team { background: rgba(8,18,32,0.72); border-style: dashed; }
+    .om-dot.green { background: var(--success); box-shadow: 0 0 8px rgba(61,227,164,0.6); }
+    .om-dot.amber { background: var(--warning); box-shadow: 0 0 8px rgba(255,180,92,0.6); }
+    .om-dot.red { background: var(--danger); box-shadow: 0 0 8px rgba(255,100,124,0.6); }
+    .om-dot.gray { background: var(--muted); }
+    .orgmap-legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 11.5px; margin-top: 8px; }
+
+    /* expandable activity rows (ClawPort: click a row to expand raw JSON) */
+    .act-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px;
+      background: rgba(8,18,32,0.55); margin-top: 6px; font-size: 13px; cursor: pointer;
+      border: 1px solid transparent; transition: border-color .15s ease; }
+    .act-row:hover { border-color: rgba(49,215,255,0.35); }
+    .act-row .chev { color: var(--muted); font-size: 11px; margin-left: auto; flex: none; }
+    .act-row .when { color: var(--muted); font-size: 11px; margin-left: 6px; flex: none; }
+    .act-detail { display: none; }
+    .act-detail.open { display: block; }
+    .act-detail pre { margin: 4px 0 0; max-height: 240px; overflow: auto; font-size: 11px; }
+
     @media (max-width: 640px) {
       main { padding: 16px 14px 80px; }
       header { padding: 12px 14px; }
@@ -164,6 +195,7 @@
     <span class="spacer"></span>
     <button id="refresh-btn" class="hidden">Refresh</button>
     <button id="logout-btn" class="hidden">Logout</button>
+    <button id="live-btn" class="hidden" title="Floating live activity stream (persists across views)">Live</button>
     <button id="pair-btn">Connect</button>
   </header>
 
@@ -1015,6 +1047,7 @@
         $("pairing-panel").classList.add("hidden");
         $("refresh-btn").classList.remove("hidden");
         $("logout-btn").classList.remove("hidden");
+        $("live-btn").classList.remove("hidden");
         $("pair-btn").classList.add("hidden");
         setStatus("Connected · session " + session.session_id.slice(0, 8), "good");
         showCommandCenter();
@@ -1168,6 +1201,16 @@
         var detailEl = runCard.querySelector(".run-detail");
         if (detailEl) await expandRun(runCard.getAttribute("data-run"), detailEl);
       }
+      var actRowEl = event.target.closest("[data-act]");
+      if (actRowEl) {
+        event.preventDefault();
+        var chev = actRowEl.querySelector(".chev");
+        var detail = actRowEl.querySelector(".act-detail");
+        if (detail) {
+          var open = detail.classList.toggle("open");
+          if (chev) chev.textContent = open ? "▾" : "▸";
+        }
+      }
     });
 
     window.setInterval(function () {
@@ -1220,28 +1263,117 @@
       return statusChip(status);
     }
 
+    function omTone(state) {
+      var chip = statusChip(state);
+      if (chip === "green") return "green";
+      if (chip === "amber") return "amber";
+      if (chip === "red") return "red";
+      return "gray";
+    }
+
     async function loadOrgMap() {
       var box = $("orgmap-content");
       box.innerHTML = "<div class='muted'>Loading…</div>";
       try {
         var data = await api("/api/v1/agents/overview");
         var agents = (data.agents || []).filter(function (a) { return a.status !== "retired"; });
-        var lines = [];
+        if (!agents.length) { box.innerHTML = "<div class='empty-note'>No agents configured.</div>"; return; }
         var joe = agents.find(function (a) { return /joe/i.test(a.display_name) && /orchestr/i.test((a.description || "") + (a.display_name || "")); });
         var lead = joe || agents[0];
-        if (!lead) { box.innerHTML = "<div class='empty-note'>No agents configured.</div>"; return; }
         var others = agents.filter(function (a) { return a.agent_id !== lead.agent_id; });
-        lines.push(lead.display_name + "  [" + (lead.role_id || "lead") + "]");
-        lines.push("├── " + others.map(function (a) { return a.display_name + " [" + (a.status || "unknown") + "]"; }).join("\n├── "));
-        var missions = (data.missions || []).filter(function (m) { return m.status === "active" || m.status === "planning"; });
-        var extra = [];
-        (data.roles || []).slice(0, 6).forEach(function (r) { extra.push(r.title); });
-        if (missions.length) extra.push(missions.length + " active mission(s)");
-        if (extra.length) lines.push("└── team · " + extra.join(" · "));
-        box.innerHTML = lines.join("\n");
-        var subs = [];
-        (data.health || []).forEach(function (h) { subs.push(h.kind + ": " + h.state); });
-        if (subs.length) box.innerHTML += "<div class='muted small' style='margin-top:12px'>" + subs.join(" · ") + "</div>";
+
+        function teamOf(a) {
+          var key = String(a.key || a.role_id || "");
+          var seg = key.split(".")[0];
+          if (seg) return seg.charAt(0).toUpperCase() + seg.slice(1);
+          return "General";
+        }
+        var teams = {};
+        others.forEach(function (a) { var t = teamOf(a); (teams[t] = teams[t] || []).push(a); });
+        var teamKeys = Object.keys(teams).sort();
+
+        var NODE_W = 208, NODE_H = 52, GAP_X = 30, GAP_Y = 26, PAD = 14;
+        var colW = NODE_W + GAP_X;
+        var rootX = PAD, rootY = PAD;
+        var teamX = function (i) { return rootX + NODE_W + GAP_X + i * colW; };
+        var teamHeaderY = rootY + NODE_H + GAP_Y;
+        var totalW = PAD * 2 + NODE_W + GAP_X + teamKeys.length * colW;
+        var maxRows = 1;
+        teamKeys.forEach(function (k) { maxRows = Math.max(maxRows, teams[k].length); });
+        var totalH = teamHeaderY + NODE_H + GAP_Y + maxRows * (NODE_H + GAP_Y) + PAD;
+
+        box.innerHTML = "<div class='orgmap-wrap'><div class='orgmap-canvas' id='orgmap-canvas' style='width:" +
+          totalW + "px;height:" + totalH + "px'></div>" +
+          "<div class='orgmap-legend'><span><span class='om-dot green'></span>active/healthy</span>" +
+          "<span><span class='om-dot amber'></span>waiting/queued</span>" +
+          "<span><span class='om-dot red'></span>blocked/failed</span>" +
+          "<span class='muted'>click a node for the agent profile</span></div></div>";
+        var canvas = $("orgmap-canvas");
+        var svgNS = "http://www.w3.org/2000/svg";
+        var svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("class", "orgmap-svg");
+        svg.setAttribute("viewBox", "0 0 " + totalW + " " + totalH);
+        canvas.appendChild(svg);
+
+        var nodes = [];
+
+        function nodeEl(agent, x, y, cls, sub) {
+          var el = document.createElement("div");
+          el.className = "orgmap-node " + (cls || "");
+          el.style.left = x + "px";
+          el.style.top = y + "px";
+          el.style.width = NODE_W + "px";
+          el.style.height = NODE_H + "px";
+          var dot = document.createElement("span");
+          dot.className = "om-dot " + omTone(agent.status);
+          var name = document.createElement("span");
+          var nameDiv = document.createElement("div");
+          nameDiv.className = "om-name";
+          nameDiv.textContent = String(agent.display_name || "Agent").slice(0, 26);
+          var subDiv = document.createElement("div");
+          subDiv.className = "om-sub";
+          subDiv.textContent = sub;
+          name.appendChild(nameDiv);
+          name.appendChild(subDiv);
+          el.appendChild(dot);
+          el.appendChild(name);
+          el.addEventListener("click", function () { openAgentDetail(agent.agent_id); });
+          return el;
+        }
+
+        function edge(x1, y1, x2, y2) {
+          var path = document.createElementNS(svgNS, "path");
+          var mx = (x1 + x2) / 2;
+          path.setAttribute("class", "orgmap-edge");
+          path.setAttribute("d", "M " + x1 + " " + y1 + " C " + mx + " " + y1 + ", " + mx + " " + y2 + ", " + x2 + " " + y2);
+          svg.appendChild(path);
+        }
+
+        // root (lead)
+        var leadNode = nodeEl(lead, rootX, rootY, "", (lead.role_id || "lead") + " · " + (lead.status || ""));
+        canvas.appendChild(leadNode);
+        nodes.push({ agent: lead, el: leadNode, x: rootX, y: rootY });
+        var rootCx = rootX + NODE_W / 2;
+        var rootBottom = rootY + NODE_H;
+
+        teamKeys.forEach(function (k, i) {
+          var tx = teamX(i);
+          var members = teams[k];
+          edge(rootCx, rootBottom, tx + NODE_W / 2, teamHeaderY);
+          var teamNode = nodeEl({
+            agent_id: null, display_name: k, status: "waiting",
+          }, tx, teamHeaderY, "team", members.length + " agent(s)");
+          teamNode.addEventListener("click", function () {});
+          canvas.appendChild(teamNode);
+          var colTop = teamHeaderY + NODE_H + GAP_Y;
+          var startY = colTop + ((maxRows - members.length) * (NODE_H + GAP_Y)) / 2;
+          members.forEach(function (m, j) {
+            var my = startY + j * (NODE_H + GAP_Y);
+            edge(tx + NODE_W / 2, teamHeaderY + NODE_H, tx + NODE_W / 2, my);
+            var el = nodeEl(m, tx, my, "", (m.role_id || "agent") + " · " + (m.status || ""));
+            canvas.appendChild(el);
+          });
+        });
       } catch (e) {
         box.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
       }
@@ -1259,11 +1391,16 @@
         sub.textContent = agents.length + " active agent(s) · " + (data.agents.active || 0) + " active overall";
         grid.innerHTML = agents.map(function (a) {
           var tone = agentStatusTone(a.status);
+          var prov = a.provider_id && providers[a.provider_id];
+          var mod = a.model_id && models[a.model_id];
           return "<div class='agent-card' style='cursor:pointer' data-open-agent='" + a.id + "'>" +
             "<div class='row'><span class='orb'>" + esc(a.display_name.charAt(0).toUpperCase()) + "</span>" +
             "<div><div class='name'>" + esc(a.display_name) + "</div>" +
             "<div class='muted small'>" + esc(a.key || a.id.slice(0, 12)) + "</div></div></div>" +
-            "<div class='badges'><span class='badge " + (tone || "") + "'>" + esc(a.status) + "</span></div>" +
+            "<div class='badges'><span class='badge " + (tone || "") + "'>" + esc(a.status) + "</span>" +
+            (prov ? "<span class='badge cyan' title='Provider'>" + esc((prov.key || prov.display_name || "").slice(0, 20)) + "</span>" : "") +
+            (mod ? "<span class='badge cyan' title='Model'>" + esc((mod.key || mod.model_identifier || "").slice(0, 26)) + "</span>" : "") +
+            "</div>" +
             "<div class='desc'>" + esc((a.description || a.purpose || "").slice(0, 90)) + "</div>" +
             "<div class='actions'>" +
             "<button data-talk='" + a.id + "'>Talk</button>" +
@@ -1397,6 +1534,22 @@
       }
     }
 
+    function actRow(label, ev, whenKey) {
+      var payload = {};
+      try {
+        payload = (ev && typeof ev === "object") ? ev : { event: String(ev) };
+      } catch (e) {}
+      var raw = "";
+      try { raw = JSON.stringify(payload); } catch (e) { raw = String(payload); }
+      raw = raw.slice(0, 2500);
+      return "<div class='act-row' data-act> <span class='pill " + statusChip(ev.level || ev.kind || ev.status) + "'></span>" +
+        "<b>" + esc(label) + "</b><span class='muted'>" +
+        esc((ev.summary || ev.message || ev.objective || "").slice(0, 90)) + "</span>" +
+        "<span class='when'>" + esc(timeAgo(ev[whenKey] || ev.created_at)) + "</span>" +
+        "<span class='chev'>▸</span>" +
+        "<div class='act-detail'><pre class='msg'>" + esc(raw) + "</pre></div></div>";
+    }
+
     async function loadActivity() {
       var box = $("cc-activity-body");
       box.innerHTML = "<div class='muted'>Loading…</div>";
@@ -1404,11 +1557,8 @@
       try {
         var events = await api("/api/v1/agents/activity");
         if (events && events.length) {
-          html += "<div class='section-title'><h3>Agents</h3></div>" + events.slice(0, 8).map(function (ev) {
-            return "<div class='deleg'><span class='pill " + statusChip(ev.level || ev.kind) + "'></span>" +
-              "<b>" + esc(ev.kind || "event") + "</b><span class='muted small'>" +
-              esc((ev.summary || "").slice(0, 90)) + "</span>" +
-              "<span class='muted small'>" + esc(timeAgo(ev.created_at)) + "</span></div>";
+          html += "<div class='section-title'><h3>Agents</h3></div>" + events.slice(0, 10).map(function (ev) {
+            return actRow(ev.kind || "event", ev, "created_at");
           }).join("");
         }
       } catch (e) {}
@@ -1416,22 +1566,16 @@
         var a = await api("/api/v1/automation/activity");
         var events = a.activity || [];
         if (events.length) {
-          html += "<div class='section-title'><h3>Automations</h3></div>" + events.slice(0, 8).map(function (ev) {
-            return "<div class='deleg'><span class='pill " + statusChip(ev.level) + "'></span>" +
-              "<b>" + esc(ev.kind || "event") + "</b><span class='muted small'>" +
-              esc((ev.message || "").slice(0, 90)) + "</span>" +
-              "<span class='muted small'>" + esc(timeAgo(ev.recorded_at)) + "</span></div>";
+          html += "<div class='section-title'><h3>Automations</h3></div>" + events.slice(0, 10).map(function (ev) {
+            return actRow(ev.kind || "event", ev, "recorded_at");
           }).join("");
         }
       } catch (e) {}
       try {
         var data = await api("/api/v1/control/overview");
         if (data.recent_runs && data.recent_runs.length) {
-          html += "<div class='section-title'><h3>Agent runs</h3></div>" + data.recent_runs.slice(0, 8).map(function (r) {
-            return "<div class='deleg'><span class='pill " + statusChip(r.status) + "'></span>" +
-              "<b>" + esc(r.agent_key || "Agent") + "</b><span class='muted small'>" +
-              esc((r.objective || "").slice(0, 80)) + "</span>" +
-              "<span class='muted small'>" + esc(timeAgo(r.started_at)) + "</span></div>";
+          html += "<div class='section-title'><h3>Agent runs</h3></div>" + data.recent_runs.slice(0, 10).map(function (r) {
+            return actRow(r.agent_key || "Agent", r, "started_at");
           }).join("");
         }
       } catch (e) {}
@@ -1482,17 +1626,57 @@
       box.innerHTML = html || "<div class='empty-note'>No provider data.</div>";
     }
 
-    // ---- Floating live activity panel (Section AJ) ----
+    // ---- Floating live activity panel (ClawPort-style persistent live stream) ----
     var liveEnabled = false;
+    var liveTimer = null;
     function feedLive(html) {
       if (!liveEnabled) return;
       var body = $("live-body");
       body.innerHTML = html || "<div class='empty-note'>No activity yet.</div>";
     }
+    async function refreshLive() {
+      if (!liveEnabled) return;
+      var rows = [];
+      try {
+        var events = await api("/api/v1/agents/activity");
+        (events || []).slice(0, 12).forEach(function (ev) {
+          rows.push({ label: ev.kind || "event", text: (ev.summary || "").slice(0, 70), when: ev.created_at, ev: ev });
+        });
+      } catch (e) {}
+      try {
+        var data = await api("/api/v1/control/overview");
+        (data.recent_runs || []).slice(0, 12).forEach(function (r) {
+          rows.push({ label: r.agent_key || "Agent", text: (r.objective || "").slice(0, 70), when: r.started_at, ev: r });
+        });
+      } catch (e) {}
+      if (!rows.length) { feedLive("<div class='empty-note'>No activity yet.</div>"); return; }
+      var html = rows.sort(function (a, b) { return String(a.when).localeCompare(String(b.when)); }).slice(-12).map(function (r) {
+        return "<div class='live-row'><span class='pill " + statusChip(r.ev.level || r.ev.kind || r.ev.status) + "'></span>" +
+          "<b>" + esc(r.label) + "</b> " + esc(r.text) +
+          "<span class='when'>" + esc(timeAgo(r.when)) + "</span></div>";
+      }).join("");
+      feedLive(html);
+    }
+    function setLive(on) {
+      liveEnabled = on;
+      $("live-panel").classList.toggle("hidden", !on);
+      var btn = $("live-btn");
+      btn.classList.remove("hidden");
+      btn.classList.toggle("primary", on);
+      if (on) {
+        refreshLive().catch(function () {});
+        if (!liveTimer) liveTimer = window.setInterval(function () { refreshLive().catch(function () {}); }, 15000);
+      } else if (liveTimer) {
+        window.clearInterval(liveTimer);
+        liveTimer = null;
+      }
+    }
+    $("live-btn").addEventListener("click", function () { setLive(!liveEnabled); });
     $("live-head").addEventListener("click", function () {
       var body = $("live-body");
       body.classList.toggle("hidden");
     });
+    // Live stream persists across views once enabled (ClawPort Section AJ mirror).
 
     // nav: expose cc for boot() to reveal
     function showCommandCenter() {
