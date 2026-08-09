@@ -2429,6 +2429,10 @@
     .cc-module-detail { color: var(--faint); font-size: 12px; line-height: 1.45; }
     .cc-module-actions { display: flex; gap: 8px; margin-top: 2px; }
     .cc-module-actions button { padding: 7px 10px; font-size: 12px; }
+    .cc-focused { padding: 18px; }
+    .cc-focused .cc-module { background: transparent; border-color: rgba(59,143,216,.4); }
+    .cc-focused-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .cc-focused-actions button { padding: 10px 14px; font-size: 13px; }
     @media (min-width: 1300px) {
       .cc-grid { grid-template-columns: repeat(3, 1fr); }
     }
@@ -7293,13 +7297,17 @@
         var agents = props.agentsOverview || {};
         var notifications = props.notifications || [];
         var security = props.security || {};
+        var securityOverview = props.securityOverview || {};
         var runtimeOn = !!runtime.online;
         var unread = notifications.filter(function (n) { return n.unread; }).length;
+        var focusedPair = useState(null);
+        var focused = focusedPair[0];
+        var setFocused = focusedPair[1];
 
         function moduleCard(opts) {
           return h(
             "article",
-            { className: "cc-module glass-card " + (opts.tone || ""), "data-module": opts.module },
+            { className: "cc-module glass-card " + (opts.tone || ""), "data-module": opts.module, key: opts.module },
             h("div", { className: "cc-module-head" },
               h("span", { className: "cc-module-icon" }, icon(opts.icon)),
               h("div", { style: { flex: 1, minWidth: 0 } }, h("h3", null, opts.title), opts.sub ? h("p", null, opts.sub) : null),
@@ -7309,6 +7317,7 @@
             opts.detail ? h("div", { className: "cc-module-detail" }, opts.detail) : null,
             h("div", { className: "cc-module-actions" },
               h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(opts.open); } }, opts.openLabel || "Open"),
+              h("button", { type: "button", className: "ghost-button", title: "Focus " + opts.title, onClick: function () { setFocused(opts.module); } }, icon("fa-expand"), " Focus"),
               h("button", { type: "button", className: "ghost-button", onClick: function () { props.onAsk({ module_type: opts.module, object_type: opts.objectType || "", object_id: opts.objectId || "", label: opts.title }); }, title: "Ask Joe about " + opts.title }, icon("fa-wand-magic-sparkles"), " Joe")
             )
           );
@@ -7319,28 +7328,57 @@
         var workingAgents = agentList.filter(function (a) { return a.availability === "busy"; });
         var failedAgents = agentList.filter(function (a) { return a.status === "failed" || a.availability === "offline"; });
         var agentBadge = (agentList.length ? String(agentList.length) : (agents.total != null ? String(agents.total) : null));
+        var pendingApprovals = (securityOverview.pending_approvals != null ? securityOverview.pending_approvals : (auto.pending_approvals != null ? auto.pending_approvals : 0));
+        var openSecurityEvents = (securityOverview.security_events_open != null ? securityOverview.security_events_open : (security.security_events_open != null ? security.security_events_open : null));
+
+        var modules = [
+          { module: "ask-joe", title: "Ask Joe", icon: "fa-wand-magic-sparkles", sub: runtimeOn ? "Local " + (runtime.model || "model") : "Ollama local model", open: "command", openLabel: "Open Joe", onAsk: function () { props.onAsk({ module_type: "global", label: "Joe" }); } },
+          { module: "agents", title: "Agents", icon: "fa-user-astronaut", sub: (activeAgents.length ? activeAgents.length + " active" : "") + (workingAgents.length ? " · " + workingAgents.length + " working" : "") + (failedAgents.length ? " · " + failedAgents.length + " failed" : ""), value: agentBadge ? agentBadge + " agent(s)" : null, detail: agentList.length ? agentList.slice(0, 5).map(function (a) { return a.display_name; }).join(", ") : null, badge: agentBadge, badgeTone: failedAgents.length ? "danger" : (workingAgents.length ? "info" : ""), open: "agents", objectType: "module" },
+          { module: "automation", title: "Automations", icon: "fa-robot", sub: "Workflow engine", value: (auto.running ? auto.running + " running" : "idle") + (auto.failed_recently ? " · " + auto.failed_recently + " failed" : ""), detail: (auto.workflows_enabled != null ? auto.workflows_enabled + " enabled / " + (auto.workflows_total || 0) + " total" : null) + (auto.pending_approvals ? " · " + auto.pending_approvals + " approvals" : ""), badge: auto.failed_recently ? auto.failed_recently : (auto.running ? auto.running : null), badgeTone: auto.failed_recently ? "danger" : "info", open: "automation", objectType: "module" },
+          { module: "work", title: "Current Work", icon: "fa-list-check", sub: "Agent runs and tasks", value: (auto.running ? auto.running + " running" : "no active work") + (auto.waiting ? " · " + auto.waiting + " waiting" : ""), badge: auto.running || null, badgeTone: "info", open: "automation", objectType: "module" },
+          { module: "approvals", title: "Approvals", icon: "fa-user-check", sub: "Waiting for you", value: pendingApprovals ? pendingApprovals + " pending" : "all clear", badge: pendingApprovals || null, badgeTone: pendingApprovals ? "danger" : "", open: "security-center", objectType: "module" },
+          { module: "executions", title: "Executions", icon: "fa-clock-rotate-left", sub: "Runs and traces", value: (auto.running ? auto.running + " running" : "idle") + (auto.failed_recently ? " · " + auto.failed_recently + " failed" : ""), badge: auto.running || null, badgeTone: "info", open: "automation", objectType: "module" },
+          { module: "memory", title: "Memory", icon: "fa-brain", sub: "Knowledge platform", open: "memory", objectType: "module" },
+          { module: "files", title: "Files", icon: "fa-folder-open", sub: "Project artifacts", open: "files", objectType: "module" },
+          { module: "terminal", title: "Terminal", icon: "fa-terminal", sub: "Authenticated host shell", open: "terminal", openLabel: "Open", onOpen: function () { window.location.href = "/os/terminal"; }, objectType: "module" },
+          { module: "build", title: "Build JoeOS", icon: "fa-hammer", sub: "Autonomous engineering", open: "build", openLabel: "Open", onOpen: function () { window.location.href = "/os/build"; }, objectType: "module" },
+          { module: "system", title: "System Pulse", icon: "fa-heart-pulse", sub: runtimeOn ? "Healthy" : "Offline", value: runtimeOn ? (props.uptimeSeconds ? Math.round(props.uptimeSeconds / 60) + "m up" : null) : "runtime offline", detail: props.metrics ? Object.keys(props.metrics || {}).slice(0, 4).map(function (k) { return k + " " + (props.metrics[k] && props.metrics[k].value != null ? props.metrics[k].value : "?"); }).join(" · ") : null, badgeTone: runtimeOn ? "" : "danger", badge: runtimeOn ? null : "off", open: "dashboard", objectType: "module" },
+          { module: "models", title: "Models & AI", icon: "fa-microchip", sub: "Providers and compute", value: runtime.model ? runtime.model : null, open: "ai", objectType: "module" },
+          { module: "attention", title: "Attention", icon: "fa-bell", sub: "Notifications", value: unread ? unread + " unread" : "all clear", badge: unread || null, badgeTone: unread ? "danger" : "", open: "communications", objectType: "module" },
+          { module: "security", title: "Security", icon: "fa-shield-halved", sub: (securityOverview.lockdown_active || security.lockdown_active) ? "LOCKDOWN ACTIVE" : "No lockdown", value: openSecurityEvents != null ? openSecurityEvents + " open events" : null, badgeTone: (securityOverview.lockdown_active || security.lockdown_active) ? "danger" : "", badge: (securityOverview.lockdown_active || security.lockdown_active) ? "locked" : null, open: "security-center", objectType: "module" }
+        ];
+
+        var activeModule = focused ? (modules.find(function (m) { return m.module === focused; }) || null) : null;
+
+        if (activeModule) {
+          return h(
+            "div",
+            { className: "command-center" },
+            h("div", { className: "cc-heading" },
+              h("button", { type: "button", className: "ghost-button", onClick: function () { setFocused(null); } }, icon("fa-arrow-left"), " Back to Command Center"),
+              h("h2", null, activeModule.title),
+              h("p", null, activeModule.sub || "")
+            ),
+            h(
+              "div",
+              { className: "cc-focused glass-card" },
+              moduleCard(activeModule),
+              h("div", { className: "cc-focused-actions" },
+                h("button", { type: "button", className: "primary-button", onClick: function () { props.onOpen(activeModule.open); } }, icon("fa-arrow-up-right-from-square"), " Open " + activeModule.title),
+                h("button", { type: "button", className: "secondary-button", onClick: function () { props.onAsk({ module_type: activeModule.module, object_type: activeModule.objectType || "", object_id: activeModule.objectId || "", label: activeModule.title }); } }, icon("fa-wand-magic-sparkles"), " Ask Joe about this")
+              )
+            )
+          );
+        }
 
         return h(
           "div",
           { className: "command-center" },
           h("div", { className: "cc-heading" },
             h("h2", null, "Command Center"),
-            h("p", null, "Broad operational state at a glance — open any module, or focus Joe on it.")
+            h("p", null, "Broad operational state at a glance — open any module, focus it, or ask Joe about it.")
           ),
-          h("div", { className: "cc-grid" },
-            moduleCard({ module: "ask-joe", title: "Ask Joe", icon: "fa-wand-magic-sparkles", sub: runtimeOn ? "Local " + (runtime.model || "model") : "Ollama local model", open: "command", openLabel: "Open Joe", badge: "", onAsk: function () { props.onAsk({ module_type: "global", label: "Joe" }); } }),
-            moduleCard({ module: "agents", title: "Agents", icon: "fa-user-astronaut", sub: (activeAgents.length ? activeAgents.length + " active" : "") + (workingAgents.length ? " · " + workingAgents.length + " working" : "") + (failedAgents.length ? " · " + failedAgents.length + " failed" : ""), value: agentBadge ? agentBadge + " agent(s)" : null, detail: agentList.length ? agentList.slice(0, 5).map(function (a) { return a.display_name; }).join(", ") : null, badge: agentBadge, badgeTone: failedAgents.length ? "danger" : (workingAgents.length ? "info" : ""), open: "agents", objectType: "module" }),
-            moduleCard({ module: "automation", title: "Automations", icon: "fa-robot", sub: "Workflow engine", value: (auto.running ? auto.running + " running" : "idle") + (auto.failed_recently ? " · " + auto.failed_recently + " failed" : ""), detail: (auto.workflows_enabled != null ? auto.workflows_enabled + " enabled / " + (auto.workflows_total || 0) + " total" : null) + (auto.pending_approvals ? " · " + auto.pending_approvals + " approvals" : ""), badge: auto.failed_recently ? auto.failed_recently : (auto.running ? auto.running : null), badgeTone: auto.failed_recently ? "danger" : "info", open: "automation", objectType: "module" }),
-            moduleCard({ module: "work", title: "Current Work", icon: "fa-list-check", sub: "Agent runs and tasks", value: (auto.running ? auto.running + " running" : "no active work") + (auto.waiting ? " · " + auto.waiting + " waiting" : ""), badge: auto.running || null, badgeTone: "info", open: "automation", objectType: "module" }),
-            moduleCard({ module: "memory", title: "Memory", icon: "fa-brain", sub: "Knowledge platform", open: "memory", objectType: "module" }),
-            moduleCard({ module: "files", title: "Files", icon: "fa-folder-open", sub: "Project artifacts", open: "files", objectType: "module" }),
-            moduleCard({ module: "terminal", title: "Terminal", icon: "fa-terminal", sub: "Authenticated host shell", open: "terminal", openLabel: "Open", onOpen: function () { window.location.href = "/os/terminal"; }, objectType: "module" }),
-            moduleCard({ module: "build", title: "Build JoeOS", icon: "fa-hammer", sub: "Autonomous engineering", open: "build", openLabel: "Open", onOpen: function () { window.location.href = "/os/build"; }, objectType: "module" }),
-            moduleCard({ module: "system", title: "System Pulse", icon: "fa-heart-pulse", sub: runtimeOn ? "Healthy" : "Offline", value: runtimeOn ? (props.uptimeSeconds ? Math.round(props.uptimeSeconds / 60) + "m up" : null) : "runtime offline", detail: props.metrics ? Object.keys(props.metrics || {}).slice(0, 4).map(function (k) { return k + " " + (props.metrics[k] && props.metrics[k].value != null ? props.metrics[k].value : "?"); }).join(" · ") : null, badgeTone: runtimeOn ? "" : "danger", badge: runtimeOn ? null : "off", open: "dashboard", objectType: "module" }),
-            moduleCard({ module: "models", title: "Models & AI", icon: "fa-microchip", sub: "Providers and compute", value: runtime.model ? runtime.model : null, open: "ai", objectType: "module" }),
-            moduleCard({ module: "attention", title: "Attention", icon: "fa-bell", sub: "Notifications", value: unread ? unread + " unread" : "all clear", badge: unread || null, badgeTone: unread ? "danger" : "", open: "communications", objectType: "module" }),
-            moduleCard({ module: "security", title: "Security", icon: "fa-shield-halved", sub: security.lockdown_active ? "LOCKDOWN ACTIVE" : "No lockdown", value: security.events != null ? security.events + " events" : null, badgeTone: security.lockdown_active ? "danger" : "", badge: security.lockdown_active ? "locked" : null, open: "security-center", objectType: "module" })
-          )
+          h("div", { className: "cc-grid" }, modules.map(moduleCard))
         );
       }
 
@@ -9992,6 +10030,7 @@
             agentsOverview: agentsOverview,
             notifications: notifications,
             security: security,
+            securityOverview: securityOverview,
             uptimeSeconds: uptimeSeconds,
             onOpen: function (id) { selectSection(String(id)); },
             onAsk: focusAssistant
