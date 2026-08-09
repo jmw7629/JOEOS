@@ -199,6 +199,8 @@
 
       <div id="cc-overview" class="cc-view active">
 
+      <div id="cc-stats" class="cc-grid" style="margin-bottom:16px"></div>
+
       <div class="panel hero">
         <div class="row" style="align-items:flex-start">
           <span class="orb">J</span>
@@ -977,7 +979,30 @@
       (data.models.items || []).forEach(function (m) { modelsById[m.id] = m; });
       renderTeam(data);
       renderActivity(data);
+      renderOverviewStats(data);
       await loadCouncils();
+    }
+
+    function renderOverviewStats(data) {
+      var box = $("cc-stats");
+      if (!box) return;
+      var agents = (data.agents.items || []);
+      var active = agents.filter(function (a) { return a.status === "active"; }).length;
+      var runs = (data.recent_runs || []);
+      var working = runs.filter(function (r) { return ["running", "working", "executing", "in_progress"].indexOf(r.status) !== -1; }).length;
+      var waiting = runs.filter(function (r) { return ["waiting", "blocked", "pending"].indexOf(r.status) !== -1; }).length;
+      var done = runs.filter(function (r) { return ["succeeded", "completed", "done"].indexOf(r.status) !== -1; }).length;
+      var failed = runs.filter(function (r) { return ["failed", "error", "cancelled"].indexOf(r.status) !== -1; }).length;
+      var providers = (data.providers.items || []).filter(function (p) { return p.status === "active"; }).length;
+      var models = (data.models.items || []).filter(function (m) { return m.status === "active"; }).length;
+      box.innerHTML =
+        statCell("Agents active", active, active ? "green" : "") +
+        statCell("Working now", working, working ? "amber" : "") +
+        statCell("Waiting for Joe", waiting, waiting ? "amber" : "") +
+        statCell("Completed", done, done ? "green" : "") +
+        statCell("Failed", failed, failed ? "red" : "") +
+        statCell("Providers", providers, providers ? "green" : "") +
+        statCell("Models", models, models ? "green" : "");
     }
 
     // ------------------------------------------------------------------
