@@ -143,6 +143,7 @@
         <textarea id="ask-input" placeholder="e.g. Scan the repository for open security TODOs and propose a plan."></textarea>
         <div class="row" style="margin-top:12px">
           <button id="ask-btn" class="primary">Ask Joe</button>
+          <button id="build-btn">Continue building JoeOS</button>
           <span class="muted small">Joe plans, delegates, verifies, and reports.</span>
         </div>
         <div id="ask-reply"></div>
@@ -930,6 +931,28 @@
       } finally {
         btn.disabled = false;
         await refreshAll();
+      }
+    });
+
+    $("build-btn").addEventListener("click", async function () {
+      var btn = $("build-btn");
+      btn.disabled = true;
+      $("ask-reply").innerHTML = "<div class='msg muted'>Contacting the Engineering Director…</div>";
+      try {
+        var result = await api("/api/v1/engineering/director/continue", {
+          method: "POST", body: JSON.stringify({}),
+        });
+        var parts = [];
+        if (result.current_work) parts.push("working on <b>" + esc(result.current_work.key) + "</b>");
+        if (result.next_up && result.next_up.length) parts.push("next: " + esc(result.next_up.slice(0, 3).join(", ")));
+        if (result.open_blockers && result.open_blockers.length) parts.push(result.open_blockers.length + " item(s) need you");
+        $("ask-reply").innerHTML = "<div class='msg'>Campaign <b>" + esc(result.state) + "</b> · autonomy level " +
+          result.autonomy_level + " · " + parts.join(" · ") +
+          ". <a href='/os/build'>Open Build</a></div>";
+      } catch (e) {
+        $("ask-reply").innerHTML = "<div class='msg err'>Could not start the build: " + esc(e.message) + "</div>";
+      } finally {
+        btn.disabled = false;
       }
     });
 

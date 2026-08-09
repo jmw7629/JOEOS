@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050912">
+  <title>JoeOS — Build</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --canvas: #050912; --surface: rgba(10,22,39,0.82); --line: rgba(139,212,255,0.14);
+      --text: #eaf6ff; --muted: #91a6ba; --cyan: #31d7ff; --success: #3de3a4;
+      --warning: #ffb45c; --danger: #ff647c;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--text);
+      font: 14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+    header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; gap: 12px;
+      align-items: center; flex-wrap: wrap; position: sticky; top: 0; z-index: 20;
+      background: rgba(5,9,18,0.9); backdrop-filter: blur(8px); }
+    header strong { font-size: 16px; }
+    main { padding: 20px; max-width: 1080px; margin: 0 auto; }
+    button { background: rgba(49,215,255,0.12); color: var(--text); border: 1px solid rgba(49,215,255,0.4);
+      border-radius: 10px; padding: 9px 14px; cursor: pointer; font-size: 13px; }
+    button:hover { background: rgba(49,215,255,0.22); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    button.primary { background: var(--cyan); color: #04121c; border-color: var(--cyan); font-weight: 600; }
+    button.danger { border-color: rgba(255,100,124,0.5); color: var(--danger); background: rgba(255,100,124,0.08); }
+    input, select, textarea { background: rgba(8,18,32,0.9); color: var(--text); border: 1px solid var(--line);
+      border-radius: 10px; padding: 9px 12px; font-size: 13px; width: 100%; }
+    label { display: block; color: var(--muted); font-size: 12px; margin: 10px 0 5px; }
+    .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+      padding: 16px; margin-bottom: 14px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--line); color: var(--muted); }
+    .badge.green { color: var(--success); border-color: rgba(61,227,164,0.5); }
+    .badge.amber { color: var(--warning); border-color: rgba(255,180,92,0.5); }
+    .badge.red { color: var(--danger); border-color: rgba(255,100,124,0.5); }
+    .badge.cyan { color: var(--cyan); border-color: rgba(49,215,255,0.5); }
+    .muted { color: var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
+    .msg { white-space: pre-wrap; background: rgba(0,0,0,0.3); border: 1px solid var(--line);
+      border-radius: 10px; padding: 10px; margin-top: 8px; max-height: 260px; overflow: auto; }
+    .hidden { display: none !important; }
+    .pill { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .pill.green { background: var(--success); } .pill.amber { background: var(--warning); }
+    .pill.red { background: var(--danger); } .pill.gray { background: var(--muted); }
+    a { color: var(--cyan); text-decoration: none; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; }
+    .stage-list { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+    .stage { font-size: 10px; padding: 2px 7px; border-radius: 12px; border: 1px solid var(--line); color: var(--muted); }
+    .stage.done { color: var(--success); border-color: rgba(61,227,164,0.5); }
+    .stage.active { color: var(--cyan); border-color: rgba(49,215,255,0.6); background: rgba(49,215,255,0.1); }
+    .stage.failed { color: var(--danger); border-color: rgba(255,100,124,0.5); }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>JoeOS <span style="color:var(--cyan)">Build</span></strong>
+    <span class="muted" id="conn-status">Not connected</span>
+    <span style="flex:1"></span>
+    <button id="refresh-btn" class="hidden">Refresh</button>
+    <button id="logout-btn" class="hidden">Logout</button>
+    <button id="pair-btn">Connect</button>
+  </header>
+
+  <main>
+    <section id="pairing-panel" class="panel hidden">
+      <h3 style="margin-top:0">Connect this browser to JoeOS</h3>
+      <p class="muted">Enter the one-time pairing code issued by the local JoeOS console, then assign the device to the owner role.</p>
+      <label for="pair-code">Pairing code</label>
+      <input id="pair-code" placeholder="JOEOS1|https://...|uuid|SECRET" autocomplete="off">
+      <div class="row" style="margin-top:12px">
+        <button id="pair-submit" class="primary">Pair browser</button>
+        <button id="pair-check">Check status</button>
+      </div>
+      <p id="pair-message" class="muted" style="margin-top:10px"></p>
+    </section>
+
+    <section id="dashboard" class="hidden">
+      <div class="panel" style="border-color:rgba(49,215,255,0.3)">
+        <div class="row">
+          <span class="pill gray" id="campaign-pill"></span>
+          <strong id="campaign-title">Build JoeOS</strong>
+          <span class="badge" id="campaign-state">—</span>
+          <span style="flex:1"></span>
+          <button id="continue-btn" class="primary">Continue building JoeOS</button>
+          <button id="pause-btn">Pause</button>
+          <button id="stop-after-btn">Stop after current</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <label for="level-select" style="margin:0">Autonomy</label>
+          <select id="level-select" style="width:auto">
+            <option value="0">0 · Plan only</option>
+            <option value="1">1 · Implement + verify</option>
+            <option value="2" selected>2 · Safe autonomous development</option>
+            <option value="3">3 · Continuous safe build</option>
+          </select>
+          <button id="level-btn">Apply</button>
+          <span class="muted" id="level-status"></span>
+        </div>
+        <div id="campaign-msg" class="msg hidden"></div>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <h4 style="margin:0 0 8px">Current work</h4>
+          <div id="current-work" class="muted">None</div>
+        </div>
+        <div class="panel">
+          <h4 style="margin:0 0 8px">Up next</h4>
+          <div id="next-up" class="muted">None</div>
+        </div>
+        <div class="panel">
+          <h4 style="margin:0 0 8px">Needs you</h4>
+          <div id="needs-you" class="muted">0 open blockers</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h4 style="margin:0 0 8px">Work packages</h4>
+        <div id="packages"></div>
+      </div>
+
+      <div class="panel">
+        <h4 style="margin:0 0 8px">Checkpoints</h4>
+        <div id="checkpoints" class="muted">Loading…</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+    var ORIGIN = window.location.origin;
+
+    function b64encode(bytes) {
+      var binary = "";
+      for (var i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    }
+    function b64decode(text) {
+      var base64 = text.replace(/-/g, "+").replace(/_/g, "/");
+      while (base64.length % 4) base64 += "=";
+      var binary = atob(base64);
+      var out = new Uint8Array(binary.length);
+      for (var i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+      return out;
+    }
+    function concatBytes(arrays) {
+      var total = arrays.reduce(function (n, a) { return n + a.byteLength; }, 0);
+      var out = new Uint8Array(total);
+      var offset = 0;
+      arrays.forEach(function (a) { out.set(a, offset); offset += a.byteLength; });
+      return out;
+    }
+    function textBytes(value) { return new TextEncoder().encode(value); }
+    function lenPrefixed(bytes) {
+      var out = new Uint8Array(4 + bytes.byteLength);
+      var view = new DataView(out.buffer);
+      view.setUint32(0, bytes.byteLength, false);
+      out.set(bytes, 4);
+      return out;
+    }
+    async function sha256(bytes) { return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)); }
+    async function hmacSha256(keyBytes, messageBytes) {
+      var key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      return new Uint8Array(await crypto.subtle.sign("HMAC", key, messageBytes));
+    }
+    var SESSION_KEY = "joeos:session";
+    var SESSION_REFRESH_KEY = "joeos:session-refresh";
+    var DEVICE_KEY_PAIR = "joeos:device-keypair";
+    function loadSession() { try { return JSON.parse(window.sessionStorage.getItem(SESSION_KEY) || "null"); } catch (e) { return null; } }
+    function saveSession(session) { try { window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch (e) {} }
+    function clearSession() { try { window.sessionStorage.removeItem(SESSION_KEY); window.sessionStorage.removeItem(SESSION_REFRESH_KEY); window.localStorage.removeItem(DEVICE_KEY_PAIR); } catch (e) {} }
+    async function api(url, options) {
+      options = options || {};
+      var headers = Object.assign({}, options.headers || {});
+      headers["Accept"] = "application/json";
+      var session = loadSession();
+      if (session && session.session_id) headers["X-Joeos-Session"] = session.session_id;
+      if (options.body) headers["Content-Type"] = "application/json";
+      var controller = new AbortController();
+      var timer = window.setTimeout(function () { controller.abort(); }, 60000);
+      try {
+        var response = await fetch(url, Object.assign({}, options, { headers: headers, signal: controller.signal }));
+        var payload = null;
+        try { payload = await response.json(); } catch (e) { payload = null; }
+        if (!response.ok) {
+          var detail = payload && (payload.detail || payload.message);
+          var message = detail && typeof detail === "object" ? detail.message : detail;
+          var err = new Error(message || ("Request failed with status " + response.status));
+          err.status = response.status;
+          err.payload = payload;
+          throw err;
+        }
+        return payload;
+      } finally { window.clearTimeout(timer); }
+    }
+    var DOMAINS = {
+      PAIRING_KEY_INFO: new Uint8Array(concatBytes([textBytes("joeos.device-enrollment.pairing-key.v1"), new Uint8Array([1])])),
+      CLAIM: textBytes("JOEOS-DEVICE-ENROLLMENT-CLAIM-V1\0"),
+      CLIENT_PROOF: textBytes("JOEOS-DEVICE-ENROLLMENT-CLIENT-PROOF-V1\0"),
+      TRANSCRIPT: textBytes("JOEOS-DEVICE-ENROLLMENT-TRANSCRIPT-V1\0"),
+    };
+    async function generateP256() { return await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]); }
+    async function exportSPKI(keyPair) { var spki = await crypto.subtle.exportKey("spki", keyPair.publicKey); return b64encode(new Uint8Array(spki)); }
+    async function ecdsaSignDER(keyPair, message) {
+      var raw = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, keyPair.privateKey, message);
+      var r = new Uint8Array(raw.slice(0, 32));
+      var s = new Uint8Array(raw.slice(32, 64));
+      function toDERInt(bigEndian) {
+        var i = 0; while (i < bigEndian.length && bigEndian[i] === 0) i++;
+        var value = bigEndian.slice(i);
+        var prefix = (value[0] & 0x80) ? [0] : [];
+        var body = new Uint8Array(prefix.concat(Array.from(value)));
+        var len = body.length;
+        var lenBytes = len < 128 ? [len] : [0x81, len];
+        return new Uint8Array([0x02].concat(lenBytes, Array.from(body)));
+      }
+      var seqBody = concatBytes([toDERInt(r), toDERInt(s)]);
+      var seqLen = seqBody.byteLength;
+      var seqLenBytes = seqLen < 128 ? [seqLen] : [0x81, seqLen];
+      return b64encode(concatBytes([new Uint8Array([0x30].concat(seqLenBytes)), seqBody]));
+    }
+    async function derivePairingKey(secretBytes, offerId) {
+      var offerBytes = new Uint8Array(16);
+      var view = new DataView(offerBytes.buffer);
+      var hex = offerId.replace(/-/g, "");
+      for (var i = 0; i < 16; i++) view.setUint8(i, parseInt(hex.substr(i * 2, 2), 16));
+      var extracted = await hmacSha256(offerBytes, secretBytes);
+      return await hmacSha256(extracted, DOMAINS.PAIRING_KEY_INFO);
+    }
+    function base32Decode(encoded) {
+      var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+      var clean = encoded.replace(/=+$/, "").toUpperCase();
+      var bytes = [];
+      var buffer = 0;
+      var bitsLeft = 0;
+      for (var i = 0; i < clean.length; i++) {
+        var idx = alphabet.indexOf(clean.charAt(i));
+        if (idx === -1) throw new Error("Invalid pairing code.");
+        buffer = (buffer << 5) | idx;
+        bitsLeft += 5;
+        if (bitsLeft >= 8) { bytes.push((buffer >>> (bitsLeft - 8)) & 0xff); bitsLeft -= 8; }
+      }
+      return new Uint8Array(bytes);
+    }
+    function parsePairingCode(code) {
+      var parts = (code || "").trim().split("|");
+      if (parts.length !== 4 || parts[0] !== "JOEOS1") throw new Error("Invalid pairing code.");
+      return { origin: parts[1], offer_id: parts[2], secret: base32Decode(parts[3]) };
+    }
+    function uuidv4() {
+      return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, function (c) {
+        return (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16);
+      });
+    }
+    function randomBytes32() { var out = new Uint8Array(32); crypto.getRandomValues(out); return out; }
+    async function claimProof(pairingKey, fields) {
+      var values = [
+        textBytes(fields.observed_server_id), textBytes(fields.audience_origin),
+        textBytes(fields.offer_id), textBytes(fields.request_id),
+        textBytes(fields.client_instance_id), fields.client_nonce,
+        textBytes(fields.display_name), textBytes(fields.platform),
+        textBytes(fields.os_version), textBytes(fields.app_version),
+        fields.auth_spki, fields.approval_spki,
+      ];
+      var transcript = DOMAINS.CLAIM;
+      for (var i = 0; i < values.length; i++) transcript = concatBytes([transcript, lenPrefixed(values[i])]);
+      return await hmacSha256(pairingKey, transcript);
+    }
+    async function pairDevice(code) {
+      var parsed = parsePairingCode(code);
+      var authPair = await generateP256();
+      var approvalPair = await generateP256();
+      var requestId = uuidv4();
+      var clientInstanceId = uuidv4();
+      var clientNonce = randomBytes32();
+      var authSPKI = await exportSPKI(authPair);
+      var approvalSPKI = await exportSPKI(approvalPair);
+      var bootstrap = await api("/api/v1/bootstrap");
+      var serverId = bootstrap.server.server_id;
+      var pairingKey = await derivePairingKey(parsed.secret, parsed.offer_id);
+      var fields = {
+        observed_server_id: serverId, audience_origin: parsed.origin,
+        offer_id: parsed.offer_id, request_id: requestId,
+        client_instance_id: clientInstanceId, client_nonce: clientNonce,
+        display_name: "JoeOS Browser", platform: "linux",
+        os_version: "browser", app_version: "2.0.0",
+        auth_spki: b64decode(authSPKI), approval_spki: b64decode(approvalSPKI),
+      };
+      var proof = await claimProof(pairingKey, fields);
+      var challengePayload = {
+        schema_version: 1, request_id: requestId, offer_id: parsed.offer_id,
+        observed_server_id: serverId, audience_origin: parsed.origin,
+        client_nonce: b64encode(clientNonce),
+        device: { client_instance_id: clientInstanceId, display_name: "JoeOS Browser",
+                  platform: "linux", os_version: "browser", app_version: "2.0.0" },
+        device_authentication_key: { algorithm: "ES256", format: "spki_der_base64url", value: authSPKI },
+        approval_key: { algorithm: "ES256", format: "spki_der_base64url", value: approvalSPKI },
+        claim_proof: b64encode(proof),
+      };
+      var challenge = await api("/api/v1/device-enrollment/challenges", { method: "POST", body: JSON.stringify(challengePayload) });
+      var transcriptDigest = b64decode(challenge.transcript_sha256);
+      var clientProof = await hmacSha256(pairingKey, concatBytes([DOMAINS.CLIENT_PROOF, transcriptDigest]));
+      var authPayload = b64decode(challenge.device_authentication_payload);
+      var approvalPayload = b64decode(challenge.approval_payload);
+      var authSignature = await ecdsaSignDER(authPair, authPayload);
+      var approvalSignature = await ecdsaSignDER(approvalPair, approvalPayload);
+      var completion = {
+        schema_version: 1, idempotency_key: uuidv4(),
+        transcript_sha256: challenge.transcript_sha256, client_proof: b64encode(clientProof),
+        device_authentication_signature: authSignature, approval_signature: approvalSignature,
+      };
+      var receipt = await api("/api/v1/device-enrollment/challenges/" + challenge.challenge_id + "/complete", { method: "POST", body: JSON.stringify(completion) });
+      var exportedAuth = await crypto.subtle.exportKey("jwk", authPair.privateKey);
+      var exportedApproval = await crypto.subtle.exportKey("jwk", approvalPair.privateKey);
+      try { window.localStorage.setItem(DEVICE_KEY_PAIR, JSON.stringify({ device_id: receipt.device_id, auth: exportedAuth, approval: exportedApproval })); } catch (e) {}
+      return { receipt: receipt, server_id: serverId };
+    }
+    async function establishSession() {
+      var stored = null;
+      try { stored = JSON.parse(window.localStorage.getItem(DEVICE_KEY_PAIR) || "null"); } catch (e) {}
+      if (!stored) throw new Error("No paired device keys on this browser.");
+      var authPair = await crypto.subtle.importKey("jwk", stored.auth, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+      var authChallenge = await api("/api/v1/auth/challenge", { method: "POST", body: JSON.stringify({ device_id: stored.device_id }) });
+      var message = textBytes(authChallenge.message);
+      var raw = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, authPair, message);
+      var r = new Uint8Array(raw.slice(0, 32));
+      var s = new Uint8Array(raw.slice(32, 64));
+      function derInt(bigEndian) {
+        var i = 0; while (i < bigEndian.length && bigEndian[i] === 0) i++;
+        var value = bigEndian.slice(i);
+        var body = new Uint8Array(((value[0] & 0x80) ? [0] : []).concat(Array.from(value)));
+        var len = body.length;
+        return new Uint8Array([0x02].concat(len < 128 ? [len] : [0x81, len], Array.from(body)));
+      }
+      var seq = concatBytes([derInt(r), derInt(s)]);
+      var sig = b64encode(concatBytes([new Uint8Array([0x30].concat(seq.byteLength < 128 ? [seq.byteLength] : [0x81, seq.byteLength])), seq]));
+      var sessionResult = await api("/api/v1/auth/session", { method: "POST", body: JSON.stringify({ challenge_id: authChallenge.challenge_id, signature: sig }) });
+      saveSession(sessionResult.session);
+      try { window.sessionStorage.setItem(SESSION_REFRESH_KEY, sessionResult.refresh_token); } catch (e) {}
+      return sessionResult;
+    }
+
+    function $(id) { return document.getElementById(id); }
+    function esc(value) {
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+    function setStatus(text, tone) {
+      $("conn-status").textContent = text;
+      $("conn-status").style.color = tone === "good" ? "var(--success)" : tone === "bad" ? "var(--danger)" : "var(--muted)";
+    }
+
+    var state = { campaign: null, packages: [], blockers: [], checkpoints: [] };
+
+    function toneFor(stateName) {
+      if (stateName === "completed" || stateName === "eligible" || stateName === "validated") return "green";
+      if (stateName === "queued" || stateName === "planning" || stateName === "implementing" || stateName === "validating") return "amber";
+      if (stateName === "blocked" || stateName === "failed") return "red";
+      return "gray";
+    }
+
+    async function refreshAll() {
+      var list = await api("/api/v1/engineering/campaigns");
+      var campaign = list[0] || null;
+      state.campaign = campaign;
+      if (!campaign) {
+        $("campaign-title").textContent = "No build campaign yet";
+        $("campaign-state").textContent = "proposed";
+        $("current-work").textContent = "Run 'Continue building JoeOS' to create one.";
+        return;
+      }
+      $("campaign-title").textContent = campaign.title || "Build JoeOS";
+      $("campaign-state").textContent = campaign.state;
+      $("campaign-pill").className = "pill " + (campaign.state === "active" ? "green" : campaign.state === "paused" ? "amber" : "gray");
+      $("level-select").value = String(campaign.autonomy_level || 2);
+
+      state.packages = await api("/api/v1/engineering/campaigns/" + campaign.campaign_id + "/packages");
+      state.blockers = await api("/api/v1/engineering/campaigns/" + campaign.campaign_id + "/blockers");
+      state.checkpoints = await api("/api/v1/engineering/campaigns/" + campaign.campaign_id + "/checkpoints");
+      render();
+    }
+
+    function render() {
+      var current = state.packages.find(function (p) {
+        return ["eligible", "planning", "implementing", "validating", "reviewing", "committing", "integrating", "pushed"].indexOf(p.state) !== -1;
+      });
+      $("current-work").innerHTML = current
+        ? "<div><span class='pill " + toneFor(current.state) + "'></span><b>" + esc(current.key) + "</b> — " + esc(current.title) + "</div>" +
+          "<div class='muted' style='margin-top:4px'>stage " + esc(current.current_stage) + " · attempts " + current.attempts + "</div>"
+        : "<span class='muted'>No active package</span>";
+
+      var next = state.packages.filter(function (p) { return p.state === "queued"; }).slice(0, 5);
+      $("next-up").innerHTML = next.length
+        ? next.map(function (p) { return "<div style='margin:3px 0'><span class='badge cyan'>" + esc(p.key) + "</span> " + esc(p.title) + "</div>"; }).join("")
+        : "<span class='muted'>No queued packages</span>";
+
+      var openBlockers = state.blockers.filter(function (b) { return b.state === "open"; });
+      $("needs-you").innerHTML = openBlockers.length
+        ? openBlockers.map(function (b) {
+            return "<div style='margin:4px 0'><span class='badge red'>" + esc(b.reason) + "</span> <span class='muted'>" + esc((b.detail || "").slice(0, 80)) + "</span></div>";
+          }).join("")
+        : "<span class='muted'>0 open blockers</span>";
+
+      $("packages").innerHTML = "<table><tr><th>Package</th><th>State</th><th>Stage</th><th>Risk</th><th>Attempts</th></tr>" +
+        state.packages.map(function (p) {
+          return "<tr><td><b>" + esc(p.key) + "</b><div class='muted small'>" + esc(p.title) + "</div></td>" +
+            "<td><span class='badge " + toneFor(p.state) + "'>" + esc(p.state) + "</span></td>" +
+            "<td>" + esc(p.current_stage) + "</td>" +
+            "<td>" + esc(p.risk) + "</td>" +
+            "<td>" + p.attempts + "</td></tr>";
+        }).join("") + "</table>";
+
+      $("checkpoints").innerHTML = state.checkpoints.length
+        ? state.checkpoints.slice(-12).map(function (c) {
+            return "<div class='row' style='margin:2px 0'><span class='badge'>" + esc(c.kind) + "</span> <span class='badge cyan'>" + esc(c.stage) + "</span> <span class='muted'>" + esc(c.note || "") + "</span></div>";
+          }).join("")
+        : "No checkpoints yet.";
+    }
+
+    async function continueBuild() {
+      $("campaign-msg").classList.remove("hidden");
+      $("campaign-msg").textContent = "Contacting the Engineering Director…";
+      $("campaign-msg").style.color = "var(--muted)";
+      try {
+        var result = await api("/api/v1/engineering/director/continue", {
+          method: "POST", body: JSON.stringify({ autonomy_level: parseInt($("level-select").value, 10) }),
+        });
+        $("campaign-msg").textContent = "Campaign " + result.state + " — " +
+          (result.current_work ? "working on " + result.current_work.key : "selecting next work") +
+          (result.next_up && result.next_up.length ? " · next: " + result.next_up.join(", ") : "");
+        $("campaign-msg").style.color = "var(--success)";
+        await refreshAll();
+      } catch (e) {
+        $("campaign-msg").textContent = "Failed: " + e.message;
+        $("campaign-msg").style.color = "var(--danger)";
+      }
+    }
+
+    async function pauseCampaign() {
+      if (!state.campaign) return;
+      try {
+        await api("/api/v1/engineering/campaigns/" + state.campaign.campaign_id + "/pause", { method: "POST" });
+        await refreshAll();
+      } catch (e) { alert("Pause failed: " + e.message); }
+    }
+    async function stopAfterCurrent() {
+      if (!state.campaign) return;
+      try {
+        await api("/api/v1/engineering/campaigns/" + state.campaign.campaign_id + "/pause-after-current", { method: "POST" });
+        alert("The campaign will pause after the current package finishes.");
+      } catch (e) { alert("Failed: " + e.message); }
+    }
+    async function applyLevel() {
+      if (!state.campaign) return;
+      try {
+        var updated = await api("/api/v1/engineering/campaigns/" + state.campaign.campaign_id + "/autonomy-level", {
+          method: "POST", body: JSON.stringify({ level: parseInt($("level-select").value, 10) }),
+        });
+        $("level-status").textContent = "Autonomy level " + updated.autonomy_level + " saved.";
+      } catch (e) { $("level-status").textContent = "Failed: " + e.message; }
+    }
+
+    $("pair-btn").addEventListener("click", function () { $("pairing-panel").classList.remove("hidden"); });
+    $("pair-submit").addEventListener("click", async function () {
+      $("pair-message").textContent = "Pairing…";
+      try { await pairDevice($("pair-code").value.trim()); $("pair-message").textContent = "Browser paired. Assign the device, then Check status."; }
+      catch (e) { $("pair-message").textContent = "Pairing failed: " + e.message; }
+    });
+    $("pair-check").addEventListener("click", async function () {
+      try {
+        var sessionResult = await establishSession();
+        saveSession(sessionResult.session);
+        $("dashboard").classList.remove("hidden");
+        $("pairing-panel").classList.add("hidden");
+        $("refresh-btn").classList.remove("hidden");
+        $("logout-btn").classList.remove("hidden");
+        $("pair-btn").classList.add("hidden");
+        setStatus("Connected · session " + sessionResult.session.session_id.slice(0, 8), "good");
+        await refreshAll();
+      } catch (e) {
+        $("pair-message").textContent = "Not ready yet: " + e.message + ". The operator must assign this device to the owner role first.";
+      }
+    });
+    $("refresh-btn").addEventListener("click", refreshAll);
+    $("logout-btn").addEventListener("click", function () { clearSession(); window.location.reload(); });
+    $("continue-btn").addEventListener("click", continueBuild);
+    $("pause-btn").addEventListener("click", pauseCampaign);
+    $("stop-after-btn").addEventListener("click", stopAfterCurrent);
+    $("level-btn").addEventListener("click", applyLevel);
+
+    async function boot() {
+      var session = loadSession();
+      if (session) {
+        $("dashboard").classList.remove("hidden");
+        $("pairing-panel").classList.add("hidden");
+        $("refresh-btn").classList.remove("hidden");
+        $("logout-btn").classList.remove("hidden");
+        $("pair-btn").classList.add("hidden");
+        setStatus("Connected · session " + session.session_id.slice(0, 8), "good");
+        try { await refreshAll(); }
+        catch (e) { setStatus("Session expired: " + e.message, "bad"); $("pairing-panel").classList.remove("hidden"); }
+      } else {
+        $("pairing-panel").classList.remove("hidden");
+        setStatus("Not connected");
+      }
+    }
+    window.setInterval(function () {
+      if (loadSession()) refreshAll().catch(function () {});
+    }, 15000);
+    boot();
+  </script>
+</body>
+</html>

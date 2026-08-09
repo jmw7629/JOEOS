@@ -29,6 +29,7 @@ from server.command_center import CommandCenterService, command_center_router
 from server.communications import CommunicationsService, communications_router
 from server.engineering import EngineeringService, engineering_router
 from server.engineering.campaign import CampaignService, CampaignStore, CampaignWorker, campaign_router
+from server.engineering.campaign.director import EngineeringDirector
 from server.autonomous import (
     AgentFabricAutomationExecutor,
     AutomationNotifier,
@@ -932,6 +933,64 @@ def _autonomous_lease_seconds() -> int:
         return 300
 
 
+def _campaign_notification_sink(app: FastAPI):
+    """Route campaign notifications to the JoeOS Notification Center."""
+    def sink(category: str, title: str, message: str, severity: str,
+             related_entity: str, links: tuple) -> None:
+        communications = getattr(app.state, "communications_service", None)
+        if communications is None:
+            return
+        try:
+            communications.create_notification(
+                source="campaign",
+                source_type="campaign",
+                category=category,
+                title=title,
+                message=message,
+                severity=severity,
+                deduplication_key="campaign.%s.%s" % (category, related_entity or "campaign"),
+                related_entity=related_entity or "",
+                action_links=tuple(links),
+            )
+        except Exception as error:  # noqa: BLE001 - dedup suppression is expected
+            if "duplicate notification" in str(error).lower():
+                return
+            _record_event(app.state.db_path, "warning", "campaign",
+                          "notification failed: %s" % error)
+    return sink
+
+
+def _build_engineering_director(app: FastAPI):
+    """Construct the production Engineering Director wired to the real
+    ActionService, owner principal, and runner executors.
+
+    Returns a no-op-safe handler if the control plane is not ready so the
+    campaign worker can still advance the state machine."""
+    action_service = getattr(app.state, "action_service", None)
+    if action_service is None:
+        return None
+    try:
+        from runner.joeos_runner.operations import DevCommandExecutor
+        from runner.joeos_runner.executors import WorkspaceFilesystemExecutor
+    except ImportError:  # pragma: no cover - runner not importable
+        return None
+    principal = getattr(app.state, "activation_principal", {}) or {}
+    worktree_root = str(Path(app.state.db_path).parent / "campaign-worktrees")
+    return EngineeringDirector(
+        action_service=action_service,
+        principal=principal,
+        fs_executor=WorkspaceFilesystemExecutor(),
+        dev_executor=DevCommandExecutor(),
+        notification_sink=_campaign_notification_sink(app),
+        event_sink=lambda level, source, message: _record_event(
+            app.state.db_path, level, source, message),
+        worktree_root=worktree_root,
+        protected_branches=frozenset(getattr(app.state, "protected_branches",
+                                             {"main", "ai-rebuild", "master",
+                                              "production", "release"})),
+    )
+
+
 def _campaign_stage_handler(app: FastAPI):
     """Production stage handler dispatching executable stages to the registered
     runner executors (git worktrees, opencode coding, dev commands, apple build).
@@ -1554,9 +1613,16 @@ async def lifespan(app: FastAPI):
             db_path, level, source, message
         ),
         stage_handler=_campaign_stage_handler(app),
+        notification_sink=_campaign_notification_sink(app),
     )
     app.state.campaign_service.prepare()
     await asyncio.to_thread(app.state.campaign_service.recover_after_restart)
+    # Engineering Director: drives the campaign through the authoritative
+    # AgentFabric (role agents) + runner executors. The worker principal does
+    # the state-machine advancement; agent runs use the owner principal.
+    director = _build_engineering_director(app)
+    app.state.engineering_director = director
+    app.state.campaign_service._stage_handler = director.handler
     await _refresh_runtime(app)
     await asyncio.to_thread(_record_metric, db_path, app.state.runtime)
     await asyncio.to_thread(_record_event, db_path, "success", "joeos", "JoeOS local command center started.")
@@ -1861,6 +1927,8 @@ def os_frontend(rest: str) -> FileResponse:
         return FileResponse(AGENT_FABRIC_PAGE_PATH, media_type="text/html")
     if head == "automations":
         return FileResponse(AUTOMATIONS_PAGE_PATH, media_type="text/html")
+    if head == "build":
+        return FileResponse(BUILD_PAGE_PATH, media_type="text/html")
     return FileResponse(INDEX_PATH, media_type="text/html")
 
 
@@ -1886,6 +1954,7 @@ def browser_sdk() -> FileResponse:
 
 AGENT_FABRIC_PAGE_PATH = _package_asset("agent_fabric.html")
 AUTOMATIONS_PAGE_PATH = _package_asset("automations.html")
+BUILD_PAGE_PATH = _package_asset("build.html")
 
 
 @app.get("/healthz")

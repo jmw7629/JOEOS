@@ -81,6 +81,10 @@ class AuthorityService:
         "engineering.package.read",
         "engineering.campaign.manage",
         "engineering.package.manage",
+        "engineering.campaign.start",
+        "engineering.campaign.pause",
+        "engineering.campaign.cancel",
+        "engineering.blocker.resolve",
     ]
 
     def __init__(
