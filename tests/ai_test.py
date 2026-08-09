@@ -169,6 +169,41 @@ class AiServiceTests(unittest.TestCase):
                     pass
             asyncio.run(collect())
 
+    def test_assistant_scope_block_is_bounded_and_injected(self):
+        captured = {}
+
+        async def fake_executor(messages, tools, decision):
+            captured["system"] = [m["content"] for m in messages if m.get("role") == "system"]
+            yield {"kind": "delta", "content": "ok"}
+            yield {"kind": "done", "model": "qwen2.5-coder:7b"}
+
+        service, http = self._service(_runtime_online())
+        self._assistant_online(service)
+        service.assistant_executor = FakeExecutor(fake_executor)
+
+        events = []
+        async def collect():
+            async for event in service.assistant_chat_stream(
+                [{"role": "user", "content": "why did this fail?"}],
+                model="qwen2.5-coder:7b",
+                context={"module_type": "automations", "object_type": "automation",
+                         "object_id": "acme.nightly", "label": "Nightly Build"},
+            ):
+                events.append(event)
+        asyncio.run(collect())
+        self.assertEqual([e["kind"] for e in events], ["delta", "done"])
+        joined = "\n".join(captured["system"])
+        self.assertIn("JOE IS FOCUSED ON THIS MODULE", joined)
+        self.assertIn("Nightly Build", joined)
+        self.assertIn("acme.nightly", joined)
+
+    def test_assistant_scope_rejects_unbounded_context(self):
+        scope = service.assistant_chat_stream if False else None
+        service, http = self._service(_runtime_online())
+        self._assistant_online(service)
+        block = service._scoped_context_block({"label": "x" * 500, "object_id": "y" * 200})
+        self.assertLessEqual(len(block or ""), 800)
+
 
 class FakeExecutor:
     def __init__(self, generator):

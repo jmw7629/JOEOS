@@ -279,7 +279,39 @@ class AIService:
             "tools": [t["function"]["name"] for t in self.assistant_tools if isinstance(t, dict)],
         }
 
-    async def assistant_chat_stream(self, messages: List[dict], *, model: str = "") -> AsyncIterator[Dict]:
+    def _scoped_context_block(self, context: Optional[Dict]) -> Optional[str]:
+        """Build the bounded JoeContextScope line for the model.
+
+        ``context`` is an authorized object reference from the UI (module type,
+        object type, object id, label) — never arbitrary DOM text. Values are
+        length-bounded. Returns None when no scope is present."""
+        if not isinstance(context, dict):
+            return None
+        module_type = str(context.get("module_type") or "")[:40]
+        object_type = str(context.get("object_type") or "")[:40]
+        object_id = str(context.get("object_id") or "")[:80]
+        label = str(context.get("label") or "")[:60]
+        if not module_type and not label:
+            return None
+        lines = ["JOE IS FOCUSED ON THIS MODULE:"]
+        if module_type:
+            lines.append("- module_type: %s" % module_type)
+        if object_type:
+            lines.append("- object_type: %s" % object_type)
+        if object_id:
+            lines.append("- object_id: %s" % object_id)
+        if label:
+            lines.append("- label: %s" % label)
+        lines.append(
+            "Interpret 'this', 'that', 'here' as the focused object. You are "
+            "scoped to it, not granted extra authority; all actions still obey "
+            "ToolBroker, policy, and approval."
+        )
+        return "\n".join(lines)[:800]
+
+    async def assistant_chat_stream(
+        self, messages: List[dict], *, model: str = "", context: Optional[Dict] = None
+    ) -> AsyncIterator[Dict]:
         """Agentic, streaming local assistant chat over Ollama (never Lemonade).
 
         When the backend has wired an agent executor, the bounded safe-tool loop
@@ -294,6 +326,9 @@ class AIService:
             raise RuntimeError("No Ollama model is available for the assistant.")
 
         history: List[Dict[str, str]] = []
+        scope_block = self._scoped_context_block(context)
+        if scope_block:
+            history.append({"role": "system", "content": scope_block})
         for message in (messages or [])[-12:]:
             if not isinstance(message, dict):
                 continue

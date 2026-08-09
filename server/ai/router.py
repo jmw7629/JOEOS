@@ -71,10 +71,13 @@ async def chat_stream(request: Request):
     if not isinstance(messages, list):
         raise HTTPException(status_code=400, detail="messages must be an array.")
     model = str(payload.get("model") or "").strip()
+    context = payload.get("context")
+    if not isinstance(context, dict):
+        context = None
 
     async def event_stream():
         try:
-            async for event in service.assistant_chat_stream(messages, model=model):
+            async for event in service.assistant_chat_stream(messages, model=model, context=context):
                 yield "data: " + json.dumps(event) + "\n\n"
         except Exception as error:  # noqa: BLE001 - surfaced as an SSE error event
             yield "data: " + json.dumps({"kind": "error", "message": str(error)[:500]}) + "\n\n"

@@ -2374,6 +2374,40 @@
       color: var(--success);
     }
 
+    .assistant-focus {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      margin: 8px 12px 0;
+      border: 1px solid rgba(59, 143, 216, .45);
+      border-radius: 9px;
+      background: rgba(11, 58, 99, .28);
+      font-size: 11px;
+      letter-spacing: .02em;
+    }
+    .assistant-focus .focus-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--bright);
+      font-weight: 600;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .assistant-focus .focus-label i { color: var(--interactive); }
+    .assistant-focus .focus-clear {
+      background: transparent;
+      border: none;
+      color: var(--faint);
+      cursor: pointer;
+      padding: 2px 4px;
+      font-size: 12px;
+    }
+    .assistant-focus .focus-clear:hover { color: var(--text); }
+
     .assistant-messages {
       display: flex;
       min-height: 0;
@@ -7086,6 +7120,12 @@
             h("div", { className: "assistant-head-actions" }, h("button", { type: "button", onClick: props.onClear, "aria-label": "Clear assistant conversation", title: "Clear conversation" }, icon("fa-eraser")), h("button", { type: "button", onClick: props.onClose, "aria-label": "Close AI assistant", title: "Close assistant" }, icon("fa-xmark")))
           ),
           h("div", { className: "assistant-context", title: modelLabel }, icon("fa-lock"), "Private Ollama · " + (props.assistantModel || modelLabel)),
+          props.focused ? h(
+            "div",
+            { className: "assistant-focus", "data-focus-scope": (props.focused.module_type || "module") },
+            h("span", { className: "focus-label" }, icon("fa-crosshairs"), "JOE IS FOCUSED ON: " + (props.focused.label || props.focused.module_type || "module")),
+            h("button", { type: "button", className: "focus-clear", onClick: props.onClearFocus, title: "Clear module focus" }, icon("fa-xmark"))
+          ) : null,
           h(
             "div",
             { className: "assistant-messages", "aria-live": "polite" },
@@ -7244,7 +7284,8 @@
           h(
             "div",
             { className: "agent-card-actions" },
-            h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(agent); } }, "Open workspace")
+            h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(agent); } }, "Open workspace"),
+            props.onJoeFocus ? h("button", { type: "button", className: "ghost-button", style: { flex: 1 }, onClick: function () { props.onJoeFocus(agent); }, title: "Ask Joe about this agent" }, icon("fa-wand-magic-sparkles"), " Ask Joe") : null
           )
         );
       }
@@ -7272,7 +7313,7 @@
             ),
             h("span", { className: "agents-count" }, filtered.length + " of " + props.agents.length + " agents")
           ),
-          filtered.length ? h("div", { className: "agent-card-grid" }, filtered.map(function (agent) { return h(AgentCard, { agent: agent, key: agent.agent_id, onOpen: props.onOpen }); })) : h("div", { className: "os-empty" }, icon("fa-user-astronaut"), h("p", null, "No agents match this filter. Agents you configure appear here."), h("p", { className: "os-subnote" }, "Create an agent profile through the agent API, then refresh."))
+          filtered.length ? h("div", { className: "agent-card-grid" }, filtered.map(function (agent) { return h(AgentCard, { agent: agent, key: agent.agent_id, onOpen: props.onOpen, onJoeFocus: function (a) { focusAssistant({ module_type: "agents", object_type: "agent", object_id: a.agent_id || a.id, label: a.display_name }); } }); })) : h("div", { className: "os-empty" }, icon("fa-user-astronaut"), h("p", null, "No agents match this filter. Agents you configure appear here."), h("p", { className: "os-subnote" }, "Create an agent profile through the agent API, then refresh."))
         );
       }
 
@@ -8058,6 +8099,9 @@
         var assistantModelPair = useState("");
         var assistantModel = assistantModelPair[0];
         var setAssistantModel = assistantModelPair[1];
+        var assistantContextPair = useState(null);
+        var assistantContext = assistantContextPair[0];
+        var setAssistantContext = assistantContextPair[1];
         var nowPair = useState(new Date());
         var now = nowPair[0];
         var setNow = nowPair[1];
@@ -8387,6 +8431,18 @@
         var thinkingRef = useRef(false);
         var assistantAbortRef = useRef(null);
         var assistantModelRef = useRef("");
+        var assistantContextRef = useRef(null);
+
+        function focusAssistant(scope) {
+          assistantContextRef.current = scope || null;
+          setAssistantContext(scope || null);
+          setAssistantOpen(true);
+        }
+
+        function clearAssistantFocus() {
+          assistantContextRef.current = null;
+          setAssistantContext(null);
+        }
         var pendingBotRef = useRef(new Set());
         var dragWidgetRef = useRef(null);
 
@@ -9197,6 +9253,19 @@
 
         useEffect(function () {
           loadAssistantConfig();
+          function onJoeFocus(event) {
+            var el = event.target.closest("[data-joe-focus]");
+            if (!el) return;
+            event.preventDefault();
+            focusAssistant({
+              module_type: el.getAttribute("data-joe-module") || "module",
+              object_type: el.getAttribute("data-joe-object-type") || "",
+              object_id: el.getAttribute("data-joe-object-id") || "",
+              label: el.getAttribute("data-joe-label") || ""
+            });
+          }
+          document.addEventListener("click", onJoeFocus);
+          return function () { document.removeEventListener("click", onJoeFocus); };
         }, []);
 
         useEffect(function () {
@@ -9680,7 +9749,7 @@
           var response = await window.fetch("/api/v1/ai/chat/stream", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messages: history, model: assistantModelRef.current }),
+            body: JSON.stringify({ messages: history, model: assistantModelRef.current, context: assistantContextRef.current || null }),
             signal: signal
           });
           if (!response.ok) {
@@ -10041,6 +10110,8 @@
             onClear: function () { setMessages([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: "Conversation cleared. I’m ready for the next message." }]); },
             runtime: runtime,
             assistantModel: assistantModel,
+            focused: assistantContext,
+            onClearFocus: clearAssistantFocus,
             inputRef: assistantInputRef,
             endRef: assistantEndRef
           }) : h("button", { type: "button", className: "assistant-fab", onClick: function () { setAssistantOpen(true); }, "aria-label": "Open JoeOS local AI", title: "Chat with JoeOS local AI (Ollama)" }, icon("fa-wand-magic-sparkles")),
