@@ -168,3 +168,60 @@ work_packages:
       - integrate
       - push
       - complete
+  - key: engineering-director
+    title: "Engineering Director orchestration"
+    description: >
+      Auto-select next dependency-ready work, dispatch stages to the
+      Architect/Builder/Verifier/Security role agents, run the bounded
+      Builder-Verifier repair loop, raise human gates, and notify Joe.
+    owner_agent_key: engineering.director
+    verifier_agent_key: engineering.verification
+    review_agent_key: engineering.securityreviewer
+    order: 7
+    priority: 10
+    risk: low
+    dependencies: [campaign-domain, role-profiles, autonomy-policy, worktree-isolation]
+    acceptance_criteria:
+      - "Queued packages whose dependencies are satisfied auto-promote to eligible."
+      - "A verifier rejection routes back to the Builder for a bounded repair attempt."
+      - "A security BLOCK raises a durable blocker and stops that package."
+      - "The worker principal cannot escalate autonomy or resolve blockers."
+      - "A campaign auto-completes when all packages are terminal."
+    stage_order:
+      - eligibility
+      - plan
+      - worktree
+      - implement
+      - validate
+      - review
+      - commit
+      - integrate
+      - push
+      - complete
+  - key: build-command-center
+    title: "Build Command Center UI"
+    description: >
+      Mobile-usable /os/build surface showing campaign status, current work,
+      next packages, open blockers, and controls (continue, pause, stop after
+      current, autonomy level).
+    owner_agent_key: engineering.builder
+    verifier_agent_key: engineering.verification
+    review_agent_key: engineering.securityreviewer
+    order: 8
+    priority: 20
+    risk: low
+    dependencies: [engineering-director]
+    acceptance_criteria:
+      - "Campaign status and next work render from authoritative campaign state."
+      - "Continue/pause/stop-after-current/autonomy controls work end-to-end."
+    stage_order:
+      - eligibility
+      - plan
+      - worktree
+      - implement
+      - validate
+      - review
+      - commit
+      - integrate
+      - push
+      - complete
