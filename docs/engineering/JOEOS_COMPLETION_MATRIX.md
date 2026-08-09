@@ -62,7 +62,7 @@ Updated continuously by the autonomous completion loop.
 
 | ID | AREA | REQUIREMENT | DEP | STATUS | TEST | COMMIT |
 |----|------|-------------|-----|--------|------|--------|
-| M-501 | UX | Multi-module desktop grid (ASK JOE, AGENTS, WORK, AUTOMATIONS, …) | M-301 | NOT_STARTED | — | — |
+| M-501 | UX | Multi-module desktop grid (ASK JOE, AGENTS, WORK, AUTOMATIONS, …) | M-301 | DONE | — | — |
 | M-502 | UX | Focus mode (double-click/expand) | M-301 | NOT_STARTED | — | — |
 | M-503 | UX | Inspector (right-side) on desktop | M-301 | NOT_STARTED | — | — |
 | M-504 | UX | Compact navigation rail | M-501 | NOT_STARTED | — | — |
@@ -73,7 +73,7 @@ Updated continuously by the autonomous completion loop.
 |----|------|-------------|-----|--------|------|--------|
 | M-601 | Agents | Agent cards (compact + expanded break-open) | M-301 | NOT_STARTED | — | — |
 | M-602 | Agents | Org map (interactive hierarchy) | — | DONE (agent_fabric) | smoke | a63f9f3 |
-| M-603 | Agents | Team overview (working/idle/waiting/failed/needs-Joe) | M-601 | NOT_STARTED | — | — |
+| M-603 | Agents | Team overview (working/idle/waiting/failed/needs-Joe) | M-601 | PARTIAL (command center + agent_fabric) | — | — |
 | M-604 | Agents | Agent detail sections (identity/state/model/tools/memory/…) | M-601 | NOT_STARTED | — | — |
 | M-605 | Agents | Auto-discovery from authoritative AgentFabric | — | NOT_STARTED | — | — |
 
