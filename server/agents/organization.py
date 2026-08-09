@@ -374,6 +374,21 @@ def _role_from_row(row) -> RoleDefinition:
     )
 
 
+_AGENT_STATES = frozenset(
+    {"configured", "available", "active", "executing", "waiting", "blocked",
+     "paused", "degraded", "unhealthy", "unavailable", "retired"}
+)
+_AGENT_AVAILABILITY = frozenset(
+    {"available", "busy", "blocked", "paused", "offline", "unavailable"}
+)
+
+
+def _coerce_status(value: object, *, valid: frozenset, default: str) -> str:
+    if isinstance(value, str) and value in valid:
+        return value
+    return default
+
+
 def _agent_from_row(row) -> AgentProfile:
     return AgentProfile(
         agent_id=row["agent_id"],
@@ -381,8 +396,8 @@ def _agent_from_row(row) -> AgentProfile:
         role_id=row["role_id"],
         department=row["department"],
         team=row["team"],
-        status=row["status"],
-        availability=row["availability"],
+        status=_coerce_status(row["status"], valid=_AGENT_STATES, default="configured"),
+        availability=_coerce_status(row["availability"], valid=_AGENT_AVAILABILITY, default="offline"),
         capabilities=tuple(x for x in row["capabilities"].split("|") if x),
         skills=_deserialize_skills(row["skills"]),
         model_preferences=tuple(x for x in row["model_preferences"].split("|") if x),

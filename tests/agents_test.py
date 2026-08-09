@@ -99,6 +99,21 @@ class OrganizationTests(AgentsFixture):
         self.assertEqual(disabled.availability, "offline")
         self.assertEqual(len(self.service.organization.agents()), 1)
 
+    def test_agent_overview_tolerates_corrupt_status_values(self):
+        import sqlite3
+
+        with sqlite3.connect(self.service.storage.path()) as conn:
+            conn.execute(
+                "UPDATE org_agents SET status = 'None', availability = 'None' WHERE agent_id = ?",
+                (self.agent.agent_id,),
+            )
+            conn.commit()
+        agents = self.service.organization.agents()
+        self.assertEqual(len(agents), 2)
+        corrupted = next(a for a in agents if a.agent_id == self.agent.agent_id)
+        self.assertEqual(corrupted.status, "configured")
+        self.assertEqual(corrupted.availability, "offline")
+
 
 class MissionTests(AgentsFixture):
     def test_mission_lifecycle(self):
