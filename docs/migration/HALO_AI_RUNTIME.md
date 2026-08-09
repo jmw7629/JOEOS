@@ -35,6 +35,12 @@ Current `ollama ps`: no models loaded (all idle).
 | `gpt-oss-120b-Q4_K_M` | llamacpp | 58.5 GB | 131072 |
 
 - Not yet integrated with the JoeOS ProviderRegistry (Section F/ModelCannon work).
+- **Canary result (2026-08-09):** `/v1/models` advertises both models as
+  `downloaded: true`, but the checkpoint dirs under
+  `/var/cache/models/lemonade/` are empty stubs (4–8 KB); loading fails with
+  Hugging Face 404 `model_load_error`. Ollama on Halo is fully functional
+  (8 real models, live inference verified). Lemonade inference is **not**
+  usable until real weights are present on disk.
 
 ## Private access (Section E)
 
