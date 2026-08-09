@@ -23,7 +23,18 @@ Current `ollama ps`: no models loaded (all idle).
 
 ## Lemonade (Halo)
 
-- **Not currently reachable** on `13305` from the VPS over the tailnet (port closed at discovery time). Lemonade is present on the Halo per the directive; its exact binary/version/service/bind/models require on-Host inventory via SSH (Section D completion) — **pending Halo shell access**.
+- Version: **10.5.1** (`/usr/bin/lemonade`). Service `lemond.service` **active/running**.
+- Bind: `127.0.0.1:13305` + `[::1]:13305` (loopback only — this is why the
+  earlier Tailnet probe from the VPS saw the port closed; correct posture).
+- API: OpenAI-compatible at `http://127.0.0.1:13305/v1/models`; also a local web UI.
+- Models on disk:
+
+| Model | Recipe | Size | ctx |
+|---|---|---|---|
+| `Qwen3-Coder-30B-A3B-Instruct-Q4_K_M` | llamacpp | 17.3 GB | 262144 |
+| `gpt-oss-120b-Q4_K_M` | llamacpp | 58.5 GB | 131072 |
+
+- Not yet integrated with the JoeOS ProviderRegistry (Section F/ModelCannon work).
 
 ## Private access (Section E)
 
@@ -42,4 +53,4 @@ Current `ollama ps`: no models loaded (all idle).
 | deepseek-r1:14b | Ollama | reasoning | TBD | yes (verify) | no | good | strong | no |
 | TBD (Lemonade on Halo) | Lemonade | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 
-Pending: on-Host `ollama show` context lengths, tool-calling probes, and Lemonade inventory once Halo shell access is available.
+Pending: on-Host `ollama show` context lengths, tool-calling probes, and Lemonade completion probes (Section AX canaries).
