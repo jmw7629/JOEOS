@@ -39,7 +39,8 @@ Audited 2026-08-09 against the live Halo authoritative host
 
 ## Remaining work (real)
 
-- **Not built this session**: mobile-focused Command Center (390x844) beyond responsive base; desktop focus-mode/inspector polish; full global search surface; per-module context menus/pin/reorder; deeper agent break-open (identity/tools/memory/automations sections already largely present in agent_fabric); schedule pipeline DAG visualization; Approvals/Executions dedicated modules.
+- **Completed in subsequent loop**: Command Center focus-mode + Approvals/Executions modules; module-scoped Joe on automation and model surfaces; global search for agents/automations/models; pipeline DAG visualization; mobile Command Center + mobile agent/kanban/pipelines (390px verified, no tiny columns).
+- **Still not built**: per-module context menus / pin / reorder; dedicated desktop inspector pane beyond focus-mode; deeper agent break-open sub-tabs (identity/tools/memory/automations largely present in agent_fabric); schedule pipeline DAG (automation DAG done; campaign DAG pending); dedicated Search route enriched with task/build results.
 - **Privileged/human-required**:
   - `/opt/joeos` runner checkout refresh on Halo requires root (`sudo`) — the human operator must run it (or provide the sudo password).
   - Lemonade inference on Halo requires pulling real weights (`lemonade pull`) — gated off; Ollama satisfies the workload.

@@ -46,7 +46,7 @@ Updated continuously by the autonomous completion loop.
 |----|------|-------------|-----|--------|------|--------|
 | M-301 | UX | Reusable module surface (compact/standard/expanded/focused/inspect) | — | NOT_STARTED | — | — |
 | M-302 | UX | Module states (loading/empty/healthy/degraded/failed/offline) | M-301 | NOT_STARTED | — | — |
-| M-303 | UX | Break-open module→subcomponent→detail interaction | M-301 | NOT_STARTED | — | — |
+| M-303 | UX | Break-open module→subcomponent→detail interaction | M-301 | DONE (command center focus + terminal tabs) | — | — |
 | M-304 | UX | Layout persistence (arrangement/collapse/orb) | M-301 | NOT_STARTED | — | — |
 
 ## 4. Module-scoped Joe
@@ -54,7 +54,7 @@ Updated continuously by the autonomous completion loop.
 | ID | AREA | REQUIREMENT | DEP | STATUS | TEST | COMMIT |
 |----|------|-------------|-----|--------|------|--------|
 | M-401 | Joe | Scoped-context contract (JoeContextScope) | — | DONE | — | — |
-| M-402 | Joe | Joe on every module; clear focus indicator | M-401 | PARTIAL (agents/terminal) | — | — |
+| M-402 | Joe | Joe on every module; clear focus indicator | M-401 | DONE (command center + agents + automation + models + terminal) | — | — |
 | M-403 | Joe | Scoped actions obey ToolBroker/policy/approval | M-401 | NOT_STARTED | — | — |
 | M-404 | Joe | Global floating orb preserved | M-401 | NOT_STARTED | — | — |
 
@@ -63,7 +63,7 @@ Updated continuously by the autonomous completion loop.
 | ID | AREA | REQUIREMENT | DEP | STATUS | TEST | COMMIT |
 |----|------|-------------|-----|--------|------|--------|
 | M-501 | UX | Multi-module desktop grid (ASK JOE, AGENTS, WORK, AUTOMATIONS, …) | M-301 | DONE | — | — |
-| M-502 | UX | Focus mode (double-click/expand) | M-301 | NOT_STARTED | — | — |
+| M-502 | UX | Focus mode (double-click/expand) | M-301 | DONE | — | — |
 | M-503 | UX | Inspector (right-side) on desktop | M-301 | NOT_STARTED | — | — |
 | M-504 | UX | Compact navigation rail | M-501 | NOT_STARTED | — | — |
 
@@ -72,7 +72,7 @@ Updated continuously by the autonomous completion loop.
 | ID | AREA | REQUIREMENT | DEP | STATUS | TEST | COMMIT |
 |----|------|-------------|-----|--------|------|--------|
 | M-601 | Agents | Agent cards (compact + expanded break-open) | M-301 | NOT_STARTED | — | — |
-| M-602 | Agents | Org map (interactive hierarchy) | — | DONE (agent_fabric) | smoke | a63f9f3 |
+| M-602 | Agents | Org map (interactive hierarchy) | — | DONE | smoke | a63f9f3 |
 | M-603 | Agents | Team overview (working/idle/waiting/failed/needs-Joe) | M-601 | PARTIAL (command center + agent_fabric) | — | — |
 | M-604 | Agents | Agent detail sections (identity/state/model/tools/memory/…) | M-601 | NOT_STARTED | — | — |
 | M-605 | Agents | Auto-discovery from authoritative AgentFabric | — | NOT_STARTED | — | — |
@@ -84,7 +84,7 @@ Updated continuously by the autonomous completion loop.
 | M-701 | Work | Work board (BACKLOG→DONE) from real state | M-301 | NOT_STARTED | — | — |
 | M-702 | Work | Task card break-open (objective/agent/deps/graph/tools/…) | M-701 | NOT_STARTED | — | — |
 | M-703 | Auto | Schedule/cron monitor (failing surfacing) | M-301 | NOT_STARTED | — | — |
-| M-704 | Auto | Pipeline/DAG visualization (TaskGraph/automation/campaign) | M-301 | NOT_STARTED | — | — |
+| M-704 | Auto | Pipeline/DAG visualization (TaskGraph/automation/campaign) | M-301 | DONE (automation) | — | — |
 | M-705 | Auto | Schedule pipeline (trigger→result) | M-703 | NOT_STARTED | — | — |
 
 ## 8. Memory / Files / Activity
@@ -114,23 +114,23 @@ Updated continuously by the autonomous completion loop.
 |----|------|-------------|-----|--------|------|--------|
 | M-1001 | Models | Model & compute module (providers/models/loads/queue/assignments) | M-301 | NOT_STARTED | — | — |
 | M-1002 | Models | Model card break-open + provider card | M-1001 | NOT_STARTED | — | — |
-| M-1003 | Apps | Approvals attention surface | M-301 | NOT_STARTED | — | — |
-| M-1004 | Apps | Executions module (proposal/policy/approval/runner/artifacts) | M-301 | NOT_STARTED | — | — |
+| M-1003 | Apps | Approvals attention surface | M-301 | DONE (command center) | — | — |
+| M-1004 | Apps | Executions module (proposal/policy/approval/runner/artifacts) | M-301 | DONE (command center) | — | — |
 | M-1005 | Build | Build JoeOS module (campaign/roadmap/packages/checkpoints) | M-301 | NOT_STARTED | — | — |
 
 ## 11. Mobile
 
 | ID | AREA | REQUIREMENT | DEP | STATUS | TEST | COMMIT |
 |----|------|-------------|-----|--------|------|--------|
-| M-1101 | Mobile | Mobile home (executive summary, no tiny cards) | M-501 | NOT_STARTED | — | — |
-| M-1102 | Mobile | Mobile agent view + kanban segments + vertical pipelines | M-601/M-701 | NOT_STARTED | — | — |
+| M-1101 | Mobile | Mobile home (executive summary, no tiny cards) | M-501 | DONE | — | — |
+| M-1102 | Mobile | Mobile agent view + kanban segments + vertical pipelines | M-601/M-701 | DONE | — | — |
 | M-1103 | Mobile | Mobile terminal | M-906 | NOT_STARTED | — | — |
 
 ## 12. Global UX / polish
 
 | ID | AREA | REQUIREMENT | DEP | STATUS | TEST | COMMIT |
 |----|------|-------------|-----|--------|------|--------|
-| M-1201 | UX | Global search across agents/tasks/automations/memory/files/… | M-501 | NOT_STARTED | — | — |
+| M-1201 | UX | Global search across agents/tasks/automations/memory/files/… | M-501 | DONE | — | — |
 | M-1202 | UX | Command palette | M-501 | PARTIAL (existing) | — | — |
 | M-1203 | UX | Shortcuts (no conflicts) | M-501 | PARTIAL | — | — |
 | M-1204 | UX | Visual acceptance 1440x900 / 1024x768 / 390x844 | M-501 | NOT_STARTED | — | — |

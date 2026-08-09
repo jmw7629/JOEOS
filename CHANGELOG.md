@@ -51,6 +51,13 @@ by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
   `update_agent` did not persist provider/model policy.
 - Autonomous execution validated on Halo (joeos.joe run → qwen3-coder-next).
 
+### Modular Command Center + Terminal
+
+- Modular Command Center home with focus-mode, Approvals/Executions modules, and module-scoped Joe on every surface.
+- Global search extended to agents/automations/models.
+- Pipeline DAG visualization in the Agent Command Center.
+- Mobile-focused Command Center and Agent surfaces.
+
 ### Module-scoped Joe
 
 - `JoeContextScope` contract: the assistant stream accepts a bounded
