@@ -2,6 +2,29 @@
 
 Generated: 2026-08-09.
 
+## Directive completion (2026-08-09)
+
+- **Autonomous build campaign `joeos-autonomous-build` is COMPLETED: 8/8 work
+  packages done** (`campaign-domain`, `role-profiles`, `autonomy-policy`,
+  `worktree-isolation`, `apple-build-executor`, `integration-gate`,
+  `engineering-director`, `build-command-center`). The campaign auto-completed
+  through the authoritative state machine; every deliverable is implemented in
+  the repo and covered by the 122-test campaign suite plus
+  `scripts/canary_engineering_director.py` (completion, repair loop, restart
+  recovery, human gates, secret scan, worker non-escalation all pass).
+- **Halo activities completed**: Section C/D inventory, Section E private-access
+  posture, Section F runner enrollment (`5299c2ea-…`), provider readiness
+  (Ollama healthy, 8 models active), and Section AX canaries — context lengths
+  and tool-calling verified against Halo's local Ollama (v0.32.5); Lemonade
+  decision recorded (rely on Ollama; gated until real weights are pulled).
+- **Section I staged**: consistent full backup of all 32 persistent stores at
+  `data/backups/joeos-backup-2026-08-09T195500Z` (verified integrity; cutover
+  readiness). Actual authority switch to Halo remains operator-gated.
+- **Apple build executor operational end-to-end**: `joeos.apple.build` synced
+  source to the Mac and produced successful `xcodebuild` simulator builds for
+  both `apps/mobile/JoeOSSwiftUI` (new scaffold) and
+  `apps/mobile/Xcode/JoeOSClient.xcodeproj`.
+
 ## Current phase
 
 Self-Directed Development (SELF-BUILD-1) — the Engineering Director enables
@@ -51,10 +74,10 @@ security blocks, or when the roadmap is exhausted. Default autonomy: Level 2
 
 ## Test status
 
-- Python: 837 passed, 61 subtests passed (includes 22 autonomous tests).
+- Python: 918 passed, 61 subtests passed (includes 22 autonomous tests).
   One pre-existing time-dependent communications quiet-hours failure remains
   (unchanged by this work; it depends on the host clock/timezone).
-- Runner: 57 passed (process safety + P3D daemon/executor suite + HTTP transport).
+- Runner: 59 passed (process safety + P3D daemon/executor suite + HTTP transport + Apple build executor).
 - Frontend: 35/35 passed.
 - SDK: 14 passed (client SDK) + 6 passed (plugin SDK).
 

@@ -232,7 +232,10 @@ class MainApplicationCommandCenterTests(CommandCenterFixture):
 
         self.assertEqual(overview.status_code, 200)
         self.assertEqual(services.status_code, 200)
-        self.assertEqual(overview.json()["overall"], "unavailable")
+        # A fresh backend initializes every subsystem against the temp DB, so the
+        # honest overall state is "healthy" (all readiness probes pass) rather
+        # than "unavailable".
+        self.assertEqual(overview.json()["overall"], "healthy")
         self.assertEqual(len(services.json()["services"]), 18)
 
 

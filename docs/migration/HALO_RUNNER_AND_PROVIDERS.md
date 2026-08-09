@@ -50,3 +50,16 @@
 
 Action for Lemonade: either download real weights (`lemonade pull`) or rely on
 Ollama for inference post-cutover. Ollama alone satisfies the coder workload.
+**Decision (2026-08-09): rely on Ollama post-cutover; Lemonade stays gated off
+until real weights are pulled on Halo.**
+
+## Additional Section AX verification (2026-08-09)
+
+- Context lengths (`/api/show`): kimi-k2.7-code 262144, qwen3-coder-next 262144,
+  qwen3-coder:30b-a3b-q8_0 262144, qwen3.6:35b 262144, gpt-oss:120b 131072,
+  llama3.3:70b 131072, llama3.2:3b 131072, deepseek-r1:14b 131072.
+- Tool calling (`/api/chat` + `get_weather` tool): confirmed on llama3.2:3b,
+  qwen3-coder:30b-a3b-q8_0, qwen3-coder-next:latest, llama3.3:70b; none on
+  deepseek-r1:14b, gpt-oss:120b, qwen3.6:35b.
+- Model registry on Halo: 8 Ollama models `active`; VPS-only qwen2.5 models
+  `disabled`. Coder + reasoning + tool-calling workloads are satisfied by Ollama.
