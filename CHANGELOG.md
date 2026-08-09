@@ -3,6 +3,40 @@
 All notable changes to the JoeOS Command Center are documented here, grouped
 by release. The authoritative version is `JOEOS_VERSION` in `joeos_backend.py`.
 
+## [2.3.0] — 2026-08-09
+
+### Autonomous self-directed development (SELF-BUILD-1)
+
+- **Engineering Director** (`server/engineering/campaign/director.py`): the
+  production stage handler that compiles WorkPackages into bounded structured
+  agent instructions and dispatches plan/implement/validate/review stages to the
+  engineering role agents through the existing AgentFabric. Builder output is
+  applied inside an isolated worktree through the runner's bounded
+  filesystem/git/test executors, with path-traversal, size-budget, and
+  secret-scan rejection.
+- **Auto-selection + continuation**: the campaign worker now auto-promotes
+  queued packages whose dependencies are satisfied to eligible, and auto-completes
+  a campaign when every package is terminal. Multiple packages complete without
+  operator prompts.
+- **Builder ↔ Verifier repair loop**: a verifier rejection routes the package
+  back to the Builder for a bounded repair attempt; when the attempt budget is
+  exhausted the package is blocked with a durable blocker.
+- **Human gates**: `human_decision`, `credential_required`,
+  `device_action_required`, `approval_required`, `security_block`, and
+  `verifier_reject` blocker reasons, with Notification Center delivery.
+- **Autonomy levels** 0-3 (default 2 — safe autonomous development) with
+  validation and campaign storage; escalation requires operator action.
+- **Build Command Center** `/os/build` (mobile-usable) with continue/pause/
+  stop-after-current/autonomy-level controls, current work, next packages, open
+  blockers, and checkpoints.
+- **Ask Joe integration**: "Continue building JoeOS" resumes/starts the campaign
+  through `POST /api/v1/engineering/director/continue`.
+- **Capabilities**: owner role now includes
+  `engineering.campaign.start/pause/cancel` and `engineering.blocker.resolve`.
+- **Canary**: `scripts/canary_engineering_director.py` proves multi-package
+  continuation, repair loop, campaign completion, restart recovery, human gates,
+  secret-scan blocking, and worker non-escalation.
+
 ## [2.2.0] — 2026-08-08
 
 ### Autonomous operations (AUTONOMY-1)

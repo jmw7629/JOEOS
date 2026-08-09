@@ -1,11 +1,16 @@
 # JoeOS Status
 
-Generated: 2026-08-08.
+Generated: 2026-08-09.
 
 ## Current phase
 
-Autonomous Operations (AUTONOMY-1) — persistent background agents, automations,
-schedules, triggers, recovery, and notifications (delivered).
+Self-Directed Development (SELF-BUILD-1) — the Engineering Director enables
+JoeOS to continue building JoeOS autonomously: roadmap → work package selection →
+Architect plan → Builder implement (isolated worktree) → Verifier validate →
+Security review → commit/push feature branch → checkpoint → next package. It
+stops only for genuine human decisions, credentials, device actions, approvals,
+security blocks, or when the roadmap is exhausted. Default autonomy: Level 2
+(Safe Autonomous Development).
 
 ## Live agent + autonomy status
 
