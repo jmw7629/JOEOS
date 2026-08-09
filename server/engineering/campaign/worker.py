@@ -54,7 +54,7 @@ class CampaignWorker:
                     self._tick_interval_seconds)
         while not self._stop.is_set():
             try:
-                await asyncio.to_thread(self.tick)
+                await self.tick_async()
             except Exception as error:  # pragma: no cover - defensive
                 logger.exception("campaign worker tick failed: %s", error)
             try:
@@ -69,3 +69,7 @@ class CampaignWorker:
     def tick(self) -> int:
         """Run one synchronous tick. Returns the number of stages advanced."""
         return self._service.worker_tick(stage_handler=self._stage_handler)
+
+    async def tick_async(self) -> int:
+        """Run one async tick, awaiting async stage handlers (the Director)."""
+        return await self._service.worker_tick_async(stage_handler=self._stage_handler)

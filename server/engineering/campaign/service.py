@@ -12,6 +12,7 @@ recorded against a checkpoint revision.
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import sqlite3
 import time
@@ -105,12 +106,24 @@ class CampaignService:
         *,
         event_sink: Optional[Callable[[str, str, str], None]] = None,
         stage_handler: Optional[Callable[[Dict, CampaignRecord, WorkPackageRecord, StageName, int], Dict]] = None,
+        notification_sink: Optional[Callable[[str, str, str, str, str, tuple], None]] = None,
         now: Callable[[], int] = now_ms,
     ) -> None:
         self._store = store
         self._events = event_sink or (lambda level, source, message: None)
         self._stage_handler = stage_handler
+        self._notification_sink = notification_sink
         self._now = now
+
+    def _emit_notification(self, category: str, title: str, message: str, severity: str,
+                           related_entity: str, links: tuple) -> None:
+        if self._notification_sink is None:
+            return
+        try:
+            self._notification_sink(category, title, message, severity,
+                                    related_entity, links)
+        except Exception as error:  # pragma: no cover - defensive
+            self._events("warning", "campaign", "notification failed: %s" % error)
 
     def prepare(self) -> None:
         self._store.prepare()
@@ -394,6 +407,123 @@ class CampaignService:
                                     note="package completed")
             self._emit(principal, "package.completed", campaign_id=campaign.campaign_id,
                        package_id=package_id)
+            self._emit_notification("PACKAGE_COMPLETED", "Work package complete: %s" % package.key,
+                                    "Commit verified and integrated: %s" % package.title,
+                                    "informational", package.package_id,
+                                    ("/os/build",))
+            return {"package": completed, "gate": GateResult(gate="push", passed=True,
+                                                             detail="package completed")}
+        gate_name = gate_for_stage(nxt)
+        handler = stage_handler or self._stage_handler
+        evidence: List[str] = []
+        passed = True
+        detail = ""
+        if handler is not None:
+            try:
+                outcome = self._invoke_stage(handler, principal, campaign, package,
+                                             nxt, package.attempts + 1)
+                passed = bool(outcome.get("passed", True))
+                detail = str(outcome.get("detail", "") or "")
+                evidence = [str(e) for e in outcome.get("evidence", [])][:64]
+            except Exception as exc:  # pragma: no cover - defensive
+                passed = False
+                detail = "stage handler error: %s" % exc
+        if not passed:
+            attempts = package.attempts + 1
+            campaign = self._store.get_campaign(package.campaign_id)
+            max_attempts = campaign.max_attempts_per_package if campaign else 3
+            if (gate_name in ("validation", "review", "implementation")
+                    and attempts < max_attempts
+                    and nxt in ("validate", "implement")):
+                # Repair loop: route a failed implementation/validation back to
+                # the Builder for a bounded repair attempt instead of blocking.
+                repaired = self._store.update_work_package(
+                    package_id, state="eligible", current_stage="eligibility",
+                    attempts=attempts, error_detail=detail, last_gate=gate_name)
+                self._record_checkpoint(campaign.campaign_id, package_id, "stage",
+                                        "eligibility",
+                                        note="repair attempt %d after %s" % (attempts, gate_name))
+                self._emit(principal, "package.repair", campaign_id=campaign.campaign_id,
+                           package_id=package_id, data={"gate": gate_name, "attempt": attempts})
+                return {"package": repaired, "gate": GateResult(
+                    gate=gate_name or "plan", passed=False, detail=detail,
+                    evidence=tuple(evidence), blocker_created=False, repair=True)}
+            state_target = "blocked"
+            self._store.update_work_package(
+                package_id, state=state_target, current_stage=current,
+                error_detail=detail, last_gate=gate_name, attempts=attempts)
+            blocker = EngineeringBlockerRecord(
+                blocker_id="blk-%s" % _new_id(), campaign_id=campaign.campaign_id,
+                package_id=package_id, reason=_blocker_reason_for_gate(gate_name),
+                detail=detail[:4000], state="open", created_at=now_iso(),
+            )
+            self._store.create_blocker(blocker)
+            self._emit(principal, "package.blocked", campaign_id=campaign.campaign_id,
+                       package_id=package_id, data={"gate": gate_name})
+            self._emit_notification("BUILD_BLOCKED", "Build blocked: %s" % package.key,
+                                    detail[:600], "high", package.package_id,
+                                    ("/os/build",))
+            return {"package": self._store.get_work_package(package_id),
+                    "gate": GateResult(gate=gate_name or "plan", passed=False, detail=detail,
+                                       evidence=tuple(evidence), blocker_created=True)}
+        self._store.update_work_package(
+            package_id, state=package_state_for_stage(nxt), current_stage=nxt,
+            last_gate=gate_name)
+        self._record_checkpoint(campaign.campaign_id, package_id, "stage", nxt,
+                                note="advanced to %s" % nxt)
+        self._emit(principal, "package.advanced", campaign_id=campaign.campaign_id,
+                   package_id=package_id, data={"stage": nxt})
+        return {"package": self._store.get_work_package(package_id),
+                "gate": GateResult(gate=gate_name or "plan", passed=True, detail=detail,
+                                   evidence=tuple(evidence))}
+
+    @staticmethod
+    def _invoke_stage(handler: Callable[..., Any], principal: Dict, campaign: CampaignRecord,
+                      package: WorkPackageRecord, stage: str, attempt: int) -> Dict[str, Any]:
+        """Invoke a stage handler synchronously, executing it when it is async.
+
+        Sync handlers (tests, simple adapters) are called directly. Async
+        handlers (the Engineering Director) are driven to completion through a
+        fresh event loop when none is running (the worker tick runs in a
+        dedicated asyncio task; the HTTP advance path is sync)."""
+        import asyncio as _asyncio
+        import inspect as _inspect
+        outcome = handler(principal, campaign, package, stage, attempt)
+        if _inspect.isawaitable(outcome):
+            try:
+                _asyncio.get_event_loop().run_until_complete(outcome)
+            except RuntimeError:
+                outcome = _asyncio.run(outcome)
+        if outcome is None:
+            return {"passed": True, "detail": "", "evidence": ()}
+        return outcome
+
+    async def advance_package_async(self, principal: Dict, package_id: str, *,
+                                    stage_handler: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
+        """Async variant of ``advance_package`` for handlers that must be awaited
+        in the campaign worker's event loop (the Engineering Director)."""
+        self._require(principal, PACKAGE_MANAGE_CAP)
+        package = self._store.get_work_package(package_id)
+        if package is None:
+            raise CampaignError(404, "package_not_found", "The work package does not exist.")
+        campaign = self._store.get_campaign(package.campaign_id)
+        if campaign is None or campaign.state != "active":
+            raise CampaignError(409, "campaign_not_active",
+                                "The owning campaign must be active to advance a package.")
+        stage_order = tuple(package.stage_order) or DEFAULT_ROADMAP_STAGE_ORDER
+        current = package.current_stage
+        nxt = next_stage(current, stage_order)
+        if nxt is None:
+            completed = self._store.update_work_package(
+                package_id, state="completed", current_stage="complete", last_gate="push")
+            self._record_checkpoint(campaign.campaign_id, package_id, "stage", "complete",
+                                    note="package completed")
+            self._emit(principal, "package.completed", campaign_id=campaign.campaign_id,
+                       package_id=package_id)
+            self._emit_notification("PACKAGE_COMPLETED", "Work package complete: %s" % package.key,
+                                    "Commit verified and integrated: %s" % package.title,
+                                    "informational", package.package_id,
+                                    ("/os/build",))
             return {"package": completed, "gate": GateResult(gate="push", passed=True,
                                                              detail="package completed")}
         gate_name = gate_for_stage(nxt)
@@ -404,6 +534,10 @@ class CampaignService:
         if handler is not None:
             try:
                 outcome = handler(principal, campaign, package, nxt, package.attempts + 1)
+                if inspect.isawaitable(outcome):
+                    outcome = await outcome
+                if outcome is None:
+                    outcome = {"passed": True, "detail": "", "evidence": ()}
                 passed = bool(outcome.get("passed", True))
                 detail = str(outcome.get("detail", "") or "")
                 evidence = [str(e) for e in outcome.get("evidence", [])][:64]
@@ -411,18 +545,36 @@ class CampaignService:
                 passed = False
                 detail = "stage handler error: %s" % exc
         if not passed:
-            state_target = "blocked"
+            attempts = package.attempts + 1
+            max_attempts = campaign.max_attempts_per_package if campaign else 3
+            if (gate_name in ("validation", "review", "implementation")
+                    and attempts < max_attempts
+                    and nxt in ("validate", "implement")):
+                repaired = self._store.update_work_package(
+                    package_id, state="eligible", current_stage="eligibility",
+                    attempts=attempts, error_detail=detail, last_gate=gate_name)
+                self._record_checkpoint(campaign.campaign_id, package_id, "stage",
+                                        "eligibility",
+                                        note="repair attempt %d after %s" % (attempts, gate_name))
+                self._emit(principal, "package.repair", campaign_id=campaign.campaign_id,
+                           package_id=package_id, data={"gate": gate_name, "attempt": attempts})
+                return {"package": repaired, "gate": GateResult(
+                    gate=gate_name or "plan", passed=False, detail=detail,
+                    evidence=tuple(evidence), blocker_created=False, repair=True)}
             self._store.update_work_package(
-                package_id, state=state_target, current_stage=current,
-                error_detail=detail, last_gate=gate_name)
+                package_id, state="blocked", current_stage=current,
+                error_detail=detail, last_gate=gate_name, attempts=attempts)
             blocker = EngineeringBlockerRecord(
                 blocker_id="blk-%s" % _new_id(), campaign_id=campaign.campaign_id,
-                package_id=package_id, reason="gate_failed",
+                package_id=package_id, reason=_blocker_reason_for_gate(gate_name),
                 detail=detail[:4000], state="open", created_at=now_iso(),
             )
             self._store.create_blocker(blocker)
             self._emit(principal, "package.blocked", campaign_id=campaign.campaign_id,
                        package_id=package_id, data={"gate": gate_name})
+            self._emit_notification("BUILD_BLOCKED", "Build blocked: %s" % package.key,
+                                    detail[:600], "high", package.package_id,
+                                    ("/os/build",))
             return {"package": self._store.get_work_package(package_id),
                     "gate": GateResult(gate=gate_name or "plan", passed=False, detail=detail,
                                        evidence=tuple(evidence), blocker_created=True)}
@@ -522,6 +674,97 @@ class CampaignService:
         return self._store.list_blockers(campaign_id)
 
     # ------------------------------------------------------------------
+    # Engineering Director (self-build) controls
+    # ------------------------------------------------------------------
+
+    def continue_building(self, principal: Dict, campaign_key: str = "joeos-autonomous-build",
+                          autonomy_level: Optional[int] = None) -> Dict[str, Any]:
+        """Resume or start the autonomous build campaign and select next work.
+
+        This is the single entry point behind "Continue building JoeOS". It
+        finds the campaign by key, validates/records the autonomy level, resumes
+        a paused/blocked campaign (or starts a proposed one), and returns the
+        campaign with the next dependency-ready packages.
+        """
+        self._require(principal, CAMPAIGN_START_CAP)
+        campaign = self._store.get_campaign_by_key(campaign_key)
+        if campaign is None:
+            raise CampaignError(404, "campaign_not_found",
+                                "No campaign with key %s exists." % campaign_key)
+        if autonomy_level is not None:
+            from .autonomy import validate_autonomy_level
+            validate_autonomy_level(autonomy_level)
+            self._store.update_campaign_autonomy_level(campaign.campaign_id, autonomy_level)
+        if campaign.state in ("paused", "blocked"):
+            self.resume_campaign(principal, campaign.campaign_id)
+        elif campaign.state == "proposed":
+            self.start_campaign(principal, campaign.campaign_id)
+        elif campaign.state == "completed":
+            return self._build_status(principal, campaign.campaign_id, started=False)
+        refreshed = self._store.get_campaign(campaign.campaign_id)
+        self._emit(principal, "campaign.continue", campaign_id=campaign.campaign_id)
+        return self._build_status(principal, campaign.campaign_id, started=True)
+
+    def pause_after_current(self, principal: Dict, campaign_id: str) -> CampaignRecord:
+        """Mark the campaign to pause after the currently-running package."""
+        self._require(principal, CAMPAIGN_PAUSE_CAP)
+        campaign = self._store.get_campaign(campaign_id)
+        if campaign is None:
+            raise CampaignError(404, "campaign_not_found", "The campaign does not exist.")
+        updated = self._store.update_campaign_control(campaign_id, pause_after_current=True)
+        self._emit(principal, "campaign.pause_after_current", campaign_id=campaign_id)
+        return updated  # type: ignore[return-value]
+
+    def set_autonomy_level(self, principal: Dict, campaign_id: str, level: int) -> CampaignRecord:
+        """Explicitly set the campaign autonomy level (0-3). Refuses escalation
+        beyond the registered policy's binding constraints."""
+        self._require(principal, CAMPAIGN_MANAGE_CAP)
+        from .autonomy import AUTONOMY_LEVEL_NAMES, validate_autonomy_level
+        try:
+            validate_autonomy_level(level)
+        except ValueError as error:
+            raise CampaignError(422, "invalid_autonomy_level", str(error)) from error
+        campaign = self._store.get_campaign(campaign_id)
+        if campaign is None:
+            raise CampaignError(404, "campaign_not_found", "The campaign does not exist.")
+        policy = get_autonomy_policy(campaign.autonomy_policy_key)
+        if policy is None:
+            raise CampaignError(409, "autonomy_policy_missing",
+                                "The autonomy policy is not registered.")
+        updated = self._store.update_campaign_autonomy_level(campaign.campaign_id, level)
+        self._record_checkpoint(campaign_id, None, "manual", "eligibility",
+                                note="autonomy level set to %s" % AUTONOMY_LEVEL_NAMES[level])
+        self._emit(principal, "campaign.autonomy_level", campaign_id=campaign_id,
+                   data={"level": level})
+        return updated  # type: ignore[return-value]
+
+    def _build_status(self, principal: Dict, campaign_id: str, *, started: bool) -> Dict[str, Any]:
+        campaign = self._store.get_campaign(campaign_id)
+        if campaign is None:
+            raise CampaignError(404, "campaign_not_found", "The campaign does not exist.")
+        packages = self._store.list_work_packages(campaign_id)
+        open_blockers = [b for b in self._store.list_blockers(campaign_id) if b.state == "open"]
+        by_state: Dict[str, int] = {}
+        for package in packages:
+            by_state[package.state] = by_state.get(package.state, 0) + 1
+        current = next((p for p in packages if p.state in _EXECUTABLE_PACKAGE_STATES), None)
+        next_packages = [p for p in packages
+                         if p.state == "queued" and self._dependencies_satisfied(p, campaign_id)]
+        return {
+            "started": started,
+            "campaign_id": campaign.campaign_id,
+            "key": campaign.key,
+            "state": campaign.state,
+            "autonomy_level": campaign.autonomy_level,
+            "packages": by_state,
+            "current_work": current.model_dump() if current else None,
+            "next_up": [p.key for p in sorted(
+                next_packages, key=lambda p: (p.roadmap_order, p.priority))][:5],
+            "open_blockers": [b.model_dump() for b in open_blockers[:8]],
+            "checkpoints": len(self._store.list_checkpoints(campaign_id)),
+        }
+
+    # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
 
@@ -537,13 +780,29 @@ class CampaignService:
         an executable state are touched. The stage handler defaults to the one
         injected at construction; when None the state machine advances without
         executing work (safe-by-default). Returns the number of stages advanced.
-        """
+
+        Autonomous self-driving: queued packages whose dependencies are satisfied
+        are promoted to eligible automatically so the campaign continues without
+        operator prompting. When a campaign's packages all reach a terminal
+        state, the campaign is marked completed."""
         principal = self._worker_principal(worker)
         advanced = 0
         for campaign in self._store.list_campaigns():
             if campaign.state != "active":
                 continue
+            if getattr(campaign, "pause_after_current", False):
+                running = any(p.state in _EXECUTABLE_PACKAGE_STATES
+                              for p in self._store.list_work_packages(campaign.campaign_id))
+                if not running:
+                    self._store.update_campaign_control(campaign.campaign_id,
+                                                        pause_after_current=False)
+                    self._store.update_campaign_state(campaign.campaign_id, state="paused")
+                    self._record_checkpoint(campaign.campaign_id, None, "manual", "eligibility",
+                                            note="paused after current package")
+                    continue
             packages = self._store.list_work_packages(campaign.campaign_id)
+            promoted = self._promote_ready_packages(campaign, packages)
+            advanced += promoted
             candidates = [p for p in packages
                           if p.state in _EXECUTABLE_PACKAGE_STATES
                           and self._dependencies_satisfied(p, campaign.campaign_id)]
@@ -554,11 +813,112 @@ class CampaignService:
                         stage_handler=stage_handler or self._stage_handler,
                     )
                 except Exception as error:  # pragma: no cover - defensive
-                    self._emit("error", "campaign", "worker advance failed for %s: %s"
-                               % (package.package_id, error))
+                    self._events("error", "campaign", "worker advance failed for %s: %s"
+                                 % (package.package_id, error))
                     continue
                 advanced += 1
+            self._maybe_complete_campaign(campaign.campaign_id)
         return advanced
+
+    async def worker_tick_async(self, *, worker: str = "campaign-worker",
+                                stage_handler: Optional[Callable[..., Any]] = None) -> int:
+        """Async variant of ``worker_tick`` that awaits async stage handlers.
+
+        Used by the production campaign worker so the Engineering Director's
+        async agent stages run inside the worker's event loop."""
+        principal = self._worker_principal(worker)
+        advanced = 0
+        for campaign in self._store.list_campaigns():
+            if campaign.state != "active":
+                continue
+            if getattr(campaign, "pause_after_current", False):
+                running = any(p.state in _EXECUTABLE_PACKAGE_STATES
+                              for p in self._store.list_work_packages(campaign.campaign_id))
+                if not running:
+                    self._store.update_campaign_control(campaign.campaign_id,
+                                                        pause_after_current=False)
+                    self._store.update_campaign_state(campaign.campaign_id, state="paused")
+                    self._record_checkpoint(campaign.campaign_id, None, "manual", "eligibility",
+                                            note="paused after current package")
+                    continue
+            packages = self._store.list_work_packages(campaign.campaign_id)
+            promoted = self._promote_ready_packages(campaign, packages)
+            advanced += promoted
+            candidates = [p for p in packages
+                          if p.state in _EXECUTABLE_PACKAGE_STATES
+                          and self._dependencies_satisfied(p, campaign.campaign_id)]
+            for package in candidates[:campaign.max_parallel_packages]:
+                try:
+                    await self.advance_package_async(
+                        principal, package.package_id,
+                        stage_handler=stage_handler or self._stage_handler,
+                    )
+                except Exception as error:  # pragma: no cover - defensive
+                    self._events("error", "campaign", "worker advance failed for %s: %s"
+                                 % (package.package_id, error))
+                    continue
+                advanced += 1
+            self._maybe_complete_campaign(campaign.campaign_id)
+        return advanced
+
+    def _promote_ready_packages(self, campaign: CampaignRecord,
+                                packages: Sequence[WorkPackageRecord]) -> int:
+        """Promote queued packages whose dependencies are satisfied to eligible.
+
+        Only packages still in ``queued`` with all dependencies completed are
+        promoted, and the promotion respects the campaign's concurrency cap.
+        Returns the number of packages promoted."""
+        promoted = 0
+        active_count = sum(1 for p in packages
+                           if p.state in _EXECUTABLE_PACKAGE_STATES
+                           or p.state in ("implementing", "validating"))
+        for package in packages:
+            if package.state != "queued":
+                continue
+            if not self._dependencies_satisfied(package, campaign.campaign_id):
+                continue
+            if active_count + promoted >= campaign.max_parallel_packages:
+                break
+            self._store.update_work_package(
+                package.package_id, state="eligible", current_stage="eligibility",
+                last_gate="eligibility")
+            self._record_checkpoint(campaign.campaign_id, package.package_id,
+                                    "stage", "eligibility",
+                                    note="auto-promoted after dependencies satisfied")
+            promoted += 1
+        return promoted
+
+    def _maybe_complete_campaign(self, campaign_id: str) -> Optional[CampaignRecord]:
+        """Mark the campaign completed when every package is terminal.
+
+        Terminal states are completed, failed, cancelled, and blocked (blocked
+        packages remain visible to the operator as awaiting human action, so a
+        campaign with only blocked work reports blocked rather than completed)."""
+        campaign = self._store.get_campaign(campaign_id)
+        if campaign is None or campaign.state != "active":
+            return None
+        packages = self._store.list_work_packages(campaign_id)
+        if not packages:
+            return None
+        terminal = {"completed", "failed", "cancelled"}
+        if all(p.state in terminal for p in packages):
+            summary = "campaign completed: %d/%d packages done" % (
+                sum(1 for p in packages if p.state == "completed"), len(packages))
+            updated = self._store.update_campaign_state(
+                campaign_id, state="completed", completion_summary=summary)
+            self._record_checkpoint(campaign_id, None, "manual", "complete",
+                                    note=summary)
+            self._emit_notification("CAMPAIGN_COMPLETED", "Build campaign completed",
+                                    summary, "informational", campaign_id,
+                                    ("/os/build",))
+            return updated  # type: ignore[return-value]
+        if all(p.state in ("completed", "failed", "cancelled", "blocked") for p in packages):
+            blocked = sum(1 for p in packages if p.state == "blocked")
+            updated = self._store.update_campaign_state(
+                campaign_id, state="blocked",
+                completion_summary="campaign stopped: %d package(s) need attention" % blocked)
+            return updated  # type: ignore[return-value]
+        return None
 
     def _worker_principal(self, worker: str) -> Dict:
         return {
@@ -597,3 +957,14 @@ def _new_id() -> str:
     import uuid
 
     return uuid.uuid4().hex[:24]
+
+
+def _blocker_reason_for_gate(gate_name: Optional[str]) -> str:
+    """Map a failed gate to a stable blocker reason for operator triage."""
+    if gate_name == "review":
+        return "security_block"
+    if gate_name == "validation":
+        return "verifier_reject"
+    if gate_name == "implementation":
+        return "gate_failed"
+    return "gate_failed"

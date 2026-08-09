@@ -12,6 +12,45 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+# Explicit autonomy levels for the self-build campaign.
+#
+# LEVEL 0 — PLAN ONLY: agents inspect and propose work; no source modification.
+# LEVEL 1 — IMPLEMENT + VERIFY: isolated feature branches/worktrees + tests;
+#           no automatic merge or deployment.
+# LEVEL 2 — SAFE AUTONOMOUS DEVELOPMENT: implement, verify, commit, push
+#           feature branches, integrate low-risk work; production deployment
+#           remains gated.
+# LEVEL 3 — CONTINUOUS SAFE BUILD: continuously select + complete low-risk
+#           roadmap items including safe deployment when policy allows.
+#
+# Default is LEVEL 2. Levels never grant new authority; they only gate which
+# policy constraints are already available. Escalation requires explicit
+# operator action and is refused by the service when policy forbids it.
+AUTONOMY_LEVEL_PLAN_ONLY = 0
+AUTONOMY_LEVEL_IMPLEMENT_VERIFY = 1
+AUTONOMY_LEVEL_SAFE_DEVELOPMENT = 2
+AUTONOMY_LEVEL_CONTINUOUS_BUILD = 3
+
+DEFAULT_AUTONOMY_LEVEL = AUTONOMY_LEVEL_SAFE_DEVELOPMENT
+
+AUTONOMY_LEVEL_NAMES = {
+    0: "plan_only",
+    1: "implement_verify",
+    2: "safe_autonomous_development",
+    3: "continuous_safe_build",
+}
+
+
+def validate_autonomy_level(level: int) -> int:
+    """Validate a requested autonomy level, clamping nothing; raises on invalid."""
+    if int(level) not in AUTONOMY_LEVEL_NAMES:
+        raise ValueError("autonomy level must be one of %s" % sorted(AUTONOMY_LEVEL_NAMES))
+    return int(level)
+
+
+def autonomy_level_name(level: int) -> str:
+    return AUTONOMY_LEVEL_NAMES.get(validate_autonomy_level(level), "unknown")
+
 
 class StrictPolicyModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)

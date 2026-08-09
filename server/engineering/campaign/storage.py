@@ -171,6 +171,19 @@ class CampaignStore:
                 CREATE INDEX IF NOT EXISTS idx_heartbeats_campaign ON engineering_heartbeats(campaign_id);
                 """
             )
+            # Guarded additive migrations for the self-build director fields.
+            pragma_rows = connection.execute("PRAGMA table_info(engineering_campaigns)").fetchall()
+            campaign_columns = {
+                (row["name"] if isinstance(row, sqlite3.Row) or isinstance(row, dict)
+                 else row[1]) for row in pragma_rows
+            }
+            if "autonomy_level" not in campaign_columns:
+                connection.execute(
+                    "ALTER TABLE engineering_campaigns ADD COLUMN autonomy_level INTEGER NOT NULL DEFAULT 2")
+            if "pause_after_current" not in campaign_columns:
+                connection.execute(
+                    "ALTER TABLE engineering_campaigns ADD COLUMN pause_after_current INTEGER NOT NULL DEFAULT 0")
+            connection.commit()
 
     # ------------------------------------------------------------------
     # Campaigns
@@ -187,8 +200,9 @@ class CampaignStore:
                         integration_branch, autonomy_policy_key, state, current_stage, worktree_root,
                         max_parallel_packages, max_attempts_per_package, heartbeat_timeout_ms,
                         revision, created_by, created_at, updated_at, last_heartbeat_at,
-                        completion_summary, failure_reason, schema_version
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        completion_summary, failure_reason, schema_version,
+                        autonomy_level, pause_after_current
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         record.campaign_id, record.key, record.title, record.description,
@@ -199,6 +213,8 @@ class CampaignStore:
                         record.revision, record.created_by, record.created_at, record.updated_at,
                         record.last_heartbeat_at, record.completion_summary, record.failure_reason,
                         self.schema_version,
+                        record.autonomy_level,
+                        1 if getattr(record, "pause_after_current", False) else 0,
                     ),
                 )
                 connection.commit()
@@ -262,6 +278,36 @@ class CampaignStore:
                         last_heartbeat_at,
                         campaign_id,
                     ),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return self.get_campaign(campaign_id)
+
+    def update_campaign_autonomy_level(self, campaign_id: str, level: int) -> Optional[CampaignRecord]:
+        with self._connection_factory() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                connection.execute(
+                    "UPDATE engineering_campaigns SET autonomy_level = ?, updated_at = ? "
+                    "WHERE campaign_id = ?",
+                    (int(level), _now_iso(), campaign_id),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return self.get_campaign(campaign_id)
+
+    def update_campaign_control(self, campaign_id: str, *, pause_after_current: bool) -> Optional[CampaignRecord]:
+        with self._connection_factory() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                connection.execute(
+                    "UPDATE engineering_campaigns SET pause_after_current = ?, updated_at = ? "
+                    "WHERE campaign_id = ?",
+                    (1 if pause_after_current else 0, _now_iso(), campaign_id),
                 )
                 connection.commit()
             except Exception:
@@ -707,18 +753,28 @@ class CampaignStore:
 def _campaign_from_row(row) -> Optional[CampaignRecord]:
     if row is None:
         return None
+    try:
+        autonomy_level = int(row["autonomy_level"])
+    except (KeyError, TypeError, ValueError):
+        autonomy_level = 2
+    try:
+        pause_after_current = bool(int(row["pause_after_current"]))
+    except (KeyError, TypeError, ValueError):
+        pause_after_current = False
     return CampaignRecord(
         campaign_id=row["campaign_id"], key=row["key"], title=row["title"],
         description=row["description"], repository_path=row["repository_path"],
         base_branch=row["base_branch"], integration_branch=row["integration_branch"],
         autonomy_policy_key=row["autonomy_policy_key"], state=row["state"],
-        current_stage=row["current_stage"], worktree_root=row["worktree_root"],
+        current_stage=row["current_stage"], autonomy_level=autonomy_level,
+        worktree_root=row["worktree_root"],
         max_parallel_packages=row["max_parallel_packages"],
         max_attempts_per_package=row["max_attempts_per_package"],
         heartbeat_timeout_ms=row["heartbeat_timeout_ms"], revision=row["revision"],
         created_by=row["created_by"], created_at=row["created_at"],
         updated_at=row["updated_at"], last_heartbeat_at=row["last_heartbeat_at"],
         completion_summary=row["completion_summary"], failure_reason=row["failure_reason"],
+        pause_after_current=pause_after_current,
     )
 
 

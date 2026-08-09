@@ -27,7 +27,12 @@ from .models import (
     WorkPackageRecord,
 )
 
-VALID_BLOCK_REASONS = ("worktree_conflict", "gate_failed", "watchdog_expired", "operator", "missing_requirement")
+VALID_BLOCK_REASONS = (
+    "worktree_conflict", "gate_failed", "watchdog_expired", "operator",
+    "missing_requirement", "human_decision", "credential_required",
+    "device_action_required", "approval_required", "security_block",
+    "verifier_reject",
+)
 from .service import CampaignError, CampaignService
 from .roadmap import parse_roadmap_document
 
@@ -363,5 +368,57 @@ def list_checkpoints(
 ) -> List[EngineeringCheckpointRecord]:
     try:
         return list(service.checkpoints(principal, campaign_id))
+    except CampaignError as exc:
+        raise _translate(exc) from exc
+
+
+# ---------------------------------------------------------------------------
+# Engineering Director (self-build) controls
+# ---------------------------------------------------------------------------
+
+
+@router.post("/engineering/director/continue")
+def director_continue(
+    payload: dict,
+    service: CampaignService = Depends(get_campaign_service),
+    principal: dict = Depends(require_application_session),
+) -> dict:
+    """"Continue building JoeOS": resume/start the autonomous build campaign."""
+    try:
+        level = payload.get("autonomy_level")
+        return service.continue_building(
+            principal,
+            campaign_key=str(payload.get("campaign_key") or "joeos-autonomous-build"),
+            autonomy_level=int(level) if level is not None else None,
+        )
+    except CampaignError as exc:
+        raise _translate(exc) from exc
+
+
+@router.post("/engineering/campaigns/{campaign_id}/pause-after-current", response_model=CampaignRecord)
+def campaign_pause_after_current(
+    campaign_id: str,
+    service: CampaignService = Depends(get_campaign_service),
+    principal: dict = Depends(require_application_session),
+) -> CampaignRecord:
+    try:
+        return service.pause_after_current(principal, campaign_id)
+    except CampaignError as exc:
+        raise _translate(exc) from exc
+
+
+@router.post("/engineering/campaigns/{campaign_id}/autonomy-level", response_model=CampaignRecord)
+def campaign_set_autonomy_level(
+    campaign_id: str,
+    payload: dict,
+    service: CampaignService = Depends(get_campaign_service),
+    principal: dict = Depends(require_application_session),
+) -> CampaignRecord:
+    try:
+        level = int(payload.get("level"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="invalid_autonomy_level") from None
+    try:
+        return service.set_autonomy_level(principal, campaign_id, level)
     except CampaignError as exc:
         raise _translate(exc) from exc

@@ -72,7 +72,19 @@ StageName = Literal[
     "push",
     "complete",
 ]
-BlockReason = Literal["worktree_conflict", "gate_failed", "watchdog_expired", "operator", "missing_requirement"]
+BlockReason = Literal[
+    "worktree_conflict",
+    "gate_failed",
+    "watchdog_expired",
+    "operator",
+    "missing_requirement",
+    "human_decision",
+    "credential_required",
+    "device_action_required",
+    "approval_required",
+    "security_block",
+    "verifier_reject",
+]
 
 
 class CampaignDefinition(StrictEngineeringModel):
@@ -101,6 +113,8 @@ class CampaignRecord(StrictEngineeringModel):
     autonomy_policy_key: str
     state: CampaignState = "proposed"
     current_stage: StageName = "queued"
+    autonomy_level: int = Field(default=2, ge=0, le=3)
+    pause_after_current: bool = Field(default=False)
     worktree_root: Optional[str] = None
     max_parallel_packages: int = 1
     max_attempts_per_package: int = 3
@@ -232,6 +246,7 @@ class GateResult(StrictEngineeringModel):
     detail: str = ""
     evidence: Tuple[str, ...] = Field(default=(), max_length=64)
     blocker_created: bool = False
+    repair: bool = False
 
 
 class StageTransition(StrictEngineeringModel):
