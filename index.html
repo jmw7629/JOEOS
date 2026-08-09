@@ -2408,6 +2408,31 @@
     }
     .assistant-focus .focus-clear:hover { color: var(--text); }
 
+    /* ---- Command Center (modular home) ---- */
+    .command-center { display: flex; flex-direction: column; gap: 14px; }
+    .cc-heading h2 { margin: 0 0 2px; font-size: 22px; }
+    .cc-heading p { margin: 0; color: var(--faint); font-size: 13px; }
+    .cc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+    .cc-module { display: flex; flex-direction: column; gap: 10px; padding: 14px 15px; border: 1px solid var(--line);
+      border-radius: 14px; background: var(--panel); transition: border-color .15s ease, transform .12s ease; }
+    .cc-module:hover { border-color: rgba(59, 143, 216, .5); transform: translateY(-1px); }
+    .cc-module-head { display: flex; align-items: center; gap: 10px; }
+    .cc-module-icon { color: var(--interactive); font-size: 16px; }
+    .cc-module-head h3 { margin: 0; font-size: 14px; letter-spacing: .02em; }
+    .cc-module-head p { margin: 0; color: var(--faint); font-size: 11px; }
+    .cc-module-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+      border: 1px solid var(--line); color: var(--bright); flex: none; }
+    .cc-module-badge.info { color: var(--interactive); border-color: rgba(59,143,216,.5); }
+    .cc-module-badge.danger { color: var(--danger); border-color: rgba(255,100,124,.5); }
+    .cc-module-value { font-size: 20px; font-weight: 700; line-height: 1.2; }
+    .cc-module-muted { color: var(--faint); font-weight: 500; font-size: 14px; }
+    .cc-module-detail { color: var(--faint); font-size: 12px; line-height: 1.45; }
+    .cc-module-actions { display: flex; gap: 8px; margin-top: 2px; }
+    .cc-module-actions button { padding: 7px 10px; font-size: 12px; }
+    @media (min-width: 1300px) {
+      .cc-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
     .assistant-messages {
       display: flex;
       min-height: 0;
@@ -4960,6 +4985,7 @@
       var useRef = React.useRef;
 
       var NAV_ITEMS = [
+        { id: "command", label: "Command Center", short: "Command", icon: "fa-border-all" },
         { id: "mission", label: "Mission Control", short: "Mission", icon: "fa-compass" },
         { id: "dashboard", label: "Executive Dashboard", short: "Dashboard", icon: "fa-chart-line" },
         { id: "pipeline", label: "CI/CD Pipeline", short: "Pipeline", icon: "fa-code-branch" },
@@ -7261,6 +7287,63 @@
         return date.toLocaleString();
       }
 
+      function CommandCenterHome(props) {
+        var runtime = props.runtime || {};
+        var auto = props.automationOverview || {};
+        var agents = props.agentsOverview || {};
+        var notifications = props.notifications || [];
+        var security = props.security || {};
+        var runtimeOn = !!runtime.online;
+        var unread = notifications.filter(function (n) { return n.unread; }).length;
+
+        function moduleCard(opts) {
+          return h(
+            "article",
+            { className: "cc-module glass-card " + (opts.tone || ""), "data-module": opts.module },
+            h("div", { className: "cc-module-head" },
+              h("span", { className: "cc-module-icon" }, icon(opts.icon)),
+              h("div", { style: { flex: 1, minWidth: 0 } }, h("h3", null, opts.title), opts.sub ? h("p", null, opts.sub) : null),
+              opts.badge != null ? h("span", { className: "cc-module-badge" + (opts.badgeTone ? " " + opts.badgeTone : "") }, String(opts.badge)) : null
+            ),
+            h("div", { className: "cc-module-value" }, opts.value ? opts.value : h("span", { className: "cc-module-muted" }, "—")),
+            opts.detail ? h("div", { className: "cc-module-detail" }, opts.detail) : null,
+            h("div", { className: "cc-module-actions" },
+              h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(opts.open); } }, opts.openLabel || "Open"),
+              h("button", { type: "button", className: "ghost-button", onClick: function () { props.onAsk({ module_type: opts.module, object_type: opts.objectType || "", object_id: opts.objectId || "", label: opts.title }); }, title: "Ask Joe about " + opts.title }, icon("fa-wand-magic-sparkles"), " Joe")
+            )
+          );
+        }
+
+        var agentList = Array.isArray(agents.agents) ? agents.agents : [];
+        var activeAgents = agentList.filter(function (a) { return a.status === "active" || a.availability === "idle" || a.availability === "busy"; });
+        var workingAgents = agentList.filter(function (a) { return a.availability === "busy"; });
+        var failedAgents = agentList.filter(function (a) { return a.status === "failed" || a.availability === "offline"; });
+        var agentBadge = (agentList.length ? String(agentList.length) : (agents.total != null ? String(agents.total) : null));
+
+        return h(
+          "div",
+          { className: "command-center" },
+          h("div", { className: "cc-heading" },
+            h("h2", null, "Command Center"),
+            h("p", null, "Broad operational state at a glance — open any module, or focus Joe on it.")
+          ),
+          h("div", { className: "cc-grid" },
+            moduleCard({ module: "ask-joe", title: "Ask Joe", icon: "fa-wand-magic-sparkles", sub: runtimeOn ? "Local " + (runtime.model || "model") : "Ollama local model", open: "command", openLabel: "Open Joe", badge: "", onAsk: function () { props.onAsk({ module_type: "global", label: "Joe" }); } }),
+            moduleCard({ module: "agents", title: "Agents", icon: "fa-user-astronaut", sub: (activeAgents.length ? activeAgents.length + " active" : "") + (workingAgents.length ? " · " + workingAgents.length + " working" : "") + (failedAgents.length ? " · " + failedAgents.length + " failed" : ""), value: agentBadge ? agentBadge + " agent(s)" : null, detail: agentList.length ? agentList.slice(0, 5).map(function (a) { return a.display_name; }).join(", ") : null, badge: agentBadge, badgeTone: failedAgents.length ? "danger" : (workingAgents.length ? "info" : ""), open: "agents", objectType: "module" }),
+            moduleCard({ module: "automation", title: "Automations", icon: "fa-robot", sub: "Workflow engine", value: (auto.running ? auto.running + " running" : "idle") + (auto.failed_recently ? " · " + auto.failed_recently + " failed" : ""), detail: (auto.workflows_enabled != null ? auto.workflows_enabled + " enabled / " + (auto.workflows_total || 0) + " total" : null) + (auto.pending_approvals ? " · " + auto.pending_approvals + " approvals" : ""), badge: auto.failed_recently ? auto.failed_recently : (auto.running ? auto.running : null), badgeTone: auto.failed_recently ? "danger" : "info", open: "automation", objectType: "module" }),
+            moduleCard({ module: "work", title: "Current Work", icon: "fa-list-check", sub: "Agent runs and tasks", value: (auto.running ? auto.running + " running" : "no active work") + (auto.waiting ? " · " + auto.waiting + " waiting" : ""), badge: auto.running || null, badgeTone: "info", open: "automation", objectType: "module" }),
+            moduleCard({ module: "memory", title: "Memory", icon: "fa-brain", sub: "Knowledge platform", open: "memory", objectType: "module" }),
+            moduleCard({ module: "files", title: "Files", icon: "fa-folder-open", sub: "Project artifacts", open: "files", objectType: "module" }),
+            moduleCard({ module: "terminal", title: "Terminal", icon: "fa-terminal", sub: "Authenticated host shell", open: "terminal", openLabel: "Open", onOpen: function () { window.location.href = "/os/terminal"; }, objectType: "module" }),
+            moduleCard({ module: "build", title: "Build JoeOS", icon: "fa-hammer", sub: "Autonomous engineering", open: "build", openLabel: "Open", onOpen: function () { window.location.href = "/os/build"; }, objectType: "module" }),
+            moduleCard({ module: "system", title: "System Pulse", icon: "fa-heart-pulse", sub: runtimeOn ? "Healthy" : "Offline", value: runtimeOn ? (props.uptimeSeconds ? Math.round(props.uptimeSeconds / 60) + "m up" : null) : "runtime offline", detail: props.metrics ? Object.keys(props.metrics || {}).slice(0, 4).map(function (k) { return k + " " + (props.metrics[k] && props.metrics[k].value != null ? props.metrics[k].value : "?"); }).join(" · ") : null, badgeTone: runtimeOn ? "" : "danger", badge: runtimeOn ? null : "off", open: "dashboard", objectType: "module" }),
+            moduleCard({ module: "models", title: "Models & AI", icon: "fa-microchip", sub: "Providers and compute", value: runtime.model ? runtime.model : null, open: "ai", objectType: "module" }),
+            moduleCard({ module: "attention", title: "Attention", icon: "fa-bell", sub: "Notifications", value: unread ? unread + " unread" : "all clear", badge: unread || null, badgeTone: unread ? "danger" : "", open: "communications", objectType: "module" }),
+            moduleCard({ module: "security", title: "Security", icon: "fa-shield-halved", sub: security.lockdown_active ? "LOCKDOWN ACTIVE" : "No lockdown", value: security.events != null ? security.events + " events" : null, badgeTone: security.lockdown_active ? "danger" : "", badge: security.lockdown_active ? "locked" : null, open: "security-center", objectType: "module" })
+          )
+        );
+      }
+
       function AgentCard(props) {
         var agent = props.agent;
         var caps = Array.isArray(agent.capabilities) ? agent.capabilities.slice(0, 4) : [];
@@ -8085,8 +8168,9 @@
         var activePair = useState(function () {
           try {
             var savedSection = window.localStorage.getItem("joeos:last-section");
-            return NAV_ITEMS.some(function (item) { return item.id === savedSection; }) ? savedSection : "mission";
-          } catch (error) { return "mission"; }
+            if (savedSection === "command") return savedSection;
+            return NAV_ITEMS.some(function (item) { return item.id === savedSection; }) ? savedSection : "command";
+          } catch (error) { return "command"; }
         });
         var active = activePair[0];
         var setActive = activePair[1];
@@ -9900,7 +9984,19 @@
         ]);
 
         var section = null;
-        if (active === "mission") {
+        if (active === "command") {
+          section = h(CommandCenterHome, {
+            runtime: runtime,
+            metrics: metrics,
+            automationOverview: automationOverview,
+            agentsOverview: agentsOverview,
+            notifications: notifications,
+            security: security,
+            uptimeSeconds: uptimeSeconds,
+            onOpen: function (id) { selectSection(String(id)); },
+            onAsk: focusAssistant
+          });
+        } else if (active === "mission") {
           section = h(MissionControlSection, { workspace: workspace, catalog: catalog, metrics: metrics, runtime: runtime, security: security, bots: bots, logs: logs, saving: workspaceSaving, error: workspaceError, editing: editingLayout, dragging: draggingWidget, dropTarget: dropTarget, onAdd: function () { setCatalogOpen(true); }, onEdit: toggleLayoutEditing, onCustomize: function () { setCustomizerOpen(true); }, onConfigure: openConfigurationGuide, onAsk: askFromMission, onMove: moveWorkspaceWidget, onResize: resizeWorkspaceWidget, onHide: hideWorkspaceWidget, onDragStart: beginWidgetDrag, onDragOver: overWidgetDrag, onDrop: dropWidget, onDragEnd: endWidgetDrag });
         } else if (active === "dashboard") {
           section = h(DashboardSection, { metrics: metrics, uptimeSeconds: uptimeSeconds, lastUpdated: lastUpdated, runtime: runtime, onBrief: generateBrief });
