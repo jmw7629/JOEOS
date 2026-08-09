@@ -524,7 +524,7 @@ class AppleBuildExecutor:
         source_root: str,
         project_path: str,
         scheme: str = "JoeOSClient",
-        destination: str = "platform=iOS Simulator,name=iPhone 16 Pro",
+        destination: str = "platform=iOS Simulator,name=iPhone 16 Pro,OS=18.6",
         ssh_port: str = "22",
         adapter: Optional[Callable[[list, dict], dict]] = None,
         progress: Optional[Callable[[str], None]] = None,
@@ -541,9 +541,9 @@ class AppleBuildExecutor:
         self._adapter = adapter
         self._progress = progress
 
-    def _ssh_command(self) -> list:
+    def _ssh_args(self) -> list:
+        """ssh argument vector (without the executable; run_process supplies it)."""
         return [
-            "ssh",
             "-i", self._identity_file,
             "-o", "BatchMode=yes",
             "-o", "StrictHostKeyChecking=accept-new",
@@ -585,7 +585,7 @@ class AppleBuildExecutor:
             return {"status": "failed", "summary": "mirror directory not configured",
                     "exit_classification": "denied"}
         rsync = [
-            "rsync", "-az", "--delete",
+            "-az", "--delete",
             "--exclude", ".git",
             "--exclude", ".venv",
             "--exclude", "node_modules",
@@ -603,35 +603,45 @@ class AppleBuildExecutor:
                 "exit_classification": "clean"}
 
     def _remote_build(self, operation: str, timeout_ms: int) -> dict:
+        # The remote command is a typed argument vector appended to the ssh
+        # invocation; ssh joins them into the remote shell command. Every
+        # element is config-derived (never a request parameter), and the
+        # xcodebuild path is absolute so no `cd ... &&` shell composition is
+        # needed. The -destination value carries embedded quotes to preserve
+        # its spaces on the remote shell. The runner's process layer bounds
+        # output, so no `2>&1 | tail` shell pipeline is required either.
+        abs_project = "%s/%s" % (self._mirror_dir, self._project_path.lstrip("/"))
+        if "'" in self._destination or "'" in self._scheme or "'" in abs_project:
+            return {"status": "failed", "summary": "apple build rejected quote in config",
+                    "exit_classification": "denied"}
+        destination_arg = "'%s'" % self._destination
         if operation == "build_simulator":
-            command = (
-                "cd %s && xcodebuild -project %s -scheme %s "
-                "-destination '%s' -configuration Debug "
-                "ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build 2>&1 | tail -40"
-                % (self._mirror_dir, self._project_path, self._scheme, self._destination)
-            )
+            command = [
+                "xcodebuild", "-project", abs_project, "-scheme", self._scheme,
+                "-destination", destination_arg, "-configuration", "Debug",
+                "ARCHS=arm64", "ONLY_ACTIVE_ARCH=YES", "build",
+            ]
         elif operation == "test_simulator":
-            command = (
-                "cd %s && xcodebuild -project %s -scheme %s "
-                "-destination '%s' -configuration Debug test 2>&1 | tail -60"
-                % (self._mirror_dir, self._project_path, self._scheme, self._destination)
-            )
+            command = [
+                "xcodebuild", "-project", abs_project, "-scheme", self._scheme,
+                "-destination", destination_arg, "-configuration", "Debug",
+                "test",
+            ]
         elif operation == "build_device":
-            command = (
-                "cd %s && xcodebuild -project %s -scheme %s "
-                "-configuration Debug "
-                "CODE_SIGNING_ALLOWED=NO build 2>&1 | tail -40"
-                % (self._mirror_dir, self._project_path, self._scheme)
-            )
+            command = [
+                "xcodebuild", "-project", abs_project, "-scheme", self._scheme,
+                "-configuration", "Debug", "CODE_SIGNING_ALLOWED=NO", "build",
+            ]
         else:  # pragma: no cover - guarded above
             return {"status": "failed", "summary": "unsupported operation",
                     "exit_classification": "denied"}
-        args = self._ssh_command() + [command]
+        args = self._ssh_args() + command
         result = run_process(executable="ssh", arguments=args, cwd="/",
                              timeout_ms=timeout_ms)
         if result.exit_code != 0:
             return {"status": "failed", "summary": "apple build failed",
-                    "exit_classification": "failed"}
+                    "exit_classification": "failed",
+                    "output": (result.stdout or "")[-2000:]}
         return {"status": "succeeded", "summary": "apple build succeeded",
                 "exit_classification": "clean", "output": result.stdout[-2000:]}
 

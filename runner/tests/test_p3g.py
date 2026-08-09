@@ -165,6 +165,67 @@ class AppleBuildExecutorTests(unittest.TestCase):
         result = executor.execute({"operation": "verify_health"}, "", root="/")
         self.assertEqual(result["status"], "succeeded", result)
 
+    def test_sync_source_argument_vector_has_no_duplicate_executable(self):
+        import joeos_runner.operations as operations_module
+        captured = {}
+        def fake_run_process(*, executable, arguments, cwd, timeout_ms, **kwargs):
+            captured["executable"] = executable
+            captured["arguments"] = list(arguments)
+            return ProcessResult(exit_code=0, stdout="synced", stderr="",
+                                 duration_ms=10)
+        original = operations_module.run_process
+        operations_module.run_process = fake_run_process
+        try:
+            executor = AppleBuildExecutor(
+                host="100.68.105.127", user="user",
+                identity_file="/home/x/.ssh/key",
+                mirror_dir="/Users/user/Developer/JOEOS",
+                source_root="/home/x/JOEOS",
+                project_path="apps/mobile/Xcode/JoeOSClient.xcodeproj",
+            )
+            result = executor.execute({"operation": "sync_source"}, "", root="/",
+                                      timeout_ms=60_000)
+        finally:
+            operations_module.run_process = original
+        self.assertEqual(result["status"], "succeeded", result)
+        self.assertEqual(captured["executable"], "rsync")
+        argv = captured["arguments"]
+        self.assertEqual(argv[0], "-az", "rsync executable must not be duplicated")
+        for argument in argv:
+            for marker in (";", "&&", "||", "|", "`", "$(", ">", "<"):
+                self.assertNotIn(marker, argument, "shell control char in rsync arg: %r" % argument)
+
+    def test_remote_build_argument_vector_is_shell_safe(self):
+        import joeos_runner.operations as operations_module
+        captured = {}
+        def fake_run_process(*, executable, arguments, cwd, timeout_ms, **kwargs):
+            captured["arguments"] = list(arguments)
+            return ProcessResult(exit_code=0, stdout="built ok", stderr="",
+                                 duration_ms=10)
+        original = operations_module.run_process
+        operations_module.run_process = fake_run_process
+        try:
+            executor = AppleBuildExecutor(
+                host="100.68.105.127", user="user",
+                identity_file="/home/x/.ssh/key",
+                mirror_dir="/Users/user/Developer/JOEOS",
+                source_root="/home/x/JOEOS",
+                project_path="apps/mobile/Xcode/JoeOSClient.xcodeproj",
+            )
+            result = executor.execute({"operation": "build_simulator"}, "", root="/",
+                                      timeout_ms=60_000)
+        finally:
+            operations_module.run_process = original
+        self.assertEqual(result["status"], "succeeded", result)
+        argv = captured["arguments"]
+        self.assertEqual(argv[0], "-i", "ssh executable must not be duplicated")
+        self.assertIn("xcodebuild", argv)
+        self.assertIn("-project", argv)
+        self.assertIn("/Users/user/Developer/JOEOS/apps/mobile/Xcode/JoeOSClient.xcodeproj", argv)
+        for argument in argv:
+            for marker in (";", "&&", "||", "|", "`", "$(", ">", "<"):
+                self.assertNotIn(marker, argument, "shell control char in ssh arg: %r" % argument)
+
 
 class OpenCodeExecutorTests(unittest.TestCase):
     def test_missing_binary_denied(self):

@@ -88,6 +88,7 @@ class RunnerConfiguration:
     apple_build_user: str = ""
     apple_build_identity: str = ""
     apple_build_mirror: str = ""
+    apple_build_destination: str = ""
 
     @classmethod
     def load(cls, path: str, environ: Optional[Dict[str, str]] = None) -> "RunnerConfiguration":

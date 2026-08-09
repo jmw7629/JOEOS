@@ -85,6 +85,7 @@ def _executor_resolver(config: RunnerConfiguration):
                 user=str(getattr(config, "apple_build_user", "") or ""),
                 identity_file=str(getattr(config, "apple_build_identity", "") or ""),
                 mirror_dir=str(getattr(config, "apple_build_mirror", "") or ""),
+                destination=str(getattr(config, "apple_build_destination", "") or ""),
                 source_root=config.work_root,
                 project_path="apps/mobile/Xcode/JoeOSClient.xcodeproj",
             )
