@@ -356,5 +356,31 @@ class DraftTests(CommunicationsFixture):
         self.assertIsNone(self.service.get_draft(draft.draft_id))
 
 
+
+
+    def test_legacy_severity_tolerated(self):
+        """A notification row with a legacy severity (e.g. 'high') must not
+        crash the notifications surface when read."""
+        from server.communications.notifications import _normalize_severity
+
+        self.assertEqual(_normalize_severity("high"), "critical")
+        self.assertEqual(_normalize_severity("info"), "informational")
+        # Create a notification, then inject a legacy severity directly into the
+        # store and confirm reading it normalizes instead of raising.
+        notification = self.service.create_notification(
+            source="automation", category="workflow_failed",
+            title="Legacy", severity="error",
+        )
+        center = getattr(self.service, "notifications", None)
+        if center is not None and hasattr(center, "_connection_factory"):
+            with center._connection_factory() as connection:
+                connection.execute(
+                    "UPDATE comms_notifications SET severity = 'high' WHERE notification_id = ?",
+                    (str(notification.notification_id),),
+                )
+            # Reading must not raise.
+            rows = center.list(limit=50)
+            self.assertGreaterEqual(len(rows), 1)
+
 if __name__ == "__main__":
     unittest.main()

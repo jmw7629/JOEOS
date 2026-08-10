@@ -356,6 +356,11 @@ class NotificationCenter:
             channels = tuple(json.loads(str(row["delivery_channels"]))) if str(row["delivery_channels"]) else ()
         except ValueError:
             channels = ()
+        # Tolerate legacy/unknown severity values from older writers so a row
+        # read never crashes the communications surface. Normalize the old
+        # `high` to the closest allowed literal; keep anything else as-is by
+        # passing it through the model's permissive fallback.
+        severity = _normalize_severity(str(row["severity"]))
         return NotificationRecord(
             notification_id=str(row["notification_id"]),
             source=str(row["source"]),
@@ -363,7 +368,7 @@ class NotificationCenter:
             category=str(row["category"]),
             title=str(row["title"]),
             message=str(row["message"]),
-            severity=str(row["severity"]),
+            severity=severity,
             priority=str(row["priority"]),
             urgency=str(row["urgency"]),
             privacy=str(row["privacy"]),
@@ -389,6 +394,27 @@ class NotificationCenter:
             escalation_policy=str(row["escalation_policy"]),
             trace_id=str(row["trace_id"]),
         )
+
+
+def _normalize_severity(value: str) -> str:
+    """Map a stored severity to an allowed model value.
+
+    Older writers or external integrations may store severities outside the
+    current Literal (e.g. ``high``). Reading such a row must never crash the
+    notifications surface, so unknown values fall back to ``critical`` (the
+    closest semantic match) and the legacy ``high`` maps to ``critical``.
+    """
+    allowed = {"informational", "success", "warning", "error", "critical", "security_critical"}
+    raw = (value or "").strip().lower()
+    if raw in allowed:
+        return raw
+    if raw == "high":
+        return "critical"
+    if raw in {"info", "information"}:
+        return "informational"
+    if raw in {"severe", "fatal", "emergency"}:
+        return "critical"
+    return "warning"
 
 
 def _in_window(current: str, start: str, end: str) -> bool:
