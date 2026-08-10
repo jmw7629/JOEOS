@@ -2489,6 +2489,7 @@
     .cc-module-muted { color: var(--faint); font-weight: 500; font-size: 14px; }
     .cc-module-detail { color: var(--faint); font-size: 12px; line-height: 1.45; }
     .cc-module-actions { display: flex; gap: 8px; margin-top: 2px; }
+    .cc-undo-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
     .cc-module-actions button { padding: 7px 10px; font-size: 12px; }
     .cc-focused { padding: 18px; }
     .cc-focused .cc-module { background: transparent; border-color: rgba(59,143,216,.4); }
@@ -7695,12 +7696,36 @@
         var layoutPair = useState(readLayout);
         var layout = layoutPair[0];
         var setLayout = layoutPair[1];
+        var layoutUndoPair = useState([]);
+        var layoutUndo = layoutUndoPair[0];
+        var setLayoutUndo = layoutUndoPair[1];
+        function pushLayoutUndo(prev) {
+          setLayoutUndo(function (stack) {
+            var next = stack.slice().concat([prev]);
+            if (next.length > 20) next.shift();
+            return next;
+          });
+        }
         function persistLayout(next) {
+          var prev = readLayout();
+          if (prev !== null || next) pushLayoutUndo(prev);
           setLayout(next);
           try {
             var raw = window.localStorage.getItem("joeos:ui-prefs");
             var parsed = raw ? JSON.parse(raw) : {};
             parsed.command_layout = next;
+            window.localStorage.setItem("joeos:ui-prefs", JSON.stringify(parsed));
+          } catch (error) {}
+        }
+        function undoLayout() {
+          if (!layoutUndo.length) return;
+          var prev = layoutUndo[layoutUndo.length - 1];
+          setLayoutUndo(layoutUndo.slice(0, -1));
+          setLayout(prev);
+          try {
+            var raw = window.localStorage.getItem("joeos:ui-prefs");
+            var parsed = raw ? JSON.parse(raw) : {};
+            parsed.command_layout = prev;
             window.localStorage.setItem("joeos:ui-prefs", JSON.stringify(parsed));
           } catch (error) {}
         }
@@ -7860,6 +7885,7 @@
               h("h2", null, "Command Center"),
               h("p", null, "Broad operational state at a glance — open, focus, pin, reorder, or ask Joe about any module.")
             ),
+            layoutUndo.length ? h("div", { className: "cc-undo-bar" }, h("button", { type: "button", className: "secondary-button", onClick: undoLayout }, icon("fa-rotate-left"), "Undo layout change"), h("span", { className: "cc-module-muted" }, "Reorder, pin, and reset are reversible.")) : null,
             h("div", { className: "cc-grid" }, ordered.map(function (m) {
               return moduleCard(m);
             }))
