@@ -176,9 +176,34 @@
     /* Density modes — compact tightens rows; comfortable relaxes them. */
     html[data-density="compact"] {
       --ui-density: -4px;
+      --cc-row-scale: .9;
+      --cc-meta-show: none;
     }
     html[data-density="comfortable"] {
       --ui-density: 6px;
+      --cc-row-scale: 1;
+      --cc-meta-show: inline;
+    }
+    html[data-density="command"] {
+      --ui-density: -8px;
+      --cc-row-scale: .78;
+      --cc-meta-show: none;
+      --cc-metric-scale: .85;
+    }
+    html[data-density="command"] .cc-module-detail,
+    html[data-density="command"] .cc-inspector-meta,
+    html[data-density="command"] .cc-timeline-copy span {
+      font-size: 10.5px;
+    }
+    html[data-density="command"] .cc-module {
+      padding: 10px 12px;
+      gap: 7px;
+    }
+    html[data-density="command"] .cc-module-value {
+      font-size: 17px;
+    }
+    html[data-density="command"] .attention-card {
+      padding: 11px 12px;
     }
 
     /* Reduced motion — media preference and the explicit setting. */
@@ -5555,7 +5580,7 @@
 
       function normalizeTheme(theme) {
         var source = theme && typeof theme === "object" ? theme : {};
-        var density = ["compact", "comfortable", "spacious"].indexOf(source.density) >= 0 ? source.density : "comfortable";
+        var density = ["compact", "command", "comfortable", "spacious"].indexOf(source.density) >= 0 ? source.density : "comfortable";
         var fontFamily = ["system", "rounded", "monospace", "serif"].indexOf(source.font_family) >= 0 ? source.font_family : "system";
         return {
           font_scale: safeNumber(source.font_scale == null ? 1 : source.font_scale, .85, 1.35),
@@ -5582,7 +5607,7 @@
           var prefs = defaultUiPrefs();
           if (parsed && typeof parsed === "object") {
             if (["system", "dark", "light"].indexOf(parsed.theme) >= 0) prefs.theme = parsed.theme;
-            if (["compact", "balanced", "comfortable"].indexOf(parsed.density) >= 0) prefs.density = parsed.density;
+            if (["command", "compact", "balanced", "comfortable"].indexOf(parsed.density) >= 0) prefs.density = parsed.density;
             if (["full", "reduced"].indexOf(parsed.effects) >= 0) prefs.effects = parsed.effects;
             if (["standard", "reduced"].indexOf(parsed.motion) >= 0) prefs.motion = parsed.motion;
             if (["normal", "high"].indexOf(parsed.contrast) >= 0) prefs.contrast = parsed.contrast;
@@ -6781,7 +6806,7 @@
               { className: "glass-card panel-card" },
               h("div", { className: "plugin-header" }, icon("fa-palette"), h("strong", null, "Appearance")),
               h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-theme" }, "Theme"), h("select", { id: "ui-theme", className: "form-control", value: prefs.theme, onChange: function (event) { update("theme", event.target.value); } }, h("option", { value: "system" }, "System (" + effectiveTheme + ")"), h("option", { value: "dark" }, "Dark"), h("option", { value: "light" }, "Light"))),
-              h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-density" }, "Density"), h("select", { id: "ui-density", className: "form-control", value: prefs.density, onChange: function (event) { update("density", event.target.value); } }, h("option", { value: "compact" }, "Compact"), h("option", { value: "balanced" }, "Balanced"), h("option", { value: "comfortable" }, "Comfortable"))),
+              h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-density" }, "Density"), h("select", { id: "ui-density", className: "form-control", value: prefs.density, onChange: function (event) { update("density", event.target.value); } }, h("option", { value: "command" }, "Command"), h("option", { value: "compact" }, "Compact"), h("option", { value: "balanced" }, "Balanced"), h("option", { value: "comfortable" }, "Comfortable"))),
               h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-effects" }, "Visual effects"), h("select", { id: "ui-effects", className: "form-control", value: prefs.effects, onChange: function (event) { update("effects", event.target.value); } }, h("option", { value: "full" }, "Full"), h("option", { value: "reduced" }, "Reduced (flat surfaces)"))),
               h("p", { className: "settings-help" }, "Reduced effects removes blur and glow while preserving contrast and readability.")
             ),
@@ -7331,7 +7356,7 @@
               h("input", { id: "workspace-glass-opacity", type: "range", min: ".5", max: ".94", step: ".02", value: theme.glass_opacity, onChange: function (event) { props.onTheme("glass_opacity", Number(event.target.value)); } })
             ),
             h("div", { className: "theme-value-row" }, h("span", { className: "theme-label", id: "workspace-density-label" }, "Layout density")),
-            h("div", { className: "density-options", role: "group", "aria-labelledby": "workspace-density-label" }, ["compact", "comfortable", "spacious"].map(function (density) {
+            h("div", { className: "density-options", role: "group", "aria-labelledby": "workspace-density-label" }, ["command", "compact", "comfortable"].map(function (density) {
               return h("button", { type: "button", className: "density-option " + (theme.density === density ? "active" : ""), onClick: function () { props.onTheme("density", density); }, "aria-pressed": theme.density === density, key: density }, density.charAt(0).toUpperCase() + density.slice(1));
             }))
           ),
