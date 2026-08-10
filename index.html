@@ -3669,6 +3669,29 @@
       color: var(--color-status-critical);
       border: 1px solid rgba(255, 59, 92, .45);
     }
+    .palette-actions {
+      display: inline-flex;
+      gap: 4px;
+      margin-left: auto;
+      flex: 0 0 auto;
+    }
+    .palette-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border: 1px solid rgba(126, 209, 255, .16);
+      border-radius: 6px;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .palette-action.risk-security {
+      color: var(--color-status-security);
+      border-color: rgba(167, 139, 250, .35);
+    }
     html[data-contrast="high"] .palette-item.active,
     html[data-contrast="high"] .palette-item:focus-visible {
       outline: 2px solid var(--color-focus-ring);
@@ -7184,31 +7207,58 @@
         var activePair = useState(0);
         var activeIndex = activePair[0];
         var setActiveIndex = activePair[1];
+        var objectGroupsPair = useState(null);
+        var objectGroups = objectGroupsPair[0];
+        var setObjectGroups = objectGroupsPair[1];
+        var objectSearchingPair = useState(false);
+        var objectSearching = objectSearchingPair[0];
+        var setObjectSearching = objectSearchingPair[1];
         var inputRef = useRef(null);
         var listRef = useRef(null);
         var containerRef = useRef(null);
         useFocusTrap(true, containerRef);
         useEffect(function () { if (inputRef.current) inputRef.current.focus(); }, []);
+        var searchToken = 0;
+        useEffect(function () {
+          var token = ++searchToken;
+          var q = (query || "").trim();
+          if (q.length < 2) { setObjectGroups(null); setObjectSearching(false); return; }
+          setObjectSearching(true);
+          var timer = setTimeout(function () {
+            searchPaletteObjects(q).then(function (groups) {
+              if (token !== searchToken) return;
+              setObjectGroups(groups || []);
+              setObjectSearching(false);
+            }).catch(function () { if (token === searchToken) { setObjectGroups([]); setObjectSearching(false); } });
+          }, 220);
+          return function () { clearTimeout(timer); };
+        }, [query]);
         var scored = (props.commands || [])
           .map(function (command) { return { command: command, score: paletteScore(command, query) }; })
           .filter(function (item) { return item.score >= 0; })
           .sort(function (a, b) { return b.score - a.score || (a.command.label < b.command.label ? -1 : 1); })
           .slice(0, 24);
+        var objectItems = [];
+        (objectGroups || []).forEach(function (group) {
+          (group.items || []).forEach(function (item) { objectItems.push({ group: group, item: item }); });
+        });
         useEffect(function () { setActiveIndex(0); }, [query]);
         function activate(item) {
+          if (item && item.object) { openObjectRef(item.object); props.onClose(); return; }
           item.command.run();
           props.onClose();
         }
         function onKeyDown(event) {
           if (event.key === "ArrowDown") {
             event.preventDefault();
-            setActiveIndex(function (current) { return Math.min(current + 1, scored.length - 1); });
+            setActiveIndex(function (current) { return Math.min(current + 1, scored.length + objectItems.length - 1); });
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
             setActiveIndex(function (current) { return Math.max(current - 1, 0); });
-          } else if (event.key === "Enter" && scored[activeIndex]) {
+          } else if (event.key === "Enter") {
             event.preventDefault();
-            activate(scored[activeIndex].command);
+            if (activeIndex < scored.length && scored[activeIndex]) activate(scored[activeIndex].command);
+            else if (activeIndex >= scored.length && objectItems[activeIndex - scored.length]) activate(objectItems[activeIndex - scored.length].item);
           }
         }
         var groups = {};
@@ -7224,10 +7274,38 @@
           h(
             "div",
             { className: "command-palette", role: "dialog", "aria-modal": "true", "aria-label": "JoeOS command palette", ref: containerRef, onKeyDown: onKeyDown },
-            h("div", { className: "palette-search" }, icon("fa-magnifying-glass"), h("input", { ref: inputRef, value: query, onChange: function (event) { setQuery(event.target.value); }, placeholder: "Search commands and sections…", "aria-label": "Search commands" }), h("span", { className: "palette-shortcut" }, "ESC")),
+            h("div", { className: "palette-search" }, icon("fa-magnifying-glass"), h("input", { ref: inputRef, value: query, onChange: function (event) { setQuery(event.target.value); }, placeholder: "Search objects and commands…", "aria-label": "Search objects and commands" }), h("span", { className: "palette-shortcut" }, "ESC")),
             h(
               "div",
               { className: "palette-results", ref: listRef, role: "listbox", "aria-label": "Command results" },
+              objectSearching ? h("div", { className: "palette-caption" }, "Searching objects…") : null,
+              objectItems.length ? objectGroups.map(function (og) {
+                return h(
+                  "div",
+                  { className: "palette-group", key: "obj-" + og.label },
+                  h("div", { className: "palette-caption" }, og.label),
+                  og.items.map(function (it) {
+                    var current = flatIndex++;
+                    return h(
+                      "button",
+                      {
+                        type: "button",
+                        className: "palette-item" + (scored.length + current === activeIndex ? " active" : ""),
+                        onClick: function () { activate(it); },
+                        onMouseEnter: function () { setActiveIndex(scored.length + current); },
+                        key: it.id,
+                        role: "option",
+                        "aria-selected": scored.length + current === activeIndex
+                      },
+                      h("span", null, icon(it.icon)),
+                      h("span", { className: "palette-copy" }, h("strong", null, it.title), h("small", null, it.detail)),
+                      it.actions && it.actions.length ? h("span", { className: "palette-actions" }, it.actions.slice(0, 2).map(function (action) {
+                        return h("span", { className: "palette-action" + (action.risk ? " risk-" + action.risk : ""), key: action.id }, icon(action.icon), action.label);
+                      })) : null
+                    );
+                  })
+                );
+              }) : null,
               scored.length ? groupKeys.map(function (category) {
                 var items = groups[category];
                 return h(
@@ -7255,7 +7333,7 @@
                     );
                   })
                 );
-              }) : h("div", { className: "empty-widget" }, "No command matches that search.")
+              }) : (!objectSearching && !objectItems.length && query.trim().length >= 2) ? h("div", { className: "empty-widget" }, "No objects or commands match that search.") : (query ? null : h("div", { className: "palette-caption" }, "Type to search objects and commands"))
             )
           )
         );
@@ -9366,6 +9444,74 @@
           } catch (error) {}
           setSearchResults({ query: query, groups: groups.filter(function (group) { return group.items.length; }) });
           setSearchSearching(false);
+        }
+
+        function openObjectRef(ref) {
+          // Canonical Enterprise Object routing: every object resolves to the
+          // correct JoeOS workspace without losing the selected object.
+          var type = ref.object_type || ref.type;
+          var id = ref.object_id || ref.id;
+          if (!type) return;
+          if (type === "agent") { selectSection("agents"); if (id) selectAgentFromApi(id); }
+          else if (type === "agent_run" || type === "mission") { window.location.href = "/os/agents?mission=" + encodeURIComponent(id || ""); }
+          else if (type === "automation" || type === "schedule" || type === "workflow") { window.location.href = "/os/automations?workflow=" + encodeURIComponent(id || ""); }
+          else if (type === "model") { window.location.href = "/os/agents?model=" + encodeURIComponent(id || ""); }
+          else if (type === "provider") { window.location.href = "/os/agents?provider=" + encodeURIComponent(id || ""); }
+          else if (type === "approval") { selectSection("security-center"); }
+          else if (type === "execution") { window.location.href = "/os/automations?execution=" + encodeURIComponent(id || ""); }
+          else if (type === "file" || type === "folder" || type === "artifact") { selectSection("files"); }
+          else if (type === "memory") { selectSection("memory"); }
+          else if (type === "conversation") { selectSection("communications"); }
+          else if (type === "device" || type === "machine") { selectSection("device-enrollment"); }
+          else { selectSection("command"); }
+        }
+
+        function objectQuickActions(ref) {
+          // Actionable palette results: Open + type-appropriate primary action.
+          var actions = [];
+          var type = ref.object_type || ref.type;
+          var id = ref.object_id || ref.id;
+          actions.push({ id: "open-" + type + "-" + id, label: "Open", icon: "fa-arrow-up-right-from-square", run: function () { openObjectRef(ref); } });
+          if (type === "agent") actions.push({ id: "run-" + id, label: "Run", icon: "fa-play", run: function () { openObjectRef(ref); } });
+          if (type === "approval") actions.push({ id: "approve-" + id, label: "Approve", icon: "fa-check", risk: "security", run: function () { selectSection("security-center"); } });
+          if (type === "automation") actions.push({ id: "pin-" + id, label: "Pin", icon: "fa-thumbtack", run: function () {} });
+          return actions;
+        }
+
+        var paletteObjectQuery = null;
+        async function searchPaletteObjects(query, cancelToken) {
+          if (!query || String(query).trim().length < 2) return null;
+          var groups = [];
+          try {
+            var agentPayload = await requestJson("/api/v1/agents/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            var agents = ((agentPayload && agentPayload.agents) || []).filter(function (agent) {
+              return String(agent.display_name || agent.key || agent.agent_id || "").toLowerCase().indexOf(String(query).toLowerCase()) !== -1;
+            }).slice(0, 6);
+            if (agents.length) groups.push({
+              label: "Agents", icon: "fa-user-astronaut", items: agents.map(function (agent) {
+                return { id: "agent-" + agent.agent_id, object: { object_type: "agent", object_id: agent.agent_id, label: agent.display_name }, title: agent.display_name, detail: String(agent.status || agent.availability || "") + (agent.role_id ? " · " + agent.role_id : ""), icon: "fa-user-astronaut", actions: objectQuickActions({ object_type: "agent", object_id: agent.agent_id, label: agent.display_name }) };
+              })
+            });
+          } catch (error) {}
+          try {
+            var workflowsPayload = await requestJson("/api/v1/automation/workflows", { cache: "no-store", headers: { Accept: "application/json" } });
+            var workflows = (Array.isArray(workflowsPayload) ? workflowsPayload : []).filter(function (workflow) {
+              return String(workflow.name || workflow.workflow_id || "").toLowerCase().indexOf(String(query).toLowerCase()) !== -1;
+            }).slice(0, 6);
+            if (workflows.length) groups.push({
+              label: "Automations", icon: "fa-diagram-project", items: workflows.map(function (workflow) {
+                return { id: "automation-" + workflow.workflow_id, object: { object_type: "automation", object_id: workflow.workflow_id, label: workflow.name }, title: workflow.name || workflow.workflow_id, detail: workflow.workflow_id + " · " + (workflow.status || ""), icon: "fa-diagram-project", actions: objectQuickActions({ object_type: "automation", object_id: workflow.workflow_id, label: workflow.name }) };
+              })
+            });
+          } catch (error) {}
+          try {
+            var memoryPayload = await requestJson("/api/v1/memory/search?q=" + encodeURIComponent(query) + "&limit=6", { cache: "no-store", headers: { Accept: "application/json" } });
+            var memoryItems = ((memoryPayload && memoryPayload.results) || []).slice(0, 6).map(function (result) {
+              return { id: "memory-" + result.result_id, object: { object_type: "memory", object_id: result.result_id, label: result.reason || result.memory_id }, title: result.reason || result.memory_id, detail: "Scope: " + result.scope + " · " + result.authority, icon: "fa-brain", actions: objectQuickActions({ object_type: "memory", object_id: result.result_id, label: result.reason }) };
+            });
+            if (memoryItems.length) groups.push({ label: "Memory", icon: "fa-brain", items: memoryItems });
+          } catch (error) {}
+          return groups.filter(function (group) { return group.items && group.items.length; });
         }
 
         function openContextWorkspace() {
