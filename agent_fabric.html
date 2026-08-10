@@ -2086,7 +2086,7 @@
         });
         if (filtered.length) {
           html += "<div class='section-title'><h3>Schedules (" + filtered.length + ")</h3></div><table class='matrix'><tr>" +
-            "<th>Workflow</th><th>Timezone</th><th>Next run</th><th>Last run</th><th>Failures</th><th>Status</th></tr>" +
+            "<th>Workflow</th><th>Timezone</th><th>Next run</th><th>Last run</th><th>Failures</th><th>Status</th><th></th></tr>" +
             filtered.map(function (s) {
               var fails = failedByWf[s.workflow_id] || 0;
               return "<tr>" +
@@ -2095,7 +2095,8 @@
                 "<td>" + esc(s.next_run || "—") + "</td>" +
                 "<td>" + esc(s.last_run || "—") + "</td>" +
                 "<td>" + (fails ? "<span class='chip red'>" + fails + "</span>" : "<span class='chip green'>0</span>") + "</td>" +
-                "<td><span class='chip " + (s.enabled ? "green" : "amber") + "'>" + esc(s.enabled ? "enabled" : "paused") + "</span></td></tr>";
+                "<td><span class='chip " + (s.enabled ? "green" : "amber") + "'>" + esc(s.enabled ? "enabled" : "paused") + "</span></td>" +
+                "<td><button data-sched-run='" + esc(s.workflow_id) + "' class='ghost' style='padding:4px 8px;font-size:11px'>trigger → result</button></td></tr>";
             }).join("") + "</table>";
         } else {
           html += "<div class='empty-note' style='margin-top:12px'>No schedules in this view.</div>";
@@ -2130,6 +2131,45 @@
         var btn = event.target.closest("[data-schedfilter]");
         if (btn) { schedFilter = btn.getAttribute("data-schedfilter"); loadSchedule(); }
       });
+      box.querySelectorAll("[data-sched-run]").forEach(function (btn) {
+        btn.addEventListener("click", function (event) {
+          event.stopPropagation();
+          showScheduleLifecycle(btn.getAttribute("data-sched-run"));
+        });
+      });
+    }
+
+    function showScheduleLifecycle(workflowId) {
+      // Trigger → execution → result for one scheduled workflow, from authoritative runs.
+      var runs = schedRuns.filter(function (r) { return r.workflow_id === workflowId; }).slice(0, 8);
+      var el = document.getElementById("sched-lifecycle");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "sched-lifecycle";
+        document.getElementById("cc-schedule-body").appendChild(el);
+      }
+      var steps = ["TRIGGER", "EXECUTION", "RESULT"].map(function (s) {
+        return "<span class='pipe-node'>" + s + "</span>";
+      }).join("<span class='muted'> → </span>");
+      if (!runs.length) {
+        el.innerHTML = "<div class='section-title' style='margin-top:12px'><h3>Lifecycle · " + esc(workflowId) + "</h3></div>" +
+          "<div class='pipe-strip'>" + steps + "</div>" +
+          stateNote("empty", "No executions recorded for this schedule yet. Runs will appear here after the next trigger.");
+        return;
+      }
+      var bars = runs.map(function (r) {
+        var bad = r.state === "failed" || r.state === "error";
+        var tone = bad ? "red" : (r.state === "running" ? "amber" : "green");
+        return "<div class='row' style='gap:8px;align-items:center'>" +
+          "<span class='chip " + tone + "'>" + esc(r.state) + "</span>" +
+          "<span class='mono small'>" + esc((r.run_id || "").slice(0, 12)) + "</span>" +
+          "<span class='muted small'>" + esc(r.current_node || "—") + "</span>" +
+          "<span class='muted small'>" + (r.duration_seconds != null ? r.duration_seconds + "s" : "—") + "</span>" +
+          "<span class='muted small' title='" + esc(r.error || "") + "'>" + esc(timeAgo(r.started_at)) + "</span></div>";
+      }).join("");
+      el.innerHTML = "<div class='section-title' style='margin-top:12px'><h3>Lifecycle · " + esc(workflowId) + "</h3></div>" +
+        "<div class='pipe-strip'>" + steps + "</div>" +
+        "<div style='display:flex;flex-direction:column;gap:6px;margin-top:8px'>" + bars + "</div>";
     }
 
     async function loadPipelines() {
