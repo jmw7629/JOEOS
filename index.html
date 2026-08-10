@@ -2433,8 +2433,37 @@
     .cc-focused .cc-module { background: transparent; border-color: rgba(59,143,216,.4); }
     .cc-focused-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
     .cc-focused-actions button { padding: 10px 14px; font-size: 13px; }
+    /* module context menu + pin + inspector */
+    .cc-module-head { position: relative; }
+    .cc-more { border: none; background: transparent; color: var(--faint); padding: 4px 6px; line-height: 1; }
+    .cc-more:hover { color: var(--text); background: rgba(139,212,255,.08); }
+    .cc-pinned { border-color: rgba(59,143,216,.55); }
+    .cc-pinned .cc-module-icon { color: var(--active); }
+    .cc-menu { position: absolute; z-index: 30; right: 0; top: 32px; min-width: 170px; background: var(--panel);
+      border: 1px solid rgba(59,143,216,.4); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.5); padding: 4px; }
+    .cc-menu button { display: flex; width: 100%; align-items: center; gap: 8px; padding: 8px 10px; background: transparent;
+      border: none; border-radius: 7px; color: var(--text); text-align: left; font-size: 12.5px; }
+    .cc-menu button:hover { background: rgba(49,215,255,.12); }
+    .cc-menu button:disabled { opacity: .4; cursor: default; }
+    .cc-menu-backdrop { position: fixed; inset: 0; z-index: 25; }
+    .cc-with-inspector { display: flex; gap: 16px; align-items: flex-start; }
+    .cc-main { flex: 1; min-width: 0; }
+    .cc-inspector { flex: 0 0 320px; max-width: 360px; position: sticky; top: 84px; padding: 16px;
+      border-color: rgba(59,143,216,.35); display: flex; flex-direction: column; gap: 12px; }
+    .cc-inspector-head { display: flex; align-items: center; gap: 10px; }
+    .cc-inspector-head h3 { margin: 0; font-size: 15px; flex: 1; }
+    .cc-inspector-value { font-size: 20px; font-weight: 700; }
+    .cc-inspector-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .cc-inspector-actions button { padding: 9px 12px; font-size: 12.5px; }
     @media (min-width: 1300px) {
       .cc-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 1370px) {
+      .cc-inspector { flex-basis: 280px; max-width: 300px; }
+    }
+    @media (max-width: 900px) {
+      .cc-with-inspector { flex-direction: column; }
+      .cc-inspector { position: static; flex-basis: auto; max-width: none; width: 100%; }
     }
 
     .assistant-messages {
@@ -7316,15 +7345,46 @@
         var focusedPair = useState(null);
         var focused = focusedPair[0];
         var setFocused = focusedPair[1];
+        var inspectorPair = useState(null);
+        var inspector = inspectorPair[0];
+        var setInspector = inspectorPair[1];
+        var menuPair = useState(null);
+        var menuFor = menuPair[0];
+        var setMenuFor = menuPair[1];
+
+        // ---- Persisted command-center layout (order + pinned) via ui-prefs ----
+        function readLayout() {
+          try {
+            var raw = window.localStorage.getItem("joeos:ui-prefs");
+            var parsed = raw ? JSON.parse(raw) : {};
+            var layout = parsed && parsed.command_layout && parsed.command_layout.order;
+            if (Array.isArray(layout) && layout.length) return parsed.command_layout;
+          } catch (error) {}
+          return null;
+        }
+        var layoutPair = useState(readLayout);
+        var layout = layoutPair[0];
+        var setLayout = layoutPair[1];
+        function persistLayout(next) {
+          setLayout(next);
+          try {
+            var raw = window.localStorage.getItem("joeos:ui-prefs");
+            var parsed = raw ? JSON.parse(raw) : {};
+            parsed.command_layout = next;
+            window.localStorage.setItem("joeos:ui-prefs", JSON.stringify(parsed));
+          } catch (error) {}
+        }
 
         function moduleCard(opts) {
+          var pinned = layout && layout.pinned && layout.pinned[opts.module];
           return h(
             "article",
-            { className: "cc-module glass-card " + (opts.tone || ""), "data-module": opts.module, key: opts.module },
+            { className: "cc-module glass-card " + (opts.tone || "") + (pinned ? " cc-pinned" : ""), "data-module": opts.module, key: opts.module },
             h("div", { className: "cc-module-head" },
               h("span", { className: "cc-module-icon" }, icon(opts.icon)),
               h("div", { style: { flex: 1, minWidth: 0 } }, h("h3", null, opts.title), opts.sub ? h("p", null, opts.sub) : null),
-              opts.badge != null ? h("span", { className: "cc-module-badge" + (opts.badgeTone ? " " + opts.badgeTone : "") }, String(opts.badge)) : null
+              opts.badge != null ? h("span", { className: "cc-module-badge" + (opts.badgeTone ? " " + opts.badgeTone : "") }, String(opts.badge)) : null,
+              h("button", { type: "button", className: "cc-more ghost-button", "aria-label": "Module menu for " + opts.title, onClick: function (event) { event.stopPropagation(); setMenuFor(menuFor === opts.module ? null : opts.module); } }, icon("fa-ellipsis-vertical"))
             ),
             h("div", { className: "cc-module-value" }, opts.value ? opts.value : h("span", { className: "cc-module-muted" }, "—")),
             opts.detail ? h("div", { className: "cc-module-detail" }, opts.detail) : null,
@@ -7332,8 +7392,44 @@
               h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(opts.open); } }, opts.openLabel || "Open"),
               h("button", { type: "button", className: "ghost-button", title: "Focus " + opts.title, onClick: function () { setFocused(opts.module); } }, icon("fa-expand"), " Focus"),
               h("button", { type: "button", className: "ghost-button", onClick: function () { props.onAsk({ module_type: opts.module, object_type: opts.objectType || "", object_id: opts.objectId || "", label: opts.title }); }, title: "Ask Joe about " + opts.title }, icon("fa-wand-magic-sparkles"), " Joe")
-            )
+            ),
+            menuFor === opts.module ? h(
+              "div",
+              { className: "cc-menu", role: "menu", "aria-label": opts.title + " menu" },
+              h("button", { type: "button", role: "menuitem", onClick: function () { setMenuFor(null); props.onOpen(opts.open); } }, icon("fa-arrow-up-right-from-square"), " Open"),
+              h("button", { type: "button", role: "menuitem", onClick: function () { setMenuFor(null); setFocused(opts.module); } }, icon("fa-expand"), " Focus"),
+              h("button", { type: "button", role: "menuitem", onClick: function () { setMenuFor(null); setInspector(inspector === opts.module ? null : opts.module); } }, icon("fa-circle-info"), inspector === opts.module ? " Close inspector" : " Inspect"),
+              h("button", { type: "button", role: "menuitem", onClick: function () {
+                setMenuFor(null);
+                var next = layout ? { order: layout.order.slice(), pinned: Object.assign({}, layout.pinned || {}) } : { order: null, pinned: {} };
+                if (pinned) delete next.pinned[opts.module]; else next.pinned[opts.module] = true;
+                persistLayout(next);
+              } }, icon(pinned ? "fa-thumbtack-slash" : "fa-thumbtack"), pinned ? " Unpin" : " Pin"),
+              h("button", { type: "button", role: "menuitem", disabled: effectiveOrder().indexOf(opts.module) <= 0, onClick: function () { moveModule(opts.module, -1); } }, icon("fa-arrow-up"), " Move up"),
+              h("button", { type: "button", role: "menuitem", disabled: effectiveOrder().indexOf(opts.module) >= effectiveOrder().length - 1, onClick: function () { moveModule(opts.module, 1); } }, icon("fa-arrow-down"), " Move down"),
+              h("button", { type: "button", role: "menuitem", onClick: function () { setMenuFor(null); resetLayout(); } }, icon("fa-rotate-left"), " Reset position")
+            ) : null
           );
+        }
+
+        function effectiveOrder() {
+          if (layout && layout.order && layout.order.length) return layout.order;
+          return modules.map(function (m) { return m.module; });
+        }
+        function moveModule(moduleId, delta) {
+          var order = effectiveOrder().slice();
+          var idx = order.indexOf(moduleId);
+          var target = idx + delta;
+          if (idx < 0 || target < 0 || target >= order.length) return;
+          order.splice(idx, 1);
+          order.splice(target, 0, moduleId);
+          var next = { order: order, pinned: Object.assign({}, (layout && layout.pinned) || {}) };
+          persistLayout(next);
+        }
+
+        function resetLayout() {
+          persistLayout({ order: null, pinned: {} });
+          setMenuFor(null);
         }
 
         var agentList = Array.isArray(agents.agents) ? agents.agents : [];
@@ -7384,14 +7480,57 @@
           );
         }
 
+        // Apply persisted ordering + pinned-first. Pinned modules keep their
+        // relative pinned order; then non-pinned in saved order; then any new
+        // modules not yet saved.
+        var savedOrder = layout && layout.order && layout.order.length ? layout.order : null;
+        var pinnedSet = (layout && layout.pinned) || {};
+        function moduleOrderKey(m) {
+          var orderIdx = savedOrder ? savedOrder.indexOf(m.module) : -1;
+          return orderIdx < 0 ? 1e6 + modules.indexOf(m) : orderIdx;
+        }
+        var ordered = modules.slice().sort(function (a, b) {
+          var pa = pinnedSet[a.module] ? 0 : 1;
+          var pb = pinnedSet[b.module] ? 0 : 1;
+          if (pa !== pb) return pa - pb;
+          return moduleOrderKey(a) - moduleOrderKey(b);
+        });
+
+        var inspected = inspector ? (modules.find(function (m) { return m.module === inspector; }) || null) : null;
+
         return h(
           "div",
-          { className: "command-center" },
-          h("div", { className: "cc-heading" },
-            h("h2", null, "Command Center"),
-            h("p", null, "Broad operational state at a glance — open any module, focus it, or ask Joe about it.")
+          { className: "command-center cc-with-inspector" },
+          h(
+            "div",
+            { className: "cc-main" },
+            h("div", { className: "cc-heading" },
+              h("h2", null, "Command Center"),
+              h("p", null, "Broad operational state at a glance — open, focus, pin, reorder, or ask Joe about any module.")
+            ),
+            h("div", { className: "cc-grid" }, ordered.map(function (m) {
+              return moduleCard(m);
+            }))
           ),
-          h("div", { className: "cc-grid" }, modules.map(moduleCard))
+          inspected ? h(
+            "aside",
+            { className: "cc-inspector glass-card", "aria-label": inspected.title + " inspector" },
+            h("div", { className: "cc-inspector-head" },
+              h("span", { className: "cc-module-icon" }, icon(inspected.icon)),
+              h("h3", null, inspected.title),
+              h("button", { type: "button", className: "ghost-button", "aria-label": "Close inspector", onClick: function () { setInspector(null); } }, icon("fa-xmark"))
+            ),
+            h("div", { className: "cc-inspector-body" },
+              inspected.sub ? h("p", { className: "cc-module-detail" }, inspected.sub) : null,
+              inspected.value ? h("div", { className: "cc-inspector-value" }, inspected.value) : null,
+              inspected.detail ? h("p", { className: "cc-module-detail" }, inspected.detail) : null
+            ),
+            h("div", { className: "cc-inspector-actions" },
+              h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(inspected.open); } }, icon("fa-arrow-up-right-from-square"), " Open"),
+              h("button", { type: "button", className: "ghost-button", onClick: function () { props.onAsk({ module_type: inspected.module, object_type: inspected.objectType || "", object_id: inspected.objectId || "", label: inspected.title }); } }, icon("fa-wand-magic-sparkles"), " Ask Joe")
+            )
+          ) : null,
+          menuFor ? h("div", { className: "cc-menu-backdrop", onClick: function () { setMenuFor(null); } }) : null
         );
       }
 
