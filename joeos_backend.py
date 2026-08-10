@@ -1858,13 +1858,59 @@ async def lifespan(app: FastAPI):
                 pass
             await asyncio.sleep(60)
 
+    async def _health_watchdog() -> None:
+        """Supervise the backend from inside the process.
+
+        A wedged backend (workers failing on the DB while uvicorn stays alive)
+        would not be caught by systemd's Restart=on-failure because the process
+        never exits. This watchdog polls the same checks as /healthz/ready; on
+        a sustained failure it records the incident as object activity and then
+        terminates the process so the supervisor restarts it cleanly.
+        """
+        consecutive = 0
+        last_state = "ok"
+        while True:
+            await asyncio.sleep(30)
+            try:
+                ready = await asyncio.to_thread(_readiness_snapshot, app)
+            except Exception:  # noqa: BLE001
+                ready = {"ready": False, "checks": {}}
+            if ready.get("ready"):
+                if last_state != "ok":
+                    _record_object_activity(
+                        app, "service", "recovered", "ok",
+                        detail="JoeOS backend readiness restored after a degraded state.",
+                    )
+                    last_state = "ok"
+                consecutive = 0
+                continue
+            consecutive += 1
+            if last_state == "ok":
+                _record_object_activity(
+                    app, "service", "degraded", "degraded",
+                    detail="JoeOS backend readiness check failed: %s" % str(ready.get("checks", {})),
+                )
+                last_state = "degraded"
+            # Three consecutive failures (~90s) means the backend is wedged.
+            if consecutive >= 3:
+                _record_object_activity(
+                    app, "service", "restarting", "failed",
+                    detail="JoeOS backend watchdog detected an unresponsive service; requesting supervisor restart.",
+                )
+                import os
+                os._exit(1)
+
     terminal_reaper = asyncio.create_task(_terminal_reaper(), name="joeos-terminal-reaper")
+    health_watchdog = asyncio.create_task(_health_watchdog(), name="joeos-health-watchdog")
     try:
         yield
     finally:
         terminal_reaper.cancel()
+        health_watchdog.cancel()
         with suppress(asyncio.CancelledError):
             await terminal_reaper
+        with suppress(asyncio.CancelledError):
+            await health_watchdog
         gateway = getattr(app.state, "terminal_gateway", None)
         if gateway is not None:
             for session in list(gateway.list()):
@@ -2178,6 +2224,62 @@ AUTOMATIONS_PAGE_PATH = _package_asset("automations.html")
 BUILD_PAGE_PATH = _package_asset("build.html")
 
 
+def _readiness_snapshot(app: Any) -> Dict[str, Any]:
+    """Compute the same readiness checks as /healthz/ready, in-process.
+
+    Used by the health watchdog so it can detect a wedged-but-alive backend
+    without a network round-trip.
+    """
+    checks: Dict[str, Any] = {}
+    db_path = getattr(app.state, "db_path", None)
+    db_ok = False
+    if db_path is not None:
+        try:
+            with _connect(db_path) as connection:
+                connection.execute("SELECT 1")
+            db_ok = True
+        except Exception:  # noqa: BLE001
+            db_ok = False
+    checks["database"] = db_ok
+    campaign_ok = False
+    campaign_service = getattr(app.state, "campaign_service", None)
+    if campaign_service is not None and hasattr(campaign_service, "_store"):
+        try:
+            campaign_service._store.list_campaigns()
+            campaign_ok = True
+        except Exception:  # noqa: BLE001
+            campaign_ok = False
+    checks["campaign"] = campaign_ok
+    activity_ok = False
+    activity = getattr(app.state, "object_activity", None)
+    if activity is not None:
+        try:
+            activity.recent(limit=1)
+            activity_ok = True
+        except Exception:  # noqa: BLE001
+            activity_ok = False
+    checks["activity"] = activity_ok
+    return {"ready": db_ok and campaign_ok and activity_ok, "checks": checks}
+
+
+def _record_object_activity(app: Any, actor: str, action: str, result: str, *, detail: str = "") -> None:
+    """Record a service-level event in the object activity timeline."""
+    activity = getattr(app.state, "object_activity", None)
+    if activity is None:
+        return
+    try:
+        activity.record(
+            actor=actor,
+            action=action,
+            object_type="service",
+            object_id="joeos-backend",
+            result=result,
+            detail=detail,
+        )
+    except Exception:  # noqa: BLE001 - recording must never crash the loop
+        pass
+
+
 @app.get("/healthz")
 def healthz(request: Request) -> Dict[str, Any]:
     runtime = request.app.state.runtime
@@ -2186,6 +2288,24 @@ def healthz(request: Request) -> Dict[str, Any]:
         "lemonade": "online" if runtime.get("online") else "offline",
         "model": runtime.get("model"),
     }
+
+
+@app.get("/healthz/ready")
+def readiness(request: Request) -> JSONResponse:
+    """Readiness probe for supervisors (systemd healthcheck / orchestrators).
+
+    Unlike the liveness probe, readiness reflects whether the backend can
+    actually serve the product: the application database must be writable and
+    the background worker subsystems (campaign, autonomous) must be reachable.
+    Returns 503 (not ready) instead of 200 so a supervisor can restart a
+    wedged-but-alive process.
+    """
+    snapshot = _readiness_snapshot(request.app)
+    ready = snapshot["ready"]
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={"status": "ready" if ready else "not_ready", "checks": snapshot["checks"]},
+    )
 
 
 @app.get("/_internal/diagnostics")

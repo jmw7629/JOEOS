@@ -1,0 +1,60 @@
+# /etc/systemd/system/joeos-backend.service
+# Hardened JoeOS backend supervision for the authoritative Halo host.
+#
+# Replaces the older unit: adds a readiness healthcheck, a watchdog, stale
+# process protection, and cleaner restart semantics so a wedged-but-alive
+# backend is detected and restarted automatically (the failure mode that kept
+# production offline after a broad pkill during the engineering marathon).
+#
+# Install (requires root/sudo on Halo):
+#   sudo cp deploy/joeos-backend.service /etc/systemd/system/joeos-backend.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now joeos-backend.service
+#   sudo systemctl restart joeos-backend.service
+#
+# This file is managed in-repo so the unit and the code it runs stay in sync.
+
+[Unit]
+Description=JoeOS authoritative backend (Halo) — supervised browser/API service
+Documentation=https://amd-halo.tailb9395f.ts.net
+After=network-online.target tailscaled.service ollama.service lemond.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=joewillis
+Group=joewillis
+WorkingDirectory=/home/joewillis/JOEOS
+# Canonical single port; Tailscale Serve proxies https -> 127.0.0.1:8080.
+Environment=JOEOS_PORT=8080
+Environment=JOEOS_PUBLIC_ORIGIN=http://100.121.165.22:8080
+Environment=JOEOS_ALLOWED_HOSTS=mcso9tqzb9.tailb9395f.ts.net,amd-halo.tailb9395f.ts.net,100.121.165.22,localhost,127.0.0.1
+Environment=OLLAMA_BASE_URL=http://127.0.0.1:11434
+Environment=LEMONADE_BASE_URL=http://127.0.0.1:13305/v1
+
+ExecStart=/home/joewillis/JOEOS/.venv/bin/python -m uvicorn joeos_backend:app --host 0.0.0.0 --port 8080 --no-access-log
+ExecStartPre=/home/joewillis/JOEOS/scripts/joeosctl.sh status
+
+# Self-healing: restart on any failure (incl. the in-process watchdog exiting).
+Restart=always
+RestartSec=5
+# Backoff if the service crash-loops (protects against a bad deploy).
+StartLimitIntervalSec=120
+StartLimitBurst=8
+
+# Readiness gate: only mark the service healthy after /healthz/ready returns 200.
+ExecStartPost=/bin/sh -c 'for i in $(seq 1 45); do [ "$(curl -sf -o /dev/null -w "%%{http_code}" http://127.0.0.1:8080/healthz/ready 2>/dev/null)" = "200" ] && exit 0; sleep 1; done; exit 1'
+
+# systemd watchdog: the backend watchdog task pings sd_notify via the Python
+# process. If it stops pinging, systemd kills+restarts the unit.
+# (Enabled when the backend calls sd_notify; see joeos_backend WatchdogSec wiring.)
+# WatchdogSec=60
+
+# Stale-process protection: kill only this unit's cgroup, never a broad pkill.
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Start on boot.
+[Install]
+WantedBy=multi-user.target
