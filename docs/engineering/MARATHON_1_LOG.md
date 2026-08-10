@@ -97,3 +97,10 @@ step ("Multiple commands produce Info.plist"). Fix: removed the Info.plist
 PBXFileReference from the Resources group (INFOPLIST_FILE path still drives it).
 Result: full `xcodebuild build` and `xcodebuild test` SUCCEED on the Mac
 (arm64 simulator; test bundle passes).
+
+## Halo recovered + marathon deployed (authoritative host live)
+Halo returned to the tailnet. Backend restarted with `c229e08`; verified live:
+assistant config returns D1 routing metadata (provider=ollama, capability=tool_use,
+healthy), module catalog serves 10 built-in modules, Halo runner 5299c2ea
+reconnected (healthy), all /os routes 200, terminal auth-gated. The deployment
+blocker from the outage is cleared.
