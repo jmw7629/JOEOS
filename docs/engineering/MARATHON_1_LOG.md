@@ -36,3 +36,6 @@ COMPLETE. Right-side contextual inspector (sticky, >= desktop; full-width on
 COMPLETE. Pipelines view renders real work-package dependency rows (state-colored
 deps edges) from /engineering/campaigns/{id}/packages, alongside automation
 pipelines; preserves DAG when automation runs are empty.
+### D5 — deeper agent detail surface
+COMPLETE. Tabbed agent management (Overview/Identity/Tools/Memory/Automations/
+Executions) wired to real agent profile, provider/model, run, and memory data.

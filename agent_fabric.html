@@ -196,6 +196,14 @@
     .wp-dag-row .pipe-head { margin-bottom: 6px; }
     .wp-dag-row .pipe-strip { gap: 5px; }
 
+    /* agent detail tabbed surface */
+    .ad-tabs { display: flex; gap: 5px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 12px; }
+    .ad-tabs button { background: transparent; border: 1px solid transparent; color: var(--muted); padding: 6px 12px; border-radius: 8px; font-size: 12.5px; cursor: pointer; }
+    .ad-tabs button:hover { color: var(--text); background: rgba(139,212,255,0.08); }
+    .ad-tabs button.active { color: var(--cyan); border-color: rgba(49,215,255,0.45); background: rgba(49,215,255,0.1); }
+    .ad-pane { }
+    .ad-pane.hidden { display: none; }
+
     @media (max-width: 640px) {
       main { padding: 16px 14px 80px; }
       header { padding: 12px 14px; }
@@ -1792,9 +1800,19 @@
     // ------------------------------------------------------------------
     // Agent detail surface (Section AB)
     // ------------------------------------------------------------------
+    var adTab = "overview";
+    function setAdTab(tab) {
+      adTab = tab;
+      var btns = document.querySelectorAll("#ad-tabs button");
+      btns.forEach(function (b) { b.classList.toggle("active", b.getAttribute("data-tab") === tab); });
+      var panes = document.querySelectorAll("#ad-body .ad-pane");
+      panes.forEach(function (p) { p.classList.toggle("hidden", p.getAttribute("data-pane") !== tab); });
+    }
+
     async function openAgentDetail(agentId) {
       $("agent-detail").classList.remove("hidden");
       $("ad-body").innerHTML = "<div class='muted'>Loading…</div>";
+      adTab = "overview";
       try {
         var [agent, overview] = await Promise.all([
           api("/api/v1/control/agents/" + agentId),
@@ -1804,37 +1822,103 @@
         var models = {}; (overview.models.items || []).forEach(function (m) { models[m.id] = m; });
         var runs = [];
         try { runs = (await api("/api/v1/control/agents/" + agentId + "/runs")).runs || []; } catch (e) {}
+        var memory = [];
+        try {
+          var mem = await api("/api/v1/memory/records?limit=8");
+          memory = Array.isArray(mem) ? mem : ((mem && mem.records) || []);
+        } catch (e) {}
         var prov = agent.provider_id && providers[agent.provider_id];
         var mod = agent.model_id && models[agent.model_id];
-        var html = "";
-        html += "<div class='row' style='align-items:flex-start'><span class='orb'>" + esc((agent.display_name || "A").charAt(0).toUpperCase()) + "</span><div style='flex:1'>" +
+
+        function tabBtn(tab, label, iconName) {
+          return "<button type='button' data-tab='" + tab + "' class='" + (adTab === tab ? "active" : "") + "'>" + iconName + " " + label + "</button>";
+        }
+        function paneStart(tab) {
+          return "<div class='ad-pane" + (adTab === tab ? "" : " hidden") + "' data-pane='" + tab + "'>";
+        }
+
+        var overviewHtml = paneStart("overview") +
+          "<div class='row' style='align-items:flex-start'><span class='orb'>" + esc((agent.display_name || "A").charAt(0).toUpperCase()) + "</span><div style='flex:1'>" +
           "<h3 style='margin:0 0 2px'>" + esc(agent.display_name || "Agent") + "</h3>" +
           "<div class='muted small'>" + esc(agent.key || agent.id) + "</div></div>" +
-          "<span class='badge " + agentStatusTone(agent.status) + "'>" + esc(agent.status) + "</span></div>";
-        html += "<p class='muted small' style='margin:10px 0'>" + esc(agent.purpose || agent.description || "") + "</p>";
-        html += "<div class='badges' style='margin-bottom:12px'>" +
+          "<span class='badge " + agentStatusTone(agent.status) + "'>" + esc(agent.status) + "</span></div>" +
+          "<p class='muted small' style='margin:10px 0'>" + esc(agent.purpose || agent.description || "") + "</p>" +
+          "<div class='badges' style='margin-bottom:12px'>" +
           (prov ? "<span class='chip cyan'>provider " + esc(prov.key || prov.display_name) + "</span>" : "") +
           (mod ? "<span class='chip cyan'>model " + esc(mod.key || mod.model_identifier) + "</span>" : "") +
           "<span class='chip'>policy " + esc(agent.default_provider_policy || "backend") + "</span>" +
           (agent.max_runtime_ms ? "<span class='chip'>max " + agent.max_runtime_ms + "ms</span>" : "") +
+          "</div>" +
+          "<div class='section-title' style='margin-top:8px'><h3>Recent activity</h3></div>" +
+          (runs.length ? runs.slice(0, 5).map(function (r) {
+            return "<div class='deleg'><span class='pill " + runTone(r.status) + "'></span>" +
+              "<b>" + esc(r.status) + "</b><span class='muted small'>" + esc((r.objective || "").slice(0, 80)) + "</span>" +
+              "<span class='muted small'>" + esc(timeAgo(r.started_at)) + "</span></div>";
+          }).join("") : "<div class='empty-note'>No runs yet.</div>") +
           "</div>";
-        if (agent.allowed_tools) {
-          html += "<div class='section-title' style='margin-top:14px'><h3>Tools</h3></div>" +
-            "<div class='badges'>" + agent.allowed_tools.split(",").filter(Boolean).slice(0, 12).map(function (t) {
-              return "<span class='chip'>" + esc(t.trim()) + "</span>";
-            }).join("") + "</div>";
-        }
-        html += "<div class='section-title' style='margin-top:14px'><h3>Recent runs</h3></div>";
-        html += (runs.length ? runs.slice(0, 6).map(function (r) {
-          return "<div class='deleg'><span class='pill " + runTone(r.status) + "'></span>" +
-            "<b>" + esc(r.status) + "</b><span class='muted small'>" + esc((r.objective || "").slice(0, 80)) + "</span>" +
-            "<span class='muted small'>" + esc(timeAgo(r.started_at)) + "</span></div>";
-        }).join("") : "<div class='empty-note'>No runs yet.</div>");
-        html += "<div class='row' style='margin-top:16px;justify-content:flex-end'>" +
-          "<button data-talk='" + agentId + "'>Talk</button>" +
-          "<button data-task='" + agentId + "'>Start a task</button>" +
-          "<button class='ghost' id='ad-close-btn'>Close</button></div>";
-        $("ad-body").innerHTML = html;
+
+        var identityHtml = paneStart("identity") +
+          "<div class='section-title' style='margin-top:0'><h3>Identity</h3></div>" +
+          "<table class='matrix'><tr><td>Key</td><td class='mono'>" + esc(agent.key || "—") + "</td></tr>" +
+          "<tr><td>Agent ID</td><td class='mono'>" + esc(agent.id || "—") + "</td></tr>" +
+          "<tr><td>Status</td><td><span class='chip " + agentStatusTone(agent.status) + "'>" + esc(agent.status) + "</span></td></tr>" +
+          "<tr><td>Provider policy</td><td>" + esc(agent.default_provider_policy || "backend") + "</td></tr>" +
+          "<tr><td>Max runtime</td><td>" + (agent.max_runtime_ms ? agent.max_runtime_ms + " ms" : "unbounded") + "</td></tr>" +
+          "<tr><td>Max token budget</td><td>" + (agent.max_token_budget ? agent.max_token_budget : "unset") + "</td></tr>" +
+          "<tr><td>Description</td><td>" + esc(agent.description || agent.purpose || "—") + "</td></tr></table>" +
+          "</div>";
+
+        var toolsHtml = paneStart("tools") +
+          "<div class='section-title' style='margin-top:0'><h3>Authorized tools</h3></div>" +
+          (agent.allowed_tools ? "<div class='badges'>" + agent.allowed_tools.split(",").filter(Boolean).map(function (t) {
+            return "<span class='chip'>" + esc(t.trim()) + "</span>";
+          }).join("") + "</div>" : "<div class='empty-note'>No tools authorized.</div>") +
+          (agent.denied_tools ? "<div class='section-title'><h3>Denied tools</h3></div><div class='badges'>" +
+            agent.denied_tools.split(",").filter(Boolean).map(function (t) { return "<span class='chip'>" + esc(t.trim()) + "</span>"; }).join("") +
+            "</div>" : "") +
+          "</div>";
+
+        var memoryHtml = paneStart("memory") +
+          "<div class='section-title' style='margin-top:0'><h3>Knowledge / memory</h3></div>" +
+          (memory.length ? memory.map(function (m) {
+            return "<div class='deleg'><span class='pill green'></span><b>" + esc(m.kind || "record") + "</b>" +
+              "<span class='muted small'>" + esc((m.summary || m.content || "").slice(0, 90)) + "</span>" +
+              "<span class='muted small'>" + esc(timeAgo(m.updated_at || m.created_at)) + "</span></div>";
+          }).join("") : "<div class='empty-note'>No memory records yet.</div>") +
+          "</div>";
+
+        var autoHtml = paneStart("automations") +
+          "<div class='section-title' style='margin-top:0'><h3>Automations / schedule</h3></div>" +
+          "<div class='muted small'>Automation scheduling is workspace-scoped. Assign an automation to this agent from the Automations console.</div>" +
+          "</div>";
+
+        var execHtml = paneStart("executions") +
+          "<div class='section-title' style='margin-top:0'><h3>Executions / runs</h3></div>" +
+          (runs.length ? runs.slice(0, 12).map(function (r) {
+            return "<div class='deleg'><span class='pill " + runTone(r.status) + "'></span>" +
+              "<b>" + esc(r.status) + "</b><span class='muted small'>" + esc((r.objective || "").slice(0, 100)) + "</span>" +
+              "<span class='muted small'>" + esc(timeAgo(r.started_at)) + (r.duration_ms ? " · " + Math.round(r.duration_ms / 1000) + "s" : "") + "</span></div>";
+          }).join("") : "<div class='empty-note'>No executions yet.</div>") +
+          "</div>";
+
+        $("ad-body").innerHTML =
+          "<div class='ad-tabs' id='ad-tabs'>" +
+            tabBtn("overview", "Overview", "▦") +
+            tabBtn("identity", "Identity", "🪪") +
+            tabBtn("tools", "Tools", "🔧") +
+            tabBtn("memory", "Memory", "🧠") +
+            tabBtn("automations", "Automations", "⏱") +
+            tabBtn("executions", "Executions", "⚙") +
+          "</div>" +
+          overviewHtml + identityHtml + toolsHtml + memoryHtml + autoHtml + execHtml +
+          "<div class='row' style='margin-top:16px;justify-content:flex-end'>" +
+            "<button data-talk='" + agentId + "'>Talk</button>" +
+            "<button data-task='" + agentId + "'>Start a task</button>" +
+            "<button class='ghost' id='ad-close-btn'>Close</button></div>";
+        document.getElementById("ad-tabs").addEventListener("click", function (event) {
+          var btn = event.target.closest("[data-tab]");
+          if (btn) setAdTab(btn.getAttribute("data-tab"));
+        });
         var closeBtn = document.getElementById("ad-close-btn");
         if (closeBtn) closeBtn.addEventListener("click", closeAgentDetail);
       } catch (e) {
