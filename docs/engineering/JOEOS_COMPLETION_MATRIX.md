@@ -104,6 +104,15 @@ Updated continuously by the autonomous completion loop.
 | M-1308 | UX | Universal interaction grammar + self-describing OS | M-1301 | DONE (D24/D25) | docs | 16c03c8 |
 | M-1309 | UX | Named internal Return controls on all drill-downs | M-301 | DONE | test_nav | 5da8ad5 |
 | M-1310 | UX | Function dedup + single Joe invocation | M-301 | DONE | test_dedup | f0244ed |
+| M-1311 | Objects | Object intelligence: semantic status, capability reasons, relationship ranking, activity timeline, causal Why resolver | M-1301 | DONE (P1-P4) | 45 object tests | 4442acc |
+| M-1312 | Objects | Quick Look intelligence: impact surface, semantic status, activity timeline, Why action | M-1311 | DONE (P5/P6/P7) | test_quicklook2 | cca7b90 |
+| M-1313 | Objects | Type-aware Object Comparison (models/providers/agents/executions) | M-1301 | DONE (P8) | test_compare | 0a030b3 |
+| M-1314 | Workspace | Workspace snapshots (save/restore/list, no secrets) | M-301 | DONE (P10) | test_snapshots | 811c4c0 |
+| M-1315 | UX | Adaptive density modes (Comfortable/Compact/Command) | M-301 | DONE (P12) | test_density | 36f16df |
+| M-1316 | Attention | Prioritization by severity/impact/urgency (no routine activity) | M-905 | DONE (P18) | test_attention | 3fc0b52 |
+| M-1317 | QA | Release test WAL/SHM race repaired + stress verified | all | DONE (P30) | 13x stable | 8585f74 |
+| M-1318 | Security | Object intelligence security review (impact authz filter) | M-1311 | DONE (P29) | security tests | 7628089 |
+
 
 | M-804 | Activity | Unified activity console (human-first, expandable detail) | M-301 | PARTIAL (agent_fabric) | — | a63f9f3 |
 | M-805 | Activity | Live activity widget (persistent, filterable) | M-804 | PARTIAL | — | a63f9f3 |

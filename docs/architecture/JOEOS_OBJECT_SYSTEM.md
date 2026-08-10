@@ -234,11 +234,106 @@ object-native where beneficial. No destructive rewrite.
 
 ---
 
-## 11. Tests
+## 11. Object Graph Intelligence
+
+The Object System is an intelligent enterprise graph, not just a navigation
+framework.
+
+### 11.1 Semantic status
+
+Raw states are normalized into human meaning: `state`, `label`, `meaning`,
+`impact`, `next`, and `tone`. HTTP codes (`503` → error, `200` → healthy),
+availability words (`busy` → running, `unavailable` → offline), and workflow
+states (`in_review` → waiting) all map to the shared vocabulary. Type-specific
+vocabulary is preserved in `raw`; nothing is collapsed into one meaningless
+generic enum.
+
+`server/objects/intelligence.py::semantic_status`
+
+### 11.2 Relationship intelligence
+
+Relationships are ranked by importance using deterministic rules over
+authoritative data: relationships from an object in a degraded/failed/blocked
+state rank higher, and relationships to unhealthy objects rank higher. Typed
+weights break ties. The graph is structural truth from data; Joe may explain
+it but never invents it.
+
+`server/objects/intelligence.py::rank_relationships`
+
+### 11.3 Capability explanation
+
+Every capability maps to an availability status with a machine + human reason:
+`available` / `unavailable` / `blocked by policy` / `blocked by permission` /
+`blocked by state` / `blocked by dependency` / `blocked by health` /
+`requires approval`. The backend remains authoritative.
+
+`server/objects/intelligence.py::capability_reason`
+
+### 11.4 Object activity timeline
+
+A persistent, object-centric timeline records who did what to which object
+when, with result and traversable related ObjectRefs. Raw audit stays separate;
+the timeline is human-facing semantic history. Entries are recorded from
+authoritative domain events — history is never manufactured.
+
+`server/objects/intelligence.py::ObjectActivityStore`
+
+### 11.5 Causality ("Why?")
+
+A server-side causal resolver gathers structured evidence: current state,
+dependency health, approval coupling, and recent activity. It produces a
+deterministic conclusion plus a bounded evidence list. Joe turns the evidence
+into a human explanation; every evidence object/event is itself an openable
+ObjectRef. Unauthorized objects deny before any data is returned.
+
+`server/objects/causality.py::CausalResolver`
+
+### 11.6 Impact analysis
+
+Reverse-dependency impact: who/what depends on this object (agents using a
+provider/model, work packages assigned to an agent, automations using a
+provider). Every impacted object is filtered through the authorized resolver —
+knowing an object is related never grants authority to read it, and impact
+analysis never leaks protected identities or counts.
+
+`server/objects/resolver.py::ObjectResolver.impact`
+
+### 11.7 Object comparison
+
+Type-aware comparison of compatible objects (`/api/v1/objects/compare`): models
+compare health/provider; providers compare availability/privacy/streaming;
+agents compare role/capabilities/availability. Different-type comparisons are
+rejected. The renderer shows meaningful type-specific differences, never
+generic JSON.
+
+`server/objects/compare.py::compare_objects`
+
+### 11.8 Object intelligence API
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/v1/objects/{type}/{id}/activity` | human-facing timeline |
+| `GET /api/v1/objects/{type}/{id}/impact` | reverse-dependency impact |
+| `GET /api/v1/objects/{type}/{id}/why` | structured causal evidence |
+| `GET /api/v1/objects/compare` | type-aware comparison |
+
+All routes are session-gated (401 without an application session).
+
+---
+
+## 12. Tests
 
 `tests/objects_system_test.py` covers: ObjectRef resolution/round-trip, type
 registry + unknown-type safe failure, capability calculation, lifecycle/policy
 denies, authorized/unauthorized resolution, adapter-error safety, relationships,
-action safety levels, and self-describing metadata. Browser behaviors are
-covered by jsdom suites (`test_palette`, `test_quicklook`, `test_recents`,
-`test_attention`, `test_nav`, `test_dedup`) and the frontend regression.
+action safety levels, and self-describing metadata.
+
+`tests/objects_intelligence_test.py` covers: semantic status normalization,
+relationship ranking, the activity timeline store, the causal resolver, type
+aware comparison, and security review (impact never leaks unresolved objects,
+resolvable dependents are returned).
+
+Browser behaviors are covered by jsdom suites (`test_palette`, `test_quicklook`,
+`test_recents`, `test_attention`, `test_nav`, `test_dedup`, `test_compare`,
+`test_quicklook2`, `test_snapshots`, `test_density`, `test_undo`) and the
+frontend regression (`tests/frontend.test.mjs`).
