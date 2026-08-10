@@ -86,3 +86,7 @@ with VPS-side code work; will retry Halo connectivity periodically.
 Public /api/v1/modules/public endpoint (built-in visible manifests, no session)
 lets the browser Command Center merge the manifest catalog: catalog modules not
 already rendered appear automatically with honest "no live data" state.
+### P6 — module catalog policy hardening
+Least-privilege guard on module creation: a user/workspace module cannot declare
+required capabilities/permissions the creator doesn't hold; workspace publishing
+requires a manage capability. Public catalog never exposes user/hidden modules.

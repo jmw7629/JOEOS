@@ -119,6 +119,22 @@ def create_module(
         raise HTTPException(status_code=422, detail=str(error)) from error
     if scope not in ("user", "workspace"):
         raise HTTPException(status_code=422, detail="scope must be user or workspace")
+    # Least-privilege guard: a user module may not declare required permissions
+    # or capabilities the creator does not already hold. This prevents a module
+    # from escalating authority through the catalog.
+    held = set(principal.get("capabilities") or [])
+    requested = set(manifest.required_capabilities) | set(manifest.required_permissions)
+    missing = sorted(requested - held)
+    if missing:
+        raise HTTPException(
+            status_code=403,
+            detail="module requires capabilities the creator does not hold: %s" % ", ".join(missing),
+        )
+    if scope == "workspace":
+        # Workspace-scoped modules are org-policy material; require an explicit
+        # manage capability so a user cannot publish for the whole workspace.
+        if "engineering.module.manage" not in held and "modules.manage" not in held:
+            raise HTTPException(status_code=403, detail="workspace module publishing requires a manage capability")
     owner_id = str(principal.get("user", {}).get("id") or "")
     stored = catalog.put(manifest, scope=scope, owner_id=owner_id)
     return stored.to_dict()

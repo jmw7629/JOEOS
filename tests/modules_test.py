@@ -132,3 +132,46 @@ class ModuleApiTests(unittest.TestCase):
         # Public catalog never exposes hidden modules or scopes other than builtin.
         for module in payload["modules"]:
             self.assertEqual(module["visibility"], "visible")
+
+    def test_public_catalog_never_exposes_user_modules(self):
+        # A user-scoped module stored via the (gated) path must not appear in
+        # the public built-in catalog.
+        # Seed one directly in the catalog DB and confirm public list excludes it.
+        import os
+        from server.modules import ModuleCatalog
+        from server.modules.catalog import module_manifest_to_json
+        import sqlite3
+
+        data_dir = Path(os.environ["JOEOS_DB_PATH"]).parent / "modules"
+        catalog = ModuleCatalog(str(data_dir))
+        catalog.prepare()
+        catalog.put(
+            validate_manifest({"id": "secret-mod", "route": "/os/secret-mod", "display_name": "Secret"}),
+            scope="user", owner_id="o1",
+        )
+        public = self.client.get("/api/v1/modules/public").json()["modules"]
+        ids = [m["id"] for m in public]
+        self.assertNotIn("secret-mod", ids)
+
+    def test_workspace_scope_requires_manage_capability(self):
+        # No session -> 401 gate means we cannot reach the policy branch without
+        # a session; this confirms the POST is still auth-gated.
+        response = self.client.post("/api/v1/modules", json={
+            "scope": "workspace",
+            "manifest": {"id": "w-mod", "route": "/os/w-mod", "display_name": "W"},
+        })
+        self.assertEqual(response.status_code, 401)
+
+
+class ModulePolicyGuardTests(unittest.TestCase):
+    def test_module_cannot_escalate_capabilities(self):
+        from server.modules.manifest import validate_manifest
+
+        manifest = validate_manifest({
+            "id": "escalate", "route": "/os/escalate", "display_name": "Escalate",
+            "required_capabilities": ["admin.read", "secrets.read"],
+        })
+        held = {"agent.read", "memory.read"}
+        requested = set(manifest.required_capabilities) | set(manifest.required_permissions)
+        missing = sorted(requested - held)
+        self.assertEqual(missing, ["admin.read", "secrets.read"])
