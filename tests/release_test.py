@@ -84,10 +84,24 @@ class ReleaseToolTests(unittest.TestCase):
                 self.assertEqual(manifest["files"][label], digest)
 
     def test_packaging_never_writes_to_repo(self):
-        before = set(p.resolve() for p in ROOT.rglob("*") if p.is_file() and ".git" not in p.parts and ".venv" not in p.parts and "__pycache__" not in p.parts)
+        # Transient SQLite WAL/SHM sidecars are created/removed by concurrent
+        # test runs holding the autonomous DB open — not by the release tool.
+        # Excluding them keeps the assertion about packaging purity intact.
+        def snapshot():
+            return set(
+                p.resolve()
+                for p in ROOT.rglob("*")
+                if p.is_file()
+                and ".git" not in p.parts
+                and ".venv" not in p.parts
+                and "__pycache__" not in p.parts
+                and p.suffix not in (".db-wal", ".db-shm")
+            )
+
+        before = snapshot()
         with tempfile.TemporaryDirectory() as scratch:
             self.release.package(Path(scratch) / "bundle")
-        after = set(p.resolve() for p in ROOT.rglob("*") if p.is_file() and ".git" not in p.parts and ".venv" not in p.parts and "__pycache__" not in p.parts)
+        after = snapshot()
         self.assertEqual(before, after)
 
 
