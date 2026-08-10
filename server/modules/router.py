@@ -60,9 +60,29 @@ def list_modules(
     principal: Dict = Depends(require_application_session),
 ) -> Dict[str, Any]:
     catalog = _catalog(request)
+    # Authenticated clients see the full visible catalog (built-in + user/
+    # workspace modules). The public read path below returns only built-ins.
     return {
         "schema_version": 1,
         "modules": [m.to_dict() for m in catalog.list(include_hidden=True)],
+    }
+
+
+@router.get("/public")
+def list_public_modules(
+    request: Request,
+) -> Dict[str, Any]:
+    """Public product-default module catalog.
+
+    Returns only built-in, visible manifests (non-sensitive product defaults).
+    User/workspace modules and hidden modules are never exposed here. This is
+    what the browser shell (which may not hold a session) consumes as the
+    authoritative module source for the Command Center."""
+    catalog = _catalog(request)
+    return {
+        "schema_version": 1,
+        "public": True,
+        "modules": [m.to_dict() for m in catalog.list(scopes=["builtin"])],
     }
 
 

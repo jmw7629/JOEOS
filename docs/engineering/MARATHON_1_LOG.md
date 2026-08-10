@@ -82,3 +82,7 @@ the box dropped off the network. DEPLOYMENT TO HALO IS BLOCKED until the host
 returns. All marathon code is committed and pushed to origin/ai-rebuild (Halo
 checkout was synced to a4b050b). The VPS rollback node remains up. Continued
 with VPS-side code work; will retry Halo connectivity periodically.
+### P2 follow-up — browser consumes authoritative module catalog
+Public /api/v1/modules/public endpoint (built-in visible manifests, no session)
+lets the browser Command Center merge the manifest catalog: catalog modules not
+already rendered appear automatically with honest "no live data" state.

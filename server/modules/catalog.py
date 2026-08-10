@@ -64,12 +64,14 @@ class ModuleCatalog:
 
     # ---- CRUD ------------------------------------------------------------
 
-    def list(self, *, include_hidden: bool = False) -> List[ModuleManifest]:
+    def list(self, *, include_hidden: bool = False, scopes: Optional[List[str]] = None) -> List[ModuleManifest]:
         rows = self._connect().execute(
-            "SELECT manifest FROM module_definitions WHERE superseded = 0 ORDER BY updated_at DESC"
+            "SELECT manifest, scope FROM module_definitions WHERE superseded = 0 ORDER BY updated_at DESC"
         ).fetchall()
         manifests: List[ModuleManifest] = []
         for row in rows:
+            if scopes is not None and row["scope"] not in scopes:
+                continue
             try:
                 manifest = module_manifest_from(row["manifest"])
             except ManifestValidationError:

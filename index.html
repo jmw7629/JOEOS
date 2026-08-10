@@ -7457,6 +7457,29 @@
           { module: "security", title: "Security", icon: "fa-shield-halved", sub: (securityOverview.lockdown_active || security.lockdown_active) ? "LOCKDOWN ACTIVE" : "No lockdown", value: openSecurityEvents != null ? openSecurityEvents + " open events" : null, badgeTone: (securityOverview.lockdown_active || security.lockdown_active) ? "danger" : "", badge: (securityOverview.lockdown_active || security.lockdown_active) ? "locked" : null, open: "security-center", objectType: "module" }
         ];
 
+        // Merge the authoritative module catalog: any built-in manifest not
+        // already rendered appears as a card (with honest "no live data" state)
+        // so user/workspace modules surface automatically.
+        var manifestList = Array.isArray(props.manifestModules) ? props.manifestModules : [];
+        var presentIds = {};
+        modules.forEach(function (m) { presentIds[m.module] = true; });
+        manifestList.forEach(function (manifest) {
+          var id = manifest.id;
+          if (presentIds[id]) return;
+          presentIds[id] = true;
+          modules.push({
+            module: id,
+            title: manifest.display_name || id,
+            icon: manifest.icon || "fa-puzzle-piece",
+            sub: manifest.description || "Declared module",
+            value: null,
+            detail: manifest.category ? "category: " + manifest.category : null,
+            open: manifest.route || ("/os/" + id),
+            objectType: "module",
+            openLabel: "Open"
+          });
+        });
+
         var activeModule = focused ? (modules.find(function (m) { return m.module === focused; }) || null) : null;
 
         if (activeModule) {
@@ -8376,6 +8399,9 @@
         var assistantContextPair = useState(null);
         var assistantContext = assistantContextPair[0];
         var setAssistantContext = assistantContextPair[1];
+        var manifestModulesPair = useState([]);
+        var manifestModules = manifestModulesPair[0];
+        var setManifestModules = manifestModulesPair[1];
         var nowPair = useState(new Date());
         var now = nowPair[0];
         var setNow = nowPair[1];
@@ -9552,6 +9578,11 @@
 
         useEffect(function () {
           loadAssistantConfig();
+          requestJson("/api/v1/modules/public", { cache: "no-store", headers: { Accept: "application/json" }, timeoutMs: 15000 })
+            .then(function (payload) {
+              if (payload && Array.isArray(payload.modules)) setManifestModules(payload.modules);
+            })
+            .catch(function () {});
           function onJoeFocus(event) {
             var el = event.target.closest("[data-joe-focus]");
             if (!el) return;
@@ -10228,6 +10259,7 @@
             security: security,
             securityOverview: securityOverview,
             uptimeSeconds: uptimeSeconds,
+            manifestModules: manifestModules,
             onOpen: function (id) { selectSection(String(id)); },
             onAsk: focusAssistant
           });

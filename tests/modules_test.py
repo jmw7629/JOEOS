@@ -120,3 +120,15 @@ class ModuleApiTests(unittest.TestCase):
     def test_capabilities_requires_session(self):
         response = self.client.get("/api/v1/modules/capabilities")
         self.assertIn(response.status_code, (401, 403))
+
+    def test_public_catalog_returns_builtin_without_session(self):
+        response = self.client.get("/api/v1/modules/public")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertTrue(payload["public"])
+        self.assertGreaterEqual(len(payload["modules"]), 1)
+        ids = [m["id"] for m in payload["modules"]]
+        self.assertIn("command", ids)
+        # Public catalog never exposes hidden modules or scopes other than builtin.
+        for module in payload["modules"]:
+            self.assertEqual(module["visibility"], "visible")
