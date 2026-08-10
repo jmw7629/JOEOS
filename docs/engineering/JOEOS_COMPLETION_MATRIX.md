@@ -94,6 +94,17 @@ Updated continuously by the autonomous completion loop.
 | M-801 | Memory | Memory browser (all/shared/agent/proposed/conflicts/stale) | M-301 | DONE (views + cards + detail) | — | — |
 | M-802 | Memory | Memory card break-open (content/source/provenance/…) | M-801 | DONE | — | — |
 | M-803 | Files | Files OS module (recent/processing/failed + detail) | M-301 | DONE (Files view + detail + scoped Joe) | test_files | c13cbc7 |
+| M-1301 | Objects | Enterprise Object System (ObjectRef, type registry, capabilities, authorized resolution, relationships, safety levels, canonical routing) | M-301 | DONE (D2/D7/D25) | 28 object tests | 52d252e..16c03c8 |
+| M-1302 | Objects | Object-native command palette (find/act on any object; not duplicate Joe) | M-1301 | DONE (D1) | test_palette | 9e5ceb7 |
+| M-1303 | Objects | Object Quick Look (inspector preview: identity/state/relationships/action) | M-1301 | DONE (D2) | test_quicklook | 3274ebb |
+| M-1304 | Objects | Universal Recents/Favorites (policy-safe ObjectRef store, jump-anywhere) | M-1301 | DONE (D3) | test_recents | 1e9e1e5 |
+| M-1305 | UX | Attention Center (one 'what needs me' model) | M-301 | DONE (D5) | test_attention | a918ccb |
+| M-1306 | UX | Action safety levels (safe/consequential/privileged/destructive) | M-1301 | DONE (D7) | 26 object tests | b766124 |
+| M-1307 | UX | Undo for reversible layout actions | M-301 | DONE (D8) | test_undo | efd3ccc |
+| M-1308 | UX | Universal interaction grammar + self-describing OS | M-1301 | DONE (D24/D25) | docs | 16c03c8 |
+| M-1309 | UX | Named internal Return controls on all drill-downs | M-301 | DONE | test_nav | 5da8ad5 |
+| M-1310 | UX | Function dedup + single Joe invocation | M-301 | DONE | test_dedup | f0244ed |
+
 | M-804 | Activity | Unified activity console (human-first, expandable detail) | M-301 | PARTIAL (agent_fabric) | — | a63f9f3 |
 | M-805 | Activity | Live activity widget (persistent, filterable) | M-804 | PARTIAL | — | a63f9f3 |
 
