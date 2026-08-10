@@ -45,7 +45,7 @@ Updated continuously by the autonomous completion loop.
 | ID | AREA | REQUIREMENT | DEP | STATUS | TEST | COMMIT |
 |----|------|-------------|-----|--------|------|--------|
 | M-301 | UX | Reusable module surface (compact/standard/expanded/focused/inspect) | — | DONE (D2/D3) | — | — |
-| M-302 | UX | Module states (loading/empty/healthy/degraded/failed/offline) | M-301 | NOT_STARTED | — | — |
+| M-302 | UX | Module states (loading/empty/healthy/degraded/failed/offline) | M-301 | DONE (stateNote() system-wide) | jsdom | 213c7a8 |
 | M-303 | UX | Break-open module→subcomponent→detail interaction | M-301 | DONE (command center focus + terminal tabs) | — | — |
 | M-304 | UX | Layout persistence (arrangement/collapse/orb) | M-301 | DONE (D2) | — | — |
 
@@ -85,7 +85,7 @@ Updated continuously by the autonomous completion loop.
 | M-702 | Work | Task card break-open (objective/agent/deps/graph/tools/…) | M-701 | PARTIAL (D4 DAG) | — | — |
 | M-703 | Auto | Schedule/cron monitor (failing surfacing) | M-301 | DONE (filters + failures) | — | — |
 | M-704 | Auto | Pipeline/DAG visualization (TaskGraph/automation/campaign) | M-301 | DONE (automation) | — | — |
-| M-705 | Auto | Schedule pipeline (trigger→result) | M-703 | NOT_STARTED | — | — |
+| M-705 | Auto | Schedule pipeline (trigger→result) | M-703 | DONE (lifecycle view) | test_lifecycle | b1b5edb |
 
 ## 8. Memory / Files / Activity
 
@@ -93,7 +93,7 @@ Updated continuously by the autonomous completion loop.
 |----|------|-------------|-----|--------|------|--------|
 | M-801 | Memory | Memory browser (all/shared/agent/proposed/conflicts/stale) | M-301 | DONE (views + cards + detail) | — | — |
 | M-802 | Memory | Memory card break-open (content/source/provenance/…) | M-801 | DONE | — | — |
-| M-803 | Files | Files OS module (recent/processing/failed + detail) | M-301 | NOT_STARTED | — | — |
+| M-803 | Files | Files OS module (recent/processing/failed + detail) | M-301 | DONE (Files view + detail + scoped Joe) | test_files | c13cbc7 |
 | M-804 | Activity | Unified activity console (human-first, expandable detail) | M-301 | PARTIAL (agent_fabric) | — | a63f9f3 |
 | M-805 | Activity | Live activity widget (persistent, filterable) | M-804 | PARTIAL | — | a63f9f3 |
 
