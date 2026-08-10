@@ -127,3 +127,52 @@ browser→Ollama/Lemonade direct refs, no secrets in served pages; gated
 security/approvals + control/executions + control/mission (401 without session).
 Completion matrix reconciled (32 DONE). Rollback tag
 joeos-agent-command-center-milestone created.
+
+## P0 live routing regression — diagnosis + repair (2026-08-10)
+### Reported symptoms
+- `https://mcso9tqzb9.tailb9395f.ts.net/os/build` and `/os/plugins` failing.
+- `https://amd-halo.tailb9395f.ts.net/os/build` offered a downloadable `build.txt`
+  on iPhone Safari instead of rendering JoeOS.
+### Host ownership (definitive)
+- `mcso9tqzb9.tailb9395f.ts.net` = **VPS (rollback node, 100.98.25.26)**. Tailscale
+  Funnel enabled, proxies to `127.0.0.1:8091` (local Caddy) → `100.121.165.22:8080`
+  (Halo). NOT authoritative.
+- `amd-halo.tailb9395f.ts.net` = **Halo (authoritative, 100.121.165.22)**. Tailscale
+  Serve HTTPS → Halo backend `0.0.0.0:8080`.
+- VPS Caddy `/etc/caddy/Caddyfile` (`:80` and `:8091`) both `reverse_proxy
+  100.121.165.22:8080` — the VPS funnel is a pass-through to Halo.
+### Root cause
+1. **Halo backend is down**: `http://100.121.165.22:8080/healthz` → connection
+   refused (code=000). All 502s on both hostnames trace here. The Halo uvicorn
+   was stopped earlier (marathon `pkill`) and its relaunch was never confirmed;
+   nothing is now listening on Halo:8080 that answers HTTP.
+2. **Service worker cached a bad /os/build response** (the Safari `build.txt`
+   download): `sw.js` cached ANY navigation response under the shell key without
+   checking status/content-type or rejecting `Content-Disposition: attachment`.
+   A stale/error/build-artifact response overwrote the cached shell, so Safari
+   kept offering `build.txt` even after the server recovered.
+### Repair (committed + pushed, d7cc9f0)
+- `sw.js` → `joeos-shell-v4`: only cache HTML/manifest responses that are not
+  attachment and not API/healthz; stable shell key; reject non-HTML navigation
+  responses. skipWaiting + activate cleanup replace stale caches on every client.
+- `tests/routes_regression_test.py`: 6 tests asserting every major `/os/*` route
+  serves the JoeOS app (HTML, never attachment), no `build.txt` artifact shadows
+  `/os/build`, and the service worker rejects attachment/error as shell content.
+- Verified live via CDP: `/os/build`, `/os/plugins`, `/os/agents`, `/os/approvals`,
+  `/os/executions`, `/os/files`, `/os/models`, `/os/work`, `/os/schedule`, `/os/`
+  all render the app with zero fatal console errors; direct deep-link + refresh
+  both restore the correct module. Full backend regression: 1012 passed + 61
+  subtests; frontend 36/36.
+### Remaining human/root gate (Halo)
+The browser service on Halo must be restarted. Authoritative checkout:
+`/home/joewillis/JOEOS` (branch `ai-rebuild`). Minimal commands on Halo:
+```
+git -C /home/joewillis/JOEOS pull --ff-only origin ai-rebuild
+cd /home/joewillis/JOEOS
+# restart the JoeOS uvicorn on 0.0.0.0:8080 (path may differ per service)
+pkill -f "uvicorn joeos_backend" || true
+nohup /home/joewillis/JOEOS/.venv/bin/python -m uvicorn joeos_backend:app \
+  --host 0.0.0.0 --port 8080 --no-access-log >/tmp/joeos.log 2>&1 &
+```
+Or use the established systemd/service restart if one exists on Halo.
+This is distinct from the privileged `/opt/joeos` runner refresh (separate gate).
