@@ -32,3 +32,7 @@ system, not a second store), reset-to-default.
 ### D3 — dedicated desktop inspector
 COMPLETE. Right-side contextual inspector (sticky, >= desktop; full-width on
 <=900px), closes cleanly, no nav dead end, Joe scoped control.
+### D4 — Campaign / WorkPackage dependency DAG
+COMPLETE. Pipelines view renders real work-package dependency rows (state-colored
+deps edges) from /engineering/campaigns/{id}/packages, alongside automation
+pipelines; preserves DAG when automation runs are empty.

@@ -190,6 +190,12 @@
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
     .pipe-arrow { color: var(--muted); font-size: 12px; }
 
+    /* campaign work-package DAG */
+    .dag-wrap { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 12px; }
+    .wp-dag-row { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+    .wp-dag-row .pipe-head { margin-bottom: 6px; }
+    .wp-dag-row .pipe-strip { gap: 5px; }
+
     @media (max-width: 640px) {
       main { padding: 16px 14px 80px; }
       header { padding: 12px 14px; }
@@ -1522,10 +1528,51 @@
       return "waiting";
     }
 
+    function wpStateTone(state) {
+      var s = String(state || "").toLowerCase();
+      if (["completed", "succeeded", "done"].indexOf(s) !== -1) return "succeeded";
+      if (["queued", "eligible", "ready", "proposed"].indexOf(s) !== -1) return "waiting";
+      if (["planning", "planned", "implementing", "validating", "reviewing", "running", "started"].indexOf(s) !== -1) return "running";
+      if (["blocked", "failed"].indexOf(s) !== -1) return "failed";
+      return "waiting";
+    }
+
+    async function loadCampaignDag() {
+      var out = "";
+      try {
+        var campaigns = (await api("/api/v1/engineering/campaigns")).campaigns || [];
+        if (!campaigns.length) return "";
+        var c = campaigns[0];
+        var pkgs = (await api("/api/v1/engineering/campaigns/" + c.campaign_id + "/packages")).packages || [];
+        if (!pkgs.length) return "";
+        var byKey = {};
+        pkgs.forEach(function (p) { byKey[p.key] = p; });
+        var rows = pkgs.map(function (p) {
+          var deps = [];
+          try { deps = JSON.parse(p.dependencies || "[]"); } catch (e) {}
+          var tone = wpStateTone(p.state);
+          var depStrips = deps.map(function (d) {
+            var dp = byKey[d];
+            return "<span class='pipe-node " + wpStateTone(dp ? dp.state : "queued") + "' title='" + esc(d) + "'>" + esc(d) + "</span>";
+          }).join("<span class='pipe-arrow'>→</span>");
+          return "<div class='wp-dag-row' data-wp='" + esc(p.key) + "'>" +
+            "<div class='pipe-head'><b>" + esc(p.key) + "</b>" +
+            "<span class='chip " + (tone === "succeeded" ? "green" : tone === "failed" ? "red" : tone === "running" ? "" : "amber") + "'>" + esc(p.state) + "</span>" +
+            "<span class='muted small'>" + esc(p.current_stage || p.stage || "") + "</span></div>" +
+            (deps.length ? "<div class='pipe-strip'><span class='muted small'>deps:</span>" + depStrips + "</div>" : "<div class='muted small'>no dependencies</div>") +
+            "</div>";
+        }).join("");
+        out += "<div class='section-title'><h3>Campaign dependencies</h3>" +
+          "<span class='muted small'>" + esc(c.title || c.key) + " · " + pkgs.length + " work package(s)</span></div>" +
+          "<div class='dag-wrap'>" + rows + "</div>";
+      } catch (e) {}
+      return out;
+    }
+
     async function loadPipelines() {
       var box = $("cc-pipelines-body");
       box.innerHTML = "<div class='muted'>Loading…</div>";
-      var html = "";
+      var html = await loadCampaignDag();
       var workflowNodes = {};
       try {
         var workflows = (await api("/api/v1/automation/workflows")) || [];
@@ -1542,7 +1589,11 @@
       } catch (e) {}
       try {
         var runs = (await api("/api/v1/automation/runs")).runs || [];
-        if (!runs.length) { box.innerHTML = "<div class='empty-note'>No automation runs yet.</div>"; return; }
+        if (!runs.length) {
+          if (!html) box.innerHTML = "<div class='empty-note'>No automation runs yet.</div>";
+          box.innerHTML = html;
+          return;
+        }
         html += "<div class='section-title'><h3>Recent pipelines</h3></div>";
         html += runs.slice(0, 8).map(function (r) {
           var nodes = workflowNodes[r.workflow_id] || [];
