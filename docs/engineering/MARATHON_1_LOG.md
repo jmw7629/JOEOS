@@ -51,3 +51,14 @@ navigation fallback retained.
 Registered engineering.appleplatform and engineering.androidplatform persistent
 role agents (SwiftUI + Kotlin/Compose ownership, no signing keys, builds via
 Mac executor / sandboxed Gradle).
+### P3 — Native iOS foundations
+JoeOSCore now includes the cross-platform ModuleManifest (native mirror of the
+server contract, compiles on Mac). App target gained ModuleRenderer.swift (trusted
+SwiftUI component registry; unknown widget types fail safely). Swift typecheck +
+JoeOSCore simulator build pass. xcodebuild full-app Info.plist error is a
+pre-existing Xcode 16 (16F6) environment issue affecting the pristine project too.
+### P4 — Native Android foundations
+Source-complete native Kotlin/Compose JoeOS project scaffolded under apps/android
+(Gradle 8.9, Compose BOM, module manifest contract, theme tokens, MainActivity
+shell, serialization). Gradle/emulator build is BLOCKED on toolchain install
+(no JDK/SDK/gradle/kotlinc on Halo or Mac) — recorded as human toolchain gate.

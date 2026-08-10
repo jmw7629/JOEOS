@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- JoeOS uses HTTPS to the authoritative backend only. Tailnet HTTPS origins
+     (e.g. amd-halo.tailb9395f.ts.net) are covered by the system trust anchors;
+     cleartext is disabled globally. This file exists to keep the policy
+     explicit and auditable. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- JoeOS native theme: near-black canvas, silver/metal neutrals, restrained
+         dark blue. Compose controls most surfaces; this covers the window. -->
+    <style name="Theme.JoeOS" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#07090D</item>
+        <item name="android:statusBarColor">#07090D</item>
+        <item name="android:navigationBarColor">#07090D</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

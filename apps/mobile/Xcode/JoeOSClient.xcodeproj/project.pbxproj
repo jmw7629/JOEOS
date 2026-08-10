@@ -15,6 +15,7 @@
 		A1B2C3D4E5F6000000000206 /* SessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000106 /* SessionManager.swift */; };
 		A1B2C3D4E5F6000000000207 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000107 /* Stores.swift */; };
 		A1B2C3D4E5F6000000000208 /* CommandCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000108 /* CommandCenterView.swift */; };
+		A1B2C3D4E5F600000000020F /* ModuleRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000010F /* ModuleRenderer.swift */; };
 		A1B2C3D4E5F6000000000209 /* ConnectionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6000000000109 /* ConnectionSettingsView.swift */; };
 		A1B2C3D4E5F600000000020A /* DeviceEnrollmentStatusRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000010A /* DeviceEnrollmentStatusRow.swift */; };
 		A1B2C3D4E5F600000000020B /* DevicePairingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F600000000010B /* DevicePairingSheet.swift */; };
@@ -43,6 +44,7 @@
 		A1B2C3D4E5F6000000000106 /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000107 /* Stores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000108 /* CommandCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandCenterView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F600000000010F /* ModuleRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleRenderer.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000109 /* ConnectionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionSettingsView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000010A /* DeviceEnrollmentStatusRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceEnrollmentStatusRow.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000010B /* DevicePairingSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevicePairingSheet.swift; sourceTree = "<group>"; };
@@ -171,6 +173,7 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F6000000000108 /* CommandCenterView.swift */,
+				A1B2C3D4E5F600000000010F /* ModuleRenderer.swift */,
 				A1B2C3D4E5F6000000000109 /* ConnectionSettingsView.swift */,
 				A1B2C3D4E5F600000000010A /* DeviceEnrollmentStatusRow.swift */,
 				A1B2C3D4E5F600000000010B /* DevicePairingSheet.swift */,
@@ -343,6 +346,7 @@
 				A1B2C3D4E5F6000000000206 /* SessionManager.swift in Sources */,
 				A1B2C3D4E5F6000000000207 /* Stores.swift in Sources */,
 				A1B2C3D4E5F6000000000208 /* CommandCenterView.swift in Sources */,
+				A1B2C3D4E5F600000000020F /* ModuleRenderer.swift in Sources */,
 				A1B2C3D4E5F6000000000209 /* ConnectionSettingsView.swift in Sources */,
 				A1B2C3D4E5F600000000020A /* DeviceEnrollmentStatusRow.swift in Sources */,
 				A1B2C3D4E5F600000000020B /* DevicePairingSheet.swift in Sources */,
