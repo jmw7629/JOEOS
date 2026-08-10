@@ -21,6 +21,39 @@ def _catalog(request: Request) -> ModuleCatalog:
     return catalog
 
 
+@router.get("/capabilities")
+def client_capabilities(
+    request: Request,
+    principal: Dict = Depends(require_application_session),
+) -> Dict[str, Any]:
+    """Server-reported client capability contract.
+
+    Clients may POST their detected capabilities (feature detection, not
+    user-agent guessing); the server adapts module/widget availability and
+    never claims a capability the client did not report. A missing report keeps
+    the server honest (no fabricated capability)."""
+    capabilities = {
+        "schema_version": 1,
+        "reported": request.app.state.client_capabilities if hasattr(request.app.state, "client_capabilities") else {},
+    }
+    return capabilities
+
+
+@router.post("/capabilities")
+def report_client_capabilities(
+    payload: dict,
+    request: Request,
+    principal: Dict = Depends(require_application_session),
+) -> Dict[str, Any]:
+    reported = payload.get("capabilities")
+    if not isinstance(reported, dict):
+        raise HTTPException(status_code=422, detail="capabilities must be an object")
+    # Store bounded, non-secret capability flags only.
+    bounded = {k: bool(v) for k, v in reported.items() if isinstance(v, bool)}
+    request.app.state.client_capabilities = bounded
+    return {"schema_version": 1, "reported": bounded}
+
+
 @router.get("")
 def list_modules(
     request: Request,

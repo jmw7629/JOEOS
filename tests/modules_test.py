@@ -90,3 +90,33 @@ class ModuleCatalogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ModuleApiTests(unittest.TestCase):
+    """Endpoint contract tests (auth gate + capability report)."""
+
+    def setUp(self):
+        import os
+        import tempfile
+
+        import joeos_backend as backend
+        from fastapi.testclient import TestClient
+
+        self.tmp = tempfile.TemporaryDirectory()
+        os.environ["JOEOS_DB_PATH"] = str(Path(self.tmp.name) / "joeos.db")
+        os.environ["LEMONADE_CONNECT_TIMEOUT"] = "0.1"
+        os.environ["LEMONADE_READ_TIMEOUT"] = "0.2"
+        self.client = TestClient(backend.app, base_url="http://127.0.0.1")
+        self.client.__enter__()
+
+    def tearDown(self):
+        self.client.__exit__(None, None, None)
+        self.tmp.cleanup()
+
+    def test_module_list_requires_session(self):
+        response = self.client.get("/api/v1/modules")
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_capabilities_requires_session(self):
+        response = self.client.get("/api/v1/modules/capabilities")
+        self.assertIn(response.status_code, (401, 403))
