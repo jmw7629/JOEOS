@@ -18,7 +18,14 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from server.identity.authority_router import require_application_session
-from server.objects.core import OBJECT_TYPES, ObjectRef, normalize_object_type, safety_gate
+from server.objects.core import (
+    OBJECT_TYPES,
+    ObjectRef,
+    capabilities_for,
+    normalize_object_type,
+    safety_for_capability,
+    safety_gate,
+)
 from server.objects.resolver import ObjectResolver
 
 router = APIRouter(prefix="/api/v1/objects", tags=["objects"])
@@ -35,6 +42,25 @@ def _session(request: Request, principal: Dict[str, Any] = Depends(require_appli
 def object_types(principal: Dict[str, Any] = Depends(_session)) -> Dict[str, Any]:
     """Registry of canonical Enterprise Object types."""
     return {"types": sorted(OBJECT_TYPES), "count": len(OBJECT_TYPES)}
+
+
+@router.get("/{object_type}/help")
+def object_type_help(object_type: str, principal: Dict[str, Any] = Depends(_session)) -> Dict[str, Any]:
+    """Self-describing metadata: what an object type is and what you can do with it.
+
+    Lets Joe teach the user 'what can I do here' from the actual registered
+    capabilities — never from generic documentation.
+    """
+    kind = normalize_object_type(object_type)
+    if not kind:
+        raise HTTPException(status_code=404, detail="Unknown object type")
+    capabilities = sorted(capabilities_for(kind))
+    return {
+        "object_type": kind,
+        "capabilities": capabilities,
+        "actions": [safety_gate(cap) for cap in capabilities],
+        "action_safety": {cap: safety_for_capability(cap) for cap in capabilities},
+    }
 
 
 @router.get("/{object_type}/{object_id}")

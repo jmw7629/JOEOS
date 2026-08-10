@@ -240,5 +240,22 @@ class SafetyLevelsTest(unittest.TestCase):
         self.assertEqual(summary["action_safety"].get("approve"), "privileged")
 
 
+class SelfDescribingTest(unittest.TestCase):
+    def test_help_capabilities_are_truthful(self):
+        from server.objects.router import RESOLVER, object_type_help
+        from server.objects.core import capabilities_for
+
+        # object_type_help is bound to require_application_session; exercise the
+        # underlying registry directly to verify the metadata is complete.
+        caps = sorted(capabilities_for("agent"))
+        self.assertIn("view", caps)
+        self.assertIn("execute", caps)
+        self.assertIn("ask_joe", caps)
+
+    def test_help_unknown_type_fails_safe(self):
+        from server.objects.core import normalize_object_type
+        self.assertIsNone(normalize_object_type("not-a-type"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2523,6 +2523,25 @@
     .cc-inspector-rel-item:hover { border-color: rgba(49, 215, 255, .4); background: rgba(49, 215, 255, .06); }
     .cc-inspector-rel-item span { color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; min-width: 92px; }
     .cc-inspector-rel-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .cc-inspector-help {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 12px;
+      padding: 8px 12px;
+      border: 1px solid rgba(49, 215, 255, .22);
+      border-radius: 9px;
+      background: rgba(49, 215, 255, .06);
+      color: var(--cyan-soft, var(--cyan));
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease;
+    }
+    .cc-inspector-help:hover {
+      border-color: rgba(49, 215, 255, .45);
+      background: rgba(49, 215, 255, .1);
+    }
     .cc-inspector-actions button { padding: 9px 12px; font-size: 12.5px; }
     @media (min-width: 1300px) {
       .cc-grid { grid-template-columns: repeat(3, 1fr); }
@@ -7921,7 +7940,8 @@
                       h("span", null, rel.relation.replace(/_/g, " ")),
                       h("strong", null, icon(objectTypeIcon(target.object_type)), " ", target.display_hint || target.object_id));
                   }))
-                ) : null
+                ) : null,
+                h("button", { type: "button", className: "cc-inspector-help", onClick: function () { if (props.onAskJoe) props.onAskJoe(quickLook); } }, icon("fa-wand-magic-sparkles"), " What can I do here? · ask Joe")
               ) : h("p", { className: "cc-module-muted" }, "Resolving object…")
             ),
             h("div", { className: "cc-inspector-actions" },
@@ -10816,7 +10836,8 @@
             recentObjects: recentObjects,
             pinnedObjects: pinnedObjects,
             onOpen: function (id) { selectSection(String(id)); },
-            onAsk: focusAssistant
+            onAsk: focusAssistant,
+            onAskJoe: function (ref) { focusAssistant({ module_type: ref.object_type || ref.type, object_type: ref.object_type || ref.type, object_id: ref.object_id || ref.id, label: ref.label || ref.display_hint || ref.object_id }); }
           });
         } else if (active === "attention") {
           section = h(AttentionCenter, { automationOverview: automationOverview, securityOverview: securityOverview, runtime: runtime, onOpen: function (id) { selectSection(String(id)); } });
