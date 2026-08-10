@@ -1843,6 +1843,13 @@
       });
     }
 
+    var schedFilter = "all";
+    var schedRuns = [];
+
+    function scheduleFilterBtn(label, key) {
+      return "<button data-schedfilter='" + key + "' class='" + (schedFilter === key ? "active" : "") + "'>" + label + "</button>";
+    }
+
     async function loadSchedule() {
       var box = $("cc-schedule-body");
       box.innerHTML = "<div class='muted'>Loading…</div>";
@@ -1857,75 +1864,77 @@
           statCell("Pending approvals", overview.pending_approvals, overview.pending_approvals ? "amber" : "") +
           "</div>";
       } catch (e) { html += "<div class='msg err'>" + esc(e.message) + "</div>"; }
+      // View filters
+      html += "<div class='row' style='margin:10px 0' data-schedfilters>" +
+        scheduleFilterBtn("All", "all") +
+        scheduleFilterBtn("Running", "running") +
+        scheduleFilterBtn("Upcoming", "upcoming") +
+        scheduleFilterBtn("Failed", "failed") +
+        scheduleFilterBtn("Paused", "paused") +
+        "</div>";
       try {
         var schedules = (await api("/api/v1/automation/schedules")).schedules || [];
-        if (schedules.length) {
-          html += "<div class='section-title'><h3>Schedules</h3></div><table class='matrix'><tr>" +
-            "<th>Workflow</th><th>Timezone</th><th>Next run</th><th>Last run</th><th>Status</th></tr>" +
-            schedules.map(function (s) {
-              return "<tr><td>" + esc(s.workflow_id) + "</td><td>" + esc(s.timezone || "") + "</td>" +
-                "<td>" + esc(s.next_run || "—") + "</td><td>" + esc(s.last_run || "—") + "</td>" +
-                "<td><span class='chip " + statusChip(s.enabled ? "enabled" : "paused") + "'>" + esc(s.enabled ? "enabled" : "paused") + "</span></td></tr>";
+        var failedByWf = {};
+        try {
+          var runs = (await api("/api/v1/automation/runs")).runs || [];
+          schedRuns = runs;
+          runs.forEach(function (r) {
+            if (r.state === "failed" || r.state === "error") failedByWf[r.workflow_id] = (failedByWf[r.workflow_id] || 0) + 1;
+          });
+        } catch (e) {}
+        var filtered = schedules.filter(function (s) {
+          if (schedFilter === "running") return s.health_state === "running" || s.health_state === "healthy";
+          if (schedFilter === "failed") return failedByWf[s.workflow_id];
+          if (schedFilter === "paused") return !s.enabled;
+          if (schedFilter === "upcoming") return s.enabled && s.next_run;
+          return true;
+        });
+        if (filtered.length) {
+          html += "<div class='section-title'><h3>Schedules (" + filtered.length + ")</h3></div><table class='matrix'><tr>" +
+            "<th>Workflow</th><th>Timezone</th><th>Next run</th><th>Last run</th><th>Failures</th><th>Status</th></tr>" +
+            filtered.map(function (s) {
+              var fails = failedByWf[s.workflow_id] || 0;
+              return "<tr>" +
+                "<td>" + esc(s.workflow_id) + (fails ? " <span class='chip red'>" + fails + " failed</span>" : "") + "</td>" +
+                "<td>" + esc(s.timezone || "—") + "</td>" +
+                "<td>" + esc(s.next_run || "—") + "</td>" +
+                "<td>" + esc(s.last_run || "—") + "</td>" +
+                "<td>" + (fails ? "<span class='chip red'>" + fails + "</span>" : "<span class='chip green'>0</span>") + "</td>" +
+                "<td><span class='chip " + (s.enabled ? "green" : "amber") + "'>" + esc(s.enabled ? "enabled" : "paused") + "</span></td></tr>";
             }).join("") + "</table>";
         } else {
-          html += "<div class='empty-note' style='margin-top:12px'>No schedules configured. Schedule from the Automations console.</div>";
+          html += "<div class='empty-note' style='margin-top:12px'>No schedules in this view.</div>";
+        }
+      } catch (e) {}
+      // Recent runs with failures prominent + retries/duration.
+      try {
+        var filteredRuns = schedRuns.filter(function (r) {
+          if (schedFilter === "running") return r.state === "running";
+          if (schedFilter === "failed") return r.state === "failed" || r.state === "error";
+          return true;
+        });
+        if (filteredRuns.length) {
+          html += "<div class='section-title'><h3>Recent runs (" + filteredRuns.length + ")</h3></div><table class='matrix'><tr>" +
+            "<th>Run</th><th>Workflow</th><th>State</th><th>Node</th><th>Duration</th><th>Retries</th><th>Error</th></tr>" +
+            filteredRuns.slice(0, 15).map(function (r) {
+              var bad = r.state === "failed" || r.state === "error";
+              return "<tr" + (bad ? " style='background:rgba(255,100,124,0.07)'" : "") + ">" +
+                "<td class='mono'>" + esc((r.run_id || "").slice(0, 12)) + "</td>" +
+                "<td>" + esc(r.workflow_id || "") + "</td>" +
+                "<td><span class='chip " + statusChip(r.state) + "'>" + esc(r.state) + "</span></td>" +
+                "<td>" + esc(r.current_node || "—") + "</td>" +
+                "<td class='muted small'>" + (r.duration_seconds ? r.duration_seconds + "s" : "—") + "</td>" +
+                "<td class='muted small'>" + (r.retry_count != null ? r.retry_count : 0) + "</td>" +
+                "<td class='muted small'>" + esc((r.error || "—").slice(0, 40)) + "</td></tr>";
+            }).join("") + "</table>";
         }
       } catch (e) {}
       box.innerHTML = html;
-    }
-
-    function statCell(k, v, tone) {
-      return "<div class='cc-stat'><div class='k'>" + esc(k) + "</div><div class='v " + (tone || "") + "'>" + (v == null ? "—" : esc(String(v))) + "</div></div>";
-    }
-
-    function pipelineNodeState(nodeId, run) {
-      var states = {};
-      try { states = JSON.parse(run.node_states || "{}") || {}; } catch (e) {}
-      if (states[nodeId]) return "succeeded";
-      if (run.state === "succeeded") return "succeeded";
-      if (nodeId === run.current_node) return run.state === "failed" ? "failed" : "running";
-      return "waiting";
-    }
-
-    function wpStateTone(state) {
-      var s = String(state || "").toLowerCase();
-      if (["completed", "succeeded", "done"].indexOf(s) !== -1) return "succeeded";
-      if (["queued", "eligible", "ready", "proposed"].indexOf(s) !== -1) return "waiting";
-      if (["planning", "planned", "implementing", "validating", "reviewing", "running", "started"].indexOf(s) !== -1) return "running";
-      if (["blocked", "failed"].indexOf(s) !== -1) return "failed";
-      return "waiting";
-    }
-
-    async function loadCampaignDag() {
-      var out = "";
-      try {
-        var campaigns = (await api("/api/v1/engineering/campaigns")).campaigns || [];
-        if (!campaigns.length) return "";
-        var c = campaigns[0];
-        var pkgs = (await api("/api/v1/engineering/campaigns/" + c.campaign_id + "/packages")).packages || [];
-        if (!pkgs.length) return "";
-        var byKey = {};
-        pkgs.forEach(function (p) { byKey[p.key] = p; });
-        var rows = pkgs.map(function (p) {
-          var deps = [];
-          try { deps = JSON.parse(p.dependencies || "[]"); } catch (e) {}
-          var tone = wpStateTone(p.state);
-          var depStrips = deps.map(function (d) {
-            var dp = byKey[d];
-            return "<span class='pipe-node " + wpStateTone(dp ? dp.state : "queued") + "' title='" + esc(d) + "'>" + esc(d) + "</span>";
-          }).join("<span class='pipe-arrow'>→</span>");
-          return "<div class='wp-dag-row' data-wp='" + esc(p.key) + "'>" +
-            "<div class='pipe-head'><b>" + esc(p.key) + "</b>" +
-            "<span class='chip " + (tone === "succeeded" ? "green" : tone === "failed" ? "red" : tone === "running" ? "" : "amber") + "'>" + esc(p.state) + "</span>" +
-            "<span class='muted small'>" + esc(p.current_stage || p.stage || "") + "</span></div>" +
-            (deps.length ? "<div class='pipe-strip'><span class='muted small'>deps:</span>" + depStrips + "</div>" : "<div class='muted small'>no dependencies</div>") +
-            "</div>";
-        }).join("");
-        out += "<div class='section-title'><h3>Campaign dependencies</h3>" +
-          "<span class='muted small'>" + esc(c.title || c.key) + " · " + pkgs.length + " work package(s)</span></div>" +
-          "<div class='dag-wrap'>" + rows + "</div>";
-      } catch (e) {}
-      return out;
+      var filters = document.querySelector("[data-schedfilters]");
+      if (filters) filters.addEventListener("click", function (event) {
+        var btn = event.target.closest("[data-schedfilter]");
+        if (btn) { schedFilter = btn.getAttribute("data-schedfilter"); loadSchedule(); }
+      });
     }
 
     async function loadPipelines() {
