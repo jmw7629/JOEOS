@@ -2515,6 +2515,13 @@
     .cc-inspector-head h3 { margin: 0; font-size: 15px; flex: 1; }
     .cc-inspector-value { font-size: 20px; font-weight: 700; }
     .cc-inspector-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .cc-inspector-label { display: block; font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+    .cc-inspector-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .cc-inspector-rel { display: flex; flex-direction: column; gap: 5px; }
+    .cc-inspector-rel-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px; background: rgba(11, 27, 47, .5); color: var(--text); font-size: 12px; cursor: pointer; text-align: left; transition: border-color .15s ease, background .15s ease; }
+    .cc-inspector-rel-item:hover { border-color: rgba(49, 215, 255, .4); background: rgba(49, 215, 255, .06); }
+    .cc-inspector-rel-item span { color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; min-width: 92px; }
+    .cc-inspector-rel-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .cc-inspector-actions button { padding: 9px 12px; font-size: 12.5px; }
     @media (min-width: 1300px) {
       .cc-grid { grid-template-columns: repeat(3, 1fr); }
@@ -7509,6 +7516,28 @@
         var inspectorPair = useState(null);
         var inspector = inspectorPair[0];
         var setInspector = inspectorPair[1];
+        var quickLookPair = useState(null);
+        var quickLook = quickLookPair[0];
+        var setQuickLook = quickLookPair[1];
+        var quickLookDataPair = useState(null);
+        var quickLookData = quickLookDataPair[0];
+        var setQuickLookData = quickLookDataPair[1];
+        useEffect(function () {
+          if (!quickLook) { setQuickLookData(null); return; }
+          setQuickLookData(null);
+          var ref = quickLook;
+          requestJson("/api/v1/objects/" + encodeURIComponent(ref.object_type || ref.type) + "/" + encodeURIComponent(ref.object_id || ref.id), { cache: "no-store", headers: { Accept: "application/json" } })
+            .then(function (summary) {
+              if (quickLook !== ref) return;
+              requestJson("/api/v1/objects/" + encodeURIComponent(ref.object_type || ref.type) + "/" + encodeURIComponent(ref.object_id || ref.id) + "/relationships", { cache: "no-store", headers: { Accept: "application/json" } })
+                .then(function (rel) {
+                  if (quickLook !== ref) return;
+                  setQuickLookData({ summary: summary, relationships: (rel && rel.relationships) || [] });
+                })
+                .catch(function () { if (quickLook === ref) setQuickLookData({ summary: summary, relationships: [] }); });
+            })
+            .catch(function () { if (quickLook === ref) setQuickLookData(null); });
+        }, [quickLook]);
         var menuPair = useState(null);
         var menuFor = menuPair[0];
         var setMenuFor = menuPair[1];
@@ -7695,7 +7724,45 @@
               return moduleCard(m);
             }))
           ),
-          inspected ? h(
+          quickLook ? h(
+            "aside",
+            { className: "cc-inspector glass-card", "aria-label": "Object inspector" },
+            h("div", { className: "cc-inspector-head" },
+              h("span", { className: "cc-module-icon" }, icon(objectTypeIcon(quickLook.object_type || quickLook.type))),
+              h("h3", null, quickLook.label || quickLook.object_id),
+              h("button", { type: "button", className: "ghost-button", "aria-label": "Close inspector", onClick: function () { setQuickLook(null); } }, icon("fa-xmark"))
+            ),
+            h("div", { className: "cc-inspector-body" },
+              quickLookData ? h(
+                "div",
+                null,
+                h("div", { className: "cc-inspector-value" }, quickLookData.summary && quickLookData.summary.name ? quickLookData.summary.name : (quickLook.label || quickLook.object_id)),
+                quickLookData.summary && quickLookData.summary.status ? h("p", { className: "cc-module-detail" }, h("span", { className: "chip " + statusChipClass(quickLookData.summary.status) }, quickLookData.summary.status)) : null,
+                quickLookData.summary && quickLookData.summary.description ? h("p", { className: "cc-module-detail" }, quickLookData.summary.description) : null,
+                quickLookData.summary && quickLookData.summary.capabilities && quickLookData.summary.capabilities.length ? h(
+                  "div",
+                  { className: "cc-inspector-meta", style: { marginTop: 10 } },
+                  h("strong", { className: "cc-inspector-label" }, "Capabilities"),
+                  h("div", { className: "cc-inspector-chips" }, quickLookData.summary.capabilities.slice(0, 6).map(function (cap) { return h("span", { className: "chip", key: cap }, cap.replace(/_/g, " ")); }))
+                ) : null,
+                quickLookData.relationships && quickLookData.relationships.length ? h(
+                  "div",
+                  { className: "cc-inspector-meta", style: { marginTop: 12 } },
+                  h("strong", { className: "cc-inspector-label" }, "Relationships"),
+                  h("div", { className: "cc-inspector-rel" }, quickLookData.relationships.slice(0, 5).map(function (rel) {
+                    var target = rel.object || {};
+                    return h("button", { type: "button", className: "cc-inspector-rel-item", key: (rel.relation || "") + "-" + (target.object_id || ""), onClick: function () { setQuickLook({ object_type: target.object_type, object_id: target.object_id, label: target.display_hint || target.object_id }); } },
+                      h("span", null, rel.relation.replace(/_/g, " ")),
+                      h("strong", null, icon(objectTypeIcon(target.object_type)), " ", target.display_hint || target.object_id));
+                  }))
+                ) : null
+              ) : h("p", { className: "cc-module-muted" }, "Resolving object…")
+            ),
+            h("div", { className: "cc-inspector-actions" },
+              h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { openObjectRef(quickLook); } }, icon("fa-arrow-up-right-from-square"), " Open")
+            )
+          ) : null,
+          (!quickLook && inspected) ? h(
             "aside",
             { className: "cc-inspector glass-card", "aria-label": inspected.title + " inspector" },
             h("div", { className: "cc-inspector-head" },
@@ -9446,6 +9513,28 @@
           setSearchSearching(false);
         }
 
+        function objectTypeIcon(type) {
+          var icons = {
+            agent: "fa-user-astronaut", agent_run: "fa-bolt", model: "fa-microchip", provider: "fa-server",
+            file: "fa-file-lines", folder: "fa-folder", artifact: "fa-box", automation: "fa-diagram-project",
+            schedule: "fa-calendar-days", execution: "fa-clock-rotate-left", approval: "fa-user-check",
+            campaign: "fa-flag", work_package: "fa-list-check", task: "fa-check-double", conversation: "fa-comments",
+            message: "fa-envelope", memory: "fa-brain", module: "fa-puzzle-piece", widget: "fa-table-cells-large",
+            device: "fa-mobile-screen", machine: "fa-server", user: "fa-user", team: "fa-people-group",
+            organization: "fa-building", workspace: "fa-window-restore", pipeline: "fa-arrows-split-up-and-left",
+            capability: "fa-key", tool: "fa-wrench", service: "fa-gears", notification: "fa-bell", event: "fa-bolt"
+          };
+          return icons[type] || "fa-circle";
+        }
+
+        function statusChipClass(status) {
+          var s = String(status || "").toLowerCase();
+          if (["active", "healthy", "succeeded", "available", "enabled", "ok", "installed", "running"].indexOf(s) !== -1) return "green";
+          if (["waiting", "paused", "queued", "idle", "proposed", "pending"].indexOf(s) !== -1) return "amber";
+          if (["failed", "error", "blocked", "offline", "unavailable", "degraded", "unhealthy"].indexOf(s) !== -1) return "red";
+          return "";
+        }
+
         function openObjectRef(ref) {
           // Canonical Enterprise Object routing: every object resolves to the
           // correct JoeOS workspace without losing the selected object.
@@ -9471,6 +9560,7 @@
           var actions = [];
           var type = ref.object_type || ref.type;
           var id = ref.object_id || ref.id;
+          actions.push({ id: "preview-" + type + "-" + id, label: "Preview", icon: "fa-circle-info", run: function () { selectSection("command"); setQuickLook(ref); } });
           actions.push({ id: "open-" + type + "-" + id, label: "Open", icon: "fa-arrow-up-right-from-square", run: function () { openObjectRef(ref); } });
           if (type === "agent") actions.push({ id: "run-" + id, label: "Run", icon: "fa-play", run: function () { openObjectRef(ref); } });
           if (type === "approval") actions.push({ id: "approve-" + id, label: "Approve", icon: "fa-check", risk: "security", run: function () { selectSection("security-center"); } });
