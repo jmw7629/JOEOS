@@ -29,6 +29,7 @@ from .models import (
     StreamDelta,
 )
 from .providers import LocalLemonadeProvider, OllamaProvider, ProviderRegistry
+from .routing import CapabilityRouter, NoEligibleProviderError, RouterSelection
 from .storage import AIStorage
 
 
@@ -107,6 +108,13 @@ class AIService:
             connection.execute("PRAGMA busy_timeout = 10000")
             return connection
 
+        import urllib.parse as _up
+        lemonade_host = api_base.rstrip("/")
+        # The OpenAI-compatible models endpoint lives on the Lemonade host at
+        # /v1/models (api_base is .../api/v1). Preserve an absolute URL because
+        # the shared http client has no base_url.
+        self._lemonade_models_url = lemonade_host.rsplit("/api/v1", 1)[0] + "/v1/models"
+
         self.storage = AIStorage(connect)
         self.local_provider = LocalLemonadeProvider(
             http_client=http_client,
@@ -129,6 +137,21 @@ class AIService:
         self._version = version
         self.assistant_executor = assistant_executor
         self.assistant_tools = list(assistant_tools or ())
+        self._model_inventory: Dict[str, List[str]] = {}
+        # Provider preference order: configured agents may express a preferred
+        # provider; the router tries it first, then the rest in registration
+        # order. Ollama remains the primary usable provider today; Lemonade is
+        # the second routable provider (its already-downloaded models appear in
+        # the inventory so they are never re-downloaded).
+        def _inventory() -> Dict[str, List[str]]:
+            return dict(self._model_inventory)
+        self.router = CapabilityRouter(self.providers, model_inventory=_inventory)
+
+    def set_provider_model_inventory(self, provider_id: str, models: List[str]) -> None:
+        """Record the authoritative installed-model inventory for a provider."""
+        if not isinstance(self._model_inventory, dict):
+            self._model_inventory = {}
+        self._model_inventory[provider_id] = [str(m) for m in models if m]
 
     def providers_records(self) -> List[ProviderRecord]:
         return self.providers.records()
@@ -177,7 +200,27 @@ class AIService:
             "models": models,
         }
 
+    async def probe_lemonade(self) -> Dict[str, Any]:
+        """Advertised models from the running Lemonade service (already-
+        downloaded on-disk weights), without claiming they are load-ready.
+        Never re-downloads or fabricates."""
+        ids: List[str] = []
+        reachable = False
+        reason = ""
+        try:
+            response = await self._http.get(self._lemonade_models_url, timeout=5.0)
+            response.raise_for_status()
+            data = response.json()
+            data_list = data.get("data", []) if isinstance(data, dict) else []
+            ids = [str(m["id"]) for m in data_list if isinstance(m, dict) and m.get("id")]
+            reachable = True
+        except Exception as error:  # noqa: BLE001 - never fabricate
+            reason = "Lemonade (loopback LLM server) unreachable: %s" % type(error).__name__
+        self._lemonade_models = ids
+        return {"available": reachable, "reason": reason, "models": ids}
+
     def overview(self) -> AIOverview:
+
         default = self.providers.default()
         record = default.availability() if default else ProviderRecord(
             provider_id="none", name="None", available=False, reason="No inference provider is registered."
@@ -259,25 +302,66 @@ class AIService:
     async def assistant_config(self) -> Dict[str, Any]:
         """Safe, honest assistant configuration for the browser widget.
 
-        Model inventory and default come from the measured Ollama runtime;
-        nothing is guessed when unmeasured."""
-        record = self.ollama_provider.availability()
-        models: List[str] = []
+        The default provider and model come from the capability router over the
+        ProviderRegistry and the currently known model inventory. The inventory
+        is recorded from the backend probe (Ollama) and any registered
+        provider (e.g. Lemonade already-downloaded models). Nothing is guessed
+        when unmeasured, and no unavailable model is claimed as ready."""
+        ollama_models: List[str] = []
         try:
             discovered = await self.ollama_provider.list_models()
-            models = [str(m["name"]) for m in discovered if m.get("name")]
+            ollama_models = [str(m["name"]) for m in discovered if m.get("name")]
         except Exception:  # noqa: BLE001 - never fabricate
-            models = []
-        default = _prefer_assistant_model(models) or record.model or ""
+            ollama_models = []
+        lemonade_ids: List[str] = []
+        try:
+            await self.probe_lemonade()
+            lemonade_ids = list(getattr(self, "_lemonade_models", []) or [])
+        except Exception:  # noqa: BLE001 - Lemonade is secondary
+            lemonade_ids = []
+
+        # Provider-scoped inventory: a Lemonade model is never claimed to run on
+        # Ollama and vice-versa.
+        self.set_provider_model_inventory("ollama", ollama_models)
+        self.set_provider_model_inventory("lemonade", lemonade_ids)
+        all_models: List[str] = []
+        for bucket in (ollama_models, lemonade_ids):
+            for m in bucket:
+                if m not in all_models:
+                    all_models.append(m)
+        # Keep the sensible conversational default (prefer proven models) while
+        # routing stays capability-based and provider-neutral.
+        default = _prefer_assistant_model(all_models) or ""
+
+        selection: Optional[RouterSelection] = None
+        try:
+            selection = self.router.select(
+                "tool_use",
+                request_model=default or None,
+                preference_order=["ollama", "lemonade"],
+            )
+        except Exception:  # noqa: BLE001 - no eligible provider is honest
+            selection = None
+
+        available = selection is not None
         return {
-            "provider": "ollama",
-            "available": record.available,
-            "reason": record.reason,
-            "model": default or "",
-            "models": models,
-            "streaming": record.supports_streaming,
+            "provider": selection.provider_id if selection else "",
+            "available": available,
+            "reason": (
+                "" if selection else "No healthy, enabled provider with an installed model is available."
+            ),
+            "model": selection.model if selection else "",
+            "models": all_models,
+            "streaming": self.providers.default().availability().supports_streaming if self.providers.default() else False,
             "tools": [t["function"]["name"] for t in self.assistant_tools if isinstance(t, dict)],
+            "routing": self.router.selection_fingerprint(selection) if selection else None,
         }
+
+    def lemonade_advertised_models(self) -> List[str]:
+        """Models Lemonade advertises via the running service (already-downloaded
+        weights). Values are cached; the caller should call ``probe_lemonade``
+        first. Does not claim the models are load-ready."""
+        return list(getattr(self, "_lemonade_models", None) or [])
 
     def _scoped_context_block(self, context: Optional[Dict]) -> Optional[str]:
         """Build the bounded JoeContextScope line for the model.
@@ -312,19 +396,19 @@ class AIService:
     async def assistant_chat_stream(
         self, messages: List[dict], *, model: str = "", context: Optional[Dict] = None
     ) -> AsyncIterator[Dict]:
-        """Agentic, streaming local assistant chat over Ollama (never Lemonade).
+        """Agentic, streaming local assistant chat, provider-neutral.
 
-        When the backend has wired an agent executor, the bounded safe-tool loop
-        runs and the final answer streams token-by-token. Otherwise it falls
-        back to plain Ollama streaming so the assistant always works. Yields
-        event dicts: ``tool``, ``delta``, and ``done``."""
-        record = self.ollama_provider.availability()
-        if not record.available:
-            raise RuntimeError(record.reason or "Ollama is not reachable on the local loopback.")
-        chosen = model or record.model or ""
-        if not chosen:
-            raise RuntimeError("No Ollama model is available for the assistant.")
-
+        The provider+model are resolved by capability through the router over
+        the ProviderRegistry/ModelRegistry (Ollama today, Lemonade or future
+        providers when healthy and eligible). The bounded safe-tool loop runs
+        via the agent executor when wired; otherwise a plain stream is used.
+        Yields event dicts: ``tool``, ``delta``, ``done``, and a leading
+        ``route`` event carrying routing metadata."""
+        selection = self._resolve_assistant(model)
+        provider = self.providers.get(selection.provider_id)
+        if provider is None:
+            raise RuntimeError("Resolved provider %s is not registered." % selection.provider_id)
+        chosen = selection.model
         history: List[Dict[str, str]] = []
         scope_block = self._scoped_context_block(context)
         if scope_block:
@@ -336,20 +420,35 @@ class AIService:
             content = str(message.get("content") or "")[:4000]
             if role in ("user", "assistant") and content.strip():
                 history.append({"role": role, "content": content})
+        yield {"kind": "route", **self.router.selection_fingerprint(selection)}
 
         if self.assistant_executor is not None:
-            decision = {"model": chosen}
+            decision = {"model": chosen, "provider": selection.provider_id}
             async for event in self.assistant_executor.stream_events(
                 history, list(self.assistant_tools), decision
             ):
                 yield event
             return
 
-        async for delta in self.ollama_provider.stream_infer(
+        async for delta in provider.stream_infer(
             history, model=chosen, temperature=0.4, max_tokens=2000
         ):
             yield {"kind": "delta", "content": delta}
-        yield {"kind": "done", "model": chosen, "provider": "ollama", "tokens_used": None}
+        yield {"kind": "done", "model": chosen, "provider": selection.provider_id, "tokens_used": None}
+
+    def _resolve_assistant(self, request_model: Optional[str] = None) -> RouterSelection:
+        """Resolve the assistant provider+model by capability.
+
+        Deterministic: a no-eligible-provider result raises rather than being
+        fabricated. ``request_model`` is honored when it is available on a
+        healthy provider; otherwise a sensible fallback is returned *with* a
+        fallback_reason (never silently)."""
+        try:
+            return self.router.select_for_assistant(request_model=request_model)
+        except NoEligibleProviderError:
+            raise RuntimeError(
+                "No healthy, enabled provider with an installed model is available for the assistant."
+            ) from None
 
     async def embed(self, texts: List[str], *, project: str = "", source_refs: Optional[List[str]] = None, privacy_class: str = "restricted") -> EmbeddingResult:
         if not self.embeddings.available():

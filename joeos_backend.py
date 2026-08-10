@@ -447,6 +447,65 @@ def _default_agent_model(ollama_state: Optional[Dict[str, Any]]) -> str:
     return "qwen3-coder:30b-a3b-q8_0"
 
 
+def _register_lemonade_registry(app: FastAPI, db_path: Path, lemonade_state: Optional[Dict[str, Any]]) -> None:
+    """Register the Lemonade provider + its already-downloaded models in the
+    authoritative ProviderRegistry / ModelRegistry.
+
+    Only registers when absent; never re-downloads weights. The model records
+    are marked active (weights exist on disk) but inference health is derived
+    live from the service, so an unloadable model is never silently routed to."""
+    action_service = getattr(app.state, "action_service", None)
+    principal = getattr(app.state, "activation_principal", {})
+    if action_service is None or not principal:
+        return
+    try:
+        provider = action_service._store.get_provider_by_key("lemonade")
+        if provider is None:
+            action_service.register_provider(
+                principal,
+                key="lemonade",
+                display_name="Lemonade (local)",
+                provider_type="lemonade",
+                location="local",
+                transport="http",
+                endpoint_reference="loopback",
+                streaming=True,
+                tool_calling=True,
+                structured_output=True,
+                context_window=262144,
+            )
+            provider = action_service._store.get_provider_by_key("lemonade")
+        if provider is None:
+            return
+        models = list((lemonade_state or {}).get("models", []))
+        for mid in models:
+            existing = next(
+                (m for m in action_service._store.list_models(provider.id) if m.key == mid),
+                None,
+            )
+            if existing is None:
+                try:
+                    action_service.register_model(
+                        principal,
+                        provider_id=provider.id,
+                        key=mid,
+                        display_name=mid,
+                        model_identifier=mid,
+                        streaming=True,
+                        tool_calling=True,
+                        structured_output=True,
+                        reasoning=("deepseek" in mid.lower() or "r1" in mid.lower()),
+                        context_limit=262144,
+                    )
+                except Exception:  # noqa: BLE001 - idempotent, never fatal
+                    pass
+        _record_event(db_path, "info", "ai",
+                      "Lemonade registry: %d existing model(s) registered." % len(models))
+    except Exception as error:  # noqa: BLE001 - registration never crashes startup
+        _record_event(db_path, "warning", "ai",
+                      "Lemonade registry registration failed: %s" % type(error).__name__)
+
+
 def _autonomous_default_model(ollama_state: Optional[Dict[str, Any]]) -> str:
     models = list((ollama_state or {}).get("models", []))
     for candidate in (
@@ -1505,6 +1564,25 @@ async def lifespan(app: FastAPI):
         app.state.ollama_state = {
             "available": False,
             "reason": "Ollama is not reachable on the VPS loopback.",
+            "models": [],
+        }
+    # Measure the local Lemonade service and register its already-downloaded
+    # models so they are visible and routable through the ProviderRegistry /
+    # ModelRegistry without re-downloading weights. If the service cannot load
+    # them (a path/config gate), the router still skips an unhealthy provider;
+    # this registration only makes the existing weights discoverable.
+    try:
+        lemonade_state = await app.state.ai_service.probe_lemonade()
+        app.state.lemonade_state = lemonade_state
+        ollama_models = list((app.state.ollama_state or {}).get("models", []))
+        lemonade_models = list((lemonade_state or {}).get("models", []))
+        app.state.ai_service.set_provider_model_inventory("ollama", ollama_models)
+        app.state.ai_service.set_provider_model_inventory("lemonade", lemonade_models)
+        _register_lemonade_registry(app, db_path, lemonade_state)
+    except Exception as error:  # noqa: BLE001 - Lemonade is secondary; never crash startup
+        app.state.lemonade_state = {
+            "available": False,
+            "reason": "Lemonade probe failed: %s" % type(error).__name__,
             "models": [],
         }
 

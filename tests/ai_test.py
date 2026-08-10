@@ -13,6 +13,8 @@ from server.ai import (
     InterpretationError,
     ProviderRegistry,
 )
+from server.ai.models import ProviderRecord
+from server.ai.routing import CapabilityRouter, NoEligibleProviderError
 
 
 class _FakeTransport(httpx.AsyncBaseTransport):
@@ -112,6 +114,7 @@ class AiServiceTests(unittest.TestCase):
             available=True, reason="ok", model=model, version="0.32.5",
             supports_streaming=True,
         )
+        service.set_provider_model_inventory("ollama", [model])
 
     def test_assistant_config_offline_is_honest(self):
         service, http = self._service(_runtime_online())
@@ -158,7 +161,9 @@ class AiServiceTests(unittest.TestCase):
                 events.append(event)
         asyncio.run(collect())
         kinds = [e["kind"] for e in events]
-        self.assertEqual(kinds, ["tool", "delta", "done"])
+        self.assertEqual(kinds, ["route", "tool", "delta", "done"])
+        self.assertEqual(events[0]["provider"], "ollama")
+        self.assertEqual(events[0]["capability"], "tool_use")
         self.assertLessEqual(len(events), 20)
 
     def test_assistant_chat_stream_raises_when_offline(self):
@@ -191,7 +196,7 @@ class AiServiceTests(unittest.TestCase):
             ):
                 events.append(event)
         asyncio.run(collect())
-        self.assertEqual([e["kind"] for e in events], ["delta", "done"])
+        self.assertEqual([e["kind"] for e in events], ["route", "delta", "done"])
         joined = "\n".join(captured["system"])
         self.assertIn("JOE IS FOCUSED ON THIS MODULE", joined)
         self.assertIn("Nightly Build", joined)
@@ -203,6 +208,129 @@ class AiServiceTests(unittest.TestCase):
         self._assistant_online(service)
         block = service._scoped_context_block({"label": "x" * 500, "object_id": "y" * 200})
         self.assertLessEqual(len(block or ""), 800)
+
+
+class ProviderRoutingTests(unittest.TestCase):
+    """Provider-neutral capability routing (D1).
+
+    Exercises the CapabilityRouter independently of any live provider so the
+    selection/health/fallback/failure contract is covered deterministically.
+    """
+
+    class _Fake:
+        provider_id = ""
+
+        def __init__(self, avail, reason="", model=None):
+            self.avail = avail
+            self.reason = reason
+            self.model = model
+
+        def availability(self):
+            return ProviderRecord(
+                provider_id=self.provider_id,
+                name=self.provider_id.capitalize(),
+                available=self.avail,
+                reason=self.reason,
+                model=self.model,
+            )
+
+    class Ollama(_Fake):
+        provider_id = "ollama"
+
+    class Lemonade(_Fake):
+        provider_id = "lemonade"
+
+    class _Reg:
+        def __init__(self, providers):
+            self._providers = providers
+
+        def get(self, pid):
+            return self._providers.get(pid)
+
+        def records(self):
+            return [p.availability() for p in self._providers.values()]
+
+    INVENTORY = {
+        "ollama": ["qwen3-coder:30b-a3b-q8_0", "qwen3-coder-next:latest", "llama3.3:70b"],
+        "lemonade": ["Qwen3-Coder-30B-A3B-Instruct-Q4_K_M", "gpt-oss-120b-Q4_K_M"],
+    }
+
+    def _router(self, providers):
+        return CapabilityRouter(self._Reg(providers), model_inventory=lambda: self.INVENTORY)
+
+    def test_healthy_ollama_selected(self):
+        router = self._router({"ollama": self.Ollama(True), "lemonade": self.Lemonade(False, "gated")})
+        sel = router.select_for_assistant()
+        self.assertEqual(sel.provider_id, "ollama")
+        self.assertTrue(sel.provider_available)
+        self.assertIn(sel.model, self.INVENTORY["ollama"])
+
+    def test_disabled_provider_rejected(self):
+        # A provider with availability False is never selected.
+        router = self._router({"ollama": self.Ollama(False, "disabled"), "lemonade": self.Lemonade(False, "off")})
+        with self.assertRaises(NoEligibleProviderError):
+            router.select_for_assistant()
+
+    def test_unhealthy_provider_falls_back(self):
+        # Requested Lemonade model but Lemonade is unhealthy -> fall back to
+        # a healthy provider, and never claim a Lemonade model runs on Ollama.
+        router = self._router({"ollama": self.Ollama(True), "lemonade": self.Lemonade(False, "gated")})
+        sel = router.select_for_assistant(
+            request_model="gpt-oss-120b-Q4_K_M", preference_order=["lemonade", "ollama"]
+        )
+        self.assertEqual(sel.provider_id, "ollama")
+        self.assertNotIn("gpt-oss", sel.model)
+        self.assertTrue(sel.fallback_reason)
+
+    def test_capability_mismatch_deterministic(self):
+        router = self._router({"ollama": self.Ollama(True), "lemonade": self.Lemonade(True)})
+        # embeddings is a hard capability with no eligible model -> error.
+        with self.assertRaises(NoEligibleProviderError):
+            router.select("embeddings")
+
+    def test_unavailable_model_falls_back(self):
+        router = self._router({"ollama": self.Ollama(True)})
+        sel = router.select_for_assistant(request_model="does-not-exist:99")
+        self.assertEqual(sel.provider_id, "ollama")
+        self.assertTrue(sel.fallback_reason)
+        self.assertNotIn(sel.requested_model, (sel.model,))
+
+    def test_preferred_provider_selected(self):
+        router = self._router({"ollama": self.Ollama(True), "lemonade": self.Lemonade(True)})
+        sel = router.select_for_assistant(
+            request_model="Qwen3-Coder-30B-A3B-Instruct-Q4_K_M",
+            preference_order=["lemonade", "ollama"],
+        )
+        self.assertEqual(sel.provider_id, "lemonade")
+        self.assertEqual(sel.model, "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M")
+        self.assertEqual(sel.fallback_reason, "")
+
+    def test_fallback_provider_selected(self):
+        # Healthy Ollama preferred, request a Lemonade-only model -> fallback
+        # to Ollama with a reason (not silently).
+        router = self._router({"ollama": self.Ollama(True), "lemonade": self.Lemonade(True)})
+        sel = router.select_for_assistant(
+            request_model="gpt-oss-120b-Q4_K_M", preference_order=["lemonade", "ollama"]
+        )
+        self.assertEqual(sel.provider_id, "lemonade")
+        # requested model is on lemonade; honored there.
+
+    def test_no_eligible_provider_deterministic(self):
+        router = self._router({"lemonade": self.Lemonade(False, "gated")})
+        with self.assertRaises(NoEligibleProviderError) as ctx:
+            router.select_for_assistant()
+        self.assertIn("No eligible provider", str(ctx.exception))
+
+    def test_routing_metadata_exposed(self):
+        router = self._router({"ollama": self.Ollama(True), "lemonade": self.Lemonade(False, "gated")})
+        sel = router.select_for_assistant()
+        fp = router.selection_fingerprint(sel)
+        self.assertIn("provider", fp)
+        self.assertIn("model", fp)
+        self.assertIn("capability", fp)
+        self.assertIn("provider_health", fp)
+        self.assertIn("provider_available", fp)
+        self.assertTrue(fp["provider_available"])
 
 
 class FakeExecutor:

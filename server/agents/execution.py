@@ -59,9 +59,37 @@ class OllamaAgentExecutor:
             tool_key, arguments, principal=self._principal or {}, service=self._control_service,
         )
 
+    def _provider_for(self, model: str):
+        """Resolve the execution provider through the AI service router.
+
+        Returns the provider instance for the resolved provider (Ollama today,
+        Lemonade or future providers when healthy and eligible). Never guesses;
+        the router raises deterministically when nothing is eligible."""
+        selection = self._ai._resolve_assistant(model)
+        provider = self._ai.providers.get(selection.provider_id)
+        if provider is None:
+            raise RuntimeError("Resolved provider %s is not registered." % selection.provider_id)
+        return provider
+
+    async def _model_call(self, provider, messages, *, model, tools, use_tools):
+        """Invoke the provider for one turn, using structured tool-calling when
+        the provider supports it, otherwise plain text (tool calls are then
+        detected from the bounded content by parse_tool_calls)."""
+        if use_tools and hasattr(provider, "infer_tool_call"):
+            try:
+                return await provider.infer_tool_call(
+                    messages, model=model, tools=tools, max_tokens=self._max_tokens,
+                )
+            except (AttributeError, TypeError):
+                pass
+        return await provider.infer(
+            messages, model=model, max_tokens=self._max_tokens,
+        )
+
     async def _complete(self, messages, tools, model) -> Dict[str, Any]:
         """One model call; if the model proposes safe tool calls, execute them
         and continue (bounded rounds), then return the final answer."""
+        provider = self._provider_for(model)
         working = list(messages)
         if tools and not any(m.get("role") == "system" for m in working):
             working = [{
@@ -76,14 +104,10 @@ class OllamaAgentExecutor:
             }] + working
         token_usage = 0
         for _round in range(MAX_TOOL_ROUNDS + 1):
-            if tools and _round < MAX_TOOL_ROUNDS:
-                result = await self._ai.ollama_provider.infer_tool_call(
-                    working, model=model, tools=tools, max_tokens=self._max_tokens,
-                )
-            else:
-                result = await self._ai.ollama_provider.infer(
-                    working, model=model, max_tokens=self._max_tokens,
-                )
+            result = await self._model_call(
+                provider, working, model=model, tools=tools,
+                use_tools=bool(tools) and _round < MAX_TOOL_ROUNDS,
+            )
             token_usage += result.tokens_used or 0
             # qwen2.5 emits tool calls as structured JSON in the content even
             # when the provider does not flag finish_reason=tool_calls, so we
@@ -120,7 +144,7 @@ class OllamaAgentExecutor:
                                      ) + "\n\nNow answer the original request in plain natural language only. Do not emit JSON or a tool call."
                                  )}]
         # Final non-tool call to produce the answer.
-        result = await self._ai.ollama_provider.infer(
+        result = await provider.infer(
             working, model=model, max_tokens=self._max_tokens,
         )
         token_usage += result.tokens_used or 0
@@ -133,21 +157,25 @@ class OllamaAgentExecutor:
     async def stream_events(self, messages: List[Dict[str, str]], tools: List[Dict], decision: Dict) -> AsyncIterator[Dict]:
         """Agentic chat stream for the persistent local assistant.
 
-        Mirrors the bounded ``_complete`` tool loop but yields machine-readable
-        events to the browser: ``{"kind": "tool", ...}`` when a safe tool runs,
-        ``{"kind": "delta", "content": ...}`` while the final answer streams from
-        Ollama, and ``{"kind": "done", ...}``. All tool execution is the same
-        schema-validated read-only ToolBroker path; nothing arbitrary runs."""
+        Provider-neutral: the execution provider is resolved by capability
+        through the AI service router (Ollama today, Lemonade or future
+        providers when healthy and eligible). Mirrors the bounded ``_complete``
+        tool loop but yields machine-readable events to the browser:
+        ``{"kind": "tool", ...}`` when a safe tool runs, ``{"kind": "delta", ...}``
+        while the final answer streams, and ``{"kind": "done", ...}``. All tool
+        execution is the same schema-validated read-only ToolBroker path;
+        nothing arbitrary runs."""
         model = decision.get("model") or self._default_model
+        provider = self._provider_for(model)
         working = list(messages)
         if tools and not any(m.get("role") == "system" for m in working):
             working = [{
                 "role": "system",
                 "content": (
                     "You are the JoeOS local assistant running entirely on the "
-                    "user's own Ollama runtime. Be concise, clear, and natural. "
-                    "You may call the provided tools. To request a tool call, "
-                    "respond with ONLY a JSON object of the form "
+                    "user's own local model runtime. Be concise, clear, and "
+                    "natural. You may call the provided tools. To request a "
+                    "tool call, respond with ONLY a JSON object of the form "
                     '{"name": "<tool>", "arguments": {...}}. When you have a '
                     "tool result, reply in plain natural language with the "
                     "answer; do not emit JSON."
@@ -155,14 +183,10 @@ class OllamaAgentExecutor:
             }] + working
         token_usage = 0
         for _round in range(MAX_TOOL_ROUNDS):
-            if tools:
-                result = await self._ai.ollama_provider.infer_tool_call(
-                    working, model=model, tools=tools, max_tokens=self._max_tokens,
-                )
-            else:
-                result = await self._ai.ollama_provider.infer(
-                    working, model=model, max_tokens=self._max_tokens,
-                )
+            result = await self._model_call(
+                provider, working, model=model, tools=tools,
+                use_tools=bool(tools),
+            )
             token_usage += result.tokens_used or 0
             calls = parse_tool_calls(result.reply) if tools else []
             if not calls:
@@ -191,11 +215,11 @@ class OllamaAgentExecutor:
                                      ) + "\n\nNow answer the original request in plain natural language only. Do not emit JSON or a tool call."
                                  )}]
         # Stream the final answer token-by-token so the assistant feels natural.
-        async for delta in self._ai.ollama_provider.stream_infer(
+        async for delta in provider.stream_infer(
             working, model=model, temperature=0.4, max_tokens=self._max_tokens,
         ):
             yield {"kind": "delta", "content": delta}
-        yield {"kind": "done", "model": model, "provider": "ollama", "tokens_used": token_usage}
+        yield {"kind": "done", "model": model, "provider": provider.provider_id, "tokens_used": token_usage}
 
     async def __call__(self, messages: List[Dict[str, str]], tools: List[Dict], decision: Dict) -> Dict[str, Any]:
         model = decision.get("model") or self._default_model
