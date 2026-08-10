@@ -203,5 +203,48 @@ class CausalResolverTest(unittest.TestCase):
         self.assertIn(result["category"], ("failure", "ok"))
 
 
+class CompareTest(unittest.TestCase):
+    def test_type_aware_model_compare(self):
+        from server.objects.compare import compare_objects
+        from server.objects.core import ObjectRef
+        from server.objects.intelligence import ObjectActivityStore
+
+        resolver = ObjectResolver()
+        resolver.wire_runtime(lambda: {"models": ["qwen3", "llama3"], "provider": "ollama", "providers": [{"id": "ollama", "healthy": True}]})
+        result = compare_objects(
+            ObjectRef("qwen3", "model"), ObjectRef("llama3", "model"),
+            resolver, {"sub": "u"},
+        )
+        self.assertTrue(result["comparable"])
+        self.assertEqual(result["object_type"], "model")
+        self.assertGreaterEqual(len(result["rows"]), 1)
+        self.assertIn("differences", result)
+
+    def test_incompatible_types(self):
+        from server.objects.compare import compare_objects
+        from server.objects.core import ObjectRef
+
+        resolver = ObjectResolver()
+        result = compare_objects(ObjectRef("a", "agent"), ObjectRef("m", "model"), resolver, {"sub": "u"})
+        self.assertFalse(result["comparable"])
+        self.assertIn("error", result)
+
+    def test_unknown_type_not_comparable(self):
+        from server.objects.compare import compare_objects
+        from server.objects.core import ObjectRef
+
+        resolver = ObjectResolver()
+        result = compare_objects(ObjectRef("x", "bogus"), ObjectRef("y", "bogus"), resolver, {"sub": "u"})
+        self.assertFalse(result["comparable"])
+
+    def test_inaccessible_objects(self):
+        from server.objects.compare import compare_objects
+        from server.objects.core import ObjectRef
+
+        resolver = ObjectResolver()
+        result = compare_objects(ObjectRef("missing", "agent"), ObjectRef("also", "agent"), resolver, {"sub": "u"})
+        self.assertFalse(result["comparable"])
+
+
 if __name__ == "__main__":
     unittest.main()

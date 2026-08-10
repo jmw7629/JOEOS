@@ -2523,6 +2523,20 @@
     .cc-inspector-rel-item:hover { border-color: rgba(49, 215, 255, .4); background: rgba(49, 215, 255, .06); }
     .cc-inspector-rel-item span { color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; min-width: 92px; }
     .cc-inspector-rel-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .cc-modal-backdrop { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(2, 5, 10, .72); padding: 18px; }
+    .cc-modal { width: 100%; max-width: 620px; max-height: 84vh; overflow: auto; background: linear-gradient(180deg, rgba(23, 28, 37, .97), rgba(11, 14, 20, .98)); border: 1px solid var(--line); border-radius: 16px; padding: 18px; box-shadow: var(--depth-floating); }
+    .cc-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .cc-modal-head h3 { margin: 0; font-size: 15px; }
+    .cc-compare-pick { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+    .cc-compare-option { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; background: rgba(49, 215, 255, .05); color: var(--text); font-size: 11.5px; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+    .cc-compare-option:hover { border-color: rgba(49, 215, 255, .4); background: rgba(49, 215, 255, .09); }
+    .cc-compare-result { margin-top: 8px; }
+    .cc-compare-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .cc-compare-table th, .cc-compare-table td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
+    .cc-compare-table th { background: rgba(11, 27, 47, .6); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .cc-compare-field { color: var(--faint); white-space: nowrap; }
+    .cc-compare-diff { background: rgba(255, 180, 92, .05); }
+    .cc-compare-diff .cc-compare-field { color: var(--warning); }
     .cc-inspector-semantic { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
     .cc-inspector-semantic-text { color: var(--muted); font-size: 12px; line-height: 1.4; flex: 1; min-width: 0; }
     .cc-inspector-impacts { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -7713,6 +7727,15 @@
         var quickLookDataPair = useState(null);
         var quickLookData = quickLookDataPair[0];
         var setQuickLookData = quickLookDataPair[1];
+        var comparePickerPair = useState(false);
+        var comparePicker = comparePickerPair[0];
+        var setComparePicker = comparePickerPair[1];
+        var compareResultPair = useState(null);
+        var compareResult = compareResultPair[0];
+        var setCompareResult = compareResultPair[1];
+        var compareTargetPair = useState(null);
+        var compareTarget = compareTargetPair[0];
+        var setCompareTarget = compareTargetPair[1];
         useEffect(function () {
           if (!quickLook) { setQuickLookData(null); return; }
           setQuickLookData(null);
@@ -7937,6 +7960,20 @@
 
         var inspected = inspector ? (modules.find(function (m) { return m.module === inspector; }) || null) : null;
 
+        function runObjectCompare(targetRef) {
+          if (!quickLook || !targetRef) return;
+          setCompareResult(null);
+          var left = quickLook;
+          var right = targetRef;
+          var base = "/api/v1/objects/compare?left_type=" + encodeURIComponent(left.object_type || left.type) +
+            "&left_id=" + encodeURIComponent(left.object_id || left.id) +
+            "&right_type=" + encodeURIComponent(right.object_type || right.type) +
+            "&right_id=" + encodeURIComponent(right.object_id || right.id);
+          requestJson(base, { cache: "no-store", headers: { Accept: "application/json" } })
+            .then(function (payload) { if (payload) setCompareResult(payload); })
+            .catch(function () { setCompareResult({ comparable: false, error: "Comparison is unavailable right now." }); });
+        }
+
         return h(
           "div",
           { className: "command-center cc-with-inspector" },
@@ -8014,6 +8051,7 @@
             ),
             h("div", { className: "cc-inspector-actions" },
               h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { if (props.onAskWhy) props.onAskWhy(quickLook); } }, icon("fa-circle-question"), " Why?"),
+              h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { setComparePicker(true); } }, icon("fa-not-equal"), " Compare"),
               h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { openObjectRef(quickLook); } }, icon("fa-arrow-up-right-from-square"), " Open")
             )
           ) : null,
@@ -8061,6 +8099,40 @@
                 }))
               ) : null,
               (!props.pinnedObjects || !props.pinnedObjects.length) && (!props.recentObjects || !props.recentObjects.length) ? h("p", { className: "cc-module-muted" }, "Open an object to see it here.") : null
+            )
+          ) : null,
+          comparePicker ? h(
+            "div",
+            { className: "cc-modal-backdrop", onClick: function (event) { if (event.target === event.currentTarget) { setComparePicker(false); setCompareTarget(null); } } },
+            h("div", { className: "cc-modal", role: "dialog", "aria-modal": "true", "aria-label": "Compare objects" },
+              h("div", { className: "cc-modal-head" },
+                h("h3", null, "Compare " + (quickLook ? (quickLook.object_type || "object").replace(/_/g, " ") : "") + " objects"),
+                h("button", { type: "button", className: "ghost-button", "aria-label": "Close compare", onClick: function () { setComparePicker(false); setCompareTarget(null); } }, icon("fa-xmark"))
+              ),
+              h("p", { className: "cc-module-muted" }, "Select a compatible object to compare with " + (quickLook ? (quickLook.label || quickLook.object_id) : "the selected object") + ". Different object types cannot be compared."),
+              h("div", { className: "cc-compare-pick" }, (props.pinnedObjects || []).concat(props.recentObjects || []).slice(0, 10).map(function (ref) {
+                if (quickLook && (ref.object_type || "") !== (quickLook.object_type || "")) return null;
+                return h("button", { type: "button", className: "cc-compare-option", key: (ref.object_type || "") + "/" + (ref.object_id || ""), onClick: function () { runObjectCompare(ref); } },
+                  icon(objectTypeIcon(ref.object_type)), " ", ref.label || ref.object_id);
+              })),
+              compareResult ? h(
+                "div",
+                { className: "cc-compare-result" },
+                compareResult.comparable === false ? h("p", { className: "cc-module-muted" }, compareResult.error) : h(
+                  "table",
+                  { className: "cc-compare-table" },
+                  h("thead", null, h("tr", null,
+                    h("th", null, "Field"),
+                    (compareResult.columns || []).map(function (col) { return h("th", { key: col.ref.object_type + "/" + col.ref.object_id }, col.summary && col.summary.name ? col.summary.name : (col.ref.display_hint || col.ref.object_id)); })
+                  )),
+                  h("tbody", null, (compareResult.rows || []).map(function (row) {
+                    return h("tr", { key: row.field, className: row.same ? "" : "cc-compare-diff" },
+                      h("td", { className: "cc-compare-field" }, row.label),
+                      h("td", null, String(row.left == null ? "—" : row.left)),
+                      h("td", null, String(row.right == null ? "—" : row.right)));
+                  }))
+                )
+              ) : null
             )
           ) : null,
           menuFor ? h("div", { className: "cc-menu-backdrop", onClick: function () { setMenuFor(null); } }) : null
