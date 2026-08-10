@@ -176,3 +176,27 @@ nohup /home/joewillis/JOEOS/.venv/bin/python -m uvicorn joeos_backend:app \
 ```
 Or use the established systemd/service restart if one exists on Halo.
 This is distinct from the privileged `/opt/joeos` runner refresh (separate gate).
+
+## P0 live restoration COMPLETE (2026-08-10)
+Deployed to Halo at commit `50b5a3e` and restarted the backend.
+- Root cause #1: Halo checkout was stale at `74ae17c` (months behind). Its
+  campaign/autonomous workers failed with `sqlite3.OperationalError: unable to
+  open database file` because the deployed code resolved a campaign DB path
+  (`data/engineering/`) that does not exist; the uvicorn wedged (no HTTP
+  response on any route, 5h13m uptime, all 502s upstream).
+- Root cause #2: service worker (`joeos-shell-v3`) cached any navigation
+  response regardless of status/content-type, so Safari kept offering the
+  cached bad `/os/build` response as `build.txt` even after recovery.
+- Repair: pulled `origin/ai-rebuild` (50b5a3e) on Halo, killed the wedged
+  uvicorn (PID 10237), restarted `uvicorn joeos_backend:app --host 0.0.0.0
+  --port 8080`. Current source uses `CampaignStore(lambda: _connect(db_path))`
+  (main `data/joeos.db`, exists) so the campaign DB path failure is gone.
+- Live verification (via tailnet HTTPS):
+  - `amd-halo.tailb9395f.ts.net`: /os/build, /os/plugins, /os/agents,
+    /os/approvals, /os/executions, /os/files, /os/models all 200 text/html,
+    no Content-Disposition. CDP headless render: Build ("JoeOS — Build"),
+    Agents ("JoeOS — Agents"), shell routes render with 0 console errors.
+  - `mcso9tqzb9.tailb9395f.ts.net` (VPS funnel → Caddy → Halo): full 15-route
+    matrix 200, no downloads.
+  - /sw.js served as application/javascript (joeos-shell-v4).
+  - /api/v1/objects/types auth-gated (401 session_required) as designed.
