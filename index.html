@@ -2523,6 +2523,20 @@
     .cc-inspector-rel-item:hover { border-color: rgba(49, 215, 255, .4); background: rgba(49, 215, 255, .06); }
     .cc-inspector-rel-item span { color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; min-width: 92px; }
     .cc-inspector-rel-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .cc-inspector-semantic { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
+    .cc-inspector-semantic-text { color: var(--muted); font-size: 12px; line-height: 1.4; flex: 1; min-width: 0; }
+    .cc-inspector-impacts { display: flex; flex-wrap: wrap; gap: 5px; }
+    .cc-inspector-impact { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px; background: rgba(11, 27, 47, .5); color: var(--text); font-size: 11px; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+    .cc-inspector-impact:hover { border-color: rgba(49, 215, 255, .4); background: rgba(49, 215, 255, .06); }
+    .cc-inspector-timeline { display: flex; flex-direction: column; gap: 8px; }
+    .cc-inspector-timeline-item { display: flex; gap: 9px; align-items: flex-start; }
+    .cc-timeline-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex: 0 0 auto; }
+    .cc-timeline-dot.success { background: var(--success); }
+    .cc-timeline-dot.danger { background: var(--danger); }
+    .cc-timeline-dot.default { background: var(--muted); }
+    .cc-timeline-copy { min-width: 0; }
+    .cc-timeline-copy strong { display: block; font-size: 11.5px; line-height: 1.3; text-transform: capitalize; }
+    .cc-timeline-copy span { display: block; color: var(--muted); font-size: 11px; line-height: 1.35; }
     .cc-inspector-help {
       display: inline-flex;
       align-items: center;
@@ -7661,6 +7675,23 @@
         return capability.replace(/_/g, " ") + " · " + (gates[level] || level);
       }
 
+      function semanticToneClass(tone) {
+        var tones = { success: "green", warning: "amber", danger: "red", default: "" };
+        return tones[tone] || "";
+      }
+
+      function setQuickLookImpactType(data, type) {
+        // Drill the impact count into the collection of impacted objects.
+        var impacted = (data && data.impact) || [];
+        var matching = impacted.filter(function (entry) {
+          var target = entry.object || {};
+          return target.object_type === type;
+        });
+        if (matching.length) {
+          openObjectRef({ object_type: type, object_id: (matching[0].object || {}).object_id, label: type.replace(/_/g, " ") });
+        }
+      }
+
       function CommandCenterHome(props) {
         var runtime = props.runtime || {};
         var auto = props.automationOverview || {};
@@ -7686,17 +7717,29 @@
           if (!quickLook) { setQuickLookData(null); return; }
           setQuickLookData(null);
           var ref = quickLook;
-          requestJson("/api/v1/objects/" + encodeURIComponent(ref.object_type || ref.type) + "/" + encodeURIComponent(ref.object_id || ref.id), { cache: "no-store", headers: { Accept: "application/json" } })
-            .then(function (summary) {
-              if (quickLook !== ref) return;
-              requestJson("/api/v1/objects/" + encodeURIComponent(ref.object_type || ref.type) + "/" + encodeURIComponent(ref.object_id || ref.id) + "/relationships", { cache: "no-store", headers: { Accept: "application/json" } })
-                .then(function (rel) {
-                  if (quickLook !== ref) return;
-                  setQuickLookData({ summary: summary, relationships: (rel && rel.relationships) || [] });
-                })
-                .catch(function () { if (quickLook === ref) setQuickLookData({ summary: summary, relationships: [] }); });
-            })
-            .catch(function () { if (quickLook === ref) setQuickLookData(null); });
+          var base = "/api/v1/objects/" + encodeURIComponent(ref.object_type || ref.type) + "/" + encodeURIComponent(ref.object_id || ref.id);
+          function load(path, fallback) {
+            return requestJson(base + path, { cache: "no-store", headers: { Accept: "application/json" } })
+              .catch(function () { return fallback; });
+          }
+          Promise.all([
+            load("", null),
+            load("/relationships", { relationships: [] }),
+            load("/impact", { impact: [], counts: {}, total: 0 }),
+            load("/activity", { activity: [] }),
+            load("/why", null),
+          ]).then(function (parts) {
+            if (quickLook !== ref) return;
+            setQuickLookData({
+              summary: parts[0],
+              relationships: (parts[1] && parts[1].relationships) || [],
+              impact: (parts[2] && parts[2].impact) || [],
+              impactCounts: (parts[2] && parts[2].counts) || {},
+              impactTotal: (parts[2] && parts[2].total) || 0,
+              activity: (parts[3] && parts[3].activity) || [],
+              why: parts[4],
+            });
+          });
         }, [quickLook]);
         var menuPair = useState(null);
         var menuFor = menuPair[0];
@@ -7922,8 +7965,33 @@
                 "div",
                 null,
                 h("div", { className: "cc-inspector-value" }, quickLookData.summary && quickLookData.summary.name ? quickLookData.summary.name : (quickLook.label || quickLook.object_id)),
-                quickLookData.summary && quickLookData.summary.status ? h("p", { className: "cc-module-detail" }, h("span", { className: "chip " + statusChipClass(quickLookData.summary.status) }, quickLookData.summary.status)) : null,
+                (quickLookData.summary && quickLookData.summary.semantic_status) ? h("div", { className: "cc-inspector-semantic" },
+                  h("span", { className: "chip " + semanticToneClass(quickLookData.summary.semantic_status.tone) }, quickLookData.summary.semantic_status.label),
+                  h("span", { className: "cc-inspector-semantic-text" }, quickLookData.summary.semantic_status.meaning)
+                ) : (quickLookData.summary && quickLookData.summary.status ? h("p", { className: "cc-module-detail" }, h("span", { className: "chip " + statusChipClass(quickLookData.summary.status) }, quickLookData.summary.status)) : null),
                 quickLookData.summary && quickLookData.summary.description ? h("p", { className: "cc-module-detail" }, quickLookData.summary.description) : null,
+                quickLookData.impactTotal > 0 ? h(
+                  "div",
+                  { className: "cc-inspector-meta", style: { marginTop: 10 } },
+                  h("strong", { className: "cc-inspector-label" }, "Impact"),
+                  h("div", { className: "cc-inspector-impacts" }, Object.keys(quickLookData.impactCounts).slice(0, 5).map(function (type) {
+                    return h("button", { type: "button", className: "cc-inspector-impact", key: type, onClick: function () { setQuickLookImpactType(quickLookData, type); } },
+                      icon(objectTypeIcon(type)), " ", quickLookData.impactCounts[type], " ", type.replace(/_/g, " "));
+                  }))
+                ) : null,
+                quickLookData.activity && quickLookData.activity.length ? h(
+                  "div",
+                  { className: "cc-inspector-meta", style: { marginTop: 12 } },
+                  h("strong", { className: "cc-inspector-label" }, "Activity"),
+                  h("div", { className: "cc-inspector-timeline" }, quickLookData.activity.slice(0, 4).map(function (entry) {
+                    var dotTone = entry.result === "ok" ? "success" : (entry.result === "error" || entry.result === "failed") ? "danger" : "default";
+                    return h("div", { className: "cc-inspector-timeline-item", key: entry.recorded_at + "-" + entry.action },
+                      h("span", { className: "cc-timeline-dot " + dotTone }),
+                      h("div", { className: "cc-timeline-copy" },
+                        h("strong", null, entry.actor, " ", entry.action.replace(/_/g, " ")),
+                        h("span", null, entry.detail || (entry.object_type + " " + entry.object_id))));
+                  }))
+                ) : null,
                 quickLookData.summary && quickLookData.summary.capabilities && quickLookData.summary.capabilities.length ? h(
                   "div",
                   { className: "cc-inspector-meta", style: { marginTop: 10 } },
@@ -7945,6 +8013,7 @@
               ) : h("p", { className: "cc-module-muted" }, "Resolving object…")
             ),
             h("div", { className: "cc-inspector-actions" },
+              h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { if (props.onAskWhy) props.onAskWhy(quickLook); } }, icon("fa-circle-question"), " Why?"),
               h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { openObjectRef(quickLook); } }, icon("fa-arrow-up-right-from-square"), " Open")
             )
           ) : null,
@@ -9187,6 +9256,9 @@
         function focusAssistant(scope) {
           assistantContextRef.current = scope || null;
           setAssistantContext(scope || null);
+          if (scope && scope.prompt) {
+            setAssistantInput(String(scope.prompt));
+          }
           setAssistantOpen(true);
         }
 
@@ -10837,7 +10909,8 @@
             pinnedObjects: pinnedObjects,
             onOpen: function (id) { selectSection(String(id)); },
             onAsk: focusAssistant,
-            onAskJoe: function (ref) { focusAssistant({ module_type: ref.object_type || ref.type, object_type: ref.object_type || ref.type, object_id: ref.object_id || ref.id, label: ref.label || ref.display_hint || ref.object_id }); }
+            onAskJoe: function (ref) { focusAssistant({ module_type: ref.object_type || ref.type, object_type: ref.object_type || ref.type, object_id: ref.object_id || ref.id, label: ref.label || ref.display_hint || ref.object_id }); },
+            onAskWhy: function (ref) { focusAssistant({ module_type: ref.object_type || ref.type, object_type: ref.object_type || ref.type, object_id: ref.object_id || ref.id, label: ref.label || ref.display_hint || ref.object_id, prompt: "Why is this " + (ref.object_type || "object") + " in its current state? Investigate the causal evidence and explain." }); }
           });
         } else if (active === "attention") {
           section = h(AttentionCenter, { automationOverview: automationOverview, securityOverview: securityOverview, runtime: runtime, onOpen: function (id) { selectSection(String(id)); } });
