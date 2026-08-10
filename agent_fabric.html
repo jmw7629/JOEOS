@@ -246,6 +246,7 @@
     <button data-cc="overview" class="active">Overview</button>
     <button data-cc="mission">Mission</button>
     <button data-cc="approvals">Approvals</button>
+    <button data-cc="executions">Executions</button>
     <button data-cc="orgmap">Org Map</button>
     <button data-cc="agents">Agents</button>
     <button data-cc="work">Work</button>
@@ -336,6 +337,12 @@
         <div id="mission-running" class="grid"></div>
         <div class="section-title"><h3>Recent activity</h3></div>
         <div id="mission-recent"></div>
+      </div>
+
+      <div id="cc-executions" class="cc-view">
+        <div class="section-title"><h3>Executions</h3>
+          <span class="muted small">Runner executions and agent runs — expand for the full record.</span></div>
+        <div id="executions-list"></div>
       </div>
 
       <div id="cc-approvals" class="cc-view">
@@ -1315,6 +1322,7 @@
     var ccViews = {
       mission: function () { return loadMission(); },
       approvals: function () { return loadApprovals(); },
+      executions: function () { return loadExecutions(); },
       orgmap: function () { return loadOrgMap(); },
       agents: function () { return loadAgentsGrid(); },
       work: function () { return loadWorkBoard(); },
@@ -1535,6 +1543,74 @@
 
     var approvalDetail = null;
     var currentJoeScope = null;
+    var executionRecords = [];
+
+    async function loadExecutions() {
+      var box = $("executions-list");
+      box.innerHTML = "<div class='muted'>Loading…</div>";
+      var html = "";
+      var jobs = [];
+      try {
+        var data = await api("/api/v1/runner/executions");
+        jobs = data.executions || [];
+        executionRecords = jobs;
+      } catch (e) {
+        try {
+          var data2 = await api("/api/v1/control/mission");
+          executionRecords = (data2.running || []).concat(data2.recent || []);
+        } catch (e2) {}
+      }
+      if (!executionRecords.length) {
+        box.innerHTML = "<div class='empty-note'>No executions yet. Agent runs and runner jobs appear here.</div>";
+        return;
+      }
+      html = executionRecords.slice(0, 40).map(function (j) {
+        var isAgent = !j.executor_id && (j.agent || j.agent_id);
+        var title = isAgent ? ((j.objective || "Agent run").slice(0, 60)) : ((j.tool_id || j.executor_id || "Execution").slice(0, 60));
+        var actor = isAgent ? (j.agent || "Agent") : ("Runner" + (j.runner_id ? " " + String(j.runner_id).slice(0, 8) : ""));
+        var state = j.status || j.state || "unknown";
+        var when = j.completed_at || j.started_at || j.requested_at || j.created_at;
+        var dur = j.duration_ms != null ? Math.round(j.duration_ms / 1000) + "s" : (j.duration_seconds ? j.duration_seconds + "s" : "");
+        return "<div class='exec-card' data-exec='" + esc(j.id || j.run_id) + "'>" +
+          "<div class='row'><b>" + esc(title) + "</b>" +
+          "<span class='chip " + statusChip(state) + "'>" + esc(state) + "</span>" +
+          "<span class='muted small'>" + esc(actor) + (dur ? " · " + dur : "") + "</span>" +
+          "<span class='muted small'>" + esc(timeAgo(when)) + "</span></div>" +
+          (j.result_summary ? "<div class='muted small'>" + esc(String(j.result_summary).slice(0, 80)) + "</div>" : "") +
+          "<div class='run-detail hidden' data-exec-detail='" + esc(j.id || j.run_id) + "'></div></div>";
+      }).join("");
+      box.innerHTML = html;
+      box.querySelectorAll("[data-exec]").forEach(function (card) {
+        card.addEventListener("click", function () {
+          var id = card.getAttribute("data-exec");
+          var detail = document.querySelector("[data-exec-detail='" + id + "']");
+          if (detail) { detail.classList.toggle("hidden"); if (!detail.classList.contains("hidden")) renderExecutionDetail(id, detail); }
+        });
+      });
+    }
+
+    function renderExecutionDetail(id, detailEl) {
+      var j = executionRecords.find(function (x) { return (x.id || x.run_id) === id; });
+      if (!j) return;
+      var isAgent = !j.executor_id && (j.agent || j.agent_id);
+      var html = "<table class='matrix'>" +
+        "<tr><td>" + (isAgent ? "Run ID" : "Job ID") + "</td><td class='mono'>" + esc(id) + "</td></tr>" +
+        "<tr><td>State</td><td><span class='chip " + statusChip(j.status || j.state) + "'>" + esc(j.status || j.state) + "</span></td></tr>" +
+        (isAgent ? "<tr><td>Agent</td><td>" + esc(j.agent || "—") + "</td></tr>" +
+          "<tr><td>Model</td><td>" + esc(j.model || "—") + "</td></tr>" +
+          "<tr><td>Objective</td><td>" + esc((j.objective || "").slice(0, 120)) + "</td></tr>" : "") +
+        (!isAgent ? "<tr><td>Executor</td><td>" + esc(j.executor_id || "—") + "</td></tr>" +
+          "<tr><td>Tool</td><td>" + esc(j.tool_id || "—") + "</td></tr>" +
+          "<tr><td>Runner</td><td>" + esc((j.runner_id || "—").slice(0, 12)) + "</td></tr>" : "") +
+        "<tr><td>Started</td><td>" + esc(timeAgo(j.started_at || j.requested_at)) + "</td></tr>" +
+        (j.completed_at ? "<tr><td>Completed</td><td>" + esc(timeAgo(j.completed_at)) + "</td></tr>" : "") +
+        (j.duration_ms != null ? "<tr><td>Duration</td><td>" + Math.round(j.duration_ms / 1000) + "s</td></tr>" : "") +
+        (j.token_usage != null ? "<tr><td>Tokens</td><td>" + esc(j.token_usage) + "</td></tr>" : "") +
+        (j.failure ? "<tr><td>Failure</td><td class='muted'>" + esc(String(j.failure).slice(0, 160)) + "</td></tr>" : "") +
+        (j.exit_classification ? "<tr><td>Exit</td><td>" + esc(j.exit_classification) + "</td></tr>" : "") +
+        "</table>";
+      detailEl.innerHTML = html;
+    }
 
     function openScopedJoe(scope) {
       // Module-scoped Joe: carries an authoritative object reference (never
