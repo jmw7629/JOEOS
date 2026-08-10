@@ -1688,6 +1688,16 @@ async def lifespan(app: FastAPI):
         _OBJECT_RESOLVER.wire_runtime(lambda: app.state.runtime)
         _OBJECT_RESOLVER.wire_workspace(app.state.workspace_service)
         app.state.object_resolver = _OBJECT_RESOLVER
+        # Object intelligence: activity timeline + causal resolver.
+        import server.objects.router as _objects_router
+        from server.objects.intelligence import ObjectActivityStore
+        from server.objects.causality import CausalResolver
+
+        _object_activity = ObjectActivityStore(lambda: _connect(db_path))
+        _objects_router.ACTIVITY_STORE = _object_activity
+        _objects_router.CAUSAL_RESOLVER = CausalResolver(_OBJECT_RESOLVER, _object_activity)
+        app.state.object_activity = _object_activity
+        app.state.causal_resolver = _objects_router.CAUSAL_RESOLVER
     except Exception as error:  # noqa: BLE001 - object system is additive
         _record_event(db_path, "warning", "objects",
                       "Object resolver wiring failed: %s" % type(error).__name__)

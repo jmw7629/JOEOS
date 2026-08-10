@@ -13,7 +13,7 @@ pass a real application session.
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -26,12 +26,19 @@ from server.objects.core import (
     safety_for_capability,
     safety_gate,
 )
+from server.objects.causality import CausalResolver
+from server.objects.intelligence import ObjectActivityStore, rank_relationships
 from server.objects.resolver import ObjectResolver
 
 router = APIRouter(prefix="/api/v1/objects", tags=["objects"])
 
 # Lazily bound resolver; the backend wires domain hooks at startup.
 RESOLVER = ObjectResolver()
+
+# Lazily bound intelligence components; the backend wires the store + causal
+# resolver at startup so domain services can record object activity.
+ACTIVITY_STORE: Optional[ObjectActivityStore] = None
+CAUSAL_RESOLVER: Optional[CausalResolver] = None
 
 
 def _session(request: Request, principal: Dict[str, Any] = Depends(require_application_session)) -> Dict[str, Any]:
@@ -94,7 +101,92 @@ def get_object_relationships(
     summary = RESOLVER.resolve(ref, principal)
     if summary is None:
         raise HTTPException(status_code=404, detail="Object not found or not accessible")
-    return {"object": ref.to_dict(), "relationships": RESOLVER.relationships(ref, principal)}
+    relationships = RESOLVER.relationships(ref, principal)
+    ranked = rank_relationships(relationships, summary.get("status"))
+    return {"object": ref.to_dict(), "relationships": ranked}
+
+
+@router.get("/{object_type}/{object_id}/activity")
+def get_object_activity(
+    object_type: str,
+    object_id: str,
+    principal: Dict[str, Any] = Depends(_session),
+) -> Dict[str, Any]:
+    """Human-facing activity timeline for an object (normalized events).
+
+    Raw audit stays in the audit store; this returns semantic, object-centric
+    history with traversable related objects.
+    """
+    kind = normalize_object_type(object_type)
+    if not kind:
+        raise HTTPException(status_code=404, detail="Unknown object type")
+    ref = ObjectRef(object_id=object_id, object_type=kind)
+    summary = RESOLVER.resolve(ref, principal)
+    if summary is None:
+        raise HTTPException(status_code=404, detail="Object not found or not accessible")
+    if ACTIVITY_STORE is None:
+        return {"object": ref.to_dict(), "activity": []}
+    return {"object": ref.to_dict(), "activity": ACTIVITY_STORE.for_object(kind, object_id)}
+
+
+@router.get("/{object_type}/{object_id}/impact")
+def get_object_impact(
+    object_type: str,
+    object_id: str,
+    principal: Dict[str, Any] = Depends(_session),
+) -> Dict[str, Any]:
+    """Dependency impact analysis: who/what depends on this object.
+
+    Uses authoritative reverse-dependency relationships. Only objects the
+    principal may access are returned; no protected identity leaks via counts.
+    """
+    kind = normalize_object_type(object_type)
+    if not kind:
+        raise HTTPException(status_code=404, detail="Unknown object type")
+    ref = ObjectRef(object_id=object_id, object_type=kind)
+    summary = RESOLVER.resolve(ref, principal)
+    if summary is None:
+        raise HTTPException(status_code=404, detail="Object not found or not accessible")
+    impacted = RESOLVER.impact(ref, principal)
+    by_type: Dict[str, int] = {}
+    for entry in impacted:
+        target = entry.get("object") or {}
+        t = target.get("object_type") or "object"
+        by_type[t] = by_type.get(t, 0) + 1
+    return {"object": ref.to_dict(), "impact": impacted, "counts": by_type, "total": len(impacted)}
+
+
+@router.get("/{object_type}/{object_id}/why")
+def get_object_why(
+    object_type: str,
+    object_id: str,
+    principal: Dict[str, Any] = Depends(_session),
+) -> Dict[str, Any]:
+    """Structured causal context for Joe: 'Why?'.
+
+    Returns grounded evidence (state, dependency health, approval coupling,
+    recent activity) and a deterministic conclusion. Joe turns the evidence
+    into a human explanation; it never invents the graph.
+    """
+    kind = normalize_object_type(object_type)
+    if not kind:
+        raise HTTPException(status_code=404, detail="Unknown object type")
+    ref = ObjectRef(object_id=object_id, object_type=kind)
+    if CAUSAL_RESOLVER is not None:
+        return CAUSAL_RESOLVER.explain(ref, principal)
+    # Fallback: deterministic conclusion from the summary alone.
+    summary = RESOLVER.resolve(ref, principal)
+    if summary is None:
+        raise HTTPException(status_code=404, detail="Object not found or not accessible")
+    from server.objects.intelligence import semantic_status
+    status = semantic_status(summary.get("status"))
+    return {
+        "object": ref.to_dict(),
+        "category": status["state"],
+        "explanation": "{name} is {state}. {meaning}".format(name=summary.get("name", "This object"), state=status["label"], meaning=status["meaning"]),
+        "semantic_status": status,
+        "evidence": [{"kind": "state", "label": "Current state", "detail": status["label"] + " — " + status["meaning"], "object": ref.to_dict()}],
+    }
 
 
 @router.get("/{object_type}/{object_id}/actions")

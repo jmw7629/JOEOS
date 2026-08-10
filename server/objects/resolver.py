@@ -22,6 +22,11 @@ from server.objects.core import (
 )
 
 
+def _semantic_status(state):
+    from server.objects.intelligence import semantic_status as _ss
+    return _ss(state)
+
+
 def _as_list(value: Any) -> List[Any]:
     if value is None:
         return []
@@ -40,11 +45,13 @@ def _object_summary(ref: ObjectRef, fields: Dict[str, Any]) -> Dict[str, Any]:
     """Build a bounded, serializable object summary from resolved fields."""
     state = fields.get("lifecycle_state") or fields.get("status")
     caps = effective_capabilities(ref.object_type, _safe_text(state, 24))
+    semantic = _semantic_status(state)
     summary: Dict[str, Any] = {
         "object": ref.to_dict(),
         "type": ref.object_type,
         "name": _safe_text(fields.get("name") or fields.get("display_name") or ref.display_hint or ref.object_id, 160),
         "status": _safe_text(state, 40) or "unknown",
+        "semantic_status": semantic,
         "capabilities": caps,
         # Uniform action safety language: every capability maps to a level so
         # the UI can gate safe/consequential/privileged/destructive actions.
@@ -571,3 +578,95 @@ class ObjectResolver:
             return result
 
         return result
+
+    # -- impact analysis -------------------------------------------------------
+    def impact(self, ref: ObjectRef, principal: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Reverse-dependency impact: who/what depends on this object.
+
+        Uses authoritative relationships from domain services. Only objects the
+        principal may see are returned; aggregate counts never leak protected
+        object identity.
+        """
+        kind = normalize_object_type(ref.object_type)
+        if not kind:
+            return []
+        impacted: List[Dict[str, Any]] = []
+
+        # Agents that use a provider/model.
+        if kind in ("provider", "model"):
+            service = self._agents
+            if service is not None:
+                agents = []
+                if hasattr(service, "organization") and hasattr(service.organization, "agents"):
+                    try:
+                        agents = service.organization.agents(include_inactive=True)
+                    except Exception:
+                        agents = []
+                for agent in _as_list(agents):
+                    provider_key = _safe_text(getattr(agent, "provider_id", None) or getattr(agent, "provider", ""), 120)
+                    model_key = _safe_text(getattr(agent, "model_id", None) or getattr(agent, "model", ""), 120)
+                    if (kind == "provider" and provider_key and provider_key.lower() == ref.object_id.lower()) or \
+                       (kind == "model" and model_key and model_key.lower() == ref.object_id.lower()):
+                        aid = str(getattr(agent, "agent_id", "") or getattr(agent, "id", ""))
+                        if aid:
+                            impacted.append({
+                                "relation": "uses" if kind == "model" else "uses_provider",
+                                "object": ObjectRef(object_id=aid, object_type="agent", display_hint=getattr(agent, "display_name", None)).to_dict(),
+                            })
+
+        # Automations/schedules that use a workflow's provider/model.
+        if kind in ("provider", "model"):
+            automation = self._automation
+            if automation is not None and hasattr(automation, "list_workflows"):
+                for workflow in _as_list(automation.list_workflows(principal)):
+                    provider_key = _safe_text(getattr(workflow, "provider_id", None) or getattr(workflow, "provider", ""), 120)
+                    model_key = _safe_text(getattr(workflow, "model_id", None) or getattr(workflow, "model", ""), 120)
+                    if (kind == "provider" and provider_key and provider_key.lower() == ref.object_id.lower()) or \
+                       (kind == "model" and model_key and model_key.lower() == ref.object_id.lower()):
+                        wid = str(getattr(workflow, "workflow_id", "") or getattr(workflow, "id", ""))
+                        if wid:
+                            impacted.append({
+                                "relation": "uses",
+                                "object": ObjectRef(object_id=wid, object_type="automation", display_hint=getattr(workflow, "name", None)).to_dict(),
+                            })
+
+        # WorkPackages assigned to an agent.
+        if kind == "agent":
+            engineering = self._engineering
+            if engineering is not None and hasattr(engineering, "list_work_packages"):
+                for wp in _as_list(engineering.list_work_packages(None)):
+                    agent_key = _safe_text(getattr(wp, "agent_id", None) or "", 120)
+                    if agent_key and agent_key.lower() == ref.object_id.lower():
+                        wid = str(getattr(wp, "work_package_id", "") or getattr(wp, "id", ""))
+                        if wid:
+                            impacted.append({
+                                "relation": "assigned_to",
+                                "object": ObjectRef(object_id=wid, object_type="work_package", display_hint=getattr(wp, "title", None) or getattr(wp, "name", None)).to_dict(),
+                            })
+
+        # Executions for an agent (dependent in-flight work).
+        if kind == "agent":
+            security = self._security
+            if security is not None and hasattr(security, "get_executions_for_agent"):
+                try:
+                    for execution in _as_list(security.get_executions_for_agent(ref.object_id)):
+                        eid = str(getattr(execution, "execution_id", "") or getattr(execution, "id", ""))
+                        if eid:
+                            impacted.append({
+                                "relation": "executed_by",
+                                "object": ObjectRef(object_id=eid, object_type="execution").to_dict(),
+                            })
+                except Exception:
+                    pass
+
+        # Deduplicate by object key.
+        seen = set()
+        unique = []
+        for entry in impacted:
+            target = entry.get("object") or {}
+            key = str(target.get("object_type")) + "/" + str(target.get("object_id"))
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(entry)
+        return unique
