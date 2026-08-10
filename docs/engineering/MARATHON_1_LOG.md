@@ -67,3 +67,9 @@ Server ModuleManifest JSON decoded successfully by the Swift ModuleManifest on
 the Mac (display_name, required_capabilities, joe_context, widget types all
 round-trip). Contract drift check added; both Swift and Kotlin models declare
 the full 26-field schema.
+
+## Marathon completion
+Final HEAD: 99b7db7 (pushed). Halo synced. All D1-D5 + P1-P7 dependency-ready
+work in scope completed and verified. Remaining items are toolchain/human gates
+(Android SDK/JDK, Xcode 16 Info.plist env quirk, Lemonade service HF-resolve).
+Full regression: 955 backend + 61 subtests, 35/35 frontend, 8/8 jsdom suites.
