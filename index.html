@@ -7386,7 +7386,7 @@
               opts.badge != null ? h("span", { className: "cc-module-badge" + (opts.badgeTone ? " " + opts.badgeTone : "") }, String(opts.badge)) : null,
               h("button", { type: "button", className: "cc-more ghost-button", "aria-label": "Module menu for " + opts.title, onClick: function (event) { event.stopPropagation(); setMenuFor(menuFor === opts.module ? null : opts.module); } }, icon("fa-ellipsis-vertical"))
             ),
-            h("div", { className: "cc-module-value" }, opts.value ? opts.value : h("span", { className: "cc-module-muted" }, "—")),
+            h("div", { className: "cc-module-value" }, opts.value ? opts.value : h("span", { className: "cc-module-muted" }, opts.emptyLabel || "No live data yet")),
             opts.detail ? h("div", { className: "cc-module-detail" }, opts.detail) : null,
             h("div", { className: "cc-module-actions" },
               h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(opts.open); } }, opts.openLabel || "Open"),
@@ -7473,6 +7473,7 @@
             icon: manifest.icon || "fa-puzzle-piece",
             sub: manifest.description || "Declared module",
             value: null,
+            emptyLabel: "No live data yet",
             detail: manifest.category ? "category: " + manifest.category : null,
             open: manifest.route || ("/os/" + id),
             objectType: "module",
