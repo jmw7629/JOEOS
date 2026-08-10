@@ -129,6 +129,7 @@
     .chip.amber { color: var(--warning); border-color: rgba(255,180,92,0.5); }
     .chip.red { color: var(--danger); border-color: rgba(255,100,124,0.5); }
     .chip.cyan { color: var(--cyan); border-color: rgba(49,215,255,0.5); }
+    .agent-current { color: var(--cyan); font-size: 12.5px; min-height: 34px; line-height: 1.35; }
     .bar { height: 6px; border-radius: 4px; background: rgba(139,212,255,0.12); overflow: hidden; margin-top: 6px; }
     .bar > span { display: block; height: 100%; background: var(--cyan); border-radius: 4px; }
     .live-panel { position: fixed; right: 14px; bottom: 14px; width: 320px; max-width: calc(100vw - 28px);
@@ -735,6 +736,11 @@
     // UI
     // ------------------------------------------------------------------
     function $(id) { return document.getElementById(id); }
+    function icon(name) {
+      var glyphs = { "fa-bolt": "⚡", "fa-user-astronaut": "✦", "fa-wand-magic-sparkles": "✦", "fa-layer-group": "▦", "fa-arrow-trend-up": "↗", "fa-expand": "⛶" };
+      return glyphs[name] || "";
+    }
+
     function esc(value) {
       return String(value == null ? "" : value)
         .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -1500,39 +1506,265 @@
       }
     }
 
+    function agentLiveState(a, missionMap) {
+      // Derive a real live state label from authoritative run/availability data.
+      var avail = String(a.availability || "idle").toLowerCase();
+      if (avail === "busy" || avail === "working") return { label: "WORKING", tone: "cyan" };
+      if (avail === "offline" || a.status === "failed") return { label: "OFFLINE", tone: "red" };
+      if (avail === "blocked") return { label: "BLOCKED", tone: "red" };
+      var run = missionMap[a.id] || missionMap[a.agent_id];
+      if (run) return { label: "WORKING", tone: "cyan" };
+      return { label: "IDLE", tone: "green" };
+    }
+
     async function loadAgentsGrid() {
       var grid = $("cc-agents-grid");
       var sub = $("cc-agents-sub");
       grid.innerHTML = "<div class='muted'>Loading…</div>";
       try {
-        var data = await api("/api/v1/control/overview");
+        var [data, mission] = await Promise.all([
+          api("/api/v1/control/overview"),
+          api("/api/v1/control/mission"),
+        ]);
         var agents = (data.agents.items || []).filter(function (a) { return a.status === "active"; });
         var providers = {}; (data.providers.items || []).forEach(function (p) { providers[p.id] = p; });
         var models = {}; (data.models.items || []).forEach(function (m) { models[m.id] = m; });
-        sub.textContent = agents.length + " active agent(s) · " + (data.agents.active || 0) + " active overall";
+        var missionMap = {};
+        (mission.running || []).forEach(function (r) { missionMap[r.agent_id] = r; });
+        (mission.recent || []).forEach(function (r) {
+          if (!missionMap[r.agent_id] || r.completed_at > (missionMap[r.agent_id].completed_at || 0)) missionMap[r.agent_id] = r;
+        });
+        sub.textContent = agents.length + " active agent(s) · " + (mission.stats.running_count || 0) + " running now";
         grid.innerHTML = agents.map(function (a) {
           var tone = agentStatusTone(a.status);
           var prov = a.provider_id && providers[a.provider_id];
           var mod = a.model_id && models[a.model_id];
+          var live = agentLiveState(a, missionMap);
+          var run = missionMap[a.id] || missionMap[a.agent_id];
+          var objective = run && run.status === "running" ? (run.objective || "").slice(0, 70) : "";
+          var last = run ? timeAgo(run.completed_at || run.started_at) : "";
+          var roleLine = (a.role_id ? a.role_id : (a.purpose || a.key || "")).slice(0, 34);
           return "<div class='agent-card' style='cursor:pointer' data-open-agent='" + a.id + "'>" +
             "<div class='row'><span class='orb'>" + esc(a.display_name.charAt(0).toUpperCase()) + "</span>" +
             "<div><div class='name'>" + esc(a.display_name) + "</div>" +
-            "<div class='muted small'>" + esc(a.key || a.id.slice(0, 12)) + "</div></div></div>" +
+            "<div class='muted small'>" + esc(roleLine) + "</div></div>" +
+            "<span class='chip " + live.tone + "'>" + live.label + "</span></div>" +
+            "<div class='agent-current'>" + (objective ? icon("fa-bolt") + " " + esc(objective) : "No active work") + "</div>" +
             "<div class='badges'><span class='badge " + (tone || "") + "'>" + esc(a.status) + "</span>" +
-            (prov ? "<span class='badge cyan' title='Provider'>" + esc((prov.key || prov.display_name || "").slice(0, 20)) + "</span>" : "") +
-            (mod ? "<span class='badge cyan' title='Model'>" + esc((mod.key || mod.model_identifier || "").slice(0, 26)) + "</span>" : "") +
+            (prov ? "<span class='badge cyan' title='Provider'>" + esc((prov.key || prov.display_name || "").slice(0, 18)) + "</span>" : "") +
+            (mod ? "<span class='badge cyan' title='Model'>" + esc((mod.key || mod.model_identifier || "").slice(0, 24)) + "</span>" : "") +
             "</div>" +
-            "<div class='desc'>" + esc((a.description || a.purpose || "").slice(0, 90)) + "</div>" +
+            "<div class='desc'>" + esc((a.description || a.purpose || "").slice(0, 80)) + "</div>" +
             "<div class='actions'>" +
+            "<button data-open-agent='" + a.id + "'>Break open</button>" +
             "<button data-talk='" + a.id + "'>Talk</button>" +
             "<button data-task='" + a.id + "'>Start a task</button>" +
-            "<button data-runs='" + a.id + "'>Activity</button>" +
             "</div>" +
             "<div class='run-detail hidden' data-agent-runs='" + a.id + "'></div>" +
             "</div>";
         }).join("") || "<div class='empty-note'>No active agents.</div>";
       } catch (e) {
         grid.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+      }
+    }
+
+    function statusChip(state) {
+      var s = String(state || "").toLowerCase();
+      if (["active", "healthy", "succeeded", "available", "configured", "enabled", "ok"].indexOf(s) !== -1) return "green";
+      if (["waiting", "paused", "queued", "proposed", "eligible", "idle"].indexOf(s) !== -1) return "amber";
+      if (["blocked", "failed", "error", "unhealthy", "revoked", "retired"].indexOf(s) !== -1) return "red";
+      return "";
+    }
+
+    function agentStatusTone(status) {
+      return statusChip(status);
+    }
+
+    function omTone(state) {
+      var chip = statusChip(state);
+      if (chip === "green") return "green";
+      if (chip === "amber") return "amber";
+      if (chip === "red") return "red";
+      return "gray";
+    }
+
+    var missionTimer = null;
+    var missionWs = null;
+
+    function missionCard(run) {
+      var tone = statusChip(run.status);
+      var el = "";
+      if (run.status === "running") {
+        var mins = run.elapsed_ms != null ? Math.round(run.elapsed_ms / 60000) + "m" : "";
+        el += "<div class='agent-card' style='border-color:rgba(49,215,255,0.45)'>" +
+          "<div class='row'><span class='orb'>" + esc((run.agent || "A").charAt(0).toUpperCase()) + "</span>" +
+          "<div><div class='name'>" + esc(run.agent) + "</div>" +
+          "<div class='muted small'>" + esc(run.agent_key || run.agent_id.slice(0, 12)) + "</div></div></div>" +
+          "<div class='desc'>" + esc((run.objective || "").slice(0, 100)) + "</div>" +
+          "<div class='badges'><span class='chip cyan'>" + esc(run.model) + "</span>" +
+          "<span class='chip cyan'>" + esc(run.provider) + "</span>" +
+          "<span class='chip amber'>running · " + esc(mins || "…") + "</span></div></div>";
+        return el;
+      }
+      el += "<div class='deleg'><span class='pill " + tone + "'></span>" +
+        "<b>" + esc(run.agent) + "</b>" +
+        "<span class='chip " + (tone === "green" ? "green" : tone === "red" ? "red" : "amber") + "'>" + esc(run.status) + "</span>" +
+        "<span class='muted'>" + esc((run.objective || "").slice(0, 90)) + "</span>" +
+        (run.model ? "<span class='chip cyan'>" + esc(run.model) + "</span>" : "") +
+        (run.duration_ms != null ? "<span class='muted small'>" + Math.round(run.duration_ms / 1000) + "s</span>" : "") +
+        (run.token_usage != null ? "<span class='muted small'>" + run.token_usage + " tok</span>" : "") +
+        "<span class='muted small'>" + esc(timeAgo(run.completed_at || run.started_at)) + "</span></div>";
+      return el;
+    }
+
+    async function loadMission() {
+      var statsBox = $("mission-stats");
+      var runningBox = $("mission-running");
+      var recentBox = $("mission-recent");
+      try {
+        var data = await api("/api/v1/control/mission");
+        var stats = data.stats || {};
+        statsBox.innerHTML =
+          statCell("Running", stats.running_count, stats.running_count ? "amber" : "") +
+          statCell("Active agents", stats.active_agents, stats.active_agents ? "amber" : "") +
+          statCell("Completed today", stats.completed_today, "") +
+          statCell("Failed today", stats.failed_today, stats.failed_today ? "red" : "") +
+          statCell("Tokens today", stats.tokens_today != null ? stats.tokens_today : 0, "");
+        runningBox.innerHTML = (data.running && data.running.length)
+          ? data.running.map(missionCard).join("")
+          : "<div class='empty-note'>No agents running right now.</div>";
+        recentBox.innerHTML = (data.recent && data.recent.length)
+          ? data.recent.map(missionCard).join("")
+          : "<div class='empty-note'>No agent activity yet.</div>";
+      } catch (e) {
+        statsBox.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+      }
+      wireMissionLive();
+    }
+
+    function wireMissionLive() {
+      // Polling fallback + realtime refresh (authoritative state).
+      if (missionTimer) return;
+      missionTimer = window.setInterval(function () { loadMission(); }, 10000);
+      try {
+        var url = (window.location.protocol === "https:" ? "wss:" : "ws:") + "//" +
+          window.location.host + "/api/v1/realtime/ws/events";
+        missionWs = new WebSocket(url);
+        missionWs.onmessage = function (event) {
+          try {
+            var envelope = JSON.parse(event.data);
+            if (envelope && envelope.source === "agents") loadMission();
+          } catch (e) {}
+        };
+        missionWs.onclose = function () { missionWs = null; };
+      } catch (e) {}
+    }
+
+    async function loadOrgMap() {
+      var box = $("orgmap-content");
+      box.innerHTML = "<div class='muted'>Loading…</div>";
+      try {
+        var data = await api("/api/v1/agents/overview");
+        var agents = (data.agents || []).filter(function (a) { return a.status !== "retired"; });
+        if (!agents.length) { box.innerHTML = "<div class='empty-note'>No agents configured.</div>"; return; }
+        var joe = agents.find(function (a) { return /joe/i.test(a.display_name) && /orchestr/i.test((a.description || "") + (a.display_name || "")); });
+        var lead = joe || agents[0];
+        var others = agents.filter(function (a) { return a.agent_id !== lead.agent_id; });
+
+        function teamOf(a) {
+          var key = String(a.key || a.role_id || "");
+          var seg = key.split(".")[0];
+          if (seg) return seg.charAt(0).toUpperCase() + seg.slice(1);
+          return "General";
+        }
+        var teams = {};
+        others.forEach(function (a) { var t = teamOf(a); (teams[t] = teams[t] || []).push(a); });
+        var teamKeys = Object.keys(teams).sort();
+
+        var NODE_W = 208, NODE_H = 52, GAP_X = 30, GAP_Y = 26, PAD = 14;
+        var colW = NODE_W + GAP_X;
+        var rootX = PAD, rootY = PAD;
+        var teamX = function (i) { return rootX + NODE_W + GAP_X + i * colW; };
+        var teamHeaderY = rootY + NODE_H + GAP_Y;
+        var totalW = PAD * 2 + NODE_W + GAP_X + teamKeys.length * colW;
+        var maxRows = 1;
+        teamKeys.forEach(function (k) { maxRows = Math.max(maxRows, teams[k].length); });
+        var totalH = teamHeaderY + NODE_H + GAP_Y + maxRows * (NODE_H + GAP_Y) + PAD;
+
+        box.innerHTML = "<div class='orgmap-wrap'><div class='orgmap-canvas' id='orgmap-canvas' style='width:" +
+          totalW + "px;height:" + totalH + "px'></div>" +
+          "<div class='orgmap-legend'><span><span class='om-dot green'></span>active/healthy</span>" +
+          "<span><span class='om-dot amber'></span>waiting/queued</span>" +
+          "<span><span class='om-dot red'></span>blocked/failed</span>" +
+          "<span class='muted'>click a node for the agent profile</span></div></div>";
+        var canvas = $("orgmap-canvas");
+        var svgNS = "http://www.w3.org/2000/svg";
+        var svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("class", "orgmap-svg");
+        svg.setAttribute("viewBox", "0 0 " + totalW + " " + totalH);
+        canvas.appendChild(svg);
+
+        var nodes = [];
+
+        function nodeEl(agent, x, y, cls, sub) {
+          var el = document.createElement("div");
+          el.className = "orgmap-node " + (cls || "");
+          el.style.left = x + "px";
+          el.style.top = y + "px";
+          el.style.width = NODE_W + "px";
+          el.style.height = NODE_H + "px";
+          var dot = document.createElement("span");
+          dot.className = "om-dot " + omTone(agent.status);
+          var name = document.createElement("span");
+          var nameDiv = document.createElement("div");
+          nameDiv.className = "om-name";
+          nameDiv.textContent = String(agent.display_name || "Agent").slice(0, 26);
+          var subDiv = document.createElement("div");
+          subDiv.className = "om-sub";
+          subDiv.textContent = sub;
+          name.appendChild(nameDiv);
+          name.appendChild(subDiv);
+          el.appendChild(dot);
+          el.appendChild(name);
+          el.addEventListener("click", function () { openAgentDetail(agent.agent_id); });
+          return el;
+        }
+
+        function edge(x1, y1, x2, y2) {
+          var path = document.createElementNS(svgNS, "path");
+          var mx = (x1 + x2) / 2;
+          path.setAttribute("class", "orgmap-edge");
+          path.setAttribute("d", "M " + x1 + " " + y1 + " C " + mx + " " + y1 + ", " + mx + " " + y2 + ", " + x2 + " " + y2);
+          svg.appendChild(path);
+        }
+
+        // root (lead)
+        var leadNode = nodeEl(lead, rootX, rootY, "", (lead.role_id || "lead") + " · " + (lead.status || ""));
+        canvas.appendChild(leadNode);
+        nodes.push({ agent: lead, el: leadNode, x: rootX, y: rootY });
+        var rootCx = rootX + NODE_W / 2;
+        var rootBottom = rootY + NODE_H;
+
+        teamKeys.forEach(function (k, i) {
+          var tx = teamX(i);
+          var members = teams[k];
+          edge(rootCx, rootBottom, tx + NODE_W / 2, teamHeaderY);
+          var teamNode = nodeEl({
+            agent_id: null, display_name: k, status: "waiting",
+          }, tx, teamHeaderY, "team", members.length + " agent(s)");
+          teamNode.addEventListener("click", function () {});
+          canvas.appendChild(teamNode);
+          var colTop = teamHeaderY + NODE_H + GAP_Y;
+          var startY = colTop + ((maxRows - members.length) * (NODE_H + GAP_Y)) / 2;
+          members.forEach(function (m, j) {
+            var my = startY + j * (NODE_H + GAP_Y);
+            edge(tx + NODE_W / 2, teamHeaderY + NODE_H, tx + NODE_W / 2, my);
+            var el = nodeEl(m, tx, my, "", (m.role_id || "agent") + " · " + (m.status || ""));
+            canvas.appendChild(el);
+          });
+        });
+      } catch (e) {
+        box.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
       }
     }
 
@@ -1906,6 +2138,10 @@
         var models = {}; (overview.models.items || []).forEach(function (m) { models[m.id] = m; });
         var runs = [];
         try { runs = (await api("/api/v1/control/agents/" + agentId + "/runs")).runs || []; } catch (e) {}
+        var delegations = [];
+        if (runs.length) {
+          try { delegations = (await api("/api/v1/control/runs/" + runs[0].id + "/delegations")).delegations || []; } catch (e) {}
+        }
         var memory = [];
         try {
           var mem = await api("/api/v1/memory/records?limit=8");
@@ -1939,6 +2175,13 @@
               "<b>" + esc(r.status) + "</b><span class='muted small'>" + esc((r.objective || "").slice(0, 80)) + "</span>" +
               "<span class='muted small'>" + esc(timeAgo(r.started_at)) + "</span></div>";
           }).join("") : "<div class='empty-note'>No runs yet.</div>") +
+          "<div class='section-title' style='margin-top:14px'><h3>Delegation</h3></div>" +
+          (delegations.length ? delegations.slice(0, 5).map(function (d) {
+            return "<div class='deleg'><span class='pill " + runTone(d.status) + "'></span>" +
+              "<b>" + esc(d.agent_key || d.agent_id || "delegate") + "</b>" +
+              "<span class='muted small'>" + esc((d.objective || "").slice(0, 80)) + "</span>" +
+              "<span class='muted small'>" + esc(timeAgo(d.started_at)) + "</span></div>";
+          }).join("") : "<div class='empty-note'>No delegations recorded.</div>") +
           "</div>";
 
         var identityHtml = paneStart("identity") +
@@ -1981,7 +2224,9 @@
           (runs.length ? runs.slice(0, 12).map(function (r) {
             return "<div class='deleg'><span class='pill " + runTone(r.status) + "'></span>" +
               "<b>" + esc(r.status) + "</b><span class='muted small'>" + esc((r.objective || "").slice(0, 100)) + "</span>" +
-              "<span class='muted small'>" + esc(timeAgo(r.started_at)) + (r.duration_ms ? " · " + Math.round(r.duration_ms / 1000) + "s" : "") + "</span></div>";
+              "<span class='muted small'>" + esc(timeAgo(r.started_at)) + (r.duration_ms ? " · " + Math.round(r.duration_ms / 1000) + "s" : "") +
+              (r.result ? "<span class='muted small' title='Result'> → " + esc(String(r.result).slice(0, 60)) + "</span>" : "") +
+              "</span></div>";
           }).join("") : "<div class='empty-note'>No executions yet.</div>") +
           "</div>";
 
