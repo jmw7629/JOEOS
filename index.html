@@ -6290,6 +6290,14 @@
         if (security.incidents_open > 0) items.push({ id: "incidents", severity: "danger", icon: "fa-file-shield", title: security.incidents_open + " open incident" + (security.incidents_open === 1 ? "" : "s"), detail: "Incident records need acknowledgement.", open: "security-center", count: security.incidents_open });
         if (!runtime.online) items.push({ id: "runtime", severity: "warning", icon: "fa-lemon", title: "Local AI runtime unavailable", detail: "Eligible work is routed to available providers. Verify the runtime.", open: "ai" });
         if (!items.length) items.push({ id: "clear", severity: "success", icon: "fa-circle-check", title: "Nothing needs you right now", detail: "Approvals, failures, security events, and blocked work are all clear." });
+        // Attention prioritization: rank by severity weight + impact (count)
+        // + type urgency. Routine/successful activity never appears here.
+        var severityWeight = { danger: 3, warning: 2, success: 0 };
+        var typeUrgency = { lockdown: 5, incidents: 4, security_events: 4, failed_automations: 3, approvals: 3, runtime: 2, secrets: 2, schedules: 1 };
+        items.forEach(function (item) {
+          item.priority = (severityWeight[item.severity] || 0) * 10 + Math.min(9, item.count || 1) + (typeUrgency[item.id] || 0);
+        });
+        items.sort(function (a, b) { return b.priority - a.priority; });
         return h(
           "section",
           { className: "page-enter", "aria-labelledby": "attention-title" },
@@ -6297,8 +6305,7 @@
             kicker: "What needs me",
             title: h("span", { id: "attention-title" }, "Attention Center"),
             description: "One honest answer to \"what needs me?\" — approvals, failures, security events, unhealthy schedules, and blocked work. Everything else stays passive activity.",
-            actions: items.some(function (item) { return item.severity !== "success"; }) ? h("span", { className: "live-pill attention", key: "attention-live" }, h("span", { className: "live-dot" }), items.length + " ITEM" + (items.length === 1 ? "" : "S") + " NEED YOUR ATTENTION") : h("span", { className: "live-pill", key: "attention-clear" }, h("span", { className: "live-dot" }), "ALL CLEAR")
-          }),
+            actions: items.some(function (item) { return item.severity !== "success"; }) ? h("span", { className: "live-pill attention", key: "attention-live" }, h("span", { className: "live-dot" }), items.length + " ITEM" + (items.length === 1 ? "" : "S") + " NEED YOUR ATTENTION") : h("span", { className: "live-pill", key: "attention-clear" }, h("span", { className: "live-dot" }), "ALL CLEAR")          }),
           h(
             "div",
             { className: "attention-grid" },
