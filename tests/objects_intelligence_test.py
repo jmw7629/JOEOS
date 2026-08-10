@@ -246,5 +246,53 @@ class CompareTest(unittest.TestCase):
         self.assertFalse(result["comparable"])
 
 
+class SecurityReviewTest(unittest.TestCase):
+    def test_impact_never_leaks_unresolvable_objects(self):
+        # An agent that depends on a provider but is not resolvable by the
+        # principal must NOT appear in impact analysis (no identity leak).
+        from server.objects.core import ObjectRef
+        from server.objects.intelligence import ObjectActivityStore
+
+        resolver = ObjectResolver()
+
+        class FakeOrg:
+            def agents(self, include_inactive=False):
+                # This agent references the provider but is NOT accessible.
+                return [type("A", (), {"agent_id": "hidden-agent", "display_name": "Hidden", "provider_id": "ollama", "model_id": "qwen3", "availability": "busy", "capabilities": ["code"]})()]
+            def agent(self, agent_id):
+                return None  # never resolvable
+
+        class FakeAgents:
+            def __init__(self):
+                self.organization = FakeOrg()
+
+        resolver.wire_agents(FakeAgents())
+        impacted = resolver.impact(ObjectRef("ollama", "provider"), {"sub": "u"})
+        # The hidden agent must not appear because it cannot be resolved.
+        self.assertEqual(impacted, [])
+
+    def test_impact_returns_resolvable_dependents(self):
+        from server.objects.core import ObjectRef
+
+        resolver = ObjectResolver()
+
+        class FakeOrg:
+            def agents(self, include_inactive=False):
+                return [type("A", (), {"agent_id": "visible", "display_name": "Visible", "provider_id": "ollama", "model_id": "qwen3", "availability": "busy", "capabilities": ["code"]})()]
+            def agent(self, agent_id):
+                if agent_id == "visible":
+                    return type("A", (), {"agent_id": "visible", "display_name": "Visible", "provider_id": "ollama", "model_id": "qwen3", "availability": "busy", "capabilities": ["code"]})()
+                return None
+
+        class FakeAgents:
+            def __init__(self):
+                self.organization = FakeOrg()
+
+        resolver.wire_agents(FakeAgents())
+        impacted = resolver.impact(ObjectRef("ollama", "provider"), {"sub": "u"})
+        self.assertEqual(len(impacted), 1)
+        self.assertEqual(impacted[0]["object"]["object_id"], "visible")
+
+
 if __name__ == "__main__":
     unittest.main()

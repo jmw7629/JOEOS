@@ -659,7 +659,9 @@ class ObjectResolver:
                 except Exception:
                     pass
 
-        # Deduplicate by object key.
+        # Deduplicate by object key and only surface objects the principal may
+        # actually resolve. Knowing an object is related never grants authority
+        # to read it; impact analysis must not leak protected identities.
         seen = set()
         unique = []
         for entry in impacted:
@@ -668,5 +670,11 @@ class ObjectResolver:
             if key in seen:
                 continue
             seen.add(key)
+            authorized = self.resolve(
+                ObjectRef(object_id=target.get("object_id") or "", object_type=target.get("object_type") or ""),
+                principal,
+            )
+            if authorized is None:
+                continue
             unique.append(entry)
         return unique

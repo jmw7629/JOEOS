@@ -51,6 +51,28 @@ def object_types(principal: Dict[str, Any] = Depends(_session)) -> Dict[str, Any
     return {"types": sorted(OBJECT_TYPES), "count": len(OBJECT_TYPES)}
 
 
+@router.get("/compare")
+def compare_objects_endpoint(
+    left_type: str,
+    left_id: str,
+    right_type: str,
+    right_id: str,
+    principal: Dict[str, Any] = Depends(_session),
+) -> Dict[str, Any]:
+    """Type-aware comparison of two compatible Enterprise Objects.
+
+    Shows meaningful type-specific differences (never generic JSON): models
+    compare health/provider; providers compare availability/privacy/streaming;
+    agents compare role/capabilities/availability. Objects of different types
+    are not comparable.
+    """
+    from server.objects.compare import compare_objects
+
+    left = ObjectRef(object_id=left_id, object_type=left_type)
+    right = ObjectRef(object_id=right_id, object_type=right_type)
+    return compare_objects(left, right, RESOLVER, principal)
+
+
 @router.get("/{object_type}/help")
 def object_type_help(object_type: str, principal: Dict[str, Any] = Depends(_session)) -> Dict[str, Any]:
     """Self-describing metadata: what an object type is and what you can do with it.
