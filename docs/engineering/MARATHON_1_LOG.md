@@ -121,3 +121,9 @@ AGPL-3.0 license respected — concept only, no code copied. Deployed to Halo.
 Mission Control milestone verified live on Halo (mission endpoint auth-gated,
 /os/agents 200, runner healthy). Continuing loop. Next READY: definitive Agent
 Card system (compact card + break-open + drill-down).
+## Stabilization phase
+Route crawl on Halo: 14 primary /os/* routes all 200. Security audit: no
+browser→Ollama/Lemonade direct refs, no secrets in served pages; gated
+security/approvals + control/executions + control/mission (401 without session).
+Completion matrix reconciled (32 DONE). Rollback tag
+joeos-agent-command-center-milestone created.
