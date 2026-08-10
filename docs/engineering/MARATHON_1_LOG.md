@@ -43,3 +43,11 @@ Executions) wired to real agent profile, provider/model, run, and memory data.
 ModuleManifest contract (cross-platform) + validated ModuleCatalog + catalog API
 seeded with built-in modules. Removed the only hardcoded personal hostname from
 reusable product code (automations.html now derives origin at runtime).
+### P2 — Browser PWA capability layer
+WebCapabilityRegistry (honest feature detection) + browser network online/offline
+state with a reconnecting/offline banner. Existing versioned service worker with
+navigation fallback retained.
+### P3/P4 — Platform agents
+Registered engineering.appleplatform and engineering.androidplatform persistent
+role agents (SwiftUI + Kotlin/Compose ownership, no signing keys, builds via
+Mac executor / sandboxed Gradle).

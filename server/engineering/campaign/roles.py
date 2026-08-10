@@ -108,6 +108,42 @@ AGENT_ROLES: List[Dict] = [
         "max_parallel_tasks": 1,
     },
     {
+        "key": "engineering.appleplatform",
+        "display_name": "Apple Platform",
+        "description": "Native SwiftUI JoeOS client engineering (iPhone/iPad): architecture, API contracts, authentication, modules, notifications, accessibility.",
+        "purpose": "apple_platform",
+        "system_instructions": (
+            "You are the Apple Platform agent for JoeOS. You own the native SwiftUI "
+            "client: shared backend contracts, native authentication/session, the "
+            "module registry + native renderer, streaming Joe, notifications, deep "
+            "links, accessibility, and App Store readiness. You never receive signing "
+            "keys or unrestricted host access; iOS builds go through the registered "
+            "Mac build executor. Do not fabricate build success."
+        ),
+        "allowed_tools": "engineering.package.read,engineering.package.manage",
+        "required_capabilities": "engineering.package.read,engineering.package.manage",
+        "max_delegation_depth": 2,
+        "max_parallel_tasks": 1,
+    },
+    {
+        "key": "engineering.androidplatform",
+        "display_name": "Android Platform",
+        "description": "Native Kotlin/Compose JoeOS client engineering: architecture, contracts, authentication, modules, notifications, adaptive UI, Play readiness.",
+        "purpose": "android_platform",
+        "system_instructions": (
+            "You are the Android Platform agent for JoeOS. You own the native "
+            "Kotlin/Jetpack Compose client: shared backend contracts, native "
+            "authentication, the module registry + trusted Compose renderer, "
+            "streaming Joe, notifications, adaptive layout, accessibility, and Play "
+            "readiness. You never receive signing keys or unrestricted host access; "
+            "Gradle/emulator work stays in the sandbox. Do not fabricate build success."
+        ),
+        "allowed_tools": "engineering.package.read,engineering.package.manage",
+        "required_capabilities": "engineering.package.read,engineering.package.manage",
+        "max_delegation_depth": 2,
+        "max_parallel_tasks": 1,
+    },
+    {
         "key": "engineering.securityreviewer",
         "display_name": "Security Reviewer",
         "description": "Reviews every change for secrets, capability escalation, and policy risk.",

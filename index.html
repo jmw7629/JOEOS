@@ -9568,6 +9568,22 @@
         }, []);
 
         useEffect(function () {
+          // Browser network state for offline/reconnecting UI (PWA resilience).
+          function syncNetwork() {
+            var root = document.documentElement;
+            var state = navigator.onLine === false ? "offline" : "online";
+            root.setAttribute("data-network", state);
+          }
+          window.addEventListener("online", syncNetwork);
+          window.addEventListener("offline", syncNetwork);
+          syncNetwork();
+          return function () {
+            window.removeEventListener("online", syncNetwork);
+            window.removeEventListener("offline", syncNetwork);
+          };
+        }, []);
+
+        useEffect(function () {
           if (assistantOpen && assistantInputRef.current) {
             addManagedTimeout(function () {
               if (assistantInputRef.current) assistantInputRef.current.focus();
@@ -10166,6 +10182,9 @@
         }
         if (!runtime || !runtime.online) {
           banners.push({ id: "offline", tone: "warning", icon: "fa-plug-circle-xmark", text: "Lemonade Server is offline — inference telemetry and model views are unavailable. The local AI assistant still runs on Ollama.", action: function () { selectSection("dashboard"); }, actionLabel: "View dashboard" });
+          if (navigator.onLine === false) {
+            banners.push({ id: "network-offline", tone: "warning", icon: "fa-wifi", text: "Browser is offline — the shell and cached state remain available; live data will refresh on reconnect." });
+          }
         }
         if (performanceSettings && (performanceSettings.low_power_mode || performanceSettings.metered_network)) {
           banners.push({ id: "low-resource", tone: "info", icon: "fa-battery-quarter", text: "Low-resource mode is active — background work is reduced and visual effects are flattened." });
@@ -10440,6 +10459,31 @@
       if ("serviceWorker" in navigator && window.isSecureContext) {
         navigator.serviceWorker.register("/sw.js").catch(function () {});
       }
+
+      // ---- WebCapabilityRegistry: honest feature detection (never UA-guessing) ----
+      window.joeosCapabilities = function () {
+        var secure = !!window.isSecureContext;
+        var online = navigator.onLine !== false;
+        return {
+          secureContext: secure,
+          serviceWorker: !!("serviceWorker" in navigator) && secure,
+          push: !!(("PushManager" in window) && ("Notification" in window) && secure),
+          notifications: !!("Notification" in window) && secure,
+          webAuthn: !!(navigator.credentials && window.PublicKeyCredential && secure),
+          mic: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && secure,
+          camera: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && secure,
+          mediaRecorder: !!(window.MediaRecorder) && secure,
+          share: !!(navigator.share) && secure,
+          fileSystemAccess: !!(window.showOpenFilePicker) && secure,
+          clipboard: !!(navigator.clipboard && navigator.clipboard.writeText) && secure,
+          indexedDB: !!window.indexedDB,
+          webSocket: !!window.WebSocket,
+          badge: !!(navigator.setAppBadge) && secure,
+          wakeLock: !!(navigator.wakeLock) && secure,
+          online: online,
+          offlineCapable: online && !!window.indexedDB,
+        };
+      };
     })();
   </script>
 </body>

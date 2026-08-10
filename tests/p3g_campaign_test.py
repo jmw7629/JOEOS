@@ -298,7 +298,12 @@ work_packages:
 
 class RoleProfileTests(unittest.TestCase):
     def test_eight_roles_defined(self):
-        self.assertEqual(len(AGENT_ROLES), 8)
+        # Director, Architect, Builder, Verification, Apple Build, Security
+        # Reviewer, Release, Watchdog, plus Apple Platform and Android Platform.
+        self.assertEqual(len(AGENT_ROLES), 10)
+        keys = [r["key"] for r in AGENT_ROLES]
+        self.assertIn("engineering.appleplatform", keys)
+        self.assertIn("engineering.androidplatform", keys)
 
     def test_role_keys_unique(self):
         keys = [r["key"] for r in AGENT_ROLES]
