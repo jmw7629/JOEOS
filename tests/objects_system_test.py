@@ -19,6 +19,9 @@ from server.objects.core import (
     effective_capabilities,
     normalize_object_type,
     register_object_type,
+    safety_for_capability,
+    safety_gate,
+    safety_level,
 )
 from server.objects.resolver import ObjectResolver
 
@@ -184,6 +187,57 @@ class ResolverTest(unittest.TestCase):
         resolver = self._resolver_with_fake_domain()
         rels = resolver.relationships(ObjectRef("a1", "agent"), {"sub": "u"})
         self.assertIsInstance(rels, list)
+
+
+class SafetyLevelsTest(unittest.TestCase):
+    def test_safe_actions_execute_immediately(self):
+        self.assertEqual(safety_level("view"), "safe")
+        self.assertEqual(safety_level("inspect"), "safe")
+        self.assertEqual(safety_gate("view")["gate"], "execute immediately")
+
+    def test_consequential_actions_preview(self):
+        self.assertEqual(safety_level("edit"), "consequential")
+        self.assertEqual(safety_level("link"), "consequential")
+        self.assertEqual(safety_gate("edit")["gate"], "preview before running")
+
+    def test_privileged_actions_require_approval(self):
+        self.assertEqual(safety_level("approve"), "privileged")
+        self.assertEqual(safety_level("execute"), "privileged")
+        self.assertEqual(safety_gate("execute")["gate"], "requires approval")
+
+    def test_destructive_actions_heavily_protected(self):
+        self.assertEqual(safety_level("delete"), "destructive")
+        self.assertEqual(safety_level("purge"), "destructive")
+        self.assertEqual(safety_gate("delete")["gate"], "heavily protected")
+
+    def test_unknown_actions_default_conservative(self):
+        # A mislabeled/unknown action must never run without a gate.
+        self.assertEqual(safety_level("totally_unknown_action"), "destructive")
+
+    def test_normalizes_action_id(self):
+        self.assertEqual(safety_level("Emergency Stop"), "destructive")
+        self.assertEqual(safety_level("approve"), "privileged")
+
+    def test_capability_safety_mapping(self):
+        self.assertEqual(safety_for_capability("view"), "safe")
+        self.assertEqual(safety_for_capability("execute"), "privileged")
+        self.assertEqual(safety_for_capability("approve"), "privileged")
+
+    def test_summary_carries_action_safety(self):
+        from server.objects.core import ObjectRef
+
+        resolver = ObjectResolver()
+
+        class FakeSecurity:
+            def approvals_list(self):
+                return [{"approval_id": "ap1", "state": "pending", "action_id": "run", "requester_identity": "u1"}]
+
+        resolver.wire_security(FakeSecurity())
+        summary = resolver.resolve(ObjectRef("ap1", "approval"), {"sub": "u"})
+        self.assertIsNotNone(summary)
+        self.assertIn("action_safety", summary)
+        self.assertEqual(summary["action_safety"].get("view"), "safe")
+        self.assertEqual(summary["action_safety"].get("approve"), "privileged")
 
 
 if __name__ == "__main__":

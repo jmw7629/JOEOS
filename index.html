@@ -7629,6 +7629,18 @@
         return "";
       }
 
+      function actionSafetyHint(summary, capability) {
+        var level = summary && summary.action_safety ? summary.action_safety[capability] : null;
+        if (!level) return capability.replace(/_/g, " ");
+        var gates = {
+          safe: "Safe — executes immediately",
+          consequential: "Consequential — previewed before running",
+          privileged: "Privileged — requires approval",
+          destructive: "Destructive — heavily protected"
+        };
+        return capability.replace(/_/g, " ") + " · " + (gates[level] || level);
+      }
+
       function CommandCenterHome(props) {
         var runtime = props.runtime || {};
         var auto = props.automationOverview || {};
@@ -7871,7 +7883,7 @@
                   "div",
                   { className: "cc-inspector-meta", style: { marginTop: 10 } },
                   h("strong", { className: "cc-inspector-label" }, "Capabilities"),
-                  h("div", { className: "cc-inspector-chips" }, quickLookData.summary.capabilities.slice(0, 6).map(function (cap) { return h("span", { className: "chip", key: cap }, cap.replace(/_/g, " ")); }))
+                  h("div", { className: "cc-inspector-chips" }, quickLookData.summary.capabilities.slice(0, 6).map(function (cap) { return h("span", { className: "chip", key: cap, title: actionSafetyHint(quickLookData.summary, cap) }, cap.replace(/_/g, " ")); }))
                 ) : null,
                 quickLookData.relationships && quickLookData.relationships.length ? h(
                   "div",

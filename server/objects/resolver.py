@@ -17,6 +17,8 @@ from server.objects.core import (
     capabilities_for,
     effective_capabilities,
     normalize_object_type,
+    safety_for_capability,
+    safety_level,
 )
 
 
@@ -44,6 +46,9 @@ def _object_summary(ref: ObjectRef, fields: Dict[str, Any]) -> Dict[str, Any]:
         "name": _safe_text(fields.get("name") or fields.get("display_name") or ref.display_hint or ref.object_id, 160),
         "status": _safe_text(state, 40) or "unknown",
         "capabilities": caps,
+        # Uniform action safety language: every capability maps to a level so
+        # the UI can gate safe/consequential/privileged/destructive actions.
+        "action_safety": {cap: safety_for_capability(cap) for cap in caps},
     }
     for key in ("description", "owner", "workspace_id", "organization_id", "version", "created_at", "updated_at", "health", "subtitle"):
         if fields.get(key) is not None:

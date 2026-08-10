@@ -265,3 +265,83 @@ def effective_capabilities(
             continue
         result.append(cap)
     return result
+
+
+# --------------------------------------------------------------------------
+# Action safety levels
+# --------------------------------------------------------------------------
+
+# One predictable safety language for every Enterprise Object action.
+SAFETY_SAFE = "safe"
+SAFETY_CONSEQUENTIAL = "consequential"
+SAFETY_PRIVILEGED = "privileged"
+SAFETY_DESTRUCTIVE = "destructive"
+
+_SAFETY_BY_ACTION: Dict[str, str] = {
+    "view": SAFETY_SAFE,
+    "inspect": SAFETY_SAFE,
+    "search": SAFETY_SAFE,
+    "ask_joe": SAFETY_SAFE,
+    "comment": SAFETY_SAFE,
+    "export": SAFETY_SAFE,
+    "attach": SAFETY_SAFE,
+    "duplicate": SAFETY_SAFE,
+    "compare": SAFETY_SAFE,
+    "link": SAFETY_CONSEQUENTIAL,
+    "unlink": SAFETY_CONSEQUENTIAL,
+    "move": SAFETY_CONSEQUENTIAL,
+    "edit": SAFETY_CONSEQUENTIAL,
+    "schedule": SAFETY_CONSEQUENTIAL,
+    "automate": SAFETY_CONSEQUENTIAL,
+    "pin": SAFETY_SAFE,
+    "share": SAFETY_CONSEQUENTIAL,
+    "version": SAFETY_CONSEQUENTIAL,
+    "approve": SAFETY_PRIVILEGED,
+    "reject": SAFETY_PRIVILEGED,
+    "execute": SAFETY_PRIVILEGED,
+    "run": SAFETY_PRIVILEGED,
+    "restore": SAFETY_PRIVILEGED,
+    "rollback": SAFETY_PRIVILEGED,
+    "archive": SAFETY_CONSEQUENTIAL,
+    "delete": SAFETY_DESTRUCTIVE,
+    "purge": SAFETY_DESTRUCTIVE,
+    "revoke": SAFETY_DESTRUCTIVE,
+    "emergency_stop": SAFETY_DESTRUCTIVE,
+}
+
+_SAFETY_ORDER = {SAFETY_SAFE: 0, SAFETY_CONSEQUENTIAL: 1, SAFETY_PRIVILEGED: 2, SAFETY_DESTRUCTIVE: 3}
+
+
+def safety_level(action_id: str) -> str:
+    """Return the safety level for an action id.
+
+    Unknown actions default to the most conservative classification so a
+    mislabeled action can never run without the appropriate gate.
+    """
+    key = str(action_id or "").strip().lower().replace(" ", "_").replace("-", "_")
+    return _SAFETY_BY_ACTION.get(key, SAFETY_DESTRUCTIVE)
+
+
+def safety_gate(action_id: str) -> Dict[str, Any]:
+    """Describe the uniform gating model for an action.
+
+    ``execute immediately``   -> safe
+    ``preview before running`` -> consequential
+    ``requires approval``      -> privileged
+    ``heavily protected``      -> destructive
+    """
+    level = safety_level(action_id)
+    gate = {
+        SAFETY_SAFE: "execute immediately",
+        SAFETY_CONSEQUENTIAL: "preview before running",
+        SAFETY_PRIVILEGED: "requires approval",
+        SAFETY_DESTRUCTIVE: "heavily protected",
+    }[level]
+    return {"action": str(action_id or ""), "level": level, "gate": gate}
+
+
+def safety_for_capability(capability: str) -> str:
+    """Map an object capability to its action safety level."""
+    key = str(capability or "").strip().lower()
+    key = {"edit": "edit", "execute": "execute", "approve": "approve", "reject": "reject"}.get(key, key)
+    return safety_level(key)
