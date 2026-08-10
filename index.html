@@ -4273,6 +4273,30 @@
       margin-bottom: 16px;
     }
 
+    .return-control {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 0 14px;
+      border: 1px solid rgba(126, 209, 255, .18);
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(37, 43, 53, .9), rgba(23, 28, 37, .85));
+      color: var(--text);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: var(--depth-raised-1);
+      transition: border-color .15s ease, box-shadow .15s ease, transform .06s ease;
+    }
+    .return-control:hover {
+      border-color: rgba(49, 215, 255, .45);
+    }
+    .return-control:active {
+      box-shadow: var(--depth-pressed);
+      transform: translateY(1px);
+    }
+
     .agent-detail-head .agent-avatar {
       width: 54px;
       height: 54px;
@@ -7682,6 +7706,7 @@
           h(
             "div",
             { className: "agent-detail-head" },
+            h("button", { type: "button", className: "return-control", onClick: function () { props.onReturn(); }, "aria-label": "Return to Agents" }, icon("fa-arrow-left"), " Agents"),
             h("div", { className: "agent-avatar" }, icon("fa-user-astronaut")),
             h("div", { style: { flex: 1 } }, h("h2", null, agent.display_name || "Unnamed agent"), h("p", null, agent.agent_id + " · role " + agent.role_id)),
             h("div", { className: "os-button-row" }, availabilityOptions.map(function (option) {
@@ -7769,6 +7794,7 @@
           h(
             "div",
             { className: "agent-detail-head" },
+            h("button", { type: "button", className: "return-control", onClick: function () { props.onReturn(); }, "aria-label": "Return to Missions" }, icon("fa-arrow-left"), " Missions"),
             h("div", { className: "agent-avatar" }, icon("fa-rocket")),
             h("div", { style: { flex: 1 } }, h("h2", null, mission.title || "Untitled mission"), h("p", null, mission.mission_id + " · " + missionStateLabel(mission.progress || mission.status))),
             h("div", { className: "os-button-row" },
@@ -8013,7 +8039,9 @@
         return h(
           React.Fragment,
           null,
-          h("div", { className: "agent-detail-head" }, h("div", { className: "agent-avatar" }, icon("fa-brain")), h("div", null, h("h2", null, record.title), h("p", { className: "os-subnote" }, record.memory_id + " · " + (record.memory_type || "memory") + " · v" + String(record.version || 1)))),
+          h("div", { className: "agent-detail-head" },
+            h("button", { type: "button", className: "return-control", onClick: function () { props.onReturn(); }, "aria-label": "Return to Memory records" }, icon("fa-arrow-left"), " Memory"),
+            h("div", { className: "agent-avatar" }, icon("fa-brain")), h("div", null, h("h2", null, record.title), h("p", { className: "os-subnote" }, record.memory_id + " · " + (record.memory_type || "memory") + " · v" + String(record.version || 1)))),
           h("div", { className: "knowledge-meta", style: { marginBottom: 12 } }, h("span", { className: "knowledge-chip tone-" + state.tone }, state.label), h("span", { className: "knowledge-chip" }, icon("fa-lock"), record.privacy_classification || "private"), h("span", { className: "knowledge-chip" }, "embedding: " + String(record.embedding_state || "not_embedded"))),
           h("div", { className: "os-code", style: { whiteSpace: "pre-wrap" } }, record.content),
           h("p", { className: "os-section-title", style: { marginTop: 16 } }, icon("fa-circle-info"), "Provenance"),
@@ -8116,7 +8144,7 @@
             h(
               "div",
               { className: "knowledge-panel glass-card", style: { padding: 16 } },
-              sub === "detail" && props.selectedRecord ? h(MemoryDetail, { record: props.selectedRecord, onCorrect: function () { props.onCorrect(props.selectedRecord); }, onForget: function () { props.onForget(props.selectedRecord); } }) :
+              sub === "detail" && props.selectedRecord ? h(MemoryDetail, { record: props.selectedRecord, onReturn: function () { props.onNavigate("records"); }, onCorrect: function () { props.onCorrect(props.selectedRecord); }, onForget: function () { props.onForget(props.selectedRecord); } }) :
               h(
                 React.Fragment,
                 null,
@@ -8251,7 +8279,7 @@
                 h("small", null, isDir ? "directory" : (entry.size || 0) + " bytes" + (entry.language ? " · " + entry.language : "") + (entry.is_secret ? " · masked" : "")));
             })) : h("div", { className: "knowledge-empty" }, "This directory is empty.")
           ),
-          h("button", { type: "button", className: "text-button", style: { marginTop: 12 }, onClick: props.onBack }, icon("fa-arrow-left"), "Back")
+          h("button", { type: "button", className: "return-control", style: { marginTop: 12 }, onClick: props.onBack }, icon("fa-arrow-left"), " Files")
         );
       }
 
@@ -8424,9 +8452,9 @@
             h(
               "div",
               { className: "glass-card", style: { padding: 16 } },
-              subView === "agent" ? h(AgentDetailView, { agent: props.selectedAgent, onAvailability: props.onAvailability, onOpen: props.onNavigate }) :
+              subView === "agent" ? h(AgentDetailView, { agent: props.selectedAgent, onAvailability: props.onAvailability, onOpen: props.onOpenAgent, onReturn: function () { props.onNavigate("directory"); } }) :
               subView === "missions" ? h(MissionsView, { missions: props.missions, busy: props.busy, onCreate: props.onCreate, onOpen: props.onOpenMission }) :
-              subView === "mission" ? h(MissionDetailView, { mission: props.selectedMission, envelope: props.envelope, onAdvance: props.onAdvance, onOpen: props.onOpenMission, onSelectTask: props.onSelectTask, selectedTaskId: props.selectedTaskId, selectedTask: props.selectedTask }) :
+              subView === "mission" ? h(MissionDetailView, { mission: props.selectedMission, envelope: props.envelope, onAdvance: props.onAdvance, onOpen: props.onOpenMission, onReturn: function () { props.onNavigate("missions"); }, onSelectTask: props.onSelectTask, selectedTaskId: props.selectedTaskId, selectedTask: props.selectedTask }) :
               subView === "council" ? h(CouncilView, { overview: props.overview, busy: props.busy, onThread: props.onThread }) :
               h(AgentsDirectoryView, { agents: props.agents, search: props.search, onSearch: props.onSearch, onOpen: props.onOpenAgent })
             )

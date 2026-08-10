@@ -94,6 +94,12 @@
     .modal-box h3 { margin: 0 0 6px; }
     .modal-x { position: absolute; right: 8px; top: 8px; background: transparent; border: none;
       color: var(--muted); font-size: 20px; padding: 6px 10px; }
+    .return-btn { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 13px;
+      border: 1px solid var(--line); border-radius: 10px; background: linear-gradient(180deg, rgba(37,43,53,0.9), rgba(23,28,37,0.85));
+      color: var(--text); font-size: 12.5px; font-weight: 600; cursor: pointer; box-shadow: var(--depth-raised-1);
+      transition: border-color .15s ease, box-shadow .15s ease, transform .06s ease; }
+    .return-btn:hover { border-color: rgba(49,215,255,0.45); }
+    .return-btn:active { box-shadow: var(--depth-pressed); transform: translateY(1px); }
 
     .orb { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px;
       border-radius: 50%; background: rgba(49,215,255,0.14); border: 1px solid rgba(49,215,255,0.4);
@@ -413,7 +419,10 @@
 
   <div id="agent-detail" class="modal hidden">
     <div class="modal-box" style="max-width:640px">
-      <button class="modal-x" id="ad-close" style="position:relative;float:right">✕</button>
+      <div class="row" style="align-items:center;gap:8px;margin-bottom:8px">
+        <button class="return-btn" id="ad-return">← Agents</button>
+        <button class="modal-x" id="ad-close" style="position:relative;float:none;margin-left:auto">✕</button>
+      </div>
       <div id="ad-body">Loading…</div>
     </div>
   </div>
@@ -2634,6 +2643,7 @@
     }
 
     $("ad-close").addEventListener("click", closeAgentDetail);
+    $("ad-return").addEventListener("click", closeAgentDetail);
 
     boot();
   </script>
