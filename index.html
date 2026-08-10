@@ -823,9 +823,18 @@
       transition: border-color .2s, background .2s, transform .2s;
     }
 
+    .assistant-top-orb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(120% 120% at 30% 24%, rgba(120, 210, 255, .95), rgba(30, 130, 200, .95) 45%, rgba(20, 60, 150, .98) 100%);
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, .4), inset 0 -2px 4px rgba(0, 20, 60, .6), 0 0 10px rgba(49, 215, 255, .35);
+    }
+
     .assistant-top-button:hover {
       border-color: rgba(49, 215, 255, .42);
       background: linear-gradient(120deg, rgba(49, 215, 255, .2), rgba(85, 119, 255, .16));
+      transform: translateY(-1px);
     }
 
     .assistant-top-button i {
@@ -5426,7 +5435,7 @@
       // ---- Keyboard Shortcut Registry — one authoritative source. ----
       var KEYBOARD_SHORTCUTS = [
         { id: "palette", command: "Open Command Palette", keys: "Ctrl+K", context: "Global" },
-        { id: "assistant", command: "Ask JoeOS AI", keys: "Ctrl+Shift+K", context: "Global" },
+        { id: "assistant", command: "Joe", keys: "Ctrl+Shift+K", context: "Global" },
         { id: "shortcuts", command: "Open keyboard shortcuts", keys: "?", context: "Global" },
         { id: "stop", command: "Stop current operation", keys: "Esc", context: "AI assistant" },
         { id: "nav", command: "Switch workspace (1-12)", keys: "Alt+1..0", context: "Global" },
@@ -6197,8 +6206,7 @@
                   h("div", { className: "plugin-header" }, icon("fa-diagram-project"), h("div", null, h("strong", null, workflow.name), h("span", null, workflow.workflow_id + " v" + workflow.current_version))),
                   h("div", { className: "plugin-meta" }, workflow.enabled ? h(StatusBadge, { state: "running", label: "Enabled", icon: "fa-play" }) : h(StatusBadge, { state: workflow.health_state === "healthy" ? "idle" : "paused", label: workflow.status.toUpperCase(), icon: "fa-pause" }), h("span", null, "Health: " + workflow.health_state)),
                   h("div", { className: "plugin-actions" },
-                    h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(workflow); } }, "Inspect"),
-                    h("button", { type: "button", className: "text-button", "data-joe-focus": "", "data-joe-module": "automation", "data-joe-object-type": "automation", "data-joe-object-id": workflow.workflow_id, "data-joe-label": workflow.name, title: "Ask Joe about this automation" }, icon("fa-wand-magic-sparkles"), " Ask Joe")
+                    h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(workflow); } }, "Inspect")
                   )
                 );
               }))
@@ -6631,8 +6639,7 @@
             title: h("span", { id: "ai-title" }, "Models & AI"),
             description: "The Local AI Runtime reports honest provider, model, embedding, and interpretation state. AI-assisted interpretations are labeled as such with provenance and are never presented as parsed facts. Cloud routing is never silent.",
             actions: [
-              h("span", { className: "live-pill" + (overview.provider_available ? "" : " attention"), key: "ai" }, h("span", { className: "live-dot " + providerState }), overview.provider_available ? "LOCAL MODEL READY" : "RUNTIME OFFLINE"),
-              h("button", { type: "button", className: "text-button", key: "ask-model", "data-joe-focus": "", "data-joe-module": "models", "data-joe-object-type": "model", "data-joe-object-id": modelLabel, "data-joe-label": modelLabel, title: "Ask Joe about this model" }, icon("fa-wand-magic-sparkles"), " Ask Joe")
+              h("span", { className: "live-pill" + (overview.provider_available ? "" : " attention"), key: "ai" }, h("span", { className: "live-dot " + providerState }), overview.provider_available ? "LOCAL MODEL READY" : "RUNTIME OFFLINE")
             ]
           }),
           h(
@@ -7427,11 +7434,18 @@
           } catch (error) {}
         }
 
+        function openModule(opts) {
+          if (opts.onOpen) { opts.onOpen(); return; }
+          props.onOpen(opts.open);
+        }
         function moduleCard(opts) {
           var pinned = layout && layout.pinned && layout.pinned[opts.module];
           return h(
             "article",
-            { className: "cc-module glass-card " + (opts.tone || "") + (pinned ? " cc-pinned" : ""), "data-module": opts.module, key: opts.module },
+            { className: "cc-module glass-card " + (opts.tone || "") + (pinned ? " cc-pinned" : ""), "data-module": opts.module, key: opts.module, role: "button", tabIndex: 0,
+              onClick: function () { openModule(opts); },
+              onKeyDown: function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openModule(opts); } },
+              "aria-label": "Open " + opts.title + " module" },
             h("div", { className: "cc-module-head" },
               h("span", { className: "cc-module-icon" }, icon(opts.icon)),
               h("div", { style: { flex: 1, minWidth: 0 } }, h("h3", null, opts.title), opts.sub ? h("p", null, opts.sub) : null),
@@ -7440,26 +7454,22 @@
             ),
             h("div", { className: "cc-module-value" }, opts.value ? opts.value : h("span", { className: "cc-module-muted" }, opts.emptyLabel || "No live data yet")),
             opts.detail ? h("div", { className: "cc-module-detail" }, opts.detail) : null,
-            h("div", { className: "cc-module-actions" },
-              h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(opts.open); } }, opts.openLabel || "Open"),
-              h("button", { type: "button", className: "ghost-button", title: "Focus " + opts.title, onClick: function () { setFocused(opts.module); } }, icon("fa-expand"), " Focus"),
-              h("button", { type: "button", className: "ghost-button", onClick: function () { props.onAsk({ module_type: opts.module, object_type: opts.objectType || "", object_id: opts.objectId || "", label: opts.title }); }, title: "Ask Joe about " + opts.title }, icon("fa-wand-magic-sparkles"), " Joe")
-            ),
             menuFor === opts.module ? h(
               "div",
               { className: "cc-menu", role: "menu", "aria-label": opts.title + " menu" },
-              h("button", { type: "button", role: "menuitem", onClick: function () { setMenuFor(null); props.onOpen(opts.open); } }, icon("fa-arrow-up-right-from-square"), " Open"),
-              h("button", { type: "button", role: "menuitem", onClick: function () { setMenuFor(null); setFocused(opts.module); } }, icon("fa-expand"), " Focus"),
-              h("button", { type: "button", role: "menuitem", onClick: function () { setMenuFor(null); setInspector(inspector === opts.module ? null : opts.module); } }, icon("fa-circle-info"), inspector === opts.module ? " Close inspector" : " Inspect"),
-              h("button", { type: "button", role: "menuitem", onClick: function () {
+              h("button", { type: "button", role: "menuitem", onClick: function (event) { event.stopPropagation(); setMenuFor(null); openModule(opts); } }, icon("fa-arrow-up-right-from-square"), " Open"),
+              h("button", { type: "button", role: "menuitem", onClick: function (event) { event.stopPropagation(); setMenuFor(null); setFocused(opts.module); } }, icon("fa-expand"), " Focus"),
+              h("button", { type: "button", role: "menuitem", onClick: function (event) { event.stopPropagation(); setMenuFor(null); setInspector(inspector === opts.module ? null : opts.module); } }, icon("fa-circle-info"), inspector === opts.module ? " Close inspector" : " Inspect"),
+              h("button", { type: "button", role: "menuitem", onClick: function (event) {
+                event.stopPropagation();
                 setMenuFor(null);
                 var next = layout ? { order: layout.order.slice(), pinned: Object.assign({}, layout.pinned || {}) } : { order: null, pinned: {} };
                 if (pinned) delete next.pinned[opts.module]; else next.pinned[opts.module] = true;
                 persistLayout(next);
               } }, icon(pinned ? "fa-thumbtack-slash" : "fa-thumbtack"), pinned ? " Unpin" : " Pin"),
-              h("button", { type: "button", role: "menuitem", disabled: effectiveOrder().indexOf(opts.module) <= 0, onClick: function () { moveModule(opts.module, -1); } }, icon("fa-arrow-up"), " Move up"),
-              h("button", { type: "button", role: "menuitem", disabled: effectiveOrder().indexOf(opts.module) >= effectiveOrder().length - 1, onClick: function () { moveModule(opts.module, 1); } }, icon("fa-arrow-down"), " Move down"),
-              h("button", { type: "button", role: "menuitem", onClick: function () { setMenuFor(null); resetLayout(); } }, icon("fa-rotate-left"), " Reset position")
+              h("button", { type: "button", role: "menuitem", disabled: effectiveOrder().indexOf(opts.module) <= 0, onClick: function (event) { event.stopPropagation(); moveModule(opts.module, -1); } }, icon("fa-arrow-up"), " Move up"),
+              h("button", { type: "button", role: "menuitem", disabled: effectiveOrder().indexOf(opts.module) >= effectiveOrder().length - 1, onClick: function (event) { event.stopPropagation(); moveModule(opts.module, 1); } }, icon("fa-arrow-down"), " Move down"),
+              h("button", { type: "button", role: "menuitem", onClick: function (event) { event.stopPropagation(); setMenuFor(null); resetLayout(); } }, icon("fa-rotate-left"), " Reset position")
             ) : null
           );
         }
@@ -7493,7 +7503,6 @@
         var openSecurityEvents = (securityOverview.security_events_open != null ? securityOverview.security_events_open : (security.security_events_open != null ? security.security_events_open : null));
 
         var modules = [
-          { module: "ask-joe", title: "Ask Joe", icon: "fa-wand-magic-sparkles", sub: runtimeOn ? "Local " + (runtime.model || "model") : "Ollama local model", open: "command", openLabel: "Open Joe", onAsk: function () { props.onAsk({ module_type: "global", label: "Joe" }); } },
           { module: "agents", title: "Agents", icon: "fa-user-astronaut", sub: (activeAgents.length ? activeAgents.length + " active" : "") + (workingAgents.length ? " · " + workingAgents.length + " working" : "") + (failedAgents.length ? " · " + failedAgents.length + " failed" : ""), value: agentBadge ? agentBadge + " agent(s)" : null, detail: agentList.length ? agentList.slice(0, 5).map(function (a) { return a.display_name; }).join(", ") : null, badge: agentBadge, badgeTone: failedAgents.length ? "danger" : (workingAgents.length ? "info" : ""), open: "agents", objectType: "module" },
           { module: "automation", title: "Automations", icon: "fa-robot", sub: "Workflow engine", value: (auto.running ? auto.running + " running" : "idle") + (auto.failed_recently ? " · " + auto.failed_recently + " failed" : ""), detail: (auto.workflows_enabled != null ? auto.workflows_enabled + " enabled / " + (auto.workflows_total || 0) + " total" : null) + (auto.pending_approvals ? " · " + auto.pending_approvals + " approvals" : ""), badge: auto.failed_recently ? auto.failed_recently : (auto.running ? auto.running : null), badgeTone: auto.failed_recently ? "danger" : "info", open: "automation", objectType: "module" },
           { module: "work", title: "Current Work", icon: "fa-list-check", sub: "Agent runs and tasks", value: (auto.running ? auto.running + " running" : "no active work") + (auto.waiting ? " · " + auto.waiting + " waiting" : ""), badge: auto.running || null, badgeTone: "info", open: "automation", objectType: "module" },
@@ -7547,11 +7556,7 @@
             h(
               "div",
               { className: "cc-focused glass-card" },
-              moduleCard(activeModule),
-              h("div", { className: "cc-focused-actions" },
-                h("button", { type: "button", className: "primary-button", onClick: function () { props.onOpen(activeModule.open); } }, icon("fa-arrow-up-right-from-square"), " Open " + activeModule.title),
-                h("button", { type: "button", className: "secondary-button", onClick: function () { props.onAsk({ module_type: activeModule.module, object_type: activeModule.objectType || "", object_id: activeModule.objectId || "", label: activeModule.title }); } }, icon("fa-wand-magic-sparkles"), " Ask Joe about this")
-              )
+              moduleCard(activeModule)
             )
           );
         }
@@ -7602,8 +7607,7 @@
               inspected.detail ? h("p", { className: "cc-module-detail" }, inspected.detail) : null
             ),
             h("div", { className: "cc-inspector-actions" },
-              h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(inspected.open); } }, icon("fa-arrow-up-right-from-square"), " Open"),
-              h("button", { type: "button", className: "ghost-button", onClick: function () { props.onAsk({ module_type: inspected.module, object_type: inspected.objectType || "", object_id: inspected.objectId || "", label: inspected.title }); } }, icon("fa-wand-magic-sparkles"), " Ask Joe")
+              h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(inspected.open); } }, icon("fa-arrow-up-right-from-square"), " Open")
             )
           ) : null,
           menuFor ? h("div", { className: "cc-menu-backdrop", onClick: function () { setMenuFor(null); } }) : null
@@ -7613,9 +7617,15 @@
       function AgentCard(props) {
         var agent = props.agent;
         var caps = Array.isArray(agent.capabilities) ? agent.capabilities.slice(0, 4) : [];
+        function openAgent(event) {
+          if (event) event.stopPropagation();
+          props.onOpen(agent);
+        }
         return h(
           "article",
-          { className: "glass-card interactive-card agent-card" },
+          { className: "glass-card interactive-card agent-card", role: "button", tabIndex: 0, onClick: openAgent,
+            onKeyDown: function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openAgent(event); } },
+            "aria-label": "Open agent " + (agent.display_name || "Unnamed agent") },
           h(
             "div",
             { className: "agent-card-top" },
@@ -7629,13 +7639,7 @@
             h("span", null, icon("fa-layer-group"), "v" + (agent.config_version || 1)),
             h("span", null, icon("fa-arrow-trend-up"), "Load " + (agent.maximum_workload || 0))
           ),
-          caps.length ? h("div", { className: "agent-capabilities" }, caps.map(function (cap) { return h("span", { className: "agent-capability", key: cap }, cap); })) : h("p", { className: "os-subnote" }, "No capabilities declared."),
-          h(
-            "div",
-            { className: "agent-card-actions" },
-            h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(agent); } }, "Open workspace"),
-            props.onJoeFocus ? h("button", { type: "button", className: "ghost-button", style: { flex: 1 }, onClick: function () { props.onJoeFocus(agent); }, title: "Ask Joe about this agent" }, icon("fa-wand-magic-sparkles"), " Ask Joe") : null
-          )
+          caps.length ? h("div", { className: "agent-capabilities" }, caps.map(function (cap) { return h("span", { className: "agent-capability", key: cap }, cap); })) : h("p", { className: "os-subnote" }, "No capabilities declared.")
         );
       }
 
@@ -10282,7 +10286,7 @@
           { id: "customize", label: "Customize Mission Control", detail: "Change fonts, colors, density, radius, and glass", icon: "fa-palette", shortcut: "C", category: "Commands", run: function () { selectSection("mission"); setCustomizerOpen(true); } },
           { id: "widgets", label: "Add a widget", detail: "Open the versioned module catalog", icon: "fa-table-cells-large", shortcut: "W", category: "Commands", run: function () { selectSection("mission"); setCatalogOpen(true); } },
           { id: "edit", label: "Edit workspace layout", detail: "Drag, move, resize, or hide Mission Control modules", icon: "fa-pen-ruler", shortcut: "E", category: "Commands", run: function () { selectSection("mission"); setEditingLayout(true); } },
-          { id: "assistant", label: "Ask JoeOS AI", detail: "Open the private read-only Lemonade assistant", icon: "fa-wand-magic-sparkles", shortcut: "⇧⌘K", category: "Commands", run: function () { setAssistantOpen(true); } },
+          { id: "assistant", label: "Joe", detail: "Open the JoeOS AI assistant", icon: "fa-wand-magic-sparkles", shortcut: "⇧⌘K", category: "Commands", run: function () { setAssistantOpen(true); } },
           { id: "mission", label: "Agent Mission Control", detail: "Live view of what agents are doing right now", icon: "fa-satellite-dish", category: "Commands", run: function () { window.location.href = "/os/agents"; } },
           { id: "working-agents", label: "Show Working Agents", detail: "Open the Agent Command Center (Mission / Agents)", icon: "fa-user-clock", category: "Commands", run: function () { window.location.href = "/os/agents"; } },
           { id: "failed-automations", label: "Show Failed Automations", detail: "Open Automations and surface failures", icon: "fa-triangle-exclamation", category: "Commands", run: function () { window.location.href = "/os/automations"; } },
@@ -10490,7 +10494,7 @@
                     })
                   ) : null
                 ),
-                h("button", { type: "button", className: "assistant-top-button", onClick: function () { setAssistantOpen(true); }, "aria-label": "Open JoeOS AI assistant" }, icon("fa-wand-magic-sparkles"), h("span", null, "Ask JoeOS AI"))
+                h("button", { type: "button", className: "assistant-top-button", onClick: function () { setAssistantOpen(true); }, "aria-label": "Open JoeOS AI assistant" }, h("span", { className: "assistant-top-orb" }), h("span", null, "Joe"))
               )
             ),
             banners.length ? h(

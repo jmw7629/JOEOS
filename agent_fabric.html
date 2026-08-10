@@ -1689,14 +1689,8 @@
             (found.target_type ? "<tr><td>Target</td><td>" + esc(found.target_type) + (found.target_id ? " · " + esc(found.target_id.slice(0, 24)) : "") + "</td></tr>" : "") +
             "<tr><td>Risk</td><td><span class='chip " + (found.risk === "high" || found.risk === "critical" ? "red" : found.risk === "medium" ? "amber" : "green") + "'>" + esc(found.risk) + "</span></td></tr>" +
             (found.data_classification ? "<tr><td>Classification</td><td>" + esc(found.data_classification) + "</td></tr>" : "") +
-            "<tr><td>Requested</td><td>" + esc(timeAgo(found.created_at)) + "</td></tr></table>" +
-            "<div class='row' style='margin-top:10px'><button data-ask-joe-approval='" + esc(found.approval_id) + "'>Ask Joe about this</button></div>";
+            "<tr><td>Requested</td><td>" + esc(timeAgo(found.created_at)) + "</td></tr></table>";
           row.parentNode.insertBefore(el, row.nextSibling);
-          var ask = el.querySelector("[data-ask-joe-approval]");
-          if (ask) ask.addEventListener("click", function () {
-            var scope = { module_type: "approvals", object_type: "approval", object_id: found.approval_id, label: "Approval " + found.approval_id.slice(0, 12) };
-            openScopedJoe(scope);
-          });
         });
       });
     }

@@ -307,3 +307,24 @@ test("knowledge layer avoids fabricating vector search", () => {
   assert.doesNotMatch(html, /cosineSimilarity\(/);
   assert.doesNotMatch(html, /fake.*embedding|embedding.*fake/i);
 });
+
+test("function dedup: clickable object cards, no button forests, single Joe invocation", () => {
+  // The Command Center module card is itself the object: role=button, keyboard
+  // openable, and the redundant Open/Focus/Ask Joe button row is gone.
+  assert.match(html, /function openModule\(opts\)/);
+  assert.match(html, /className: "cc-module glass-card "\s*\+\s*\(opts\.tone \|\| ""\)\s*\+\s*\(pinned \? " cc-pinned" : ""\), "data-module": opts\.module, key: opts\.module, role: "button", tabIndex: 0/);
+  assert.match(html, /onKeyDown: function \(event\) \{ if \(event\.key === "Enter" \|\| event\.key === " "\)/);
+  // No per-card "Open"/"Focus"/"Joe" button row remains on module cards.
+  assert.doesNotMatch(html, /cc-module-actions["']\s*,\s*\n?\s*h\("button",[^)]*"secondary-button",[^)]*opts\.openLabel \|\| "Open"/);
+  // The dedicated "Ask Joe" module card is removed (orb is canonical).
+  assert.doesNotMatch(html, /\{ module: "ask-joe"/);
+  // Agent cards are clickable objects with no redundant Open workspace / Ask Joe row.
+  assert.match(html, /className: "glass-card interactive-card agent-card", role: "button", tabIndex: 0/);
+  assert.doesNotMatch(html, /"Open workspace"/);
+  // Exactly one canonical Joe invoker surface family (topbar Joe + FAB orb), no "Ask JoeOS AI" text.
+  assert.match(html, /assistant-top-orb/);
+  assert.doesNotMatch(html, /"Ask JoeOS AI"/);
+  // Overflow menu (ellipsis) preserved for secondary actions.
+  assert.match(html, /cc-more ghost-button/);
+  assert.match(html, /role: "menuitem"/);
+});
