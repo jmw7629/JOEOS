@@ -1675,6 +1675,22 @@ async def lifespan(app: FastAPI):
     # Run recovery: interrupt runs left in queued/running/cancellation_requested
     # after a restart. Accepted user messages are preserved.
     await asyncio.to_thread(app.state.conversation_service.recover_after_restart)
+    # Wire the Enterprise Object System resolver to existing domain services.
+    try:
+        from server.objects.router import RESOLVER as _OBJECT_RESOLVER
+
+        _OBJECT_RESOLVER.wire_agents(app.state.agents_service)
+        _OBJECT_RESOLVER.wire_automation(app.state.automation_service)
+        _OBJECT_RESOLVER.wire_engineering(app.state.engineering_service)
+        _OBJECT_RESOLVER.wire_security(app.state.security_service)
+        _OBJECT_RESOLVER.wire_conversations(app.state.conversation_service)
+        _OBJECT_RESOLVER.wire_memory(app.state.memory_service)
+        _OBJECT_RESOLVER.wire_runtime(lambda: app.state.runtime)
+        _OBJECT_RESOLVER.wire_workspace(app.state.workspace_service)
+        app.state.object_resolver = _OBJECT_RESOLVER
+    except Exception as error:  # noqa: BLE001 - object system is additive
+        _record_event(db_path, "warning", "objects",
+                      "Object resolver wiring failed: %s" % type(error).__name__)
     from server.agents.execution import build_agent_executor
 
     app.state.action_service = ActionService(
@@ -1885,6 +1901,9 @@ app.include_router(runner_router)
 app.include_router(workspace_router)
 app.include_router(realtime_router)
 app.include_router(command_center_router)
+from server.objects.router import router as objects_router
+
+app.include_router(objects_router)
 app.include_router(engineering_router)
 app.include_router(campaign_router)
 app.include_router(autonomous_router)
