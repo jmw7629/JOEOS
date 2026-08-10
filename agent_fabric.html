@@ -2230,43 +2230,90 @@
       var box = $("cc-models-body");
       box.innerHTML = "<div class='muted'>Loading…</div>";
       var html = "";
-      try {
-        var svc = await api("/api/v1/command-center/services");
-        var svcs = svc.services || [];
-        if (svcs.length) {
-          html += "<div class='section-title'><h3>Runtimes</h3></div><div class='cc-grid'>" +
-            svcs.slice(0, 6).map(function (s) {
-              return "<div class='cc-stat'><div class='k'>" + esc(s.name) + "</div>" +
-                "<div class='v sm " + statusChip(s.state) + "'>" + esc(s.state) + "</div>" +
-                "<div class='muted small'>" + esc(s.message || "") + "</div></div>";
-            }).join("") + "</div>";
-        }
-      } catch (e) { html += "<div class='msg err'>" + esc(e.message) + "</div>"; }
+      var providers = [], models = [], agents = [], mission = { running: [], recent: [] };
       try {
         var data = await api("/api/v1/control/overview");
-        var providers = (data.providers.items || []).filter(function (p) { return p.status === "active"; });
-        var models = (data.models.items || []).filter(function (m) { return m.status === "active"; });
-        if (providers.length) {
-          html += "<div class='section-title'><h3>Providers</h3></div><table class='matrix'><tr><th>Name</th><th>Type</th><th>Location</th><th>Health</th></tr>" +
-            providers.map(function (p) {
-              return "<tr><td>" + esc(p.key || p.display_name) + "</td><td>" + esc(p.provider_type || p.kind || "") + "</td>" +
-                "<td>" + esc(p.location || "") + "</td>" +
-                "<td><span class='chip " + statusChip(p.health || p.status) + "'>" + esc(p.health || p.status) + "</span></td></tr>";
-            }).join("") + "</table>";
-        }
-        if (models.length) {
-          html += "<div class='section-title'><h3>Models (" + models.length + ")</h3></div><table class='matrix'><tr>" +
-            "<th>Model</th><th>Provider</th><th>Context</th><th>Tools</th><th>Vision</th><th>Reasoning</th></tr>" +
-            models.slice(0, 25).map(function (m) {
-              return "<tr><td>" + esc(m.key || m.model_identifier) + "</td><td class='muted small'>" + esc(m.provider_id || "") + "</td>" +
-                "<td>" + esc(m.context_limit || "") + "</td>" +
-                "<td>" + (m.tool_calling === 1 || m.tool_calling === true || m.tool_calling === "1" ? "yes" : "no") + "</td>" +
-                "<td>" + (m.vision ? "yes" : "no") + "</td>" +
-                "<td>" + (m.reasoning ? "yes" : "no") + "</td></tr>";
-            }).join("") + "</table>";
-        }
+        providers = data.providers.items || [];
+        models = data.models.items || [];
+        agents = data.agents.items || [];
       } catch (e) { html += "<div class='msg err'>" + esc(e.message) + "</div>"; }
+      try { mission = await api("/api/v1/control/mission"); } catch (e) {}
+
+      // Provider cards (no credentials exposed).
+      if (providers.length) {
+        html += "<div class='section-title'><h3>Providers</h3></div><div class='grid'>" +
+          providers.map(function (p) {
+            var modelCount = models.filter(function (m) { return m.provider_id === p.id; }).length;
+            return "<div class='agent-card'><div class='row'><span class='orb'>" + esc((p.key || "P").charAt(0).toUpperCase()) + "</span>" +
+              "<div><div class='name'>" + esc(p.key || p.display_name) + "</div>" +
+              "<div class='muted small'>" + esc(p.provider_type || "") + " · loopback</div></div></div>" +
+              "<div class='badges'><span class='chip " + statusChip(p.health || p.status) + "'>" + esc(p.health || p.status) + "</span>" +
+              "<span class='chip'>" + modelCount + " models</span></div>" +
+              "<div class='desc'>" + esc(p.location || "local") + (p.streaming ? " · streaming" : "") + "</div></div>";
+          }).join("") + "</div>";
+      }
+
+      // Model cards (break-open).
+      if (models.length) {
+        html += "<div class='section-title'><h3>Models (" + models.length + ")</h3></div><div class='grid'>";
+        html += models.slice(0, 24).map(function (m) {
+          var provider = providers.find(function (p) { return p.id === m.provider_id; });
+          var assigned = agents.filter(function (a) { return a.model_id === m.id; });
+          var runsFor = [];
+          mission.running.concat(mission.recent).forEach(function (r) { if (r.model === m.key || r.model === m.model_identifier) runsFor.push(r); });
+          return "<div class='agent-card' data-model-card='" + esc(m.id) + "'>" +
+            "<div class='row'><span class='orb'>" + esc((m.key || "M").charAt(0).toUpperCase()) + "</span>" +
+            "<div><div class='name'>" + esc((m.key || m.model_identifier || "").slice(0, 40)) + "</div>" +
+            "<div class='muted small'>" + esc((provider && provider.key) || "—") + "</div></div>" +
+            "<span class='chip " + statusChip(m.status) + "'>" + esc(m.status) + "</span></div>" +
+            "<div class='badges'>" +
+            (m.tool_calling ? "<span class='chip cyan'>tools</span>" : "") +
+            (m.reasoning ? "<span class='chip cyan'>reasoning</span>" : "") +
+            (m.vision ? "<span class='chip cyan'>vision</span>" : "") +
+            (m.context_limit ? "<span class='chip'>ctx " + m.context_limit + "</span>" : "") +
+            "</div>" +
+            "<div class='desc'>" + (assigned.length ? assigned.length + " agent(s) assigned · " + assigned.slice(0, 3).map(function (a) { return a.display_name; }).join(", ") : "no agent assigned") + "</div>" +
+            "<div class='run-detail hidden' data-model-detail='" + esc(m.id) + "'></div></div>";
+        }).join("");
+        html += "</div>";
+      }
       box.innerHTML = html || "<div class='empty-note'>No provider data.</div>";
+
+      // Break-open: model detail (capabilities, context, assignments, recent runs).
+      box.querySelectorAll("[data-model-card]").forEach(function (card) {
+        card.addEventListener("click", function () {
+          var id = card.getAttribute("data-model-card");
+          var detail = document.querySelector("[data-model-detail='" + id + "']");
+          if (detail) { detail.classList.toggle("hidden"); if (!detail.classList.contains("hidden")) renderModelDetail(id, detail, models, providers, agents, mission); }
+        });
+      });
+    }
+
+    function renderModelDetail(id, detailEl, models, providers, agents, mission) {
+      var m = models.find(function (x) { return x.id === id; });
+      if (!m) return;
+      var provider = providers.find(function (p) { return p.id === m.provider_id; });
+      var assigned = agents.filter(function (a) { return a.model_id === m.id; });
+      var runsFor = mission.running.concat(mission.recent).filter(function (r) { return r.model === m.key || r.model === m.model_identifier; });
+      var html = "<table class='matrix'>" +
+        "<tr><td>Model</td><td>" + esc(m.key || m.model_identifier) + "</td></tr>" +
+        "<tr><td>Provider</td><td>" + esc((provider && provider.key) || "—") + "</td></tr>" +
+        "<tr><td>State</td><td><span class='chip " + statusChip(m.status) + "'>" + esc(m.status) + "</span></td></tr>" +
+        "<tr><td>Context</td><td>" + (m.context_limit ? esc(m.context_limit) : "—") + "</td></tr>" +
+        "<tr><td>Capabilities</td><td>" + (m.tool_calling ? "tool_calling " : "") + (m.reasoning ? "reasoning " : "") + (m.vision ? "vision " : "") + (m.streaming ? "streaming " : "") + "</td></tr>" +
+        "<tr><td>Structured output</td><td>" + (m.structured_output ? "yes" : "no") + "</td></tr>" +
+        "<tr><td>Assigned agents</td><td>" + (assigned.length ? assigned.map(function (a) { return esc(a.display_name); }).join(", ") : "none") + "</td></tr>" +
+        "<tr><td>Recent runs</td><td>" + runsFor.length + "</td></tr>" +
+        "</table>";
+      if (runsFor.length) {
+        html += "<div class='section-title' style='margin-top:10px'><h3>Recent runs</h3></div>" +
+          runsFor.slice(0, 5).map(function (r) {
+            return "<div class='deleg'><span class='pill " + statusChip(r.status) + "'></span>" +
+              "<b>" + esc(r.status) + "</b><span class='muted small'>" + esc((r.objective || "").slice(0, 60)) + "</span>" +
+              "<span class='muted small'>" + esc(timeAgo(r.completed_at || r.started_at)) + "</span></div>";
+          }).join("");
+      }
+      detailEl.innerHTML = html;
     }
 
     // ---- Floating live activity panel (ClawPort-style persistent live stream) ----
