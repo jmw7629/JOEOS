@@ -111,3 +111,9 @@ app now `assembleDebug` SUCCEEDS (com.joeos.app v1.0.0 APK). Fixed two real buil
 config issues (Kotlin 2.0 Compose compiler plugin; android.useAndroidX=true) and
 a real cross-platform schema-drift bug (Kotlin @SerialName for snake_case keys,
 caught by the new ModuleManifestTest). Kotlin unit tests pass (2/2).
+### Mission Control concept port — real-time Agent Mission Control
+Ported mission-control's core feature (real-time visibility of agent activity)
+into JoeOS: /api/v1/control/mission (live runs + stats from control_agent_runs)
+and a live Mission view in the Agent Command Center (stats, running cards with
+elapsed timers, activity feed) refreshed via the realtime WS + polling.
+AGPL-3.0 license respected — concept only, no code copied. Deployed to Halo.
