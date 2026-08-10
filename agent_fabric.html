@@ -240,6 +240,7 @@
   <nav class="cc-nav hidden" id="cc-nav" aria-label="Agent Command Center">
     <button data-cc="overview" class="active">Overview</button>
     <button data-cc="mission">Mission</button>
+    <button data-cc="approvals">Approvals</button>
     <button data-cc="orgmap">Org Map</button>
     <button data-cc="agents">Agents</button>
     <button data-cc="work">Work</button>
@@ -286,6 +287,9 @@
           <button id="build-btn">Continue building JoeOS</button>
           <span class="muted small">Joe plans, delegates, verifies, and reports.</span>
         </div>
+        <div id="ask-scope" class="hidden" style="margin-top:10px;padding:7px 12px;border:1px solid rgba(49,215,255,0.4);border-radius:9px;background:rgba(11,58,99,0.28);font-size:12px;color:var(--cyan);display:flex;align-items:center;gap:8px">
+          <b>JOE IS FOCUSED ON: <span id="ask-scope-label"></span></b><span class="spacer"></span>
+          <button id="ask-scope-clear" class="ghost" style="padding:3px 8px">Clear focus</button></div>
         <div id="ask-reply"></div>
       </div>
 
@@ -327,6 +331,13 @@
         <div id="mission-running" class="grid"></div>
         <div class="section-title"><h3>Recent activity</h3></div>
         <div id="mission-recent"></div>
+      </div>
+
+      <div id="cc-approvals" class="cc-view">
+        <div class="section-title"><h3>Approvals</h3>
+          <span class="muted small">Requests awaiting decision — risk and age surfaced.</span></div>
+        <div id="approvals-stats" class="cc-grid" style="margin-bottom:16px"></div>
+        <div id="approvals-list"></div>
       </div>
 
       <div id="cc-orgmap" class="cc-view">
@@ -736,6 +747,10 @@
     // UI
     // ------------------------------------------------------------------
     function $(id) { return document.getElementById(id); }
+    function statCell(k, v, tone) {
+      return "<div class='cc-stat'><div class='k'>" + esc(k) + "</div><div class='v sm " + (tone || "") + "'>" + (v == null ? "—" : esc(String(v))) + "</div></div>";
+    }
+
     function icon(name) {
       var glyphs = { "fa-bolt": "⚡", "fa-user-astronaut": "✦", "fa-wand-magic-sparkles": "✦", "fa-layer-group": "▦", "fa-arrow-trend-up": "↗", "fa-expand": "⛶" };
       return glyphs[name] || "";
@@ -1155,8 +1170,8 @@
     $("modal-cancel").addEventListener("click", closeModal);
 
     $("ask-btn").addEventListener("click", async function () {
-      var objective = $("ask-input").value.trim();
-      if (!objective) return;
+      var objective = scopedObjective($("ask-input").value.trim());
+      if (!objective.trim() || objective === "Joe is focused on ") return;
       var joe = agentsByKey["joeos.joe"];
       if (!joe) { $("ask-reply").innerHTML = "<div class='msg err'>Joe isn't available right now.</div>"; return; }
       var btn = $("ask-btn");
@@ -1182,6 +1197,12 @@
         btn.disabled = false;
         await refreshAll();
       }
+    });
+
+    $("ask-scope-clear").addEventListener("click", function () {
+      currentJoeScope = null;
+      $("ask-scope").classList.add("hidden");
+      $("ask-reply").innerHTML = "";
     });
 
     $("build-btn").addEventListener("click", async function () {
@@ -1288,6 +1309,7 @@
 
     var ccViews = {
       mission: function () { return loadMission(); },
+      approvals: function () { return loadApprovals(); },
       orgmap: function () { return loadOrgMap(); },
       agents: function () { return loadAgentsGrid(); },
       work: function () { return loadWorkBoard(); },
@@ -1504,6 +1526,94 @@
       } catch (e) {
         box.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
       }
+    }
+
+    var approvalDetail = null;
+    var currentJoeScope = null;
+
+    function openScopedJoe(scope) {
+      // Module-scoped Joe: carries an authoritative object reference (never
+      // scraped DOM text) into the Joe objective. No authority is expanded.
+      currentJoeScope = scope || null;
+      $("ask-scope").classList.remove("hidden");
+      $("ask-scope-label").textContent = (scope && scope.label) || (scope && scope.object_type) || "module";
+      var input = $("ask-input");
+      if (input) { input.value = ""; input.focus(); }
+      $("ask-reply").innerHTML = "<div class='muted small'>Joe is focused on " +
+        esc((scope && scope.label) || (scope && scope.object_type) || "this module") + ". Type a question, then Ask Joe.</div>";
+    }
+
+    function scopedObjective(baseObjective) {
+      if (!currentJoeScope) return baseObjective;
+      return "Joe is focused on " + (currentJoeScope.label || currentJoeScope.object_type || "this module") +
+        " (object_type=" + (currentJoeScope.object_type || "module") +
+        ", object_id=" + (currentJoeScope.object_id || "n/a") + "). " +
+        "Interpret 'this'/'it' as the focused object; scope grants no extra authority. " + baseObjective;
+    }
+
+    async function loadApprovals() {
+      var statsBox = $("approvals-stats");
+      var listBox = $("approvals-list");
+      var html = "";
+      var approvals = [];
+      try {
+        var data = await api("/api/v1/security/approvals?state=pending");
+        approvals = data.approvals || [];
+      } catch (e) {
+        statsBox.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+        return;
+      }
+      var riskOrder = { "critical": 4, "high": 3, "medium": 2, "low": 1 };
+      var highest = null, oldest = null;
+      approvals.forEach(function (a) {
+        if (!highest || (riskOrder[a.risk] || 0) > (riskOrder[highest.risk] || 0)) highest = a;
+        if (!oldest || a.created_at < oldest.created_at) oldest = a;
+      });
+      statsBox.innerHTML =
+        statCell("Waiting", approvals.length, approvals.length ? "amber" : "") +
+        statCell("Highest risk", highest ? highest.risk : "—", highest && highest.risk !== "low" ? "red" : "") +
+        statCell("Oldest", oldest ? timeAgo(oldest.created_at) : "—", "") +
+        statCell("Action", highest ? (highest.action_id || "").slice(0, 22) : "—", "");
+      if (!approvals.length) {
+        listBox.innerHTML = "<div class='empty-note'>No approvals waiting.</div>";
+        return;
+      }
+      html += approvals.slice(0, 30).map(function (a) {
+        var riskTone = a.risk === "high" || a.risk === "critical" ? "red" : a.risk === "medium" ? "amber" : "green";
+        return "<div class='deleg' style='cursor:pointer' data-approval='" + esc(a.approval_id) + "'>" +
+          "<span class='pill " + riskTone + "'></span>" +
+          "<b>" + esc((a.requester_identity || "?").slice(0, 24)) + "</b>" +
+          "<span class='muted'>" + esc((a.action_id || "").slice(0, 40)) + "</span>" +
+          "<span class='chip " + riskTone + "'>" + esc(a.risk) + "</span>" +
+          (a.target_type ? "<span class='chip'>" + esc(a.target_type) + "</span>" : "") +
+          "<span class='muted small'>" + esc(timeAgo(a.created_at)) + "</span></div>";
+      }).join("");
+      listBox.innerHTML = html;
+      listBox.querySelectorAll("[data-approval]").forEach(function (row) {
+        row.addEventListener("click", function () {
+          var id = row.getAttribute("data-approval");
+          var found = approvals.find(function (a) { return a.approval_id === id; });
+          if (!found) return;
+          approvalDetail = found;
+          var el = document.createElement("div");
+          el.className = "run-detail";
+          el.innerHTML =
+            "<table class='matrix'><tr><td>Approval ID</td><td class='mono'>" + esc(found.approval_id) + "</td></tr>" +
+            "<tr><td>Requester</td><td>" + esc(found.requester_identity) + "</td></tr>" +
+            "<tr><td>Action</td><td>" + esc(found.action_id) + "</td></tr>" +
+            (found.target_type ? "<tr><td>Target</td><td>" + esc(found.target_type) + (found.target_id ? " · " + esc(found.target_id.slice(0, 24)) : "") + "</td></tr>" : "") +
+            "<tr><td>Risk</td><td><span class='chip " + (found.risk === "high" || found.risk === "critical" ? "red" : found.risk === "medium" ? "amber" : "green") + "'>" + esc(found.risk) + "</span></td></tr>" +
+            (found.data_classification ? "<tr><td>Classification</td><td>" + esc(found.data_classification) + "</td></tr>" : "") +
+            "<tr><td>Requested</td><td>" + esc(timeAgo(found.created_at)) + "</td></tr></table>" +
+            "<div class='row' style='margin-top:10px'><button data-ask-joe-approval='" + esc(found.approval_id) + "'>Ask Joe about this</button></div>";
+          row.parentNode.insertBefore(el, row.nextSibling);
+          var ask = el.querySelector("[data-ask-joe-approval]");
+          if (ask) ask.addEventListener("click", function () {
+            var scope = { module_type: "approvals", object_type: "approval", object_id: found.approval_id, label: "Approval " + found.approval_id.slice(0, 12) };
+            openScopedJoe(scope);
+          });
+        });
+      });
     }
 
     function agentLiveState(a, missionMap) {
