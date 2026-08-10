@@ -104,3 +104,10 @@ assistant config returns D1 routing metadata (provider=ollama, capability=tool_u
 healthy), module catalog serves 10 built-in modules, Halo runner 5299c2ea
 reconnected (healthy), all /os routes 200, terminal auth-gated. The deployment
 blocker from the outage is cleared.
+### P4 — Android toolchain installed + native build + contract test
+User-space toolchain on the VPS (JDK 17 Temurin, Android SDK cmdline-tools +
+platform-34 + build-tools-34 + platform-tools, Gradle 8.9). Native Kotlin/Compose
+app now `assembleDebug` SUCCEEDS (com.joeos.app v1.0.0 APK). Fixed two real build
+config issues (Kotlin 2.0 Compose compiler plugin; android.useAndroidX=true) and
+a real cross-platform schema-drift bug (Kotlin @SerialName for snake_case keys,
+caught by the new ModuleManifestTest). Kotlin unit tests pass (2/2).
