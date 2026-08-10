@@ -1,54 +1,107 @@
-# JoeOS Completion Audit
+# JoeOS Completion Audit — JOEOS-COMPLETION-LOOP-1
 
-Mission: **JOEOS-COMPLETION-LOOP-1** — Modular Command Center + Terminal +
-Agent Team Experience + Module-Scoped Joe.
+Final audit of the autonomous completion loop (incl. the 8-hour marathon).
+Authority: Halo (`amd-halo`, `/home/joewillis/JOEOS`, branch `ai-rebuild`).
+VPS remains the rollback node.
 
-Audited 2026-08-09 against the live Halo authoritative host
-(`https://amd-halo.tailb9395f.ts.net`) and the VPS rollback node.
+## Route crawl (live, Halo)
 
-## What is live
+All primary `/os/*` routes return HTTP 200 over Tailscale HTTPS
+(`https://amd-halo.tailb9395f.ts.net`): `/`, `/os/command`, `/os/agents`,
+`/os/automations`, `/os/memory`, `/os/files`, `/os/build`, `/os/terminal`,
+`/os/ai`, `/os/security-center`, `/os/providers`, `/os/models`, `/os/search`,
+`/os/settings`.
 
-| Surface | Route | Verified |
-|---|---|---|
-| Command Center (modular home) | `/os/command` (default) | 12 real-state modules, scoped Joe |
-| Executive Dashboard | `/os/dashboard` | 200 |
-| Mission Control | `/os/mission` | 200 |
-| Agent Command Center | `/os/agents` | org map, agent cards, work, schedule, pipelines, memory, activity, models, live panel |
-| Automations | `/os/automations` | 200 |
-| Build JoeOS | `/os/build` | 200 |
-| Terminal | `/os/terminal` | 200, authenticated PTY + WS |
-| Models & AI | `/os/ai` | 200 |
-| Assistant API | `/api/v1/ai/chat/config`, `/chat/stream` | Ollama streaming + tool events + scoped context |
-| Terminal API | `/api/v1/terminal/*` | auth-gated REST + WS |
+## Agent Command Center (converged workspace)
 
-## Module-scoped Joe
+Views: **Overview · Mission · Approvals · Executions · Org Map · Agents · Work ·
+Schedule · Pipelines · Memory · Activity · Models** — one coherent workspace
+(`/os/agents`), each surface wired to authoritative state:
 
-- `JoeContextScope` contract: bounded `{module_type, object_type, object_id, label}` injected as a scoped system block. No authority expansion (ToolBroker/policy/approval unchanged).
-- "JOE IS FOCUSED ON" banner with clear-focus. Ask Joe wired on agent cards and every Command Center module (incl. Terminal with bounded recent-output context).
+- **Mission** — live running AgentRuns (agent/model/provider/elapsed), recent
+  completions/failures (status/duration/tokens), aggregate stats; realtime WS
+  refresh + 10s polling.
+- **Agent Cards** — compact (name, role, live WORKING/IDLE/OFFLINE state,
+  current objective, actual provider/model) → break-open into Overview/
+  Identity/Tools/Memory/Automations/Executions tabs + Delegation (real child
+  runs) + Results.
+- **Org Map** — interactive SVG hierarchy from authoritative agent state.
+- **Work** — unified board (Backlog/Ready/Working/Verifying/Waiting-for-Joe/
+  Failed/Done) over AgentRuns + Automation runs + campaign WorkPackages, with
+  break-open.
+- **Schedule** — automation schedules with workflow/timezone/next/last/failure
+  counts and All/Running/Upcoming/Failed/Paused filters; recent runs with
+  duration/retries/error (failures highlighted).
+- **Pipelines** — automation DAG + campaign WorkPackage dependency DAG.
+- **Memory** — visual browser (All/Shared/Proposed/Conflicts/Stale) with record
+  cards + provenance detail.
+- **Models/Compute** — provider cards + break-open model cards (capabilities,
+  context, assigned agents, recent runs).
+- **Approvals** — compact (waiting/highest risk/oldest) + expanded list + detail
+  + scoped Ask Joe.
+- **Executions** — runner execution jobs + agent runs, break-open to the full
+  record.
+- **Scoped Joe** — "JOE IS FOCUSED ON" banner with clear focus; scope carries an
+  authoritative object reference into the Joe objective; never extra authority.
 
-## Terminal security
+## Web / PWA
 
-- Authenticated `require_application_session` + per-session token + origin checks.
-- PTY spawns the backend user's shell via `subprocess`/`posix_spawn` — never root, no sudo.
-- Agents have no tool exposing the terminal; nothing bypasses ToolBroker/runner through the PTY. Bounded output; idle reaping.
+- Modular Command Center home with focus-mode, desktop inspector, persisted
+  module pin/reorder.
+- WebCapabilityRegistry (honest feature detection); network offline/reconnect
+  banner; versioned service worker with navigation fallback.
+- Command palette with the required commands (Ask Joe, Mission, Working Agents,
+  Failed Automations, Waiting Approvals, Continue Building JoeOS, Terminal).
+- Universal search across agents/automations/models/memory/files.
 
-## Halo migration
+## Module platform / enterprise
 
-- Halo is the authoritative host: source at `3078c72`, migrated persistent state (cutover swap; prior data at `data.pre-cutover-20260809T212626Z`), runner `5299c2ea` reconnected, secure Tailscale Serve HTTPS, agents bound to Halo large models by capability (joeos.joe→qwen3-coder-next, architect/builder/verifier→qwen3-coder:30b-a3b-q8_0, researcher→qwen3.6:35b, security→llama3.3:70b). Autonomous run validated on Halo.
-- VPS remains intact as rollback (Section I backup + rollback tag + VPS backend still running).
+- `ModuleManifest` contract (server) with strict validation; `ModuleCatalog`
+  (builtin/user/workspace); gated catalog API + public built-in list.
+- Native mirrors: Swift (`JoeOSCore.ModuleManifest`, decodes server JSON on the
+  Mac) and Kotlin (`ModuleManifest.kt`, `@SerialName` snake_case, unit-tested).
+- Least-privilege module policy; client capability contract; personal/default
+  separation (no hardcoded hostnames in product UI).
 
-## Remaining work (real)
+## Terminal
 
-- **Completed in subsequent loop**: Command Center focus-mode + Approvals/Executions modules; module-scoped Joe on automation and model surfaces; global search for agents/automations/models; pipeline DAG visualization; mobile Command Center + mobile agent/kanban/pipelines (390px verified, no tiny columns).
-- **Still not built**: per-module context menus / pin / reorder; dedicated desktop inspector pane beyond focus-mode; deeper agent break-open sub-tabs (identity/tools/memory/automations largely present in agent_fabric); schedule pipeline DAG (automation DAG done; campaign DAG pending); dedicated Search route enriched with task/build results.
-- **Privileged/human-required**:
-  - `/opt/joeos` runner checkout refresh on Halo requires root (`sudo`) — the human operator must run it (or provide the sudo password).
-  - Lemonade inference on Halo requires pulling real weights (`lemonade pull`) — gated off; Ollama satisfies the workload.
-  - Formal cutover announcement / VPS retirement requires explicit Joe approval (VPS intentionally left intact as rollback).
-- **Provider-neutrality debt**: the assistant currently routes through the AgentFabric `OllamaAgentExecutor` → Ollama. Documented in `docs/architecture/LOCAL_AI_ASSISTANT.md`; must become `Joe → ProviderRegistry/ModelRegistry → Ollama OR Lemonade` during further Halo provider integration.
+- Real PTY-backed authenticated terminal (`/os/terminal`) via a bounded PTY
+  gateway + WebSocket; tabs, resize, copy/paste, clear, fullscreen, mobile touch
+  keys; scoped Ask Joe with bounded recent-output context. Human terminal is
+  separate from agent execution (no ToolBroker bypass).
 
-## Test state
+## Native platform foundations
 
-- Backend: 933 passed + 61 subtests (incl. new terminal + scoped-Joe tests).
-- Runner: 59 passed.
-- Frontend: 35/35 official + jsdom Command Center / scoped-Joe / assistant-stream tests.
+- iOS: SwiftUI shell + `ModuleRenderer` + `ModuleManifest`; full `xcodebuild
+  build` + `test` SUCCEED on the Mac after the Xcode 16.6 Info.plist collision
+  fix. Platform agent `engineering.appleplatform` registered.
+- Android: native Kotlin/Compose project builds (`assembleDebug` + `test`)
+  with a user-space toolchain (JDK 17, SDK, Gradle 8.9); contract unit test
+  passes. Platform agent `engineering.androidplatform` registered.
+- Toolchain is on the VPS rollback host; installing on Halo is a root gate.
+
+## Security audit
+
+- No browser→Ollama/Lemonade direct references in any served page.
+- No secrets/credentials in served HTML.
+- `security/approvals`, `control/executions`, `control/mission`, `terminal/*`
+  are auth-gated (401 without a session).
+- Module manifests validated; unknown components fail safely; least-privilege.
+- Provider/model selection never routes to an unhealthy provider; deterministic
+  errors; no model claimed available unless installed.
+
+## Tests (final)
+
+- Backend: `pytest tests/ runner/tests/ packages/` → **961 passed + 61 subtests**.
+- Frontend: `node --test tests/frontend.test.mjs` → **35/35**.
+- jsdom suites (agent cards, mission, work, schedule, approvals, memory, models,
+  executions, scoped Joe, command center, mobile, terminal, campaign DAG): pass.
+- iOS: Swift `JoeOSCore` builds; `xcodebuild build` + `test` succeed on Mac.
+- Android: `gradle assembleDebug` + `testDebugUnitTest` succeed (VPS toolchain).
+
+## Remaining (genuine)
+
+- HUMAN_REQUIRED: install Android SDK/JDK/Gradle on Halo (root) to build there;
+  iOS signing/App Store credentials; Lemonade HF-resolve service config; `/opt/
+  joeos` runner refresh (root); VPS retirement (explicit approval).
+- BLOCKED: none (technical).
