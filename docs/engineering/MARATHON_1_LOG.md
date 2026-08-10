@@ -62,3 +62,8 @@ Source-complete native Kotlin/Compose JoeOS project scaffolded under apps/androi
 (Gradle 8.9, Compose BOM, module manifest contract, theme tokens, MainActivity
 shell, serialization). Gradle/emulator build is BLOCKED on toolchain install
 (no JDK/SDK/gradle/kotlinc on Halo or Mac) — recorded as human toolchain gate.
+### P7 — Cross-platform contract verification
+Server ModuleManifest JSON decoded successfully by the Swift ModuleManifest on
+the Mac (display_name, required_capabilities, joe_context, widget types all
+round-trip). Contract drift check added; both Swift and Kotlin models declare
+the full 26-field schema.
