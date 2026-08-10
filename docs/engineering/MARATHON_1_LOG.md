@@ -73,3 +73,12 @@ Final HEAD: 99b7db7 (pushed). Halo synced. All D1-D5 + P1-P7 dependency-ready
 work in scope completed and verified. Remaining items are toolchain/human gates
 (Android SDK/JDK, Xcode 16 Info.plist env quirk, Lemonade service HF-resolve).
 Full regression: 955 backend + 61 subtests, 35/35 frontend, 8/8 jsdom suites.
+
+## Halo infrastructure blocker (mid-marathon)
+Halo (`amd-halo`, 100.121.165.22) became unreachable on the tailnet: SSH connect
+timeout, tailscale ping timeout, Ollama + HTTPS endpoints dead. My backend
+restart `pkill` stopped the Halo uvicorn; the relaunch was unconfirmed before
+the box dropped off the network. DEPLOYMENT TO HALO IS BLOCKED until the host
+returns. All marathon code is committed and pushed to origin/ai-rebuild (Halo
+checkout was synced to a4b050b). The VPS rollback node remains up. Continued
+with VPS-side code work; will retry Halo connectivity periodically.
