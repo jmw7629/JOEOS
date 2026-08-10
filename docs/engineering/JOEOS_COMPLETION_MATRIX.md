@@ -37,17 +37,17 @@ Updated continuously by the autonomous completion loop.
 
 | ID | AREA | REQUIREMENT | DEP | STATUS | TEST | COMMIT |
 |----|------|-------------|-----|--------|------|--------|
-| M-201 | AI | Assistant routes via ProviderRegistry (Ollama OR Lemonade) | M-108 | NOT_STARTED | routing test | — |
-| M-202 | AI | Model assignment by capability (not size) | M-201 | NOT_STARTED | binding audit | — |
+| M-201 | AI | Assistant routes via ProviderRegistry (Ollama OR Lemonade) | M-108 | DONE (D1) | routing test | — |
+| M-202 | AI | Model assignment by capability (not size) | M-201 | DONE (D1) | binding audit | — |
 
 ## 3. Modular surface primitives
 
 | ID | AREA | REQUIREMENT | DEP | STATUS | TEST | COMMIT |
 |----|------|-------------|-----|--------|------|--------|
-| M-301 | UX | Reusable module surface (compact/standard/expanded/focused/inspect) | — | NOT_STARTED | — | — |
+| M-301 | UX | Reusable module surface (compact/standard/expanded/focused/inspect) | — | DONE (D2/D3) | — | — |
 | M-302 | UX | Module states (loading/empty/healthy/degraded/failed/offline) | M-301 | NOT_STARTED | — | — |
 | M-303 | UX | Break-open module→subcomponent→detail interaction | M-301 | DONE (command center focus + terminal tabs) | — | — |
-| M-304 | UX | Layout persistence (arrangement/collapse/orb) | M-301 | NOT_STARTED | — | — |
+| M-304 | UX | Layout persistence (arrangement/collapse/orb) | M-301 | DONE (D2) | — | — |
 
 ## 4. Module-scoped Joe
 
@@ -71,10 +71,10 @@ Updated continuously by the autonomous completion loop.
 
 | ID | AREA | REQUIREMENT | DEP | STATUS | TEST | COMMIT |
 |----|------|-------------|-----|--------|------|--------|
-| M-601 | Agents | Agent cards (compact + expanded break-open) | M-301 | NOT_STARTED | — | — |
+| M-601 | Agents | Agent cards (compact + expanded break-open) | M-301 | DONE (D5 tabs) | — | — |
 | M-602 | Agents | Org map (interactive hierarchy) | — | DONE | smoke | a63f9f3 |
 | M-603 | Agents | Team overview (working/idle/waiting/failed/needs-Joe) | M-601 | PARTIAL (command center + agent_fabric) | — | — |
-| M-604 | Agents | Agent detail sections (identity/state/model/tools/memory/…) | M-601 | NOT_STARTED | — | — |
+| M-604 | Agents | Agent detail sections (identity/state/model/tools/memory/…) | M-601 | DONE (D5) | — | — |
 | M-605 | Agents | Auto-discovery from authoritative AgentFabric | — | NOT_STARTED | — | — |
 
 ## 7. Work / Automation / Pipelines
@@ -82,7 +82,7 @@ Updated continuously by the autonomous completion loop.
 | ID | AREA | REQUIREMENT | DEP | STATUS | TEST | COMMIT |
 |----|------|-------------|-----|--------|------|--------|
 | M-701 | Work | Work board (BACKLOG→DONE) from real state | M-301 | NOT_STARTED | — | — |
-| M-702 | Work | Task card break-open (objective/agent/deps/graph/tools/…) | M-701 | NOT_STARTED | — | — |
+| M-702 | Work | Task card break-open (objective/agent/deps/graph/tools/…) | M-701 | PARTIAL (D4 DAG) | — | — |
 | M-703 | Auto | Schedule/cron monitor (failing surfacing) | M-301 | NOT_STARTED | — | — |
 | M-704 | Auto | Pipeline/DAG visualization (TaskGraph/automation/campaign) | M-301 | DONE (automation) | — | — |
 | M-705 | Auto | Schedule pipeline (trigger→result) | M-703 | NOT_STARTED | — | — |
