@@ -361,3 +361,31 @@ class ToolRunnerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_mission_endpoint_returns_live_state(self):
+        import asyncio
+
+        from uuid import uuid4
+
+        async def fake_executor(messages, tools, decision):
+            return {"content": "done", "token_usage": 9, "model": decision.get("model")}
+
+        self._install_executor()
+        self.service._executor = fake_executor
+        agent_id = self._agent_id("joeos.builder")
+        run = self.service.start_agent_run(
+            self.p, agent_id=agent_id, conversation_id=uuid4(), message_id=uuid4(),
+            model_preference="qwen2.5-coder:7b", objective="build mission control",
+        )
+        asyncio.run(self.service.execute_agent_run(self.p, run["id"]))
+        mission = self.service.mission(self.p)
+        self.assertIn("stats", mission)
+        self.assertIn("running", mission)
+        self.assertIn("recent", mission)
+        self.assertGreaterEqual(mission["stats"]["completed_today"], 1)
+        self.assertGreaterEqual(mission["stats"]["tokens_today"], 9)
+        self.assertTrue(mission["recent"])
+        entry = mission["recent"][0]
+        self.assertEqual(entry["agent"], "Builder")
+        self.assertIn("objective", entry)
+        self.assertIn("provider", entry)

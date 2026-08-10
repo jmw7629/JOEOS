@@ -238,6 +238,7 @@
 
   <nav class="cc-nav hidden" id="cc-nav" aria-label="Agent Command Center">
     <button data-cc="overview" class="active">Overview</button>
+    <button data-cc="mission">Mission</button>
     <button data-cc="orgmap">Org Map</button>
     <button data-cc="agents">Agents</button>
     <button data-cc="work">Work</button>
@@ -315,6 +316,16 @@
           Nothing runs without an active session, and no external provider is contacted.</p>
       </details>
 
+      </div>
+
+      <div id="cc-mission" class="cc-view">
+        <div class="section-title"><h3>Agent Mission Control</h3>
+          <span class="muted small">Live view of everything the agent team is doing right now.</span></div>
+        <div id="mission-stats" class="cc-grid" style="margin-bottom:16px"></div>
+        <div class="section-title"><h3>Running now</h3></div>
+        <div id="mission-running" class="grid"></div>
+        <div class="section-title"><h3>Recent activity</h3></div>
+        <div id="mission-recent"></div>
       </div>
 
       <div id="cc-orgmap" class="cc-view">
@@ -1270,6 +1281,7 @@
     }
 
     var ccViews = {
+      mission: function () { return loadMission(); },
       orgmap: function () { return loadOrgMap(); },
       agents: function () { return loadAgentsGrid(); },
       work: function () { return loadWorkBoard(); },
@@ -1306,6 +1318,78 @@
       if (chip === "amber") return "amber";
       if (chip === "red") return "red";
       return "gray";
+    }
+
+    var missionTimer = null;
+    var missionWs = null;
+
+    function missionCard(run) {
+      var tone = statusChip(run.status);
+      var el = "";
+      if (run.status === "running") {
+        var mins = run.elapsed_ms != null ? Math.round(run.elapsed_ms / 60000) + "m" : "";
+        el += "<div class='agent-card' style='border-color:rgba(49,215,255,0.45)'>" +
+          "<div class='row'><span class='orb'>" + esc((run.agent || "A").charAt(0).toUpperCase()) + "</span>" +
+          "<div><div class='name'>" + esc(run.agent) + "</div>" +
+          "<div class='muted small'>" + esc(run.agent_key || run.agent_id.slice(0, 12)) + "</div></div></div>" +
+          "<div class='desc'>" + esc((run.objective || "").slice(0, 100)) + "</div>" +
+          "<div class='badges'><span class='chip cyan'>" + esc(run.model) + "</span>" +
+          "<span class='chip cyan'>" + esc(run.provider) + "</span>" +
+          "<span class='chip amber'>running · " + esc(mins || "…") + "</span></div></div>";
+        return el;
+      }
+      el += "<div class='deleg'><span class='pill " + tone + "'></span>" +
+        "<b>" + esc(run.agent) + "</b>" +
+        "<span class='chip " + (tone === "green" ? "green" : tone === "red" ? "red" : "amber") + "'>" + esc(run.status) + "</span>" +
+        "<span class='muted'>" + esc((run.objective || "").slice(0, 90)) + "</span>" +
+        (run.model ? "<span class='chip cyan'>" + esc(run.model) + "</span>" : "") +
+        (run.duration_ms != null ? "<span class='muted small'>" + Math.round(run.duration_ms / 1000) + "s</span>" : "") +
+        (run.token_usage != null ? "<span class='muted small'>" + run.token_usage + " tok</span>" : "") +
+        "<span class='muted small'>" + esc(timeAgo(run.completed_at || run.started_at)) + "</span></div>";
+      return el;
+    }
+
+    async function loadMission() {
+      var statsBox = $("mission-stats");
+      var runningBox = $("mission-running");
+      var recentBox = $("mission-recent");
+      try {
+        var data = await api("/api/v1/control/mission");
+        var stats = data.stats || {};
+        statsBox.innerHTML =
+          statCell("Running", stats.running_count, stats.running_count ? "amber" : "") +
+          statCell("Active agents", stats.active_agents, stats.active_agents ? "amber" : "") +
+          statCell("Completed today", stats.completed_today, "") +
+          statCell("Failed today", stats.failed_today, stats.failed_today ? "red" : "") +
+          statCell("Tokens today", stats.tokens_today != null ? stats.tokens_today : 0, "");
+        runningBox.innerHTML = (data.running && data.running.length)
+          ? data.running.map(missionCard).join("")
+          : "<div class='empty-note'>No agents running right now.</div>";
+        recentBox.innerHTML = (data.recent && data.recent.length)
+          ? data.recent.map(missionCard).join("")
+          : "<div class='empty-note'>No agent activity yet.</div>";
+      } catch (e) {
+        statsBox.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+      }
+      wireMissionLive();
+    }
+
+    function wireMissionLive() {
+      // Polling fallback + realtime refresh (authoritative state).
+      if (missionTimer) return;
+      missionTimer = window.setInterval(function () { loadMission(); }, 10000);
+      try {
+        var url = (window.location.protocol === "https:" ? "wss:" : "ws:") + "//" +
+          window.location.host + "/api/v1/realtime/ws/events";
+        missionWs = new WebSocket(url);
+        missionWs.onmessage = function (event) {
+          try {
+            var envelope = JSON.parse(event.data);
+            if (envelope && envelope.source === "agents") loadMission();
+          } catch (e) {}
+        };
+        missionWs.onclose = function () { missionWs = null; };
+      } catch (e) {}
     }
 
     async function loadOrgMap() {

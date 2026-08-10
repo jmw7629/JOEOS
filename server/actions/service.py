@@ -667,6 +667,81 @@ class ActionService:
             "recent_runs": [run_payload(r) for r in runs[:10]],
         }
 
+    def mission(self, principal: Dict) -> Dict:
+        """Real-time Agent Mission Control snapshot.
+
+        Structured live view of everything the agent team is doing right now:
+        running runs (with agent/model/provider/elapsed), recent completions and
+        failures (with duration/tokens/result), and honest aggregate stats.
+        This is the authoritative source the Mission Control console consumes.
+        """
+        self._require(principal, AGENT_READ_CAP)
+        now = self._now()
+        day_start = now - (now % 86_400_000)  # UTC midnight (ms)
+        agents = [agent_payload(a, self._latest_version_id(a.id))
+                  for a in self._store.list_agents(principal["organization"]["id"],
+                                                   principal["workspace"]["id"])]
+        by_agent = {str(a["id"]): a for a in agents}
+        providers = {p.id: p for p in self._store.list_providers()}
+        models = {m.id: m for m in self._store.list_models()}
+        all_runs = []
+        for agent in agents:
+            try:
+                all_runs.extend(self._store.list_runs_for_agent(agent["id"]))
+            except Exception:  # noqa: BLE001 - a missing run list must not break the feed
+                continue
+
+        def enrich(r) -> Dict:
+            provider = providers.get(r.provider_id)
+            model = models.get(r.model_id)
+            agent = by_agent.get(str(r.agent_id))
+            return {
+                "id": r.id,
+                "agent_id": str(r.agent_id),
+                "agent": (agent.get("display_name") if agent else None) or str(r.agent_id)[:8],
+                "agent_key": agent.get("key") if agent else None,
+                "status": r.status,
+                "objective": (getattr(r, "objective", "") or "")[:200],
+                "provider": provider.key if provider else str(r.provider_id or "")[:8],
+                "model": model.key if model else str(r.model_id or "")[:8],
+                "started_at": r.started_at,
+                "completed_at": r.completed_at,
+                "duration_ms": (r.completed_at - r.started_at)
+                    if (r.started_at and r.completed_at) else None,
+                "token_usage": r.token_usage,
+                "failure": (r.failure or "")[:300],
+            }
+
+        running = []
+        recent = []
+        completed_today = failed_today = tokens_today = 0
+        for r in all_runs:
+            entry = enrich(r)
+            if r.status == "running":
+                entry["elapsed_ms"] = now - r.started_at if r.started_at else None
+                running.append(entry)
+                continue
+            recent.append(entry)
+            if r.completed_at and r.completed_at >= day_start:
+                if r.status == "succeeded":
+                    completed_today += 1
+                elif r.status == "failed":
+                    failed_today += 1
+                tokens_today += r.token_usage or 0
+        recent.sort(key=lambda e: e["completed_at"] or e["started_at"] or 0, reverse=True)
+        return {
+            "schema_version": 1,
+            "stats": {
+                "running_count": len(running),
+                "active_agents": len({r["agent_id"] for r in running}),
+                "completed_today": completed_today,
+                "failed_today": failed_today,
+                "tokens_today": tokens_today,
+            },
+            "running": running[:25],
+            "recent": recent[:40],
+        }
+
     def get_agent_run(self, principal: Dict, run_id: UUID) -> Dict:
         self._require(principal, AGENT_READ_CAP)
         run = self._store.get_run(run_id)

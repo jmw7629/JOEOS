@@ -75,6 +75,16 @@ def control_overview(
     return _run(service, principal, lambda p: service.overview(p))
 
 
+@router.get("/mission")
+def agent_mission(
+    principal: Dict = Depends(require_application_session),
+    service: ActionService = Depends(get_action_service),
+):
+    """Real-time Agent Mission Control snapshot (running runs, recent activity,
+    honest aggregate stats)."""
+    return _run(service, principal, lambda p: service.mission(p))
+
+
 # ---------------------------------------------------------------------------
 # Providers / models
 # ---------------------------------------------------------------------------
