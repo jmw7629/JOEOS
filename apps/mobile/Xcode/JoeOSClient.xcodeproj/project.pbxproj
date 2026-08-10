@@ -51,7 +51,6 @@
 		A1B2C3D4E5F600000000010C /* JoeOSColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoeOSColors.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000010D /* JoeOSWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JoeOSWebView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F600000000010E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A1B2C3D4E5F600000000010F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000220 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A1B2C3D4E5F6000000000110 /* JoeOSClient.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JoeOSClient.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1B2C3D4E5F6000000000111 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
@@ -194,7 +193,6 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F600000000010E /* Assets.xcassets */,
-				A1B2C3D4E5F600000000010F /* Info.plist */,
 				A1B2C3D4E5F6000000000220 /* PrivacyInfo.xcprivacy */,
 			);
 			path = "../JoeOSClient/Resources";

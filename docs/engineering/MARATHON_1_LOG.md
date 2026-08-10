@@ -90,3 +90,10 @@ already rendered appear automatically with honest "no live data" state.
 Least-privilege guard on module creation: a user/workspace module cannot declare
 required capabilities/permissions the creator doesn't hold; workspace publishing
 requires a manage capability. Public catalog never exposes user/hidden modules.
+### P3 — iOS build unblocked (Xcode 16.6 Info.plist collision)
+Root cause: Xcode 16.6's build system adds an implicit copy for the Info.plist
+file reference in the Resources group, colliding with the Process-Info.plist
+step ("Multiple commands produce Info.plist"). Fix: removed the Info.plist
+PBXFileReference from the Resources group (INFOPLIST_FILE path still drives it).
+Result: full `xcodebuild build` and `xcodebuild test` SUCCEED on the Mac
+(arm64 simulator; test bundle passes).
