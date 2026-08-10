@@ -117,3 +117,7 @@ into JoeOS: /api/v1/control/mission (live runs + stats from control_agent_runs)
 and a live Mission view in the Agent Command Center (stats, running cards with
 elapsed timers, activity feed) refreshed via the realtime WS + polling.
 AGPL-3.0 license respected — concept only, no code copied. Deployed to Halo.
+## Milestone checkpoint — Mission Control (recorded, not a stop)
+Mission Control milestone verified live on Halo (mission endpoint auth-gated,
+/os/agents 200, runner healthy). Continuing loop. Next READY: definitive Agent
+Card system (compact card + break-open + drill-down).
