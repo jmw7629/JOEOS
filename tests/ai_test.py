@@ -490,3 +490,68 @@ def _json_response(payload):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExecutorProviderNeutralityTests(unittest.TestCase):
+    """D1 regression: the agent executor must route through the resolved
+    provider, not hardcode Ollama."""
+
+    def _service_with_provider(self, provider_id, available=True):
+        from server.ai.routing import CapabilityRouter
+
+        class Prov:
+            def __init__(self, pid):
+                self.provider_id = pid
+
+            def availability(self):
+                return ProviderRecord(provider_id=self.provider_id, name=self.provider_id,
+                                      available=available, reason="ok" if available else "off")
+
+            async def infer(self, messages, *, model, temperature=0.25, max_tokens=1200):
+                return InferenceResult(reply="ok:%s" % provider_id, model=model, provider=provider_id)
+
+        class Reg:
+            def __init__(self):
+                self._p = {provider_id: Prov(provider_id)}
+
+            def get(self, pid):
+                return self._p.get(pid)
+
+            def records(self):
+                return [p.availability() for p in self._p.values()]
+
+        service = object.__new__(AIService)
+        service.providers = Reg()
+        service._model_inventory = {provider_id: ["model-a"]}
+        service.router = CapabilityRouter(service.providers, model_inventory=lambda: service._model_inventory)
+        return service
+
+    def test_executor_resolves_and_uses_resolved_provider(self):
+        import asyncio
+
+        from server.agents.execution import OllamaAgentExecutor
+        from server.ai.models import InferenceResult
+
+        service = self._service_with_provider("lemonade", available=True)
+
+        class _I:
+            def __init__(self, m): self.reply = m; self.tokens_used = 3; self.model = m
+        async def fake_infer(messages, *, model, temperature=0.25, max_tokens=1200):
+            return _I("lemonade-reply")
+        service.providers.get("lemonade").infer = fake_infer
+
+        executor = OllamaAgentExecutor(service, default_model="model-a", control_service=None)
+        provider = executor._provider_for("model-a")
+        self.assertEqual(provider.provider_id, "lemonade")
+        result = asyncio.run(executor._complete([{"role": "user", "content": "hi"}], [], "model-a"))
+        self.assertIn("lemonade-reply", result["content"])
+
+    def test_executor_errors_when_no_eligible_provider(self):
+        import asyncio
+
+        from server.agents.execution import OllamaAgentExecutor
+
+        service = self._service_with_provider("lemonade", available=False)
+        executor = OllamaAgentExecutor(service, default_model="model-a")
+        with self.assertRaises(RuntimeError):
+            executor._provider_for("model-a")
