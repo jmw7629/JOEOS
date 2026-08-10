@@ -1772,40 +1772,75 @@
       var box = $("cc-kanban");
       box.innerHTML = "<div class='muted'>Loading…</div>";
       var cards = [];
+      // 1. Live agent runs (mission = full authoritative run set).
       try {
-        var data = await api("/api/v1/control/overview");
-        (data.recent_runs || []).forEach(function (r) {
-          cards.push({ id: r.id, title: (r.objective || "Run").slice(0, 70), agent: r.agent_key || "", status: r.status, when: r.started_at || r.completed_at, type: "run" });
+        var mission = await api("/api/v1/control/mission");
+        (mission.running || []).forEach(function (r) {
+          cards.push({ id: r.id, title: (r.objective || "Run").slice(0, 70), agent: r.agent, status: "running", when: r.started_at, elapsed_ms: r.elapsed_ms, type: "run", model: r.model });
+        });
+        (mission.recent || []).forEach(function (r) {
+          cards.push({ id: r.id, title: (r.objective || "Run").slice(0, 70), agent: r.agent, status: r.status, when: r.completed_at || r.started_at, type: "run", model: r.model, duration_ms: r.duration_ms });
         });
       } catch (e) {}
+      // 2. Automation runs.
+      try {
+        var auto = (await api("/api/v1/automation/runs")).runs || [];
+        auto.slice(0, 30).forEach(function (r) {
+          cards.push({ id: r.run_id, title: (r.workflow_id || "Automation").slice(0, 60), agent: "Automation", status: r.state, when: r.started_at, type: "automation", duration_ms: r.duration_seconds ? r.duration_seconds * 1000 : null });
+        });
+      } catch (e) {}
+      // 3. Campaign work packages.
       try {
         var campaigns = (await api("/api/v1/engineering/campaigns")).campaigns || [];
         if (campaigns.length) {
           var c = campaigns[0];
           var pkgs = (await api("/api/v1/engineering/campaigns/" + c.campaign_id + "/packages")).packages || [];
           pkgs.forEach(function (p) {
-            cards.push({ id: p.package_id, title: (p.key || p.package_id).slice(0, 60), agent: "Director", status: p.state, when: p.created_at || p.updated_at, type: "package" });
+            var deps = [];
+            try { deps = JSON.parse(p.dependencies || "[]"); } catch (err) {}
+            cards.push({ id: p.package_id, title: (p.key || p.package_id).slice(0, 60), agent: "Director", status: p.state, when: p.created_at || p.updated_at, type: "package", deps: deps });
           });
         }
       } catch (e) {}
       if (!cards.length) { box.innerHTML = "<div class='empty-note'>No work yet. Ask Joe or start a campaign.</div>"; return; }
       var cols = [
         { key: "backlog", title: "Backlog", match: ["queued", "proposed"] },
-        { key: "ready", title: "Ready", match: ["eligible"] },
-        { key: "working", title: "Working", match: ["working", "running", "in_progress", "started", "executing", "planning", "implementing", "validating"] },
-        { key: "verifying", title: "Verifying", match: ["verifying", "verification", "reviewing"] },
-        { key: "waiting", title: "Waiting for Joe", match: ["waiting", "blocked"] },
+        { key: "ready", title: "Ready", match: ["eligible", "waiting"] },
+        { key: "working", title: "Working", match: ["working", "running", "in_progress", "started", "executing", "planning", "implementing", "validating", "reviewing"] },
+        { key: "verifying", title: "Verifying", match: ["verifying", "verification", "review"] },
+        { key: "waiting", title: "Waiting for Joe", match: ["waiting_for_joe", "awaiting_approval", "approval_required"] },
+        { key: "failed", title: "Failed", match: ["failed", "blocked", "error"] },
         { key: "done", title: "Done", match: ["done", "completed", "succeeded", "complete"] },
       ];
       box.innerHTML = "<div class='kanban'>" + cols.map(function (col) {
         var items = cards.filter(function (c) { return col.match.indexOf(c.status) !== -1; });
         return "<div class='kanban-col'><h5>" + col.title + " (" + items.length + ")</h5>" +
           items.map(function (c) {
-            return "<div class='kb-card'><div class='t'>" + esc(c.title) + "</div>" +
+            var elapsed = c.elapsed_ms != null ? Math.round(c.elapsed_ms / 60000) + "m" : (c.duration_ms != null ? Math.round(c.duration_ms / 1000) + "s" : "");
+            var deps = c.deps && c.deps.length ? " · deps " + c.deps.join(", ") : "";
+            return "<div class='kb-card' data-wb='" + c.id + "'><div class='t'>" + esc(c.title) + "</div>" +
               "<div class='s'><span class='chip " + statusChip(c.status) + "'>" + esc(c.status) + "</span> " +
-              esc(c.agent || "") + " · " + esc(c.type || "") + "</div></div>";
+              esc(c.agent || "") + " · " + esc(c.type || "") +
+              (c.model ? " · " + esc(c.model) : "") +
+              (elapsed ? " · " + elapsed : "") + deps +
+              "</div></div>";
           }).join("") + "</div>";
       }).join("") + "</div>";
+      // Card break-open: click a card to reveal its objective + activity.
+      box.querySelectorAll("[data-wb]").forEach(function (card) {
+        card.addEventListener("click", function () {
+          var id = card.getAttribute("data-wb");
+          var detail = document.getElementById("wb-detail-" + id);
+          if (detail) { detail.classList.toggle("hidden"); return; }
+          var found = cards.find(function (c) { return c.id === id; });
+          var el = document.createElement("div");
+          el.id = "wb-detail-" + id;
+          el.className = "run-detail";
+          el.innerHTML = "<div class='muted small'>" + esc(found ? (found.title || id) : id) +
+            (found && found.deps && found.deps.length ? " · deps: " + esc(found.deps.join(", ")) : "") + "</div>";
+          card.appendChild(el);
+        });
+      });
     }
 
     async function loadSchedule() {
