@@ -3314,6 +3314,65 @@
       color: var(--success);
     }
 
+    .attention-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(minmax(0, 260px), 1fr));
+      gap: 14px;
+    }
+    .attention-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: border-color .15s ease, box-shadow .15s ease, transform .08s ease;
+    }
+    .attention-card:hover {
+      border-color: rgba(49, 215, 255, .4);
+      box-shadow: var(--depth-raised-2);
+    }
+    .attention-card:active {
+      transform: translateY(1px);
+      box-shadow: var(--depth-pressed);
+    }
+    .attention-card.tone-danger { border-color: rgba(255, 100, 124, .3); }
+    .attention-card.tone-danger:hover { border-color: rgba(255, 100, 124, .55); }
+    .attention-card.tone-warning { border-color: rgba(255, 180, 92, .3); }
+    .attention-card.tone-warning:hover { border-color: rgba(255, 180, 92, .55); }
+    .attention-card-icon {
+      display: inline-flex;
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      background: rgba(49, 215, 255, .08);
+      color: var(--cyan);
+    }
+    .attention-card.tone-danger .attention-card-icon { background: rgba(255, 100, 124, .1); color: var(--danger); }
+    .attention-card.tone-warning .attention-card-icon { background: rgba(255, 180, 92, .1); color: var(--warning); }
+    .attention-card-copy { min-width: 0; flex: 1; }
+    .attention-card-copy strong { display: block; font-size: 13.5px; line-height: 1.35; margin-bottom: 3px; }
+    .attention-card-copy span { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; }
+    .attention-count {
+      flex: 0 0 auto;
+      min-width: 26px;
+      height: 26px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 0 8px;
+    }
+    .attention-count.danger { background: rgba(255, 100, 124, .14); color: var(--danger); }
+    .attention-count.warning { background: rgba(255, 180, 92, .14); color: var(--warning); }
+    .attention-count.success { background: rgba(61, 227, 164, .14); color: var(--success); }
+
     .attention-copy,
     .next-action-copy,
     .agent-mini-copy,
@@ -5143,6 +5202,7 @@
 
       var NAV_ITEMS = [
         { id: "command", label: "Command Center", short: "Command", icon: "fa-border-all" },
+        { id: "attention", label: "Attention Center", short: "Attention", icon: "fa-bell" },
         { id: "mission", label: "Mission Control", short: "Mission", icon: "fa-compass" },
         { id: "dashboard", label: "Executive Dashboard", short: "Dashboard", icon: "fa-chart-line" },
         { id: "pipeline", label: "CI/CD Pipeline", short: "Pipeline", icon: "fa-code-branch" },
@@ -6133,6 +6193,52 @@
         );
       }
 
+      function AttentionCenter(props) {
+        // One system-level attention model: everything that actually needs a
+        // human, in one place. Passive activity stays passive.
+        var items = [];
+        var auto = props.automationOverview || {};
+        var security = props.securityOverview || {};
+        var runtime = props.runtime || {};
+        if (auto.pending_approvals > 0) items.push({ id: "approvals", severity: "danger", icon: "fa-user-check", title: auto.pending_approvals + " approval" + (auto.pending_approvals === 1 ? "" : "s") + " pending", detail: "Work is waiting for your explicit decision.", open: "security-center", count: auto.pending_approvals });
+        if (auto.failed_recently > 0) items.push({ id: "failed-automations", severity: "danger", icon: "fa-triangle-exclamation", title: auto.failed_recently + " automation" + (auto.failed_recently === 1 ? "" : "s") + " failed recently", detail: "Runs need review before retry.", open: "automation", count: auto.failed_recently });
+        if (auto.unhealthy_schedules > 0) items.push({ id: "schedules", severity: "warning", icon: "fa-calendar-days", title: auto.unhealthy_schedules + " schedule" + (auto.unhealthy_schedules === 1 ? "" : "s") + " unhealthy", detail: "Scheduled work is not producing healthy runs.", open: "automation", count: auto.unhealthy_schedules });
+        if (security.security_events_open > 0) items.push({ id: "security-events", severity: "danger", icon: "fa-shield-halved", title: security.security_events_open + " open security event" + (security.security_events_open === 1 ? "" : "s"), detail: "The security platform wants review.", open: "security-center", count: security.security_events_open });
+        if (security.lockdown_active) items.push({ id: "lockdown", severity: "danger", icon: "fa-lock", title: "Lockdown is active", detail: "Governance has elevated protections. Review before continuing.", open: "security-center" });
+        if (security.secrets_requiring_rotation > 0) items.push({ id: "secrets", severity: "warning", icon: "fa-key", title: security.secrets_requiring_rotation + " secret" + (security.secrets_requiring_rotation === 1 ? "" : "s") + " require rotation", detail: "Credential metadata indicates rotation is due.", open: "security-center", count: security.secrets_requiring_rotation });
+        if (security.incidents_open > 0) items.push({ id: "incidents", severity: "danger", icon: "fa-file-shield", title: security.incidents_open + " open incident" + (security.incidents_open === 1 ? "" : "s"), detail: "Incident records need acknowledgement.", open: "security-center", count: security.incidents_open });
+        if (!runtime.online) items.push({ id: "runtime", severity: "warning", icon: "fa-lemon", title: "Local AI runtime unavailable", detail: "Eligible work is routed to available providers. Verify the runtime.", open: "ai" });
+        if (!items.length) items.push({ id: "clear", severity: "success", icon: "fa-circle-check", title: "Nothing needs you right now", detail: "Approvals, failures, security events, and blocked work are all clear." });
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "attention-title" },
+          h(SectionHeader, {
+            kicker: "What needs me",
+            title: h("span", { id: "attention-title" }, "Attention Center"),
+            description: "One honest answer to \"what needs me?\" — approvals, failures, security events, unhealthy schedules, and blocked work. Everything else stays passive activity.",
+            actions: items.some(function (item) { return item.severity !== "success"; }) ? h("span", { className: "live-pill attention", key: "attention-live" }, h("span", { className: "live-dot" }), items.length + " ITEM" + (items.length === 1 ? "" : "S") + " NEED YOUR ATTENTION") : h("span", { className: "live-pill", key: "attention-clear" }, h("span", { className: "live-dot" }), "ALL CLEAR")
+          }),
+          h(
+            "div",
+            { className: "attention-grid" },
+            items.map(function (item) {
+              var tone = item.severity === "danger" ? "danger" : item.severity === "warning" ? "warning" : "success";
+              return h(
+                "article",
+                { className: "glass-card interactive-card attention-card tone-" + tone, role: "button", tabIndex: 0, key: item.id,
+                  onClick: function () { props.onOpen(item.open); },
+                  onKeyDown: function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); props.onOpen(item.open); } } },
+                h("div", { className: "attention-card-icon" }, icon(item.icon)),
+                h("div", { className: "attention-card-copy" },
+                  h("strong", null, item.title),
+                  h("span", null, item.detail)),
+                item.count != null ? h("span", { className: "attention-count " + tone }, item.count) : null
+              );
+            })
+          )
+        );
+      }
+
       function BotCard(props) {
         var bot = props.bot;
         var running = bot.status === "running";
@@ -6972,7 +7078,7 @@
 
       function AttentionWidget(props) {
         return h("div", { className: "attention-list" }, props.items.map(function (item) {
-          return h("div", { className: "attention-row", key: item.id }, h("span", { className: "attention-indicator " + item.severity }, icon(item.icon)), h("span", { className: "attention-copy" }, h("strong", null, item.title), h("span", null, item.detail)), h("span", { className: "attention-severity" }, item.severity === "success" ? "CLEAR" : item.severity));
+          return h("button", { type: "button", className: "attention-row", key: item.id, onClick: function () { if (props.onOpenAttention) props.onOpenAttention(); } }, h("span", { className: "attention-indicator " + item.severity }, icon(item.icon)), h("span", { className: "attention-copy" }, h("strong", null, item.title), h("span", null, item.detail)), h("span", { className: "attention-severity" }, item.severity === "success" ? "CLEAR" : item.severity));
         }));
       }
 
@@ -7038,7 +7144,7 @@
 
         function contentFor(widget, definition) {
           if (!definition || definition.state !== "ready") return h(IntegrationWidget, { definition: definition || { name: widget.widget_id, description: "A compatible integration manifest is required.", icon: "fa-plug" }, onConfigure: props.onConfigure });
-          if (widget.widget_id === "mission.attention") return h(AttentionWidget, { items: attention });
+          if (widget.widget_id === "mission.attention") return h(AttentionWidget, { items: attention, onOpenAttention: props.onOpenAttention });
           if (widget.widget_id === "mission.ai_delegation") return h(DelegationWidget, { onAsk: props.onAsk });
           if (widget.widget_id === "mission.blockers") return h(BlockersWidget, { runtime: props.runtime, workspace: props.workspace, catalog: props.catalog });
           if (widget.widget_id === "mission.next_action") return h(NextActionWidget, { items: attention, onAsk: props.onAsk });
@@ -10674,8 +10780,10 @@
             onOpen: function (id) { selectSection(String(id)); },
             onAsk: focusAssistant
           });
+        } else if (active === "attention") {
+          section = h(AttentionCenter, { automationOverview: automationOverview, securityOverview: securityOverview, runtime: runtime, onOpen: function (id) { selectSection(String(id)); } });
         } else if (active === "mission") {
-          section = h(MissionControlSection, { workspace: workspace, catalog: catalog, metrics: metrics, runtime: runtime, security: security, bots: bots, logs: logs, saving: workspaceSaving, error: workspaceError, editing: editingLayout, dragging: draggingWidget, dropTarget: dropTarget, onAdd: function () { setCatalogOpen(true); }, onEdit: toggleLayoutEditing, onCustomize: function () { setCustomizerOpen(true); }, onConfigure: openConfigurationGuide, onAsk: askFromMission, onMove: moveWorkspaceWidget, onResize: resizeWorkspaceWidget, onHide: hideWorkspaceWidget, onDragStart: beginWidgetDrag, onDragOver: overWidgetDrag, onDrop: dropWidget, onDragEnd: endWidgetDrag });
+          section = h(MissionControlSection, { workspace: workspace, catalog: catalog, metrics: metrics, runtime: runtime, security: security, bots: bots, logs: logs, saving: workspaceSaving, error: workspaceError, editing: editingLayout, dragging: draggingWidget, dropTarget: dropTarget, onAdd: function () { setCatalogOpen(true); }, onEdit: toggleLayoutEditing, onCustomize: function () { setCustomizerOpen(true); }, onConfigure: openConfigurationGuide, onAsk: askFromMission, onOpenAttention: function () { selectSection("attention"); }, onMove: moveWorkspaceWidget, onResize: resizeWorkspaceWidget, onHide: hideWorkspaceWidget, onDragStart: beginWidgetDrag, onDragOver: overWidgetDrag, onDrop: dropWidget, onDragEnd: endWidgetDrag });
         } else if (active === "dashboard") {
           section = h(DashboardSection, { metrics: metrics, uptimeSeconds: uptimeSeconds, lastUpdated: lastUpdated, runtime: runtime, onBrief: generateBrief });
         } else if (active === "pipeline") {
