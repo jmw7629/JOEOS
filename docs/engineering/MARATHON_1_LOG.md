@@ -200,3 +200,21 @@ Deployed to Halo at commit `50b5a3e` and restarted the backend.
     matrix 200, no downloads.
   - /sw.js served as application/javascript (joeos-shell-v4).
   - /api/v1/objects/types auth-gated (401 session_required) as designed.
+
+## Operational hardening — supervised self-healing backend (COMPLETE)
+Deployed `f3e4b43` + `3e37d43` to Halo. Backend is now supervised and self-healing:
+- `/healthz/ready` readiness probe (DB + campaign + activity checks, 503 when not ready).
+- In-process health watchdog: on 3 consecutive readiness failures records
+  degraded/restarting in the object activity timeline and exits so systemd
+  restarts a wedged-but-alive backend.
+- Hardened systemd unit installed (`deploy/joeos-backend.service`):
+  Restart=always, StartLimitBurst=8, ExecStartPost readiness gate,
+  KillMode=control-group, After=ollama/lemonade/tailscaled.
+- Canonical control: `scripts/joeosctl.sh` (status/health/restart/deploy/log).
+- Verified live on Halo: SIGKILL backend -> systemd NRestarts=1 -> new PID ->
+  healthz 200 -> readiness ready, twice. Recovery events recorded as object
+  activity (service/joeos-backend degraded/recovered).
+- Fixed latent prod bug found during testing: legacy notification severity
+  'high' crashed the comms surface on read; now normalized (high->critical).
+- Full regression: 1020 backend + 61 subtests, 36/36 frontend, 13 route/hardening
+  tests, 39 comms tests.
