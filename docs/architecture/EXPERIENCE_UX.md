@@ -140,3 +140,32 @@ surfaces (for example, Automation workflow enablement/health).
 - No visual-regression screenshot infrastructure exists in the repository;
   structural frontend tests (`tests/frontend.test.mjs`) cover the new
   primitives instead.
+
+## Universal interaction grammar (D24)
+
+JoeOS uses six nearly-absolute behaviors across browser, SwiftUI, and Android.
+Once learned, the whole OS becomes predictable:
+
+| Gesture | Meaning | Notes |
+|---------|---------|-------|
+| tap/click object | **open** | the object card body is the object; no separate "View/Open" buttons |
+| select | **inspect** | desktop inspector shows Object Quick Look (identity, state, relationships, primary action) |
+| long press / ellipsis | **secondary actions** | overflow menu (pin, focus, move, reset) |
+| drag | **rearrange** | workspace/module layout with persisted order + undo |
+| Return control | **back one JoeOS context** | named internal return ("← Agents"); never requires the browser Back button |
+| Joe orb | **intelligence** | the single canonical Joe invocation; context is automatic from the active ObjectRef |
+| Command palette (Cmd+K) | **find/do anything** | object-native search + actions (Open/Run/Approve/Pin/Preview) |
+
+### Rules that follow from the grammar
+
+- Object cards are `role="button"` + keyboard-openable (Enter/Space).
+- No per-card "Open / View / Ask Joe / Check Status" button forests.
+- Status is live and automatic; refresh is a diagnostic action, not a workflow.
+- Every drill-down surface exposes a visible named Return control.
+- The persistent Joe orb is the only normal Joe invocation; per-object "Ask
+  Joe" buttons and duplicate prompt fields are prohibited.
+- Actions carry a uniform safety language: safe / consequential / privileged /
+  destructive (see `docs/architecture/JOEOS_OBJECT_SYSTEM.md` §2.4).
+- Reversible actions (layout, pinning, metadata) are undoable.
+- Zero-clipping is absolute: text is never accidentally cropped; intentional
+  truncation uses ellipsis + full value accessible via tooltip/detail.
