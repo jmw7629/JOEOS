@@ -52,7 +52,7 @@
     <section id="pairing-panel" class="panel hidden">
       <h3 style="margin-top:0">Connect this browser to JoeOS</h3>
       <p class="muted">Enter the pairing code from
-        <span class="mono">python -m server.identity.cli --database data/joeos.db issue --origin https://mcso9tqzb9.tailb9395f.ts.net</span>,
+        <span class="mono">python -m server.identity.cli --database data/joeos.db issue --origin <span id="os-origin">window.location.origin</span></span>,
         pair, then assign the device to the owner. Then click Check status.</p>
       <label for="pair-code">Pairing code</label>
       <input id="pair-code" placeholder="JOEOS1|https://...|uuid|SECRET" autocomplete="off">
@@ -156,6 +156,8 @@
   </main>
 
   <script>
+      (function () { try { var el = document.getElementById("os-origin"); if (el && window.location && window.location.origin) el.textContent = window.location.origin; } catch (e) {} })();
+
     "use strict";
     // ---- pairing ceremony (same as Agent Fabric console) ----
     function b64encode(b){let s="";for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}

@@ -73,6 +73,8 @@ from server.production import ProductionService, production_router
 from server.ai import AIService, ai_router
 from server.selfmaintenance import SelfMaintenanceService, selfmaintenance_router
 from server.terminal import TerminalGateway, terminal_router
+from server.modules import ModuleCatalog, ModuleManifest, module_manifest_from
+from server.modules.router import router as modules_router
 from server.realtime import RealtimeService, SQLiteEventRepository, realtime_router
 from server.wearables import WearableService, wearables_router
 from server.security import (
@@ -445,6 +447,51 @@ def _default_agent_model(ollama_state: Optional[Dict[str, Any]]) -> str:
         if candidate in models:
             return candidate
     return "qwen3-coder:30b-a3b-q8_0"
+
+
+def _seed_builtin_modules(catalog: ModuleCatalog) -> None:
+    """Seed the built-in Command Center modules as declarative manifests.
+
+    These are product defaults (not personal/deployment values): a brand-new
+    organization sees exactly these modules regardless of the deploying host.
+    """
+    builtins = [
+        {
+            "id": "command", "display_name": "Command Center", "icon": "fa-border-all",
+            "route": "/os/command", "category": "core", "ordering": 0, "pinned": True,
+            "commands": ["open-command-center"], "joe_context": {"kind": "module"},
+            "widgets": [
+                {"id": "agents", "type": "agent_panel"},
+                {"id": "automations", "type": "task_panel"},
+            ],
+        },
+        {"id": "agents", "display_name": "Agents", "icon": "fa-user-astronaut", "route": "/os/agents",
+         "category": "core", "ordering": 10, "joe_context": {"kind": "module"}, "inspection": True,
+         "required_capabilities": ["agent.read"]},
+        {"id": "automation", "display_name": "Automations", "icon": "fa-robot", "route": "/os/automations",
+         "category": "core", "ordering": 20, "joe_context": {"kind": "module"}},
+        {"id": "memory", "display_name": "Memory", "icon": "fa-brain", "route": "/os/memory",
+         "category": "knowledge", "ordering": 30, "joe_context": {"kind": "module"}},
+        {"id": "files", "display_name": "Files", "icon": "fa-folder-open", "route": "/os/files",
+         "category": "knowledge", "ordering": 40, "joe_context": {"kind": "module"}},
+        {"id": "terminal", "display_name": "Terminal", "icon": "fa-terminal", "route": "/os/terminal",
+         "category": "tools", "ordering": 50, "joe_context": {"kind": "module"},
+         "required_permissions": ["terminal.open"]},
+        {"id": "build", "display_name": "Build JoeOS", "icon": "fa-hammer", "route": "/os/build",
+         "category": "engineering", "ordering": 60, "joe_context": {"kind": "module"}},
+        {"id": "models", "display_name": "Models & AI", "icon": "fa-microchip", "route": "/os/ai",
+         "category": "intelligence", "ordering": 70, "joe_context": {"kind": "module"}},
+        {"id": "security", "display_name": "Security", "icon": "fa-shield-halved", "route": "/os/security-center",
+         "category": "governance", "ordering": 80, "joe_context": {"kind": "module"},
+         "required_capabilities": ["security.read"]},
+        {"id": "settings", "display_name": "Settings", "icon": "fa-sliders", "route": "/os/settings",
+         "category": "system", "ordering": 90, "joe_context": {"kind": "module"}},
+    ]
+    for raw in builtins:
+        try:
+            catalog.seed_builtin(module_manifest_from(__import__("json").dumps(raw)))
+        except Exception:  # noqa: BLE001 - a bad built-in must not block the rest
+            continue
 
 
 def _register_lemonade_registry(app: FastAPI, db_path: Path, lemonade_state: Optional[Dict[str, Any]]) -> None:
@@ -1767,6 +1814,15 @@ async def lifespan(app: FastAPI):
             db_path, level, source, message
         ),
     )
+    # Declarative module catalog: seed the built-in Command Center modules so
+    # every client (browser/iOS/Android) consumes the same manifest contract.
+    try:
+        app.state.module_catalog = ModuleCatalog(str(db_path.parent / "modules"))
+        app.state.module_catalog.prepare()
+        _seed_builtin_modules(app.state.module_catalog)
+    except Exception as error:  # noqa: BLE001 - catalog must never crash startup
+        _record_event(db_path, "warning", "modules",
+                      "Module catalog init failed: %s" % type(error).__name__)
 
     async def _terminal_reaper() -> None:
         while True:
@@ -1844,6 +1900,7 @@ app.include_router(security_router)
 app.include_router(performance_router)
 app.include_router(ai_router)
 app.include_router(terminal_router)
+app.include_router(modules_router)
 app.include_router(production_router)
 app.include_router(selfmaintenance_router)
 

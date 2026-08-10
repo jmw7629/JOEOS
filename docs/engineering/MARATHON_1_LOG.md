@@ -39,3 +39,7 @@ pipelines; preserves DAG when automation runs are empty.
 ### D5 — deeper agent detail surface
 COMPLETE. Tabbed agent management (Overview/Identity/Tools/Memory/Automations/
 Executions) wired to real agent profile, provider/model, run, and memory data.
+### P1 — Enterprise shared architecture (module system + personal/default separation)
+ModuleManifest contract (cross-platform) + validated ModuleCatalog + catalog API
+seeded with built-in modules. Removed the only hardcoded personal hostname from
+reusable product code (automations.html now derives origin at runtime).
