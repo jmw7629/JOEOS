@@ -130,6 +130,11 @@
     .chip.red { color: var(--danger); border-color: rgba(255,100,124,0.5); }
     .chip.cyan { color: var(--cyan); border-color: rgba(49,215,255,0.5); }
     .agent-current { color: var(--cyan); font-size: 12.5px; min-height: 34px; line-height: 1.35; }
+    .memory-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; cursor: pointer; }
+    .memory-card:hover { border-color: rgba(49,215,255,0.4); }
+    [data-memviews] button { background: transparent; border: 1px solid transparent; color: var(--muted); padding: 6px 12px; border-radius: 8px; font-size: 12.5px; cursor: pointer; }
+    [data-memviews] button:hover { color: var(--text); background: rgba(139,212,255,0.08); }
+    [data-memviews] button.active { color: var(--cyan); border-color: rgba(49,215,255,0.45); background: rgba(49,215,255,0.1); }
     .bar { height: 6px; border-radius: 4px; background: rgba(139,212,255,0.12); overflow: hidden; margin-top: 6px; }
     .bar > span { display: block; height: 100%; background: var(--cyan); border-radius: 4px; }
     .live-panel { position: fixed; right: 14px; bottom: 14px; width: 320px; max-width: calc(100vw - 28px);
@@ -2097,41 +2102,95 @@
       box.innerHTML = html;
     }
 
+    var memoryFilter = "all";
+    var memoryRecords = [];
+
+    function memoryViewBtn(label, key) {
+      return "<button data-memview='" + key + "' class='" + (memoryFilter === key ? "active" : "") + "'>" + label + "</button>";
+    }
+
     async function loadMemory(query) {
       var box = $("cc-memory-body");
       box.innerHTML = "<div class='muted'>Loading…</div>";
+      var html = "<div class='row' style='margin-bottom:10px' data-memviews>" +
+        memoryViewBtn("All", "all") +
+        memoryViewBtn("Shared", "shared") +
+        memoryViewBtn("Proposed", "proposed") +
+        memoryViewBtn("Conflicts", "conflicts") +
+        memoryViewBtn("Stale", "stale") +
+        "</div>";
       try {
-        var url = query ? "/api/v1/memory/search?q=" + encodeURIComponent(query) : "/api/v1/memory/records?limit=25";
+        var url = query ? "/api/v1/memory/search?q=" + encodeURIComponent(query) : "/api/v1/memory/records?limit=60";
         var data = await api(url);
-        var records = Array.isArray(data) ? data : (data.records || data.results || []);
-        if (!records.length) { box.innerHTML = "<div class='empty-note'>No memory records" + (query ? " matching “" + esc(query) + "”" : "") + ".</div>"; return; }
-        box.innerHTML = "<table class='matrix'><tr><th>Kind</th><th>Agent</th><th>Summary</th><th>State</th><th>Updated</th></tr>" +
-          records.map(function (m) {
-            return "<tr><td>" + esc(m.kind || m.kind_id || "record") + "</td>" +
-              "<td>" + esc(m.agent_id || m.source || "—") + "</td>" +
-              "<td>" + esc((m.summary || m.content || m.payload || "").slice(0, 80)) + "</td>" +
-              "<td><span class='chip " + statusChip(m.state || m.status) + "'>" + esc(m.state || m.status || "—") + "</span></td>" +
-              "<td class='muted small'>" + esc(timeAgo(m.updated_at || m.created_at)) + "</td></tr>";
-          }).join("") + "</table>";
+        memoryRecords = Array.isArray(data) ? data : (data.records || data.results || []);
       } catch (e) {
         box.innerHTML = "<div class='msg err'>" + esc(e.message) + "</div>";
+        return;
       }
+      function matchesFilter(m) {
+        if (memoryFilter === "shared") return String(m.primary_scope || "").toLowerCase().indexOf("shared") !== -1;
+        if (memoryFilter === "proposed") return m.review_state === "proposed" || m.claim_state === "proposed";
+        if (memoryFilter === "conflicts") return m.conflict_state && m.conflict_state !== "none" && m.conflict_state !== "";
+        if (memoryFilter === "stale") return !!m.stale;
+        return true;
+      }
+      var filtered = memoryRecords.filter(matchesFilter);
+      if (!filtered.length) {
+        box.innerHTML = html + "<div class='empty-note'>No memory records" +
+          (query ? " matching “" + esc(query) + "”" : "") + " in this view.</div>";
+        var views = document.querySelector("[data-memviews]");
+        if (views) views.addEventListener("click", onMemView);
+        return;
+      }
+      html += filtered.map(function (m) {
+        var stateTone = m.claim_state === "confirmed" ? "green" : (m.claim_state === "proposed" ? "amber" : "gray");
+        var title = m.title || m.memory_type || "Record";
+        var summary = (m.content || "").slice(0, 90);
+        var scope = m.primary_scope || "—";
+        var author = m.author || "—";
+        return "<div class='memory-card' data-mem='" + esc(m.memory_id) + "'>" +
+          "<div class='row'><b>" + esc(title.slice(0, 50)) + "</b>" +
+          "<span class='chip " + stateTone + "'>" + esc(m.claim_state || m.review_state || "—") + "</span>" +
+          (m.stale ? "<span class='chip red'>stale</span>" : "") +
+          (m.conflict_state && m.conflict_state !== "none" ? "<span class='chip red'>conflict</span>" : "") +
+          "</div>" +
+          "<div class='muted small'>" + esc(summary) + "</div>" +
+          "<div class='muted small'>scope " + esc(scope) + " · " + esc(author) + " · " + esc(timeAgo(m.updated_at || m.created_at)) + "</div>" +
+          "<div class='run-detail hidden' data-mem-detail='" + esc(m.memory_id) + "'></div></div>";
+      }).join("");
+      box.innerHTML = html;
+      var views = document.querySelector("[data-memviews]");
+      if (views) views.addEventListener("click", onMemView);
+      box.querySelectorAll("[data-mem]").forEach(function (card) {
+        card.addEventListener("click", function () {
+          var id = card.getAttribute("data-mem");
+          var detail = document.querySelector("[data-mem-detail='" + id + "']");
+          if (detail) { detail.classList.toggle("hidden"); if (!detail.classList.contains("hidden")) renderMemoryDetail(id, detail); }
+        });
+      });
     }
 
-    function actRow(label, ev, whenKey) {
-      var payload = {};
-      try {
-        payload = (ev && typeof ev === "object") ? ev : { event: String(ev) };
-      } catch (e) {}
-      var raw = "";
-      try { raw = JSON.stringify(payload); } catch (e) { raw = String(payload); }
-      raw = raw.slice(0, 2500);
-      return "<div class='act-row' data-act> <span class='pill " + statusChip(ev.level || ev.kind || ev.status) + "'></span>" +
-        "<b>" + esc(label) + "</b><span class='muted'>" +
-        esc((ev.summary || ev.message || ev.objective || "").slice(0, 90)) + "</span>" +
-        "<span class='when'>" + esc(timeAgo(ev[whenKey] || ev.created_at)) + "</span>" +
-        "<span class='chev'>▸</span>" +
-        "<div class='act-detail'><pre class='msg'>" + esc(raw) + "</pre></div></div>";
+    function onMemView(event) {
+      var btn = event.target.closest("[data-memview]");
+      if (btn) { memoryFilter = btn.getAttribute("data-memview"); loadMemory(); }
+    }
+
+    function renderMemoryDetail(id, detailEl) {
+      var m = memoryRecords.find(function (r) { return r.memory_id === id; });
+      if (!m) return;
+      detailEl.innerHTML =
+        "<div class='section-title' style='margin-top:8px'><h3>Content</h3></div>" +
+        "<div class='muted small' style='white-space:pre-wrap'>" + esc(m.content || "—") + "</div>" +
+        "<div class='section-title' style='margin-top:10px'><h3>Provenance</h3></div>" +
+        "<table class='matrix'><tr><td>Type</td><td>" + esc(m.memory_type || "—") + "</td></tr>" +
+        "<tr><td>Scope</td><td>" + esc(m.primary_scope || "—") + "</td></tr>" +
+        "<tr><td>Author</td><td>" + esc(m.author || "—") + "</td></tr>" +
+        "<tr><td>Source</td><td>" + esc(m.source_kind || "—") + (m.source ? " · " + esc(String(m.source).slice(0, 40)) : "") + "</td></tr>" +
+        "<tr><td>Authority</td><td>" + esc(m.authority || "—") + "</td></tr>" +
+        "<tr><td>Learned</td><td>" + esc(timeAgo(m.learned_at || m.created_at)) + "</td></tr>" +
+        (m.confidence != null ? "<tr><td>Confidence</td><td>" + esc(m.confidence) + "</td></tr>" : "") +
+        (m.related_memories && m.related_memories.length ? "<tr><td>Related memories</td><td>" + esc(m.related_memories.length) + "</td></tr>" : "") +
+        "</table>";
     }
 
     async function loadActivity() {
