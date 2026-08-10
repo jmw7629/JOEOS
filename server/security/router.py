@@ -9,9 +9,11 @@ claims, or security scores are produced.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+
+from server.identity.authority_router import require_application_session
 
 from .models import (
     ApprovalRequestRecord,
@@ -108,7 +110,9 @@ def request_approval(payload: ApprovalRequest, service: SecurityService = Depend
 
 
 @router.post("/approvals/{approval_id}/approve")
-def approve(approval_id: str, payload: ApprovalDecision, service: SecurityService = Depends(get_security_service)) -> ApprovalRequestRecord:
+def approve(approval_id: str, payload: ApprovalDecision,
+                principal: Dict = Depends(require_application_session),
+                service: SecurityService = Depends(get_security_service)) -> ApprovalRequestRecord:
     try:
         return service.approve(
             approval_id=approval_id,
@@ -122,12 +126,16 @@ def approve(approval_id: str, payload: ApprovalDecision, service: SecurityServic
 
 
 @router.post("/approvals/{approval_id}/deny")
-def deny_approval(approval_id: str, payload: ApprovalDecision, service: SecurityService = Depends(get_security_service)) -> ApprovalRequestRecord:
+def deny_approval(approval_id: str, payload: ApprovalDecision,
+                principal: Dict = Depends(require_application_session),
+                service: SecurityService = Depends(get_security_service)) -> ApprovalRequestRecord:
     return service.deny_approval(approval_id=approval_id, approver_identity=payload.approver_identity)
 
 
 @router.post("/approvals/{approval_id}/verify-exact")
-def verify_approval(approval_id: str, payload: ExactVerify, service: SecurityService = Depends(get_security_service)) -> dict:
+def verify_approval(approval_id: str, payload: ExactVerify,
+                principal: Dict = Depends(require_application_session),
+                service: SecurityService = Depends(get_security_service)) -> dict:
     valid = service.verify_approval_exact(
         approval_id=approval_id,
         action_id=payload.action_id,
@@ -140,7 +148,9 @@ def verify_approval(approval_id: str, payload: ExactVerify, service: SecuritySer
 
 
 @router.get("/approvals")
-def approvals(state: Optional[str] = Query(default=None), service: SecurityService = Depends(get_security_service)) -> dict:
+def approvals(state: Optional[str] = Query(default=None),
+                principal: Dict = Depends(require_application_session),
+                service: SecurityService = Depends(get_security_service)) -> dict:
     return {"approvals": [record.model_dump() for record in service.approvals_list(state=state)]}
 
 

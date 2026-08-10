@@ -1551,7 +1551,7 @@
       var html = "";
       var jobs = [];
       try {
-        var data = await api("/api/v1/runner/executions");
+        var data = await api("/api/v1/control/executions");
         jobs = data.executions || [];
         executionRecords = jobs;
       } catch (e) {
