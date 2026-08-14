@@ -53,6 +53,18 @@ Schedule · Pipelines · Memory · Activity · Models** — one coherent workspa
 - Command palette with the required commands (Ask Joe, Mission, Working Agents,
   Failed Automations, Waiting Approvals, Continue Building JoeOS, Terminal).
 - Universal search across agents/automations/models/memory/files.
+- Keyboard shortcut registry + global handler kept in sync (no drift): Ctrl+K
+  palette, Ctrl+Shift+K Joe, Ctrl+Shift+N notifications, Ctrl+, settings,
+  Ctrl+F global search, ? / Ctrl+/ shortcut reference, Alt+1..0 workspace,
+  Esc close (M-1203).
+- Accessibility pass (M-1205): `navigation` landmarks on the desktop and mobile
+  rails, system-condition banner stack and notification panel as live
+  announcing regions, sr-only unread-notification context, focus traps,
+  skip-to-main-content link, `aria-current` on the active nav item.
+- Visual acceptance (M-1204): headless-Chrome CDP at 1440x900 / 1024x768 /
+  390x844 across `/`, `/os/build`, `/os/agents` — zero horizontal overflow at
+  every combination; desktop/tablet show the sidebar, mobile switches to the
+  hamburger drawer. Evidence: `docs/audits/VISUAL_ACCEPTANCE.md`.
 
 ## Module platform / enterprise
 
@@ -92,8 +104,12 @@ Schedule · Pipelines · Memory · Activity · Models** — one coherent workspa
 
 ## Tests (final)
 
-- Backend: `pytest tests/ runner/tests/ packages/` → **961 passed + 61 subtests**.
-- Frontend: `node --test tests/frontend.test.mjs` → **35/35**.
+- Backend: `pytest tests/` → **961 passed + 61 subtests**.
+- Runner: `pytest runner/tests/` → **59 passed**.
+- Plugin SDK: `pytest packages/` → **6 passed**.
+- Frontend: `node --test tests/frontend.test.mjs` → **38/38**.
+- Client SDK: `node --test packages/sdk/tests/client.test.mjs` → **14/14**.
+- Route/hardening regression: 13/13 passed.
 - jsdom suites (agent cards, mission, work, schedule, approvals, memory, models,
   executions, scoped Joe, command center, mobile, terminal, campaign DAG): pass.
 - iOS: Swift `JoeOSCore` builds; `xcodebuild build` + `test` succeed on Mac.
@@ -105,3 +121,9 @@ Schedule · Pipelines · Memory · Activity · Models** — one coherent workspa
   iOS signing/App Store credentials; Lemonade HF-resolve service config; `/opt/
   joeos` runner refresh (root); VPS retirement (explicit approval).
 - BLOCKED: none (technical).
+
+## Completion-loop status
+
+The autonomous completion loop for client experiences is fully complete
+(M-1201..M-1207 all DONE). Remaining items are the long-lived cloud / runner /
+native-toolchain human gates above.
