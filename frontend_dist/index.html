@@ -90,6 +90,19 @@
       --ui-density: 0px;
       --surface-blur: blur(18px);
       --surface-blur-strong: blur(26px);
+
+      /* JoeOS embossed depth system — machined 3D surface language. */
+      --depth-recessed: inset 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 -1px 0 rgba(139, 212, 255, 0.04);
+      --depth-flat: 0 0 0 1px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(139, 212, 255, 0.02);
+      --depth-raised-1: 0 1px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(139, 212, 255, 0.06);
+      --depth-raised-2: 0 1px 0 rgba(0, 0, 0, 0.5), 0 5px 14px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(139, 212, 255, 0.08);
+      --depth-raised-3: 0 2px 0 rgba(0, 0, 0, 0.5), 0 12px 30px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(139, 212, 255, 0.1);
+      --depth-floating: 0 2px 0 rgba(0, 0, 0, 0.5), 0 20px 52px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(139, 212, 255, 0.12);
+      --depth-pressed: inset 0 2px 4px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(139, 212, 255, 0.04);
+      --depth-active-edge: 0 0 0 1px rgba(49, 215, 255, 0.42), 0 6px 20px rgba(49, 215, 255, 0.14), inset 0 1px 0 rgba(139, 212, 255, 0.16);
+      --bevel-high: inset 0 1px 0 rgba(139, 212, 255, 0.07);
+      --bevel-low: inset 0 -1px 0 rgba(0, 0, 0, 0.42);
+      --metal-edge: linear-gradient(180deg, rgba(184, 192, 204, 0.16), rgba(184, 192, 204, 0.02) 40%, rgba(0, 0, 0, 0.35));
     }
 
     /* Light theme — a functional, contrast-checked presentation. */
@@ -163,9 +176,34 @@
     /* Density modes — compact tightens rows; comfortable relaxes them. */
     html[data-density="compact"] {
       --ui-density: -4px;
+      --cc-row-scale: .9;
+      --cc-meta-show: none;
     }
     html[data-density="comfortable"] {
       --ui-density: 6px;
+      --cc-row-scale: 1;
+      --cc-meta-show: inline;
+    }
+    html[data-density="command"] {
+      --ui-density: -8px;
+      --cc-row-scale: .78;
+      --cc-meta-show: none;
+      --cc-metric-scale: .85;
+    }
+    html[data-density="command"] .cc-module-detail,
+    html[data-density="command"] .cc-inspector-meta,
+    html[data-density="command"] .cc-timeline-copy span {
+      font-size: 10.5px;
+    }
+    html[data-density="command"] .cc-module {
+      padding: 10px 12px;
+      gap: 7px;
+    }
+    html[data-density="command"] .cc-module-value {
+      font-size: 17px;
+    }
+    html[data-density="command"] .attention-card {
+      padding: 11px 12px;
     }
 
     /* Reduced motion — media preference and the explicit setting. */
@@ -515,9 +553,16 @@
 
     .nav-list {
       display: flex;
+      flex: 1 1 auto;
       flex-direction: column;
       gap: 5px;
+      overflow-y: auto;
+      min-height: 0;
+      padding: 4px 2px 4px 0;
+      scrollbar-width: thin;
     }
+    .nav-list::-webkit-scrollbar { width: 6px; }
+    .nav-list::-webkit-scrollbar-thumb { background: rgba(139, 212, 255, 0.16); border-radius: 3px; }
 
     .nav-button {
       position: relative;
@@ -803,9 +848,18 @@
       transition: border-color .2s, background .2s, transform .2s;
     }
 
+    .assistant-top-orb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(120% 120% at 30% 24%, rgba(120, 210, 255, .95), rgba(30, 130, 200, .95) 45%, rgba(20, 60, 150, .98) 100%);
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, .4), inset 0 -2px 4px rgba(0, 20, 60, .6), 0 0 10px rgba(49, 215, 255, .35);
+    }
+
     .assistant-top-button:hover {
       border-color: rgba(49, 215, 255, .42);
       background: linear-gradient(120deg, rgba(49, 215, 255, .2), rgba(85, 119, 255, .16));
+      transform: translateY(-1px);
     }
 
     .assistant-top-button i {
@@ -2374,6 +2428,193 @@
       color: var(--success);
     }
 
+    .assistant-focus {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      margin: 8px 12px 0;
+      border: 1px solid rgba(59, 143, 216, .45);
+      border-radius: 9px;
+      background: rgba(11, 58, 99, .28);
+      font-size: 11px;
+      letter-spacing: .02em;
+    }
+    .assistant-focus .focus-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--bright);
+      font-weight: 600;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .assistant-focus .focus-label i { color: var(--interactive); }
+    .assistant-focus .focus-clear {
+      background: transparent;
+      border: none;
+      color: var(--faint);
+      cursor: pointer;
+      padding: 2px 4px;
+      font-size: 12px;
+    }
+    .assistant-focus .focus-clear:hover { color: var(--text); }
+
+    /* ---- Command Center (modular home) ---- */
+    .command-center { display: flex; flex-direction: column; gap: 14px; }
+    .cc-heading h2 { margin: 0 0 2px; font-size: 22px; }
+    .cc-heading p { margin: 0; color: var(--faint); font-size: 13px; }
+    .cc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+    .cc-module { display: flex; flex-direction: column; gap: 10px; padding: 14px 15px; border: 1px solid var(--line);
+      border-radius: 14px; background: linear-gradient(180deg, rgba(23, 28, 37, 0.55), rgba(11, 14, 20, 0.85));
+      box-shadow: var(--depth-raised-2); transition: border-color .15s ease, transform .12s ease, box-shadow .15s ease; }
+    .cc-module:hover { border-color: rgba(59, 143, 216, .5); transform: translateY(-1px); box-shadow: var(--depth-raised-3); }
+    .cc-module:active { transform: translateY(0); box-shadow: var(--depth-pressed); }
+    .cc-module-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .cc-module-head > div { min-width: 0; flex: 1; }
+    .cc-module-icon { color: var(--interactive); font-size: 16px; flex: none; }
+    .cc-module-head h3 { margin: 0; font-size: 14px; letter-spacing: .02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cc-module-head p { margin: 0; color: var(--faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cc-module-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+      border: 1px solid var(--line); color: var(--bright); flex: none; }
+    .cc-module-badge.info { color: var(--interactive); border-color: rgba(59,143,216,.5); }
+    .cc-module-badge.danger { color: var(--danger); border-color: rgba(255,100,124,.5); }
+    .cc-module-value { font-size: 20px; font-weight: 700; line-height: 1.2; }
+
+    /* ---- Embossed 3D depth language (machined surfaces, zero-clipping) ---- */
+    .agent-card, .glass-card, .panel-card, .cc-stat {
+      box-shadow: var(--depth-raised-1);
+      background: linear-gradient(180deg, rgba(23, 28, 37, 0.5), rgba(11, 14, 20, 0.88));
+    }
+    .cc-stat { box-shadow: var(--depth-recessed); background: rgba(8, 14, 22, 0.6); }
+    .cc-stat .v { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+    .cc-inspector { box-shadow: var(--depth-floating); background: linear-gradient(180deg, rgba(23, 28, 37, 0.72), rgba(10, 14, 20, 0.94)); }
+    .cc-menu { box-shadow: var(--depth-floating); }
+    .terminal-host, #terminal-host, .cc-focused { box-shadow: var(--depth-recessed); }
+    .cc-module-badge, .badge, .chip { box-shadow: inset 0 1px 0 rgba(139, 212, 255, 0.05), 0 1px 0 rgba(0, 0, 0, 0.3); }
+    .chip, .badge { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; vertical-align: middle; line-height: 1.6; }
+    .cc-module-actions button, .secondary-button, .ghost-button, button {
+      box-shadow: var(--depth-raised-1);
+    }
+    .cc-module-actions button:active, .secondary-button:active, button:active { box-shadow: var(--depth-pressed); transform: translateY(1px); }
+    .assistant-fab { box-shadow: 0 0 0 1px rgba(75, 220, 255, .55), 0 10px 26px rgba(20, 132, 209, .35),
+      inset 0 2px 4px rgba(255, 255, 255, 0.22), inset 0 -3px 6px rgba(0, 0, 0, 0.45),
+      inset 0 0 18px rgba(49, 215, 255, 0.25); }
+    .assistant-fab:active { box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.5), inset 0 0 14px rgba(49, 215, 255, 0.2); transform: translateY(1px); }
+    /* navigation selection plate */
+    .sidebar-nav-item, .nav-item, .cc-nav button { position: relative; }
+    .cc-nav button.active, .sidebar-nav-item.active { box-shadow: var(--depth-active-edge); }
+    /* long-content safety */
+    .agent-card .name, .cc-module-value, .fleet-stat strong, .sidebar-nav-label, .nav-label {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .row > div { min-width: 0; }
+    .agent-card .desc, .plugin-description { line-height: 1.5; min-height: 0; overflow-wrap: anywhere; }
+    .cc-module-muted { color: var(--faint); font-weight: 500; font-size: 14px; }
+    .cc-module-detail { color: var(--faint); font-size: 12px; line-height: 1.45; }
+    .cc-module-actions { display: flex; gap: 8px; margin-top: 2px; }
+    .cc-undo-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+    .cc-module-actions button { padding: 7px 10px; font-size: 12px; }
+    .cc-focused { padding: 18px; }
+    .cc-focused .cc-module { background: transparent; border-color: rgba(59,143,216,.4); }
+    .cc-focused-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .cc-focused-actions button { padding: 10px 14px; font-size: 13px; }
+    /* module context menu + pin + inspector */
+    .cc-module-head { position: relative; }
+    .cc-more { border: none; background: transparent; color: var(--faint); padding: 4px 6px; line-height: 1; }
+    .cc-more:hover { color: var(--text); background: rgba(139,212,255,.08); }
+    .cc-pinned { border-color: rgba(59,143,216,.55); }
+    .cc-pinned .cc-module-icon { color: var(--active); }
+    .cc-menu { position: absolute; z-index: 30; right: 0; top: 32px; min-width: 170px; background: var(--panel);
+      border: 1px solid rgba(59,143,216,.4); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.5); padding: 4px; }
+    .cc-menu button { display: flex; width: 100%; align-items: center; gap: 8px; padding: 8px 10px; background: transparent;
+      border: none; border-radius: 7px; color: var(--text); text-align: left; font-size: 12.5px; }
+    .cc-menu button:hover { background: rgba(49,215,255,.12); }
+    .cc-menu button:disabled { opacity: .4; cursor: default; }
+    .cc-menu-backdrop { position: fixed; inset: 0; z-index: 25; }
+    .cc-with-inspector { display: flex; gap: 16px; align-items: flex-start; }
+    .cc-main { flex: 1; min-width: 0; }
+    .cc-inspector { flex: 0 0 320px; max-width: 360px; position: sticky; top: 84px; padding: 16px;
+      border-color: rgba(59,143,216,.35); display: flex; flex-direction: column; gap: 12px; }
+    .cc-inspector-head { display: flex; align-items: center; gap: 10px; }
+    .cc-inspector-head h3 { margin: 0; font-size: 15px; flex: 1; }
+    .cc-inspector-value { font-size: 20px; font-weight: 700; }
+    .cc-inspector-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .cc-inspector-label { display: block; font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); margin-bottom: 6px; }
+    .cc-inspector-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .cc-inspector-rel { display: flex; flex-direction: column; gap: 5px; }
+    .cc-inspector-rel-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px; background: rgba(11, 27, 47, .5); color: var(--text); font-size: 12px; cursor: pointer; text-align: left; transition: border-color .15s ease, background .15s ease; }
+    .cc-inspector-rel-item:hover { border-color: rgba(49, 215, 255, .4); background: rgba(49, 215, 255, .06); }
+    .cc-inspector-rel-item span { color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; min-width: 92px; }
+    .cc-inspector-rel-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .cc-modal-backdrop { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(2, 5, 10, .72); padding: 18px; }
+    .cc-modal { width: 100%; max-width: 620px; max-height: 84vh; overflow: auto; background: linear-gradient(180deg, rgba(23, 28, 37, .97), rgba(11, 14, 20, .98)); border: 1px solid var(--line); border-radius: 16px; padding: 18px; box-shadow: var(--depth-floating); }
+    .cc-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .cc-modal-head h3 { margin: 0; font-size: 15px; }
+    .cc-compare-pick { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+    .cc-compare-option { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; background: rgba(49, 215, 255, .05); color: var(--text); font-size: 11.5px; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+    .cc-compare-option:hover { border-color: rgba(49, 215, 255, .4); background: rgba(49, 215, 255, .09); }
+    .cc-compare-result { margin-top: 8px; }
+    .cc-compare-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .cc-compare-table th, .cc-compare-table td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
+    .cc-compare-table th { background: rgba(11, 27, 47, .6); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .cc-compare-field { color: var(--faint); white-space: nowrap; }
+    .cc-compare-diff { background: rgba(255, 180, 92, .05); }
+    .cc-compare-diff .cc-compare-field { color: var(--warning); }
+    .cc-snapshot-save-row { display: flex; gap: 8px; margin: 12px 0; }
+    .cc-snapshot-save-row input { flex: 1; min-width: 0; }
+    .cc-snapshot-list { display: flex; flex-direction: column; gap: 8px; }
+    .cc-snapshot-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(11, 27, 47, .5); }
+    .cc-snapshot-copy { flex: 1; min-width: 0; }
+    .cc-snapshot-copy strong { display: block; font-size: 13px; line-height: 1.3; }
+    .cc-snapshot-copy span { display: block; color: var(--muted); font-size: 11px; line-height: 1.4; }
+    .cc-snapshot-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+    .cc-inspector-semantic { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
+    .cc-inspector-semantic-text { color: var(--muted); font-size: 12px; line-height: 1.4; flex: 1; min-width: 0; }
+    .cc-inspector-impacts { display: flex; flex-wrap: wrap; gap: 5px; }
+    .cc-inspector-impact { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px; background: rgba(11, 27, 47, .5); color: var(--text); font-size: 11px; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+    .cc-inspector-impact:hover { border-color: rgba(49, 215, 255, .4); background: rgba(49, 215, 255, .06); }
+    .cc-inspector-timeline { display: flex; flex-direction: column; gap: 8px; }
+    .cc-inspector-timeline-item { display: flex; gap: 9px; align-items: flex-start; }
+    .cc-timeline-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex: 0 0 auto; }
+    .cc-timeline-dot.success { background: var(--success); }
+    .cc-timeline-dot.danger { background: var(--danger); }
+    .cc-timeline-dot.default { background: var(--muted); }
+    .cc-timeline-copy { min-width: 0; }
+    .cc-timeline-copy strong { display: block; font-size: 11.5px; line-height: 1.3; text-transform: capitalize; }
+    .cc-timeline-copy span { display: block; color: var(--muted); font-size: 11px; line-height: 1.35; }
+    .cc-inspector-help {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 12px;
+      padding: 8px 12px;
+      border: 1px solid rgba(49, 215, 255, .22);
+      border-radius: 9px;
+      background: rgba(49, 215, 255, .06);
+      color: var(--cyan-soft, var(--cyan));
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease;
+    }
+    .cc-inspector-help:hover {
+      border-color: rgba(49, 215, 255, .45);
+      background: rgba(49, 215, 255, .1);
+    }
+    .cc-inspector-actions button { padding: 9px 12px; font-size: 12.5px; }
+    @media (min-width: 1300px) {
+      .cc-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 1370px) {
+      .cc-inspector { flex-basis: 280px; max-width: 300px; }
+    }
+    @media (max-width: 900px) {
+      .cc-with-inspector { flex-direction: column; }
+      .cc-inspector { position: static; flex-basis: auto; max-width: none; width: 100%; }
+    }
+
     .assistant-messages {
       display: flex;
       min-height: 0;
@@ -3154,6 +3395,65 @@
       color: var(--success);
     }
 
+    .attention-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(minmax(0, 260px), 1fr));
+      gap: 14px;
+    }
+    .attention-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: border-color .15s ease, box-shadow .15s ease, transform .08s ease;
+    }
+    .attention-card:hover {
+      border-color: rgba(49, 215, 255, .4);
+      box-shadow: var(--depth-raised-2);
+    }
+    .attention-card:active {
+      transform: translateY(1px);
+      box-shadow: var(--depth-pressed);
+    }
+    .attention-card.tone-danger { border-color: rgba(255, 100, 124, .3); }
+    .attention-card.tone-danger:hover { border-color: rgba(255, 100, 124, .55); }
+    .attention-card.tone-warning { border-color: rgba(255, 180, 92, .3); }
+    .attention-card.tone-warning:hover { border-color: rgba(255, 180, 92, .55); }
+    .attention-card-icon {
+      display: inline-flex;
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      background: rgba(49, 215, 255, .08);
+      color: var(--cyan);
+    }
+    .attention-card.tone-danger .attention-card-icon { background: rgba(255, 100, 124, .1); color: var(--danger); }
+    .attention-card.tone-warning .attention-card-icon { background: rgba(255, 180, 92, .1); color: var(--warning); }
+    .attention-card-copy { min-width: 0; flex: 1; }
+    .attention-card-copy strong { display: block; font-size: 13.5px; line-height: 1.35; margin-bottom: 3px; }
+    .attention-card-copy span { display: block; color: var(--muted); font-size: 12px; line-height: 1.4; }
+    .attention-count {
+      flex: 0 0 auto;
+      min-width: 26px;
+      height: 26px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 0 8px;
+    }
+    .attention-count.danger { background: rgba(255, 100, 124, .14); color: var(--danger); }
+    .attention-count.warning { background: rgba(255, 180, 92, .14); color: var(--warning); }
+    .attention-count.success { background: rgba(61, 227, 164, .14); color: var(--success); }
+
     .attention-copy,
     .next-action-copy,
     .agent-mini-copy,
@@ -3515,6 +3815,29 @@
     .palette-risk.destructive {
       color: var(--color-status-critical);
       border: 1px solid rgba(255, 59, 92, .45);
+    }
+    .palette-actions {
+      display: inline-flex;
+      gap: 4px;
+      margin-left: auto;
+      flex: 0 0 auto;
+    }
+    .palette-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border: 1px solid rgba(126, 209, 255, .16);
+      border-radius: 6px;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .palette-action.risk-security {
+      color: var(--color-status-security);
+      border-color: rgba(167, 139, 250, .35);
     }
     html[data-contrast="high"] .palette-item.active,
     html[data-contrast="high"] .palette-item:focus-visible {
@@ -3924,6 +4247,15 @@
       }
     }
 
+    /* ---- Mobile Command Center (focused drill-down, no tiny columns) ---- */
+    @media (max-width: 760px) {
+      .cc-grid { grid-template-columns: 1fr !important; gap: 10px; }
+      .cc-module { padding: 13px 14px; }
+      .cc-module-value { font-size: 19px; }
+      .cc-module-actions button { padding: 11px 12px; font-size: 13px; flex: 1; }
+      .cc-focus-mode { min-height: calc(100vh - 140px); }
+    }
+
     /* Reassert visible focus on inputs that previously suppressed outlines.
        Placed last so it wins the specificity/source-order tie. */
     input:focus-visible,
@@ -4109,6 +4441,30 @@
       align-items: center;
       gap: 14px;
       margin-bottom: 16px;
+    }
+
+    .return-control {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 0 14px;
+      border: 1px solid rgba(126, 209, 255, .18);
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(37, 43, 53, .9), rgba(23, 28, 37, .85));
+      color: var(--text);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: var(--depth-raised-1);
+      transition: border-color .15s ease, box-shadow .15s ease, transform .06s ease;
+    }
+    .return-control:hover {
+      border-color: rgba(49, 215, 255, .45);
+    }
+    .return-control:active {
+      box-shadow: var(--depth-pressed);
+      transform: translateY(1px);
     }
 
     .agent-detail-head .agent-avatar {
@@ -4926,6 +5282,8 @@
       var useRef = React.useRef;
 
       var NAV_ITEMS = [
+        { id: "command", label: "Command Center", short: "Command", icon: "fa-border-all" },
+        { id: "attention", label: "Attention Center", short: "Attention", icon: "fa-bell" },
         { id: "mission", label: "Mission Control", short: "Mission", icon: "fa-compass" },
         { id: "dashboard", label: "Executive Dashboard", short: "Dashboard", icon: "fa-chart-line" },
         { id: "pipeline", label: "CI/CD Pipeline", short: "Pipeline", icon: "fa-code-branch" },
@@ -5222,7 +5580,7 @@
 
       function normalizeTheme(theme) {
         var source = theme && typeof theme === "object" ? theme : {};
-        var density = ["compact", "comfortable", "spacious"].indexOf(source.density) >= 0 ? source.density : "comfortable";
+        var density = ["compact", "command", "comfortable", "spacious"].indexOf(source.density) >= 0 ? source.density : "comfortable";
         var fontFamily = ["system", "rounded", "monospace", "serif"].indexOf(source.font_family) >= 0 ? source.font_family : "system";
         return {
           font_scale: safeNumber(source.font_scale == null ? 1 : source.font_scale, .85, 1.35),
@@ -5249,7 +5607,7 @@
           var prefs = defaultUiPrefs();
           if (parsed && typeof parsed === "object") {
             if (["system", "dark", "light"].indexOf(parsed.theme) >= 0) prefs.theme = parsed.theme;
-            if (["compact", "balanced", "comfortable"].indexOf(parsed.density) >= 0) prefs.density = parsed.density;
+            if (["command", "compact", "balanced", "comfortable"].indexOf(parsed.density) >= 0) prefs.density = parsed.density;
             if (["full", "reduced"].indexOf(parsed.effects) >= 0) prefs.effects = parsed.effects;
             if (["standard", "reduced"].indexOf(parsed.motion) >= 0) prefs.motion = parsed.motion;
             if (["normal", "high"].indexOf(parsed.contrast) >= 0) prefs.contrast = parsed.contrast;
@@ -5272,7 +5630,7 @@
       // ---- Keyboard Shortcut Registry — one authoritative source. ----
       var KEYBOARD_SHORTCUTS = [
         { id: "palette", command: "Open Command Palette", keys: "Ctrl+K", context: "Global" },
-        { id: "assistant", command: "Ask JoeOS AI", keys: "Ctrl+Shift+K", context: "Global" },
+        { id: "assistant", command: "Joe", keys: "Ctrl+Shift+K", context: "Global" },
         { id: "shortcuts", command: "Open keyboard shortcuts", keys: "?", context: "Global" },
         { id: "stop", command: "Stop current operation", keys: "Esc", context: "AI assistant" },
         { id: "nav", command: "Switch workspace (1-12)", keys: "Alt+1..0", context: "Global" },
@@ -5553,7 +5911,7 @@
       }
 
       function DesktopSidebar(props) {
-        return h("aside", { className: "sidebar desktop-sidebar", "aria-label": "Primary navigation" }, h(SidebarContent, props));
+        return h("aside", { role: "navigation", className: "sidebar desktop-sidebar", "aria-label": "Primary navigation" }, h(SidebarContent, props));
       }
 
       function DashboardSection(props) {
@@ -5916,6 +6274,59 @@
         );
       }
 
+      function AttentionCenter(props) {
+        // One system-level attention model: everything that actually needs a
+        // human, in one place. Passive activity stays passive.
+        var items = [];
+        var auto = props.automationOverview || {};
+        var security = props.securityOverview || {};
+        var runtime = props.runtime || {};
+        if (auto.pending_approvals > 0) items.push({ id: "approvals", severity: "danger", icon: "fa-user-check", title: auto.pending_approvals + " approval" + (auto.pending_approvals === 1 ? "" : "s") + " pending", detail: "Work is waiting for your explicit decision.", open: "security-center", count: auto.pending_approvals });
+        if (auto.failed_recently > 0) items.push({ id: "failed-automations", severity: "danger", icon: "fa-triangle-exclamation", title: auto.failed_recently + " automation" + (auto.failed_recently === 1 ? "" : "s") + " failed recently", detail: "Runs need review before retry.", open: "automation", count: auto.failed_recently });
+        if (auto.unhealthy_schedules > 0) items.push({ id: "schedules", severity: "warning", icon: "fa-calendar-days", title: auto.unhealthy_schedules + " schedule" + (auto.unhealthy_schedules === 1 ? "" : "s") + " unhealthy", detail: "Scheduled work is not producing healthy runs.", open: "automation", count: auto.unhealthy_schedules });
+        if (security.security_events_open > 0) items.push({ id: "security-events", severity: "danger", icon: "fa-shield-halved", title: security.security_events_open + " open security event" + (security.security_events_open === 1 ? "" : "s"), detail: "The security platform wants review.", open: "security-center", count: security.security_events_open });
+        if (security.lockdown_active) items.push({ id: "lockdown", severity: "danger", icon: "fa-lock", title: "Lockdown is active", detail: "Governance has elevated protections. Review before continuing.", open: "security-center" });
+        if (security.secrets_requiring_rotation > 0) items.push({ id: "secrets", severity: "warning", icon: "fa-key", title: security.secrets_requiring_rotation + " secret" + (security.secrets_requiring_rotation === 1 ? "" : "s") + " require rotation", detail: "Credential metadata indicates rotation is due.", open: "security-center", count: security.secrets_requiring_rotation });
+        if (security.incidents_open > 0) items.push({ id: "incidents", severity: "danger", icon: "fa-file-shield", title: security.incidents_open + " open incident" + (security.incidents_open === 1 ? "" : "s"), detail: "Incident records need acknowledgement.", open: "security-center", count: security.incidents_open });
+        if (!runtime.online) items.push({ id: "runtime", severity: "warning", icon: "fa-lemon", title: "Local AI runtime unavailable", detail: "Eligible work is routed to available providers. Verify the runtime.", open: "ai" });
+        if (!items.length) items.push({ id: "clear", severity: "success", icon: "fa-circle-check", title: "Nothing needs you right now", detail: "Approvals, failures, security events, and blocked work are all clear." });
+        // Attention prioritization: rank by severity weight + impact (count)
+        // + type urgency. Routine/successful activity never appears here.
+        var severityWeight = { danger: 3, warning: 2, success: 0 };
+        var typeUrgency = { lockdown: 5, incidents: 4, security_events: 4, failed_automations: 3, approvals: 3, runtime: 2, secrets: 2, schedules: 1 };
+        items.forEach(function (item) {
+          item.priority = (severityWeight[item.severity] || 0) * 10 + Math.min(9, item.count || 1) + (typeUrgency[item.id] || 0);
+        });
+        items.sort(function (a, b) { return b.priority - a.priority; });
+        return h(
+          "section",
+          { className: "page-enter", "aria-labelledby": "attention-title" },
+          h(SectionHeader, {
+            kicker: "What needs me",
+            title: h("span", { id: "attention-title" }, "Attention Center"),
+            description: "One honest answer to \"what needs me?\" — approvals, failures, security events, unhealthy schedules, and blocked work. Everything else stays passive activity.",
+            actions: items.some(function (item) { return item.severity !== "success"; }) ? h("span", { className: "live-pill attention", key: "attention-live" }, h("span", { className: "live-dot" }), items.length + " ITEM" + (items.length === 1 ? "" : "S") + " NEED YOUR ATTENTION") : h("span", { className: "live-pill", key: "attention-clear" }, h("span", { className: "live-dot" }), "ALL CLEAR")          }),
+          h(
+            "div",
+            { className: "attention-grid" },
+            items.map(function (item) {
+              var tone = item.severity === "danger" ? "danger" : item.severity === "warning" ? "warning" : "success";
+              return h(
+                "article",
+                { className: "glass-card interactive-card attention-card tone-" + tone, role: "button", tabIndex: 0, key: item.id,
+                  onClick: function () { props.onOpen(item.open); },
+                  onKeyDown: function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); props.onOpen(item.open); } } },
+                h("div", { className: "attention-card-icon" }, icon(item.icon)),
+                h("div", { className: "attention-card-copy" },
+                  h("strong", null, item.title),
+                  h("span", null, item.detail)),
+                item.count != null ? h("span", { className: "attention-count " + tone }, item.count) : null
+              );
+            })
+          )
+        );
+      }
+
       function BotCard(props) {
         var bot = props.bot;
         var running = bot.status === "running";
@@ -6042,7 +6453,9 @@
                   { className: "glass-card panel-card", key: workflow.workflow_id },
                   h("div", { className: "plugin-header" }, icon("fa-diagram-project"), h("div", null, h("strong", null, workflow.name), h("span", null, workflow.workflow_id + " v" + workflow.current_version))),
                   h("div", { className: "plugin-meta" }, workflow.enabled ? h(StatusBadge, { state: "running", label: "Enabled", icon: "fa-play" }) : h(StatusBadge, { state: workflow.health_state === "healthy" ? "idle" : "paused", label: workflow.status.toUpperCase(), icon: "fa-pause" }), h("span", null, "Health: " + workflow.health_state)),
-                  h("div", { className: "plugin-actions" }, h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(workflow); } }, "Inspect"))
+                  h("div", { className: "plugin-actions" },
+                    h("button", { type: "button", className: "text-button", onClick: function () { props.onInspect(workflow); } }, "Inspect")
+                  )
                 );
               }))
             : h("article", { className: "glass-card panel-card" }, h("div", { className: "empty-state" }, icon("fa-diagram-project"), h("strong", null, "No workflows defined"), h("p", null, "Create a workflow from a safe template or a validated definition through the API.")))
@@ -6400,7 +6813,7 @@
               { className: "glass-card panel-card" },
               h("div", { className: "plugin-header" }, icon("fa-palette"), h("strong", null, "Appearance")),
               h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-theme" }, "Theme"), h("select", { id: "ui-theme", className: "form-control", value: prefs.theme, onChange: function (event) { update("theme", event.target.value); } }, h("option", { value: "system" }, "System (" + effectiveTheme + ")"), h("option", { value: "dark" }, "Dark"), h("option", { value: "light" }, "Light"))),
-              h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-density" }, "Density"), h("select", { id: "ui-density", className: "form-control", value: prefs.density, onChange: function (event) { update("density", event.target.value); } }, h("option", { value: "compact" }, "Compact"), h("option", { value: "balanced" }, "Balanced"), h("option", { value: "comfortable" }, "Comfortable"))),
+              h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-density" }, "Density"), h("select", { id: "ui-density", className: "form-control", value: prefs.density, onChange: function (event) { update("density", event.target.value); } }, h("option", { value: "command" }, "Command"), h("option", { value: "compact" }, "Compact"), h("option", { value: "balanced" }, "Balanced"), h("option", { value: "comfortable" }, "Comfortable"))),
               h("div", { className: "settings-row" }, h("label", { className: "settings-label", htmlFor: "ui-effects" }, "Visual effects"), h("select", { id: "ui-effects", className: "form-control", value: prefs.effects, onChange: function (event) { update("effects", event.target.value); } }, h("option", { value: "full" }, "Full"), h("option", { value: "reduced" }, "Reduced (flat surfaces)"))),
               h("p", { className: "settings-help" }, "Reduced effects removes blur and glow while preserving contrast and readability.")
             ),
@@ -6753,7 +7166,7 @@
 
       function AttentionWidget(props) {
         return h("div", { className: "attention-list" }, props.items.map(function (item) {
-          return h("div", { className: "attention-row", key: item.id }, h("span", { className: "attention-indicator " + item.severity }, icon(item.icon)), h("span", { className: "attention-copy" }, h("strong", null, item.title), h("span", null, item.detail)), h("span", { className: "attention-severity" }, item.severity === "success" ? "CLEAR" : item.severity));
+          return h("button", { type: "button", className: "attention-row", key: item.id, onClick: function () { if (props.onOpenAttention) props.onOpenAttention(); } }, h("span", { className: "attention-indicator " + item.severity }, icon(item.icon)), h("span", { className: "attention-copy" }, h("strong", null, item.title), h("span", null, item.detail)), h("span", { className: "attention-severity" }, item.severity === "success" ? "CLEAR" : item.severity));
         }));
       }
 
@@ -6819,7 +7232,7 @@
 
         function contentFor(widget, definition) {
           if (!definition || definition.state !== "ready") return h(IntegrationWidget, { definition: definition || { name: widget.widget_id, description: "A compatible integration manifest is required.", icon: "fa-plug" }, onConfigure: props.onConfigure });
-          if (widget.widget_id === "mission.attention") return h(AttentionWidget, { items: attention });
+          if (widget.widget_id === "mission.attention") return h(AttentionWidget, { items: attention, onOpenAttention: props.onOpenAttention });
           if (widget.widget_id === "mission.ai_delegation") return h(DelegationWidget, { onAsk: props.onAsk });
           if (widget.widget_id === "mission.blockers") return h(BlockersWidget, { runtime: props.runtime, workspace: props.workspace, catalog: props.catalog });
           if (widget.widget_id === "mission.next_action") return h(NextActionWidget, { items: attention, onAsk: props.onAsk });
@@ -6950,7 +7363,7 @@
               h("input", { id: "workspace-glass-opacity", type: "range", min: ".5", max: ".94", step: ".02", value: theme.glass_opacity, onChange: function (event) { props.onTheme("glass_opacity", Number(event.target.value)); } })
             ),
             h("div", { className: "theme-value-row" }, h("span", { className: "theme-label", id: "workspace-density-label" }, "Layout density")),
-            h("div", { className: "density-options", role: "group", "aria-labelledby": "workspace-density-label" }, ["compact", "comfortable", "spacious"].map(function (density) {
+            h("div", { className: "density-options", role: "group", "aria-labelledby": "workspace-density-label" }, ["command", "compact", "comfortable"].map(function (density) {
               return h("button", { type: "button", className: "density-option " + (theme.density === density ? "active" : ""), onClick: function () { props.onTheme("density", density); }, "aria-pressed": theme.density === density, key: density }, density.charAt(0).toUpperCase() + density.slice(1));
             }))
           ),
@@ -6988,6 +7401,43 @@
         return -1;
       }
 
+      function SnapshotPanel(props) {
+        var namePair = useState("");
+        var name = namePair[0];
+        var setName = namePair[1];
+        var snapshots = props.snapshots || [];
+        return h(
+          "div",
+          { className: "cc-modal-backdrop", onClick: function (event) { if (event.target === event.currentTarget) props.onClose(); } },
+          h("div", { className: "cc-modal", role: "dialog", "aria-modal": "true", "aria-label": "Workspace snapshots" },
+            h("div", { className: "cc-modal-head" },
+              h("h3", null, "Workspace snapshots"),
+              h("button", { type: "button", className: "ghost-button", "aria-label": "Close snapshots", onClick: props.onClose }, icon("fa-xmark"))
+            ),
+            h("p", { className: "cc-module-muted" }, "Snapshots capture layout, pins, recents, active workspace, and the current object — never secret values."),
+            h("div", { className: "cc-snapshot-save-row" },
+              h("input", { className: "os-field", placeholder: "Snapshot name (e.g. Engineering)", value: name, onChange: function (event) { setName(event.target.value); }, "aria-label": "Snapshot name" }),
+              h("button", { type: "button", className: "primary-button", disabled: !String(name || "").trim(), onClick: function () { if (String(name || "").trim()) props.onSave(String(name).trim()); } }, icon("fa-camera"), " Save")
+            ),
+            h("div", { className: "cc-snapshot-list" },
+              snapshots.length ? snapshots.slice().reverse().map(function (snapshot) {
+                return h("div", { className: "cc-snapshot-row", key: snapshot.name },
+                  h("div", { className: "cc-snapshot-copy" },
+                    h("strong", null, snapshot.name),
+                    h("span", null, snapshot.saved_at ? new Date(snapshot.saved_at).toLocaleString() : ""),
+                    h("span", null, (snapshot.pinned || []).length + " pinned · " + (snapshot.recent || []).length + " recent" + (snapshot.active_section ? " · " + snapshot.active_section : ""))
+                  ),
+                  h("div", { className: "cc-snapshot-actions" },
+                    h("button", { type: "button", className: "secondary-button", onClick: function () { props.onRestore(snapshot.name); } }, icon("fa-rotate-left"), " Restore"),
+                    h("button", { type: "button", className: "ghost-button", onClick: function () { props.onDelete(snapshot.name); } }, icon("fa-trash"))
+                  )
+                );
+              }) : h("p", { className: "cc-module-muted" }, "No snapshots saved yet.")
+            )
+          )
+        );
+      }
+
       function CommandPalette(props) {
         var queryPair = useState("");
         var query = queryPair[0];
@@ -6995,31 +7445,58 @@
         var activePair = useState(0);
         var activeIndex = activePair[0];
         var setActiveIndex = activePair[1];
+        var objectGroupsPair = useState(null);
+        var objectGroups = objectGroupsPair[0];
+        var setObjectGroups = objectGroupsPair[1];
+        var objectSearchingPair = useState(false);
+        var objectSearching = objectSearchingPair[0];
+        var setObjectSearching = objectSearchingPair[1];
         var inputRef = useRef(null);
         var listRef = useRef(null);
         var containerRef = useRef(null);
         useFocusTrap(true, containerRef);
         useEffect(function () { if (inputRef.current) inputRef.current.focus(); }, []);
+        var searchToken = 0;
+        useEffect(function () {
+          var token = ++searchToken;
+          var q = (query || "").trim();
+          if (q.length < 2) { setObjectGroups(null); setObjectSearching(false); return; }
+          setObjectSearching(true);
+          var timer = setTimeout(function () {
+            searchPaletteObjects(q).then(function (groups) {
+              if (token !== searchToken) return;
+              setObjectGroups(groups || []);
+              setObjectSearching(false);
+            }).catch(function () { if (token === searchToken) { setObjectGroups([]); setObjectSearching(false); } });
+          }, 220);
+          return function () { clearTimeout(timer); };
+        }, [query]);
         var scored = (props.commands || [])
           .map(function (command) { return { command: command, score: paletteScore(command, query) }; })
           .filter(function (item) { return item.score >= 0; })
           .sort(function (a, b) { return b.score - a.score || (a.command.label < b.command.label ? -1 : 1); })
           .slice(0, 24);
+        var objectItems = [];
+        (objectGroups || []).forEach(function (group) {
+          (group.items || []).forEach(function (item) { objectItems.push({ group: group, item: item }); });
+        });
         useEffect(function () { setActiveIndex(0); }, [query]);
         function activate(item) {
+          if (item && item.object) { openObjectRef(item.object); props.onClose(); return; }
           item.command.run();
           props.onClose();
         }
         function onKeyDown(event) {
           if (event.key === "ArrowDown") {
             event.preventDefault();
-            setActiveIndex(function (current) { return Math.min(current + 1, scored.length - 1); });
+            setActiveIndex(function (current) { return Math.min(current + 1, scored.length + objectItems.length - 1); });
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
             setActiveIndex(function (current) { return Math.max(current - 1, 0); });
-          } else if (event.key === "Enter" && scored[activeIndex]) {
+          } else if (event.key === "Enter") {
             event.preventDefault();
-            activate(scored[activeIndex].command);
+            if (activeIndex < scored.length && scored[activeIndex]) activate(scored[activeIndex].command);
+            else if (activeIndex >= scored.length && objectItems[activeIndex - scored.length]) activate(objectItems[activeIndex - scored.length].item);
           }
         }
         var groups = {};
@@ -7035,10 +7512,38 @@
           h(
             "div",
             { className: "command-palette", role: "dialog", "aria-modal": "true", "aria-label": "JoeOS command palette", ref: containerRef, onKeyDown: onKeyDown },
-            h("div", { className: "palette-search" }, icon("fa-magnifying-glass"), h("input", { ref: inputRef, value: query, onChange: function (event) { setQuery(event.target.value); }, placeholder: "Search commands and sections…", "aria-label": "Search commands" }), h("span", { className: "palette-shortcut" }, "ESC")),
+            h("div", { className: "palette-search" }, icon("fa-magnifying-glass"), h("input", { ref: inputRef, value: query, onChange: function (event) { setQuery(event.target.value); }, placeholder: "Search objects and commands…", "aria-label": "Search objects and commands" }), h("span", { className: "palette-shortcut" }, "ESC")),
             h(
               "div",
               { className: "palette-results", ref: listRef, role: "listbox", "aria-label": "Command results" },
+              objectSearching ? h("div", { className: "palette-caption" }, "Searching objects…") : null,
+              objectItems.length ? objectGroups.map(function (og) {
+                return h(
+                  "div",
+                  { className: "palette-group", key: "obj-" + og.label },
+                  h("div", { className: "palette-caption" }, og.label),
+                  og.items.map(function (it) {
+                    var current = flatIndex++;
+                    return h(
+                      "button",
+                      {
+                        type: "button",
+                        className: "palette-item" + (scored.length + current === activeIndex ? " active" : ""),
+                        onClick: function () { activate(it); },
+                        onMouseEnter: function () { setActiveIndex(scored.length + current); },
+                        key: it.id,
+                        role: "option",
+                        "aria-selected": scored.length + current === activeIndex
+                      },
+                      h("span", null, icon(it.icon)),
+                      h("span", { className: "palette-copy" }, h("strong", null, it.title), h("small", null, it.detail)),
+                      it.actions && it.actions.length ? h("span", { className: "palette-actions" }, it.actions.slice(0, 2).map(function (action) {
+                        return h("span", { className: "palette-action" + (action.risk ? " risk-" + action.risk : ""), key: action.id }, icon(action.icon), action.label);
+                      })) : null
+                    );
+                  })
+                );
+              }) : null,
               scored.length ? groupKeys.map(function (category) {
                 var items = groups[category];
                 return h(
@@ -7066,7 +7571,7 @@
                     );
                   })
                 );
-              }) : h("div", { className: "empty-widget" }, "No command matches that search.")
+              }) : (!objectSearching && !objectItems.length && query.trim().length >= 2) ? h("div", { className: "empty-widget" }, "No objects or commands match that search.") : (query ? null : h("div", { className: "palette-caption" }, "Type to search objects and commands"))
             )
           )
         );
@@ -7085,7 +7590,13 @@
             h("div", { className: "assistant-head-copy" }, h("strong", null, "JoeOS Local AI"), h("span", null, runtimeLabel(props.runtime))),
             h("div", { className: "assistant-head-actions" }, h("button", { type: "button", onClick: props.onClear, "aria-label": "Clear assistant conversation", title: "Clear conversation" }, icon("fa-eraser")), h("button", { type: "button", onClick: props.onClose, "aria-label": "Close AI assistant", title: "Close assistant" }, icon("fa-xmark")))
           ),
-          h("div", { className: "assistant-context", title: modelLabel }, icon("fa-lock"), "Private Lemonade · " + modelLabel),
+          h("div", { className: "assistant-context", title: modelLabel }, icon("fa-lock"), "Private Ollama · " + (props.assistantModel || modelLabel)),
+          props.focused ? h(
+            "div",
+            { className: "assistant-focus", "data-focus-scope": (props.focused.module_type || "module") },
+            h("span", { className: "focus-label" }, icon("fa-crosshairs"), "JOE IS FOCUSED ON: " + (props.focused.label || props.focused.module_type || "module")),
+            h("button", { type: "button", className: "focus-clear", onClick: props.onClearFocus, title: "Clear module focus" }, icon("fa-xmark"))
+          ) : null,
           h(
             "div",
             { className: "assistant-messages", "aria-live": "polite" },
@@ -7125,14 +7636,14 @@
                 ref: props.inputRef,
                 value: props.input,
                 onChange: function (event) { props.onInput(event.target.value); },
-                placeholder: "Ask your local model about this VPS…",
+                placeholder: "Chat naturally with your local model…",
                 autoComplete: "off",
                 enterKeyHint: "send",
                 spellCheck: true
               }),
               h("button", { type: "submit", className: "send-button", disabled: props.thinking || !props.input.trim(), "aria-label": "Execute command" }, icon("fa-arrow-up"))
             ),
-            h("div", { className: "assistant-hint" }, h("span", null, "Enter to send"), h("span", null, "Read-only local assistant"))
+            h("div", { className: "assistant-hint" }, h("span", null, "Enter to send"), h("span", null, "Local Ollama · agentic"))
           )
         );
       }
@@ -7221,12 +7732,502 @@
         return date.toLocaleString();
       }
 
+      function objectTypeIcon(type) {
+        var icons = {
+          agent: "fa-user-astronaut", agent_run: "fa-bolt", model: "fa-microchip", provider: "fa-server",
+          file: "fa-file-lines", folder: "fa-folder", artifact: "fa-box", automation: "fa-diagram-project",
+          schedule: "fa-calendar-days", execution: "fa-clock-rotate-left", approval: "fa-user-check",
+          campaign: "fa-flag", work_package: "fa-list-check", task: "fa-check-double", conversation: "fa-comments",
+          message: "fa-envelope", memory: "fa-brain", module: "fa-puzzle-piece", widget: "fa-table-cells-large",
+          device: "fa-mobile-screen", machine: "fa-server", user: "fa-user", team: "fa-people-group",
+          organization: "fa-building", workspace: "fa-window-restore", pipeline: "fa-arrows-split-up-and-left",
+          capability: "fa-key", tool: "fa-wrench", service: "fa-gears", notification: "fa-bell", event: "fa-bolt"
+        };
+        return icons[type] || "fa-circle";
+      }
+
+      function statusChipClass(status) {
+        var s = String(status || "").toLowerCase();
+        if (["active", "healthy", "succeeded", "available", "enabled", "ok", "installed", "running"].indexOf(s) !== -1) return "green";
+        if (["waiting", "paused", "queued", "idle", "proposed", "pending"].indexOf(s) !== -1) return "amber";
+        if (["failed", "error", "blocked", "offline", "unavailable", "degraded", "unhealthy"].indexOf(s) !== -1) return "red";
+        return "";
+      }
+
+      function actionSafetyHint(summary, capability) {
+        var level = summary && summary.action_safety ? summary.action_safety[capability] : null;
+        if (!level) return capability.replace(/_/g, " ");
+        var gates = {
+          safe: "Safe — executes immediately",
+          consequential: "Consequential — previewed before running",
+          privileged: "Privileged — requires approval",
+          destructive: "Destructive — heavily protected"
+        };
+        return capability.replace(/_/g, " ") + " · " + (gates[level] || level);
+      }
+
+      function semanticToneClass(tone) {
+        var tones = { success: "green", warning: "amber", danger: "red", default: "" };
+        return tones[tone] || "";
+      }
+
+      function setQuickLookImpactType(data, type) {
+        // Drill the impact count into the collection of impacted objects.
+        var impacted = (data && data.impact) || [];
+        var matching = impacted.filter(function (entry) {
+          var target = entry.object || {};
+          return target.object_type === type;
+        });
+        if (matching.length) {
+          openObjectRef({ object_type: type, object_id: (matching[0].object || {}).object_id, label: type.replace(/_/g, " ") });
+        }
+      }
+
+      function CommandCenterHome(props) {
+        var runtime = props.runtime || {};
+        var auto = props.automationOverview || {};
+        var agents = props.agentsOverview || {};
+        var notifications = props.notifications || [];
+        var security = props.security || {};
+        var securityOverview = props.securityOverview || {};
+        var runtimeOn = !!runtime.online;
+        var unread = notifications.filter(function (n) { return n.unread; }).length;
+        var focusedPair = useState(null);
+        var focused = focusedPair[0];
+        var setFocused = focusedPair[1];
+        var inspectorPair = useState(null);
+        var inspector = inspectorPair[0];
+        var setInspector = inspectorPair[1];
+        var quickLookPair = useState(null);
+        var quickLook = quickLookPair[0];
+        var setQuickLook = quickLookPair[1];
+        var quickLookDataPair = useState(null);
+        var quickLookData = quickLookDataPair[0];
+        var setQuickLookData = quickLookDataPair[1];
+        var comparePickerPair = useState(false);
+        var comparePicker = comparePickerPair[0];
+        var setComparePicker = comparePickerPair[1];
+        var compareResultPair = useState(null);
+        var compareResult = compareResultPair[0];
+        var setCompareResult = compareResultPair[1];
+        var compareTargetPair = useState(null);
+        var compareTarget = compareTargetPair[0];
+        var setCompareTarget = compareTargetPair[1];
+        useEffect(function () {
+          if (!quickLook) { setQuickLookData(null); return; }
+          setQuickLookData(null);
+          var ref = quickLook;
+          var base = "/api/v1/objects/" + encodeURIComponent(ref.object_type || ref.type) + "/" + encodeURIComponent(ref.object_id || ref.id);
+          function load(path, fallback) {
+            return requestJson(base + path, { cache: "no-store", headers: { Accept: "application/json" } })
+              .catch(function () { return fallback; });
+          }
+          Promise.all([
+            load("", null),
+            load("/relationships", { relationships: [] }),
+            load("/impact", { impact: [], counts: {}, total: 0 }),
+            load("/activity", { activity: [] }),
+            load("/why", null),
+          ]).then(function (parts) {
+            if (quickLook !== ref) return;
+            setQuickLookData({
+              summary: parts[0],
+              relationships: (parts[1] && parts[1].relationships) || [],
+              impact: (parts[2] && parts[2].impact) || [],
+              impactCounts: (parts[2] && parts[2].counts) || {},
+              impactTotal: (parts[2] && parts[2].total) || 0,
+              activity: (parts[3] && parts[3].activity) || [],
+              why: parts[4],
+            });
+          });
+        }, [quickLook]);
+        var menuPair = useState(null);
+        var menuFor = menuPair[0];
+        var setMenuFor = menuPair[1];
+
+        // ---- Persisted command-center layout (order + pinned) via ui-prefs ----
+        function readLayout() {
+          try {
+            var raw = window.localStorage.getItem("joeos:ui-prefs");
+            var parsed = raw ? JSON.parse(raw) : {};
+            var layout = parsed && parsed.command_layout && parsed.command_layout.order;
+            if (Array.isArray(layout) && layout.length) return parsed.command_layout;
+          } catch (error) {}
+          return null;
+        }
+        var layoutPair = useState(readLayout);
+        var layout = layoutPair[0];
+        var setLayout = layoutPair[1];
+        var layoutUndoPair = useState([]);
+        var layoutUndo = layoutUndoPair[0];
+        var setLayoutUndo = layoutUndoPair[1];
+        function pushLayoutUndo(prev) {
+          setLayoutUndo(function (stack) {
+            var next = stack.slice().concat([prev]);
+            if (next.length > 20) next.shift();
+            return next;
+          });
+        }
+        function persistLayout(next) {
+          var prev = readLayout();
+          if (prev !== null || next) pushLayoutUndo(prev);
+          setLayout(next);
+          try {
+            var raw = window.localStorage.getItem("joeos:ui-prefs");
+            var parsed = raw ? JSON.parse(raw) : {};
+            parsed.command_layout = next;
+            window.localStorage.setItem("joeos:ui-prefs", JSON.stringify(parsed));
+          } catch (error) {}
+        }
+        function undoLayout() {
+          if (!layoutUndo.length) return;
+          var prev = layoutUndo[layoutUndo.length - 1];
+          setLayoutUndo(layoutUndo.slice(0, -1));
+          setLayout(prev);
+          try {
+            var raw = window.localStorage.getItem("joeos:ui-prefs");
+            var parsed = raw ? JSON.parse(raw) : {};
+            parsed.command_layout = prev;
+            window.localStorage.setItem("joeos:ui-prefs", JSON.stringify(parsed));
+          } catch (error) {}
+        }
+
+        function openModule(opts) {
+          if (opts.onOpen) { opts.onOpen(); return; }
+          props.onOpen(opts.open);
+        }
+        function moduleCard(opts) {
+          var pinned = layout && layout.pinned && layout.pinned[opts.module];
+          return h(
+            "article",
+            { className: "cc-module glass-card " + (opts.tone || "") + (pinned ? " cc-pinned" : ""), "data-module": opts.module, key: opts.module, role: "button", tabIndex: 0,
+              onClick: function () { openModule(opts); },
+              onKeyDown: function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openModule(opts); } },
+              "aria-label": "Open " + opts.title + " module" },
+            h("div", { className: "cc-module-head" },
+              h("span", { className: "cc-module-icon" }, icon(opts.icon)),
+              h("div", { style: { flex: 1, minWidth: 0 } }, h("h3", null, opts.title), opts.sub ? h("p", null, opts.sub) : null),
+              opts.badge != null ? h("span", { className: "cc-module-badge" + (opts.badgeTone ? " " + opts.badgeTone : "") }, String(opts.badge)) : null,
+              h("button", { type: "button", className: "cc-more ghost-button", "aria-label": "Module menu for " + opts.title, onClick: function (event) { event.stopPropagation(); setMenuFor(menuFor === opts.module ? null : opts.module); } }, icon("fa-ellipsis-vertical"))
+            ),
+            h("div", { className: "cc-module-value" }, opts.value ? opts.value : h("span", { className: "cc-module-muted" }, opts.emptyLabel || "No live data yet")),
+            opts.detail ? h("div", { className: "cc-module-detail" }, opts.detail) : null,
+            menuFor === opts.module ? h(
+              "div",
+              { className: "cc-menu", role: "menu", "aria-label": opts.title + " menu" },
+              h("button", { type: "button", role: "menuitem", onClick: function (event) { event.stopPropagation(); setMenuFor(null); openModule(opts); } }, icon("fa-arrow-up-right-from-square"), " Open"),
+              h("button", { type: "button", role: "menuitem", onClick: function (event) { event.stopPropagation(); setMenuFor(null); setFocused(opts.module); } }, icon("fa-expand"), " Focus"),
+              h("button", { type: "button", role: "menuitem", onClick: function (event) { event.stopPropagation(); setMenuFor(null); setInspector(inspector === opts.module ? null : opts.module); } }, icon("fa-circle-info"), inspector === opts.module ? " Close inspector" : " Inspect"),
+              h("button", { type: "button", role: "menuitem", onClick: function (event) {
+                event.stopPropagation();
+                setMenuFor(null);
+                var next = layout ? { order: layout.order.slice(), pinned: Object.assign({}, layout.pinned || {}) } : { order: null, pinned: {} };
+                if (pinned) delete next.pinned[opts.module]; else next.pinned[opts.module] = true;
+                persistLayout(next);
+              } }, icon(pinned ? "fa-thumbtack-slash" : "fa-thumbtack"), pinned ? " Unpin" : " Pin"),
+              h("button", { type: "button", role: "menuitem", disabled: effectiveOrder().indexOf(opts.module) <= 0, onClick: function (event) { event.stopPropagation(); moveModule(opts.module, -1); } }, icon("fa-arrow-up"), " Move up"),
+              h("button", { type: "button", role: "menuitem", disabled: effectiveOrder().indexOf(opts.module) >= effectiveOrder().length - 1, onClick: function (event) { event.stopPropagation(); moveModule(opts.module, 1); } }, icon("fa-arrow-down"), " Move down"),
+              h("button", { type: "button", role: "menuitem", onClick: function (event) { event.stopPropagation(); setMenuFor(null); resetLayout(); } }, icon("fa-rotate-left"), " Reset position")
+            ) : null
+          );
+        }
+
+        function effectiveOrder() {
+          if (layout && layout.order && layout.order.length) return layout.order;
+          return modules.map(function (m) { return m.module; });
+        }
+        function moveModule(moduleId, delta) {
+          var order = effectiveOrder().slice();
+          var idx = order.indexOf(moduleId);
+          var target = idx + delta;
+          if (idx < 0 || target < 0 || target >= order.length) return;
+          order.splice(idx, 1);
+          order.splice(target, 0, moduleId);
+          var next = { order: order, pinned: Object.assign({}, (layout && layout.pinned) || {}) };
+          persistLayout(next);
+        }
+
+        function resetLayout() {
+          persistLayout({ order: null, pinned: {} });
+          setMenuFor(null);
+        }
+
+        var agentList = Array.isArray(agents.agents) ? agents.agents : [];
+        var activeAgents = agentList.filter(function (a) { return a.status === "active" || a.availability === "idle" || a.availability === "busy"; });
+        var workingAgents = agentList.filter(function (a) { return a.availability === "busy"; });
+        var failedAgents = agentList.filter(function (a) { return a.status === "failed" || a.availability === "offline"; });
+        var agentBadge = (agentList.length ? String(agentList.length) : (agents.total != null ? String(agents.total) : null));
+        var pendingApprovals = (securityOverview.pending_approvals != null ? securityOverview.pending_approvals : (auto.pending_approvals != null ? auto.pending_approvals : 0));
+        var openSecurityEvents = (securityOverview.security_events_open != null ? securityOverview.security_events_open : (security.security_events_open != null ? security.security_events_open : null));
+
+        var modules = [
+          { module: "agents", title: "Agents", icon: "fa-user-astronaut", sub: (activeAgents.length ? activeAgents.length + " active" : "") + (workingAgents.length ? " · " + workingAgents.length + " working" : "") + (failedAgents.length ? " · " + failedAgents.length + " failed" : ""), value: agentBadge ? agentBadge + " agent(s)" : null, detail: agentList.length ? agentList.slice(0, 5).map(function (a) { return a.display_name; }).join(", ") : null, badge: agentBadge, badgeTone: failedAgents.length ? "danger" : (workingAgents.length ? "info" : ""), open: "agents", objectType: "module" },
+          { module: "automation", title: "Automations", icon: "fa-robot", sub: "Workflow engine", value: (auto.running ? auto.running + " running" : "idle") + (auto.failed_recently ? " · " + auto.failed_recently + " failed" : ""), detail: (auto.workflows_enabled != null ? auto.workflows_enabled + " enabled / " + (auto.workflows_total || 0) + " total" : null) + (auto.pending_approvals ? " · " + auto.pending_approvals + " approvals" : ""), badge: auto.failed_recently ? auto.failed_recently : (auto.running ? auto.running : null), badgeTone: auto.failed_recently ? "danger" : "info", open: "automation", objectType: "module" },
+          { module: "work", title: "Current Work", icon: "fa-list-check", sub: "Agent runs and tasks", value: (auto.running ? auto.running + " running" : "no active work") + (auto.waiting ? " · " + auto.waiting + " waiting" : ""), badge: auto.running || null, badgeTone: "info", open: "automation", objectType: "module" },
+          { module: "approvals", title: "Approvals", icon: "fa-user-check", sub: "Waiting for you", value: pendingApprovals ? pendingApprovals + " pending" : "all clear", badge: pendingApprovals || null, badgeTone: pendingApprovals ? "danger" : "", open: "security-center", objectType: "module" },
+          { module: "executions", title: "Executions", icon: "fa-clock-rotate-left", sub: "Runs and traces", value: (auto.running ? auto.running + " running" : "idle") + (auto.failed_recently ? " · " + auto.failed_recently + " failed" : ""), badge: auto.running || null, badgeTone: "info", open: "automation", objectType: "module" },
+          { module: "memory", title: "Memory", icon: "fa-brain", sub: "Knowledge platform", open: "memory", objectType: "module" },
+          { module: "files", title: "Files", icon: "fa-folder-open", sub: "Project artifacts", open: "files", objectType: "module" },
+          { module: "terminal", title: "Terminal", icon: "fa-terminal", sub: "Authenticated host shell", open: "terminal", openLabel: "Open", onOpen: function () { window.location.href = "/os/terminal"; }, objectType: "module" },
+          { module: "build", title: "Build JoeOS", icon: "fa-hammer", sub: "Autonomous engineering", open: "build", openLabel: "Open", onOpen: function () { window.location.href = "/os/build"; }, objectType: "module" },
+          { module: "system", title: "System Pulse", icon: "fa-heart-pulse", sub: runtimeOn ? "Healthy" : "Offline", value: runtimeOn ? (props.uptimeSeconds ? Math.round(props.uptimeSeconds / 60) + "m up" : null) : "runtime offline", detail: props.metrics ? Object.keys(props.metrics || {}).slice(0, 4).map(function (k) { return k + " " + (props.metrics[k] && props.metrics[k].value != null ? props.metrics[k].value : "?"); }).join(" · ") : null, badgeTone: runtimeOn ? "" : "danger", badge: runtimeOn ? null : "off", open: "dashboard", objectType: "module" },
+          { module: "models", title: "Models & AI", icon: "fa-microchip", sub: "Providers and compute", value: runtime.model ? runtime.model : null, open: "ai", objectType: "module" },
+          { module: "attention", title: "Attention", icon: "fa-bell", sub: "Notifications", value: unread ? unread + " unread" : "all clear", badge: unread || null, badgeTone: unread ? "danger" : "", open: "communications", objectType: "module" },
+          { module: "security", title: "Security", icon: "fa-shield-halved", sub: (securityOverview.lockdown_active || security.lockdown_active) ? "LOCKDOWN ACTIVE" : "No lockdown", value: openSecurityEvents != null ? openSecurityEvents + " open events" : null, badgeTone: (securityOverview.lockdown_active || security.lockdown_active) ? "danger" : "", badge: (securityOverview.lockdown_active || security.lockdown_active) ? "locked" : null, open: "security-center", objectType: "module" }
+        ];
+
+        // Merge the authoritative module catalog: any built-in manifest not
+        // already rendered appears as a card (with honest "no live data" state)
+        // so user/workspace modules surface automatically.
+        var manifestList = Array.isArray(props.manifestModules) ? props.manifestModules : [];
+        var presentIds = {};
+        modules.forEach(function (m) { presentIds[m.module] = true; });
+        manifestList.forEach(function (manifest) {
+          var id = manifest.id;
+          if (presentIds[id]) return;
+          presentIds[id] = true;
+          modules.push({
+            module: id,
+            title: manifest.display_name || id,
+            icon: manifest.icon || "fa-puzzle-piece",
+            sub: manifest.description || "Declared module",
+            value: null,
+            emptyLabel: "No live data yet",
+            detail: manifest.category ? "category: " + manifest.category : null,
+            open: manifest.route || ("/os/" + id),
+            objectType: "module",
+            openLabel: "Open"
+          });
+        });
+
+        var activeModule = focused ? (modules.find(function (m) { return m.module === focused; }) || null) : null;
+
+        if (activeModule) {
+          return h(
+            "div",
+            { className: "command-center" },
+            h("div", { className: "cc-heading" },
+              h("button", { type: "button", className: "ghost-button", onClick: function () { setFocused(null); } }, icon("fa-arrow-left"), " Back to Command Center"),
+              h("h2", null, activeModule.title),
+              h("p", null, activeModule.sub || "")
+            ),
+            h(
+              "div",
+              { className: "cc-focused glass-card" },
+              moduleCard(activeModule)
+            )
+          );
+        }
+
+        // Apply persisted ordering + pinned-first. Pinned modules keep their
+        // relative pinned order; then non-pinned in saved order; then any new
+        // modules not yet saved.
+        var savedOrder = layout && layout.order && layout.order.length ? layout.order : null;
+        var pinnedSet = (layout && layout.pinned) || {};
+        function moduleOrderKey(m) {
+          var orderIdx = savedOrder ? savedOrder.indexOf(m.module) : -1;
+          return orderIdx < 0 ? 1e6 + modules.indexOf(m) : orderIdx;
+        }
+        var ordered = modules.slice().sort(function (a, b) {
+          var pa = pinnedSet[a.module] ? 0 : 1;
+          var pb = pinnedSet[b.module] ? 0 : 1;
+          if (pa !== pb) return pa - pb;
+          return moduleOrderKey(a) - moduleOrderKey(b);
+        });
+
+        var inspected = inspector ? (modules.find(function (m) { return m.module === inspector; }) || null) : null;
+
+        function runObjectCompare(targetRef) {
+          if (!quickLook || !targetRef) return;
+          setCompareResult(null);
+          var left = quickLook;
+          var right = targetRef;
+          var base = "/api/v1/objects/compare?left_type=" + encodeURIComponent(left.object_type || left.type) +
+            "&left_id=" + encodeURIComponent(left.object_id || left.id) +
+            "&right_type=" + encodeURIComponent(right.object_type || right.type) +
+            "&right_id=" + encodeURIComponent(right.object_id || right.id);
+          requestJson(base, { cache: "no-store", headers: { Accept: "application/json" } })
+            .then(function (payload) { if (payload) setCompareResult(payload); })
+            .catch(function () { setCompareResult({ comparable: false, error: "Comparison is unavailable right now." }); });
+        }
+
+        return h(
+          "div",
+          { className: "command-center cc-with-inspector" },
+          h(
+            "div",
+            { className: "cc-main" },
+            h("div", { className: "cc-heading" },
+              h("h2", null, "Command Center"),
+              h("p", null, "Broad operational state at a glance — open, focus, pin, reorder, or ask Joe about any module.")
+            ),
+            layoutUndo.length ? h("div", { className: "cc-undo-bar" }, h("button", { type: "button", className: "secondary-button", onClick: undoLayout }, icon("fa-rotate-left"), "Undo layout change"), h("span", { className: "cc-module-muted" }, "Reorder, pin, and reset are reversible.")) : null,
+            h("div", { className: "cc-grid" }, ordered.map(function (m) {
+              return moduleCard(m);
+            }))
+          ),
+          quickLook ? h(
+            "aside",
+            { className: "cc-inspector glass-card", "aria-label": "Object inspector" },
+            h("div", { className: "cc-inspector-head" },
+              h("span", { className: "cc-module-icon" }, icon(objectTypeIcon(quickLook.object_type || quickLook.type))),
+              h("h3", null, quickLook.label || quickLook.object_id),
+              h("button", { type: "button", className: "ghost-button", "aria-label": "Close inspector", onClick: function () { setQuickLook(null); } }, icon("fa-xmark"))
+            ),
+            h("div", { className: "cc-inspector-body" },
+              quickLookData ? h(
+                "div",
+                null,
+                h("div", { className: "cc-inspector-value" }, quickLookData.summary && quickLookData.summary.name ? quickLookData.summary.name : (quickLook.label || quickLook.object_id)),
+                (quickLookData.summary && quickLookData.summary.semantic_status) ? h("div", { className: "cc-inspector-semantic" },
+                  h("span", { className: "chip " + semanticToneClass(quickLookData.summary.semantic_status.tone) }, quickLookData.summary.semantic_status.label),
+                  h("span", { className: "cc-inspector-semantic-text" }, quickLookData.summary.semantic_status.meaning)
+                ) : (quickLookData.summary && quickLookData.summary.status ? h("p", { className: "cc-module-detail" }, h("span", { className: "chip " + statusChipClass(quickLookData.summary.status) }, quickLookData.summary.status)) : null),
+                quickLookData.summary && quickLookData.summary.description ? h("p", { className: "cc-module-detail" }, quickLookData.summary.description) : null,
+                quickLookData.impactTotal > 0 ? h(
+                  "div",
+                  { className: "cc-inspector-meta", style: { marginTop: 10 } },
+                  h("strong", { className: "cc-inspector-label" }, "Impact"),
+                  h("div", { className: "cc-inspector-impacts" }, Object.keys(quickLookData.impactCounts).slice(0, 5).map(function (type) {
+                    return h("button", { type: "button", className: "cc-inspector-impact", key: type, onClick: function () { setQuickLookImpactType(quickLookData, type); } },
+                      icon(objectTypeIcon(type)), " ", quickLookData.impactCounts[type], " ", type.replace(/_/g, " "));
+                  }))
+                ) : null,
+                quickLookData.activity && quickLookData.activity.length ? h(
+                  "div",
+                  { className: "cc-inspector-meta", style: { marginTop: 12 } },
+                  h("strong", { className: "cc-inspector-label" }, "Activity"),
+                  h("div", { className: "cc-inspector-timeline" }, quickLookData.activity.slice(0, 4).map(function (entry) {
+                    var dotTone = entry.result === "ok" ? "success" : (entry.result === "error" || entry.result === "failed") ? "danger" : "default";
+                    return h("div", { className: "cc-inspector-timeline-item", key: entry.recorded_at + "-" + entry.action },
+                      h("span", { className: "cc-timeline-dot " + dotTone }),
+                      h("div", { className: "cc-timeline-copy" },
+                        h("strong", null, entry.actor, " ", entry.action.replace(/_/g, " ")),
+                        h("span", null, entry.detail || (entry.object_type + " " + entry.object_id))));
+                  }))
+                ) : null,
+                quickLookData.summary && quickLookData.summary.capabilities && quickLookData.summary.capabilities.length ? h(
+                  "div",
+                  { className: "cc-inspector-meta", style: { marginTop: 10 } },
+                  h("strong", { className: "cc-inspector-label" }, "Capabilities"),
+                  h("div", { className: "cc-inspector-chips" }, quickLookData.summary.capabilities.slice(0, 6).map(function (cap) { return h("span", { className: "chip", key: cap, title: actionSafetyHint(quickLookData.summary, cap) }, cap.replace(/_/g, " ")); }))
+                ) : null,
+                quickLookData.relationships && quickLookData.relationships.length ? h(
+                  "div",
+                  { className: "cc-inspector-meta", style: { marginTop: 12 } },
+                  h("strong", { className: "cc-inspector-label" }, "Relationships"),
+                  h("div", { className: "cc-inspector-rel" }, quickLookData.relationships.slice(0, 5).map(function (rel) {
+                    var target = rel.object || {};
+                    return h("button", { type: "button", className: "cc-inspector-rel-item", key: (rel.relation || "") + "-" + (target.object_id || ""), onClick: function () { setQuickLook({ object_type: target.object_type, object_id: target.object_id, label: target.display_hint || target.object_id }); } },
+                      h("span", null, rel.relation.replace(/_/g, " ")),
+                      h("strong", null, icon(objectTypeIcon(target.object_type)), " ", target.display_hint || target.object_id));
+                  }))
+                ) : null,
+                h("button", { type: "button", className: "cc-inspector-help", onClick: function () { if (props.onAskJoe) props.onAskJoe(quickLook); } }, icon("fa-wand-magic-sparkles"), " What can I do here? · ask Joe")
+              ) : h("p", { className: "cc-module-muted" }, "Resolving object…")
+            ),
+            h("div", { className: "cc-inspector-actions" },
+              h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { if (props.onAskWhy) props.onAskWhy(quickLook); } }, icon("fa-circle-question"), " Why?"),
+              h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { setComparePicker(true); } }, icon("fa-not-equal"), " Compare"),
+              h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { openObjectRef(quickLook); } }, icon("fa-arrow-up-right-from-square"), " Open")
+            )
+          ) : null,
+          (!quickLook && inspected) ? h(
+            "aside",
+            { className: "cc-inspector glass-card", "aria-label": inspected.title + " inspector" },
+            h("div", { className: "cc-inspector-head" },
+              h("span", { className: "cc-module-icon" }, icon(inspected.icon)),
+              h("h3", null, inspected.title),
+              h("button", { type: "button", className: "ghost-button", "aria-label": "Close inspector", onClick: function () { setInspector(null); } }, icon("fa-xmark"))
+            ),
+            h("div", { className: "cc-inspector-body" },
+              inspected.sub ? h("p", { className: "cc-module-detail" }, inspected.sub) : null,
+              inspected.value ? h("div", { className: "cc-inspector-value" }, inspected.value) : null,
+              inspected.detail ? h("p", { className: "cc-module-detail" }, inspected.detail) : null
+            ),
+            h("div", { className: "cc-inspector-actions" },
+              h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(inspected.open); } }, icon("fa-arrow-up-right-from-square"), " Open")
+            )
+          ) : null,
+          (!quickLook && !inspected) ? h(
+            "aside",
+            { className: "cc-inspector glass-card", "aria-label": "Recents and pinned objects" },
+            h("div", { className: "cc-inspector-head" },
+              h("span", { className: "cc-module-icon" }, icon("fa-clock-rotate-left")),
+              h("h3", null, "Recents & Pinned"),
+              h("span", { className: "cc-module-muted", style: { fontSize: 10 } }, "Jump back to any Enterprise Object")
+            ),
+            h("div", { className: "cc-inspector-body" },
+              (props.pinnedObjects && props.pinnedObjects.length) ? h("div", { className: "cc-inspector-meta" },
+                h("strong", { className: "cc-inspector-label" }, "Pinned"),
+                h("div", { className: "cc-inspector-rel" }, props.pinnedObjects.slice(0, 6).map(function (ref) {
+                  return h("button", { type: "button", className: "cc-inspector-rel-item", key: (ref.object_type || "") + "/" + (ref.object_id || ""), onClick: function () { setQuickLook(ref); } },
+                    h("span", null, icon(objectTypeIcon(ref.object_type))),
+                    h("strong", null, ref.label || ref.object_id),
+                    h("span", { style: { marginLeft: "auto" }, "aria-hidden": true }, "·"));
+                }))
+              ) : null,
+              (props.recentObjects && props.recentObjects.length) ? h("div", { className: "cc-inspector-meta", style: { marginTop: 12 } },
+                h("strong", { className: "cc-inspector-label" }, "Recently viewed"),
+                h("div", { className: "cc-inspector-rel" }, props.recentObjects.slice(0, 8).map(function (ref) {
+                  return h("button", { type: "button", className: "cc-inspector-rel-item", key: (ref.object_type || "") + "/" + (ref.object_id || ""), onClick: function () { setQuickLook(ref); } },
+                    h("span", null, icon(objectTypeIcon(ref.object_type))),
+                    h("strong", null, ref.label || ref.object_id));
+                }))
+              ) : null,
+              (!props.pinnedObjects || !props.pinnedObjects.length) && (!props.recentObjects || !props.recentObjects.length) ? h("p", { className: "cc-module-muted" }, "Open an object to see it here.") : null
+            )
+          ) : null,
+          comparePicker ? h(
+            "div",
+            { className: "cc-modal-backdrop", onClick: function (event) { if (event.target === event.currentTarget) { setComparePicker(false); setCompareTarget(null); } } },
+            h("div", { className: "cc-modal", role: "dialog", "aria-modal": "true", "aria-label": "Compare objects" },
+              h("div", { className: "cc-modal-head" },
+                h("h3", null, "Compare " + (quickLook ? (quickLook.object_type || "object").replace(/_/g, " ") : "") + " objects"),
+                h("button", { type: "button", className: "ghost-button", "aria-label": "Close compare", onClick: function () { setComparePicker(false); setCompareTarget(null); } }, icon("fa-xmark"))
+              ),
+              h("p", { className: "cc-module-muted" }, "Select a compatible object to compare with " + (quickLook ? (quickLook.label || quickLook.object_id) : "the selected object") + ". Different object types cannot be compared."),
+              h("div", { className: "cc-compare-pick" }, (props.pinnedObjects || []).concat(props.recentObjects || []).slice(0, 10).map(function (ref) {
+                if (quickLook && (ref.object_type || "") !== (quickLook.object_type || "")) return null;
+                return h("button", { type: "button", className: "cc-compare-option", key: (ref.object_type || "") + "/" + (ref.object_id || ""), onClick: function () { runObjectCompare(ref); } },
+                  icon(objectTypeIcon(ref.object_type)), " ", ref.label || ref.object_id);
+              })),
+              compareResult ? h(
+                "div",
+                { className: "cc-compare-result" },
+                compareResult.comparable === false ? h("p", { className: "cc-module-muted" }, compareResult.error) : h(
+                  "table",
+                  { className: "cc-compare-table" },
+                  h("thead", null, h("tr", null,
+                    h("th", null, "Field"),
+                    (compareResult.columns || []).map(function (col) { return h("th", { key: col.ref.object_type + "/" + col.ref.object_id }, col.summary && col.summary.name ? col.summary.name : (col.ref.display_hint || col.ref.object_id)); })
+                  )),
+                  h("tbody", null, (compareResult.rows || []).map(function (row) {
+                    return h("tr", { key: row.field, className: row.same ? "" : "cc-compare-diff" },
+                      h("td", { className: "cc-compare-field" }, row.label),
+                      h("td", null, String(row.left == null ? "—" : row.left)),
+                      h("td", null, String(row.right == null ? "—" : row.right)));
+                  }))
+                )
+              ) : null
+            )
+          ) : null,
+          menuFor ? h("div", { className: "cc-menu-backdrop", onClick: function () { setMenuFor(null); } }) : null
+        );
+      }
+
       function AgentCard(props) {
         var agent = props.agent;
         var caps = Array.isArray(agent.capabilities) ? agent.capabilities.slice(0, 4) : [];
+        function openAgent(event) {
+          if (event) event.stopPropagation();
+          props.onOpen(agent);
+        }
         return h(
           "article",
-          { className: "glass-card interactive-card agent-card" },
+          { className: "glass-card interactive-card agent-card", role: "button", tabIndex: 0, onClick: openAgent,
+            onKeyDown: function (event) { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openAgent(event); } },
+            "aria-label": "Open agent " + (agent.display_name || "Unnamed agent") },
           h(
             "div",
             { className: "agent-card-top" },
@@ -7240,12 +8241,7 @@
             h("span", null, icon("fa-layer-group"), "v" + (agent.config_version || 1)),
             h("span", null, icon("fa-arrow-trend-up"), "Load " + (agent.maximum_workload || 0))
           ),
-          caps.length ? h("div", { className: "agent-capabilities" }, caps.map(function (cap) { return h("span", { className: "agent-capability", key: cap }, cap); })) : h("p", { className: "os-subnote" }, "No capabilities declared."),
-          h(
-            "div",
-            { className: "agent-card-actions" },
-            h("button", { type: "button", className: "secondary-button", style: { flex: 1 }, onClick: function () { props.onOpen(agent); } }, "Open workspace")
-          )
+          caps.length ? h("div", { className: "agent-capabilities" }, caps.map(function (cap) { return h("span", { className: "agent-capability", key: cap }, cap); })) : h("p", { className: "os-subnote" }, "No capabilities declared.")
         );
       }
 
@@ -7272,7 +8268,7 @@
             ),
             h("span", { className: "agents-count" }, filtered.length + " of " + props.agents.length + " agents")
           ),
-          filtered.length ? h("div", { className: "agent-card-grid" }, filtered.map(function (agent) { return h(AgentCard, { agent: agent, key: agent.agent_id, onOpen: props.onOpen }); })) : h("div", { className: "os-empty" }, icon("fa-user-astronaut"), h("p", null, "No agents match this filter. Agents you configure appear here."), h("p", { className: "os-subnote" }, "Create an agent profile through the agent API, then refresh."))
+          filtered.length ? h("div", { className: "agent-card-grid" }, filtered.map(function (agent) { return h(AgentCard, { agent: agent, key: agent.agent_id, onOpen: props.onOpen, onJoeFocus: function (a) { focusAssistant({ module_type: "agents", object_type: "agent", object_id: a.agent_id || a.id, label: a.display_name }); } }); })) : h("div", { className: "os-empty" }, icon("fa-user-astronaut"), h("p", null, "No agents match this filter. Agents you configure appear here."), h("p", { className: "os-subnote" }, "Create an agent profile through the agent API, then refresh."))
         );
       }
 
@@ -7288,6 +8284,7 @@
           h(
             "div",
             { className: "agent-detail-head" },
+            h("button", { type: "button", className: "return-control", onClick: function () { props.onReturn(); }, "aria-label": "Return to Agents" }, icon("fa-arrow-left"), " Agents"),
             h("div", { className: "agent-avatar" }, icon("fa-user-astronaut")),
             h("div", { style: { flex: 1 } }, h("h2", null, agent.display_name || "Unnamed agent"), h("p", null, agent.agent_id + " · role " + agent.role_id)),
             h("div", { className: "os-button-row" }, availabilityOptions.map(function (option) {
@@ -7375,6 +8372,7 @@
           h(
             "div",
             { className: "agent-detail-head" },
+            h("button", { type: "button", className: "return-control", onClick: function () { props.onReturn(); }, "aria-label": "Return to Missions" }, icon("fa-arrow-left"), " Missions"),
             h("div", { className: "agent-avatar" }, icon("fa-rocket")),
             h("div", { style: { flex: 1 } }, h("h2", null, mission.title || "Untitled mission"), h("p", null, mission.mission_id + " · " + missionStateLabel(mission.progress || mission.status))),
             h("div", { className: "os-button-row" },
@@ -7619,7 +8617,9 @@
         return h(
           React.Fragment,
           null,
-          h("div", { className: "agent-detail-head" }, h("div", { className: "agent-avatar" }, icon("fa-brain")), h("div", null, h("h2", null, record.title), h("p", { className: "os-subnote" }, record.memory_id + " · " + (record.memory_type || "memory") + " · v" + String(record.version || 1)))),
+          h("div", { className: "agent-detail-head" },
+            h("button", { type: "button", className: "return-control", onClick: function () { props.onReturn(); }, "aria-label": "Return to Memory records" }, icon("fa-arrow-left"), " Memory"),
+            h("div", { className: "agent-avatar" }, icon("fa-brain")), h("div", null, h("h2", null, record.title), h("p", { className: "os-subnote" }, record.memory_id + " · " + (record.memory_type || "memory") + " · v" + String(record.version || 1)))),
           h("div", { className: "knowledge-meta", style: { marginBottom: 12 } }, h("span", { className: "knowledge-chip tone-" + state.tone }, state.label), h("span", { className: "knowledge-chip" }, icon("fa-lock"), record.privacy_classification || "private"), h("span", { className: "knowledge-chip" }, "embedding: " + String(record.embedding_state || "not_embedded"))),
           h("div", { className: "os-code", style: { whiteSpace: "pre-wrap" } }, record.content),
           h("p", { className: "os-section-title", style: { marginTop: 16 } }, icon("fa-circle-info"), "Provenance"),
@@ -7722,7 +8722,7 @@
             h(
               "div",
               { className: "knowledge-panel glass-card", style: { padding: 16 } },
-              sub === "detail" && props.selectedRecord ? h(MemoryDetail, { record: props.selectedRecord, onCorrect: function () { props.onCorrect(props.selectedRecord); }, onForget: function () { props.onForget(props.selectedRecord); } }) :
+              sub === "detail" && props.selectedRecord ? h(MemoryDetail, { record: props.selectedRecord, onReturn: function () { props.onNavigate("records"); }, onCorrect: function () { props.onCorrect(props.selectedRecord); }, onForget: function () { props.onForget(props.selectedRecord); } }) :
               h(
                 React.Fragment,
                 null,
@@ -7857,7 +8857,7 @@
                 h("small", null, isDir ? "directory" : (entry.size || 0) + " bytes" + (entry.language ? " · " + entry.language : "") + (entry.is_secret ? " · masked" : "")));
             })) : h("div", { className: "knowledge-empty" }, "This directory is empty.")
           ),
-          h("button", { type: "button", className: "text-button", style: { marginTop: 12 }, onClick: props.onBack }, icon("fa-arrow-left"), "Back")
+          h("button", { type: "button", className: "return-control", style: { marginTop: 12 }, onClick: props.onBack }, icon("fa-arrow-left"), " Files")
         );
       }
 
@@ -8030,9 +9030,9 @@
             h(
               "div",
               { className: "glass-card", style: { padding: 16 } },
-              subView === "agent" ? h(AgentDetailView, { agent: props.selectedAgent, onAvailability: props.onAvailability, onOpen: props.onNavigate }) :
+              subView === "agent" ? h(AgentDetailView, { agent: props.selectedAgent, onAvailability: props.onAvailability, onOpen: props.onOpenAgent, onReturn: function () { props.onNavigate("directory"); } }) :
               subView === "missions" ? h(MissionsView, { missions: props.missions, busy: props.busy, onCreate: props.onCreate, onOpen: props.onOpenMission }) :
-              subView === "mission" ? h(MissionDetailView, { mission: props.selectedMission, envelope: props.envelope, onAdvance: props.onAdvance, onOpen: props.onOpenMission, onSelectTask: props.onSelectTask, selectedTaskId: props.selectedTaskId, selectedTask: props.selectedTask }) :
+              subView === "mission" ? h(MissionDetailView, { mission: props.selectedMission, envelope: props.envelope, onAdvance: props.onAdvance, onOpen: props.onOpenMission, onReturn: function () { props.onNavigate("missions"); }, onSelectTask: props.onSelectTask, selectedTaskId: props.selectedTaskId, selectedTask: props.selectedTask }) :
               subView === "council" ? h(CouncilView, { overview: props.overview, busy: props.busy, onThread: props.onThread }) :
               h(AgentsDirectoryView, { agents: props.agents, search: props.search, onSearch: props.onSearch, onOpen: props.onOpenAgent })
             )
@@ -8044,8 +9044,9 @@
         var activePair = useState(function () {
           try {
             var savedSection = window.localStorage.getItem("joeos:last-section");
-            return NAV_ITEMS.some(function (item) { return item.id === savedSection; }) ? savedSection : "mission";
-          } catch (error) { return "mission"; }
+            if (savedSection === "command") return savedSection;
+            return NAV_ITEMS.some(function (item) { return item.id === savedSection; }) ? savedSection : "command";
+          } catch (error) { return "command"; }
         });
         var active = activePair[0];
         var setActive = activePair[1];
@@ -8055,6 +9056,15 @@
         var assistantPair = useState(function () { return window.innerWidth >= 1370; });
         var assistantOpen = assistantPair[0];
         var setAssistantOpen = assistantPair[1];
+        var assistantModelPair = useState("");
+        var assistantModel = assistantModelPair[0];
+        var setAssistantModel = assistantModelPair[1];
+        var assistantContextPair = useState(null);
+        var assistantContext = assistantContextPair[0];
+        var setAssistantContext = assistantContextPair[1];
+        var manifestModulesPair = useState([]);
+        var manifestModules = manifestModulesPair[0];
+        var setManifestModules = manifestModulesPair[1];
         var nowPair = useState(new Date());
         var now = nowPair[0];
         var setNow = nowPair[1];
@@ -8121,6 +9131,15 @@
         var notificationsPair = useState([]);
         var notifications = notificationsPair[0];
         var setNotifications = notificationsPair[1];
+        var recentObjectsPair = useState(readRecentObjects);
+        var recentObjects = recentObjectsPair[0];
+        var setRecentObjects = recentObjectsPair[1];
+        var snapshotPanelPair = useState(false);
+        var snapshotPanelOpen = snapshotPanelPair[0];
+        var setSnapshotPanelOpen = snapshotPanelPair[1];
+        var pinnedObjectsPair = useState(readPinnedObjects);
+        var pinnedObjects = pinnedObjectsPair[0];
+        var setPinnedObjects = pinnedObjectsPair[1];
         var communicationsOverviewPair = useState({ unread_focused: 0, pending_approvals: 0, agent_requests: 0, outbox_count: 0, failed_deliveries: 0, security_alerts_unacknowledged: 0, snoozed: 0, unhealthy_accounts: 0, unhealthy_providers: 0, quiet_hours_active: false, next_digest: null });
         var communicationsOverview = communicationsOverviewPair[0];
         var setCommunicationsOverview = communicationsOverviewPair[1];
@@ -8233,7 +9252,7 @@
         var thinking = thinkingPair[0];
         var setThinking = thinkingPair[1];
         var messagesPair = useState([
-          { id: "msg-1", role: "assistant", text: "I’m your private JoeOS copilot. Once Lemonade is online, ask me about this VPS’s live health, local events, or agent profiles." }
+          { id: "msg-1", role: "assistant", text: "I’m your private JoeOS local AI, running on your own Ollama. Chat naturally — I can inspect the system, agents, memory, and docs, then answer in plain language." }
         ]);
         var messages = messagesPair[0];
         var setMessages = messagesPair[1];
@@ -8383,6 +9402,22 @@
         var remoteErrorRef = useRef(false);
         var thinkingRef = useRef(false);
         var assistantAbortRef = useRef(null);
+        var assistantModelRef = useRef("");
+        var assistantContextRef = useRef(null);
+
+        function focusAssistant(scope) {
+          assistantContextRef.current = scope || null;
+          setAssistantContext(scope || null);
+          if (scope && scope.prompt) {
+            setAssistantInput(String(scope.prompt));
+          }
+          setAssistantOpen(true);
+        }
+
+        function clearAssistantFocus() {
+          assistantContextRef.current = null;
+          setAssistantContext(null);
+        }
         var pendingBotRef = useRef(new Set());
         var dragWidgetRef = useRef(null);
 
@@ -8894,8 +9929,202 @@
           } catch (error) {
             groups.push({ label: "Project files", icon: "fa-file-lines", items: [] });
           }
+          try {
+            var agentPayload = await requestJson("/api/v1/agents/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            var agentItems = ((agentPayload && agentPayload.agents) || []).filter(function (agent) {
+              return String(agent.display_name || agent.key || "").toLowerCase().indexOf(String(query).toLowerCase()) !== -1;
+            }).slice(0, 8).map(function (agent) {
+              return { id: agent.agent_id, title: agent.display_name, detail: agent.status + (agent.role_id ? " · " + agent.role_id : ""), snippet: agent.purpose || "" };
+            });
+            groups.push({ label: "Agents", icon: "fa-user-astronaut", items: agentItems });
+          } catch (error) {}
+          try {
+            var workflowsPayload = await requestJson("/api/v1/automation/workflows", { cache: "no-store", headers: { Accept: "application/json" } });
+            var workflowItems = (Array.isArray(workflowsPayload) ? workflowsPayload : []).filter(function (workflow) {
+              return String(workflow.name || workflow.workflow_id || "").toLowerCase().indexOf(String(query).toLowerCase()) !== -1;
+            }).slice(0, 8).map(function (workflow) {
+              return { id: workflow.workflow_id, title: workflow.name || workflow.workflow_id, detail: workflow.workflow_id + " · " + workflow.status, snippet: "" };
+            });
+            groups.push({ label: "Automations", icon: "fa-diagram-project", items: workflowItems });
+          } catch (error) {}
+          try {
+            var modelPayload = await requestJson("/api/v1/ai/chat/config", { cache: "no-store", headers: { Accept: "application/json" } });
+            var modelItems = ((modelPayload && modelPayload.models) || []).filter(function (model) {
+              return String(model).toLowerCase().indexOf(String(query).toLowerCase()) !== -1;
+            }).slice(0, 8).map(function (model) { return { id: model, title: model, detail: "Ollama model", snippet: "" }; });
+            groups.push({ label: "Models", icon: "fa-microchip", items: modelItems });
+          } catch (error) {}
           setSearchResults({ query: query, groups: groups.filter(function (group) { return group.items.length; }) });
           setSearchSearching(false);
+        }
+
+        function openObjectRef(ref) {
+          // Canonical Enterprise Object routing: every object resolves to the
+          // correct JoeOS workspace without losing the selected object.
+          var type = ref.object_type || ref.type;
+          var id = ref.object_id || ref.id;
+          if (!type) return;
+          recordObjectVisit({ object_type: type, object_id: id, label: ref.label || ref.display_hint });
+          if (type === "agent") { selectSection("agents"); if (id) selectAgentFromApi(id); }
+          else if (type === "agent_run" || type === "mission") { window.location.href = "/os/agents?mission=" + encodeURIComponent(id || ""); }
+          else if (type === "automation" || type === "schedule" || type === "workflow") { window.location.href = "/os/automations?workflow=" + encodeURIComponent(id || ""); }
+          else if (type === "model") { window.location.href = "/os/agents?model=" + encodeURIComponent(id || ""); }
+          else if (type === "provider") { window.location.href = "/os/agents?provider=" + encodeURIComponent(id || ""); }
+          else if (type === "approval") { selectSection("security-center"); }
+          else if (type === "execution") { window.location.href = "/os/automations?execution=" + encodeURIComponent(id || ""); }
+          else if (type === "file" || type === "folder" || type === "artifact") { selectSection("files"); }
+          else if (type === "memory") { selectSection("memory"); }
+          else if (type === "conversation") { selectSection("communications"); }
+          else if (type === "device" || type === "machine") { selectSection("device-enrollment"); }
+          else { selectSection("command"); }
+        }
+
+        // ---- Universal Recents / Favorites (policy-safe ObjectRef store) ----
+        function readRecentObjects() {
+          try {
+            var raw = window.localStorage.getItem("joeos:recent-objects");
+            var parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed.slice(0, 12) : [];
+          } catch (error) { return []; }
+        }
+        function readPinnedObjects() {
+          try {
+            var raw = window.localStorage.getItem("joeos:pinned-objects");
+            var parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed.slice(0, 24) : [];
+          } catch (error) { return []; }
+        }
+        function persistRecents(next) {
+          setRecentObjects(next);
+          try { window.localStorage.setItem("joeos:recent-objects", JSON.stringify(next)); } catch (error) {}
+        }
+        function persistPinned(next) {
+          setPinnedObjects(next);
+          try { window.localStorage.setItem("joeos:pinned-objects", JSON.stringify(next)); } catch (error) {}
+        }
+        function recordObjectVisit(ref) {
+          if (!ref || !ref.object_id) return;
+          var key = ref.object_type + "/" + ref.object_id;
+          var next = readRecentObjects().filter(function (r) { return !(r.object_type + "/" + r.object_id === key); });
+          next.unshift({ object_type: ref.object_type, object_id: ref.object_id, label: ref.label || ref.display_hint || ref.object_id, at: Date.now() });
+          persistRecents(next.slice(0, 12));
+        }
+        function pinObjectRef(ref) {
+          if (!ref || !ref.object_id) return;
+          var key = ref.object_type + "/" + ref.object_id;
+          var next = readPinnedObjects().filter(function (r) { return !(r.object_type + "/" + r.object_id === key); });
+          next.unshift({ object_type: ref.object_type, object_id: ref.object_id, label: ref.label || ref.display_hint || ref.object_id });
+          persistPinned(next.slice(0, 24));
+        }
+        function unpinObjectRef(ref) {
+          var key = (ref.object_type || ref.type) + "/" + (ref.object_id || ref.id);
+          persistPinned(readPinnedObjects().filter(function (r) { return !(r.object_type + "/" + r.object_id === key); }));
+        }
+        function objectRefKey(ref) {
+          return (ref.object_type || ref.type) + "/" + (ref.object_id || ref.id);
+        }
+
+        // ---- Workspace snapshots (presentation context, no secrets) ----
+        function readWorkspaceSnapshots() {
+          try {
+            var raw = window.localStorage.getItem("joeos:snapshots");
+            var parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (error) { return []; }
+        }
+        function persistWorkspaceSnapshots(next) {
+          try { window.localStorage.setItem("joeos:snapshots", JSON.stringify(next)); } catch (error) {}
+        }
+        function saveWorkspaceSnapshot(name) {
+          var snapshots = readWorkspaceSnapshots();
+          snapshots = snapshots.filter(function (s) { return s.name !== name; });
+          var payload = {
+            name: name,
+            saved_at: new Date().toISOString(),
+            command_layout: readLayoutPrefs(),
+            pinned: readPinnedObjects(),
+            recent: readRecentObjects(),
+            active_section: active,
+            quick_look: quickLook ? { object_type: quickLook.object_type || quickLook.type, object_id: quickLook.object_id || quickLook.id, label: quickLook.label || quickLook.display_hint } : null,
+          };
+          snapshots.push(payload);
+          persistWorkspaceSnapshots(snapshots.slice(-12));
+          return payload;
+        }
+        function restoreWorkspaceSnapshot(name) {
+          var snapshots = readWorkspaceSnapshots();
+          var target = snapshots.find(function (s) { return s.name === name; });
+          if (!target) return false;
+          if (target.command_layout) {
+            try {
+              var raw = window.localStorage.getItem("joeos:ui-prefs");
+              var parsed = raw ? JSON.parse(raw) : {};
+              parsed.command_layout = target.command_layout;
+              window.localStorage.setItem("joeos:ui-prefs", JSON.stringify(parsed));
+            } catch (error) {}
+          }
+          persistPinned(target.pinned || []);
+          persistRecents(target.recent || []);
+          if (target.active_section && selectSection) selectSection(target.active_section);
+          if (target.quick_look && setQuickLook) setQuickLook(target.quick_look);
+          return true;
+        }
+        function readLayoutPrefs() {
+          try {
+            var raw = window.localStorage.getItem("joeos:ui-prefs");
+            var parsed = raw ? JSON.parse(raw) : {};
+            return parsed.command_layout || null;
+          } catch (error) { return null; }
+        }
+
+        function objectQuickActions(ref) {
+          // Actionable palette results: Open + type-appropriate primary action.
+          var actions = [];
+          var type = ref.object_type || ref.type;
+          var id = ref.object_id || ref.id;
+          actions.push({ id: "preview-" + type + "-" + id, label: "Preview", icon: "fa-circle-info", run: function () { selectSection("command"); setQuickLook(ref); } });
+          actions.push({ id: "open-" + type + "-" + id, label: "Open", icon: "fa-arrow-up-right-from-square", run: function () { openObjectRef(ref); } });
+          actions.push({ id: "pin-" + type + "-" + id, label: "Pin", icon: "fa-thumbtack", run: function () { pinObjectRef(ref); } });
+          if (type === "agent") actions.push({ id: "run-" + id, label: "Run", icon: "fa-play", run: function () { openObjectRef(ref); } });
+          if (type === "approval") actions.push({ id: "approve-" + id, label: "Approve", icon: "fa-check", risk: "security", run: function () { selectSection("security-center"); } });
+          if (type === "automation") actions.push({ id: "pin-" + id, label: "Pin", icon: "fa-thumbtack", run: function () {} });
+          return actions;
+        }
+
+        var paletteObjectQuery = null;
+        async function searchPaletteObjects(query, cancelToken) {
+          if (!query || String(query).trim().length < 2) return null;
+          var groups = [];
+          try {
+            var agentPayload = await requestJson("/api/v1/agents/overview", { cache: "no-store", headers: { Accept: "application/json" } });
+            var agents = ((agentPayload && agentPayload.agents) || []).filter(function (agent) {
+              return String(agent.display_name || agent.key || agent.agent_id || "").toLowerCase().indexOf(String(query).toLowerCase()) !== -1;
+            }).slice(0, 6);
+            if (agents.length) groups.push({
+              label: "Agents", icon: "fa-user-astronaut", items: agents.map(function (agent) {
+                return { id: "agent-" + agent.agent_id, object: { object_type: "agent", object_id: agent.agent_id, label: agent.display_name }, title: agent.display_name, detail: String(agent.status || agent.availability || "") + (agent.role_id ? " · " + agent.role_id : ""), icon: "fa-user-astronaut", actions: objectQuickActions({ object_type: "agent", object_id: agent.agent_id, label: agent.display_name }) };
+              })
+            });
+          } catch (error) {}
+          try {
+            var workflowsPayload = await requestJson("/api/v1/automation/workflows", { cache: "no-store", headers: { Accept: "application/json" } });
+            var workflows = (Array.isArray(workflowsPayload) ? workflowsPayload : []).filter(function (workflow) {
+              return String(workflow.name || workflow.workflow_id || "").toLowerCase().indexOf(String(query).toLowerCase()) !== -1;
+            }).slice(0, 6);
+            if (workflows.length) groups.push({
+              label: "Automations", icon: "fa-diagram-project", items: workflows.map(function (workflow) {
+                return { id: "automation-" + workflow.workflow_id, object: { object_type: "automation", object_id: workflow.workflow_id, label: workflow.name }, title: workflow.name || workflow.workflow_id, detail: workflow.workflow_id + " · " + (workflow.status || ""), icon: "fa-diagram-project", actions: objectQuickActions({ object_type: "automation", object_id: workflow.workflow_id, label: workflow.name }) };
+              })
+            });
+          } catch (error) {}
+          try {
+            var memoryPayload = await requestJson("/api/v1/memory/search?q=" + encodeURIComponent(query) + "&limit=6", { cache: "no-store", headers: { Accept: "application/json" } });
+            var memoryItems = ((memoryPayload && memoryPayload.results) || []).slice(0, 6).map(function (result) {
+              return { id: "memory-" + result.result_id, object: { object_type: "memory", object_id: result.result_id, label: result.reason || result.memory_id }, title: result.reason || result.memory_id, detail: "Scope: " + result.scope + " · " + result.authority, icon: "fa-brain", actions: objectQuickActions({ object_type: "memory", object_id: result.result_id, label: result.reason }) };
+            });
+            if (memoryItems.length) groups.push({ label: "Memory", icon: "fa-brain", items: memoryItems });
+          } catch (error) {}
+          return groups.filter(function (group) { return group.items && group.items.length; });
         }
 
         function openContextWorkspace() {
@@ -9192,6 +10421,44 @@
         }, [messages, thinking, assistantOpen]);
 
         useEffect(function () {
+          loadAssistantConfig();
+          requestJson("/api/v1/modules/public", { cache: "no-store", headers: { Accept: "application/json" }, timeoutMs: 15000 })
+            .then(function (payload) {
+              if (payload && Array.isArray(payload.modules)) setManifestModules(payload.modules);
+            })
+            .catch(function () {});
+          function onJoeFocus(event) {
+            var el = event.target.closest("[data-joe-focus]");
+            if (!el) return;
+            event.preventDefault();
+            focusAssistant({
+              module_type: el.getAttribute("data-joe-module") || "module",
+              object_type: el.getAttribute("data-joe-object-type") || "",
+              object_id: el.getAttribute("data-joe-object-id") || "",
+              label: el.getAttribute("data-joe-label") || ""
+            });
+          }
+          document.addEventListener("click", onJoeFocus);
+          return function () { document.removeEventListener("click", onJoeFocus); };
+        }, []);
+
+        useEffect(function () {
+          // Browser network state for offline/reconnecting UI (PWA resilience).
+          function syncNetwork() {
+            var root = document.documentElement;
+            var state = navigator.onLine === false ? "offline" : "online";
+            root.setAttribute("data-network", state);
+          }
+          window.addEventListener("online", syncNetwork);
+          window.addEventListener("offline", syncNetwork);
+          syncNetwork();
+          return function () {
+            window.removeEventListener("online", syncNetwork);
+            window.removeEventListener("offline", syncNetwork);
+          };
+        }, []);
+
+        useEffect(function () {
           if (assistantOpen && assistantInputRef.current) {
             addManagedTimeout(function () {
               if (assistantInputRef.current) assistantInputRef.current.focus();
@@ -9241,6 +10508,11 @@
               selectSection("settings");
               return;
             }
+            if (meta && key === "f" && !inEditable(event.target)) {
+              event.preventDefault();
+              selectSection("search");
+              return;
+            }
             if (meta && key === "/") {
               event.preventDefault();
               setShortcutsOpen(true);
@@ -9259,10 +10531,6 @@
                 selectSection(item.id);
               }
               return;
-            }
-            if ((meta && key === "g") && !inEditable(event.target)) {
-              event.preventDefault();
-              setPaletteOpen(true);
             }
           }
           window.addEventListener("keydown", onKeyDown);
@@ -9284,6 +10552,14 @@
         }
 
         function selectSection(id) {
+          if (id === "agents") {
+            // The user-facing Agents experience lives on the Agent Fabric page.
+            try { window.localStorage.setItem("joeos:last-section", "agents"); } catch (error) {}
+            if (window.location.pathname !== "/os/agents") {
+              window.location.href = "/os/agents";
+            }
+            return;
+          }
           setActive(id);
           setNotificationsOpen(false);
           try { window.localStorage.setItem("joeos:last-section", id); } catch (error) {}
@@ -9649,6 +10925,51 @@
           }
         }
 
+        function loadAssistantConfig() {
+          requestJson("/api/v1/ai/chat/config", { cache: "no-store", headers: { Accept: "application/json" }, timeoutMs: 15000 })
+            .then(function (cfg) {
+              if (cfg && cfg.model) {
+                assistantModelRef.current = cfg.model;
+                setAssistantModel(cfg.model);
+              }
+            })
+            .catch(function () {});
+        }
+
+        async function streamAssistantEvents(history, signal, onEvent) {
+          var response = await window.fetch("/api/v1/ai/chat/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages: history, model: assistantModelRef.current, context: assistantContextRef.current || null }),
+            signal: signal
+          });
+          if (!response.ok) {
+            var detail = null;
+            try { detail = await response.json(); } catch (error) {}
+            var requestError = new Error((detail && (detail.detail || detail.message)) || ("Request failed with status " + response.status));
+            throw requestError;
+          }
+          if (!response.body || !response.body.getReader) throw new Error("Streaming is not supported in this browser.");
+          var reader = response.body.getReader();
+          var decoder = new TextDecoder();
+          var buffer = "";
+          while (true) {
+            var chunk = await reader.read();
+            if (chunk.done) break;
+            buffer += decoder.decode(chunk.value, { stream: true });
+            var lines = buffer.split("\n");
+            buffer = lines.pop();
+            for (var i = 0; i < lines.length; i++) {
+              var line = lines[i].trim();
+              if (line.indexOf("data:") === 0) {
+                var raw = line.slice(5).trim();
+                if (!raw) continue;
+                try { onEvent(JSON.parse(raw)); } catch (error) {}
+              }
+            }
+          }
+        }
+
         async function runAssistant(command) {
           var clean = String(command || "").trim();
           if (!clean || thinkingRef.current) return;
@@ -9659,28 +10980,40 @@
           setMessages(function (current) { return current.concat([userMessage]).slice(-30); });
           setAssistantInput("");
           setThinking(true);
-          try {
-            var payload = await requestJson("/api/chat", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                message: clean,
-                context: {
-                  active_section: active,
-                  history: messages.slice(-10).map(function (message) { return { role: message.role, text: message.text }; })
-                }
-              }),
-              timeoutMs: 120000,
-              signal: controller.signal
+          var history = messages.concat([{ role: "user", text: clean }]).slice(-12).map(function (message) {
+            return { role: message.role === "user" ? "user" : "assistant", content: String(message.text || "") };
+          });
+          var assistantMessage = { id: "msg-" + messageIdRef.current++, role: "assistant", text: "" };
+          setMessages(function (current) { return current.concat([assistantMessage]).slice(-30); });
+          function patchAssistant(text) {
+            assistantMessage.text = text;
+            setMessages(function (current) {
+              return current.map(function (message) {
+                return message.id === assistantMessage.id ? Object.assign({}, message, { text: text }) : message;
+              });
             });
-            var reply = payload && (payload.reply || payload.response || payload.message);
-            if (!reply) throw new Error("The assistant returned an empty response.");
-            setMessages(function (current) { return current.concat([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: String(reply) }]).slice(-30); });
+          }
+          try {
+            if (!assistantModelRef.current) {
+              try {
+                var cfg = await requestJson("/api/v1/ai/chat/config", { cache: "no-store", headers: { Accept: "application/json" }, timeoutMs: 15000 });
+                if (cfg && cfg.model) { assistantModelRef.current = cfg.model; setAssistantModel(cfg.model); }
+              } catch (error) {}
+            }
+            if (!assistantModelRef.current) throw new Error("No local Ollama model is available. Check the Models & AI workspace.");
+            await streamAssistantEvents(history, controller.signal, function (event) {
+              if (event.kind === "delta") {
+                patchAssistant(assistantMessage.text + (event.content || ""));
+              } else if (event.kind === "tool") {
+                patchAssistant(assistantMessage.text + "\n" + "[used " + (event.name || "tool") + "]");
+              }
+            });
+            if (!assistantMessage.text.trim()) patchAssistant("I couldn't produce a response from the local model.");
           } catch (error) {
             if (error && error.name === "AbortError") {
-              setMessages(function (current) { return current.concat([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: "Generation stopped by the operator." }]).slice(-30); });
+              patchAssistant(assistantMessage.text + (assistantMessage.text ? "\n" : "") + "Generation stopped by the operator.");
             } else {
-              setMessages(function (current) { return current.concat([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: "I couldn’t complete that local request: " + error.message }]).slice(-30); });
+              patchAssistant(assistantMessage.text + (assistantMessage.text ? "\n" : "") + "I couldn't complete that request: " + (error.message || String(error)));
             }
           } finally {
             thinkingRef.current = false;
@@ -9724,7 +11057,10 @@
           banners.push({ id: "lockdown", tone: "security", icon: "fa-lock", text: "Lockdown is active — privileged operations are blocked until reauthentication.", action: function () { selectSection("security-center"); }, actionLabel: "Open Security Center" });
         }
         if (!runtime || !runtime.online) {
-          banners.push({ id: "offline", tone: "warning", icon: "fa-plug-circle-xmark", text: "Lemonade Server is offline — local AI and model telemetry are unavailable.", action: function () { selectSection("dashboard"); }, actionLabel: "View dashboard" });
+          banners.push({ id: "offline", tone: "warning", icon: "fa-plug-circle-xmark", text: "Lemonade Server is offline — inference telemetry and model views are unavailable. The local AI assistant still runs on Ollama.", action: function () { selectSection("dashboard"); }, actionLabel: "View dashboard" });
+          if (navigator.onLine === false) {
+            banners.push({ id: "network-offline", tone: "warning", icon: "fa-wifi", text: "Browser is offline — the shell and cached state remain available; live data will refresh on reconnect." });
+          }
         }
         if (performanceSettings && (performanceSettings.low_power_mode || performanceSettings.metered_network)) {
           banners.push({ id: "low-resource", tone: "info", icon: "fa-battery-quarter", text: "Low-resource mode is active — background work is reduced and visual effects are flattened." });
@@ -9738,7 +11074,13 @@
           { id: "customize", label: "Customize Mission Control", detail: "Change fonts, colors, density, radius, and glass", icon: "fa-palette", shortcut: "C", category: "Commands", run: function () { selectSection("mission"); setCustomizerOpen(true); } },
           { id: "widgets", label: "Add a widget", detail: "Open the versioned module catalog", icon: "fa-table-cells-large", shortcut: "W", category: "Commands", run: function () { selectSection("mission"); setCatalogOpen(true); } },
           { id: "edit", label: "Edit workspace layout", detail: "Drag, move, resize, or hide Mission Control modules", icon: "fa-pen-ruler", shortcut: "E", category: "Commands", run: function () { selectSection("mission"); setEditingLayout(true); } },
-          { id: "assistant", label: "Ask JoeOS AI", detail: "Open the private read-only Lemonade assistant", icon: "fa-wand-magic-sparkles", shortcut: "⇧⌘K", category: "Commands", run: function () { setAssistantOpen(true); } },
+          { id: "assistant", label: "Joe", detail: "Open the JoeOS AI assistant", icon: "fa-wand-magic-sparkles", shortcut: "⇧⌘K", category: "Commands", run: function () { setAssistantOpen(true); } },
+          { id: "mission", label: "Agent Mission Control", detail: "Live view of what agents are doing right now", icon: "fa-satellite-dish", category: "Commands", run: function () { window.location.href = "/os/agents"; } },
+          { id: "working-agents", label: "Show Working Agents", detail: "Open the Agent Command Center (Mission / Agents)", icon: "fa-user-clock", category: "Commands", run: function () { window.location.href = "/os/agents"; } },
+          { id: "failed-automations", label: "Show Failed Automations", detail: "Open Automations and surface failures", icon: "fa-triangle-exclamation", category: "Commands", run: function () { window.location.href = "/os/automations"; } },
+          { id: "waiting-approvals", label: "Show Waiting Approvals", detail: "Open the Security Center approvals queue", icon: "fa-user-check", category: "Commands", run: function () { selectSection("security-center"); } },
+          { id: "continue-build", label: "Continue Building JoeOS", detail: "Resume the autonomous Engineering Director build", icon: "fa-hammer", category: "Commands", run: function () { window.location.href = "/os/build"; } },
+          { id: "terminal", label: "Open Terminal", detail: "Authenticated host shell", icon: "fa-terminal", category: "Commands", run: function () { window.location.href = "/os/terminal"; } },
           { id: "settings", label: "Open Settings", detail: "Appearance, accessibility, and interface behavior", icon: "fa-sliders", shortcut: "Ctrl+,", category: "Navigation", run: function () { selectSection("settings"); } },
           { id: "shortcuts", label: "Open keyboard shortcuts", detail: "View the registered shortcut registry", icon: "fa-keyboard", shortcut: "?", category: "Help", run: function () { setShortcutsOpen(true); } },
           { id: "refresh", label: "Refresh VPS state", detail: "Reload telemetry, profiles, and local events", icon: "fa-rotate", category: "Commands", run: function () { refreshRemoteData(true); } },
@@ -9752,14 +11094,37 @@
           { id: "search-open", label: "Universal search", detail: "Search memory, project files, agents, and artifacts", icon: "fa-magnifying-glass", category: "Navigation", run: function () { selectSection("search"); } },
           { id: "context-open", label: "Open Context", detail: "Knowledge workspace and sources", icon: "fa-layer-group", category: "Navigation", run: function () { selectSection("context"); openContextWorkspace(); } },
           { id: "knowledge-refresh", label: "Refresh knowledge", detail: "Reload memory, files, and artifacts", icon: "fa-rotate", category: "Commands", run: function () { loadMemoryFromApi(); loadFilesFromApi(); } },
+          { id: "snapshot-save", label: "Save workspace snapshot", detail: "Capture layout, pins, recents, and current object", icon: "fa-camera", category: "Workspace", run: function () { saveWorkspaceSnapshot("Engineering"); } },
+          { id: "snapshot-restore", label: "Restore workspace snapshot", detail: "Return to a saved workspace state (e.g. Engineering)", icon: "fa-rotate-left", category: "Workspace", run: function () { var s = readWorkspaceSnapshots(); if (s.length) restoreWorkspaceSnapshot(s[s.length - 1].name); } },
+          { id: "snapshot-list", label: "List workspace snapshots", detail: "See saved workspace states", icon: "fa-clock-rotate-left", category: "Workspace", run: function () { setSnapshotPanelOpen(true); } },
           { id: "stop", label: "Stop current operation", detail: "Cancel the active AI generation", icon: "fa-stop", shortcut: "Esc", category: "Commands", run: function () { cancelAssistant(); } },
           { id: "focus-content", label: "Focus main content", detail: "Move keyboard focus to the primary workspace", icon: "fa-up-right-and-down-left-from-center", category: "Commands", run: function () { var node = document.getElementById("main-content"); if (node) { node.setAttribute("tabindex", "-1"); node.focus(); } } },
           { id: "lockdown", label: "Open Security Center", detail: "Reach Lockdown and Emergency Stop", icon: "fa-shield-halved", risk: "security", category: "Security", run: function () { selectSection("security-center"); } }
         ]);
 
         var section = null;
-        if (active === "mission") {
-          section = h(MissionControlSection, { workspace: workspace, catalog: catalog, metrics: metrics, runtime: runtime, security: security, bots: bots, logs: logs, saving: workspaceSaving, error: workspaceError, editing: editingLayout, dragging: draggingWidget, dropTarget: dropTarget, onAdd: function () { setCatalogOpen(true); }, onEdit: toggleLayoutEditing, onCustomize: function () { setCustomizerOpen(true); }, onConfigure: openConfigurationGuide, onAsk: askFromMission, onMove: moveWorkspaceWidget, onResize: resizeWorkspaceWidget, onHide: hideWorkspaceWidget, onDragStart: beginWidgetDrag, onDragOver: overWidgetDrag, onDrop: dropWidget, onDragEnd: endWidgetDrag });
+        if (active === "command") {
+          section = h(CommandCenterHome, {
+            runtime: runtime,
+            metrics: metrics,
+            automationOverview: automationOverview,
+            agentsOverview: agentsOverview,
+            notifications: notifications,
+            security: security,
+            securityOverview: securityOverview,
+            uptimeSeconds: uptimeSeconds,
+            manifestModules: manifestModules,
+            recentObjects: recentObjects,
+            pinnedObjects: pinnedObjects,
+            onOpen: function (id) { selectSection(String(id)); },
+            onAsk: focusAssistant,
+            onAskJoe: function (ref) { focusAssistant({ module_type: ref.object_type || ref.type, object_type: ref.object_type || ref.type, object_id: ref.object_id || ref.id, label: ref.label || ref.display_hint || ref.object_id }); },
+            onAskWhy: function (ref) { focusAssistant({ module_type: ref.object_type || ref.type, object_type: ref.object_type || ref.type, object_id: ref.object_id || ref.id, label: ref.label || ref.display_hint || ref.object_id, prompt: "Why is this " + (ref.object_type || "object") + " in its current state? Investigate the causal evidence and explain." }); }
+          });
+        } else if (active === "attention") {
+          section = h(AttentionCenter, { automationOverview: automationOverview, securityOverview: securityOverview, runtime: runtime, onOpen: function (id) { selectSection(String(id)); } });
+        } else if (active === "mission") {
+          section = h(MissionControlSection, { workspace: workspace, catalog: catalog, metrics: metrics, runtime: runtime, security: security, bots: bots, logs: logs, saving: workspaceSaving, error: workspaceError, editing: editingLayout, dragging: draggingWidget, dropTarget: dropTarget, onAdd: function () { setCatalogOpen(true); }, onEdit: toggleLayoutEditing, onCustomize: function () { setCustomizerOpen(true); }, onConfigure: openConfigurationGuide, onAsk: askFromMission, onOpenAttention: function () { selectSection("attention"); }, onMove: moveWorkspaceWidget, onResize: resizeWorkspaceWidget, onHide: hideWorkspaceWidget, onDragStart: beginWidgetDrag, onDragOver: overWidgetDrag, onDrop: dropWidget, onDragEnd: endWidgetDrag });
         } else if (active === "dashboard") {
           section = h(DashboardSection, { metrics: metrics, uptimeSeconds: uptimeSeconds, lastUpdated: lastUpdated, runtime: runtime, onBrief: generateBrief });
         } else if (active === "pipeline") {
@@ -9916,22 +11281,22 @@
                 h(
                   "div",
                   { className: "notification-wrap" },
-                  h("button", { type: "button", className: "icon-button", onClick: function () { setNotificationsOpen(!notificationsOpen); }, "aria-label": unread ? unread + " unread notifications" : "Notifications", "aria-expanded": notificationsOpen }, icon("fa-bell"), unread ? h("span", { className: "notification-count" }, unread) : null),
+                  h("button", { type: "button", className: "icon-button", onClick: function () { setNotificationsOpen(!notificationsOpen); }, "aria-label": unread ? unread + " unread notifications" : "Notifications", "aria-expanded": notificationsOpen }, icon("fa-bell"), unread ? h("span", { className: "notification-count" }, h("span", { className: "sr-only" }, unread + " unread notifications"), unread) : null),
                   notificationsOpen ? h(
                     "div",
-                    { className: "notification-panel" },
+                    { className: "notification-panel", role: "region", "aria-label": "Operational notices" },
                     h("div", { className: "notification-header" }, h("strong", null, "Operational notices"), h("button", { type: "button", className: "text-button", onClick: function () { setNotifications(notifications.map(function (item) { return Object.assign({}, item, { unread: false }); })); } }, "Mark all read")),
                     notifications.map(function (notification) {
                       return h("div", { className: "notification-item " + (notification.unread ? "unread" : ""), key: notification.id }, icon(notification.icon), h("div", null, h("strong", null, notification.title), h("p", null, notification.text), h("time", null, notification.time)));
                     })
                   ) : null
                 ),
-                h("button", { type: "button", className: "assistant-top-button", onClick: function () { setAssistantOpen(true); }, "aria-label": "Open JoeOS AI assistant" }, icon("fa-wand-magic-sparkles"), h("span", null, "Ask JoeOS AI"))
+                h("button", { type: "button", className: "assistant-top-button", onClick: function () { setAssistantOpen(true); }, "aria-label": "Open JoeOS AI assistant" }, h("span", { className: "assistant-top-orb" }), h("span", null, "Joe"))
               )
             ),
             banners.length ? h(
               "div",
-              { className: "banner-stack", role: "region", "aria-label": "System conditions" },
+              { className: "banner-stack", role: "region", "aria-label": "System conditions", "aria-live": "polite", "aria-atomic": "true" },
               banners.map(function (banner) {
                 return h(
                   "div",
@@ -9951,10 +11316,11 @@
             h(
               "div",
               { className: "mobile-drawer", id: "mobile-navigation", role: "dialog", "aria-modal": "true", "aria-label": "Mobile navigation", ref: mobileDrawerRef },
-              h("aside", { className: "sidebar", "aria-label": "Mobile navigation" }, h("button", { type: "button", className: "icon-button mobile-drawer-close", onClick: closeMobile, "aria-label": "Close navigation menu" }, icon("fa-xmark")), h(SidebarContent, { active: active, onSelect: selectSection, runtime: runtime, mobile: true, firstNavRef: firstNavRef }))
+              h("aside", { role: "navigation", className: "sidebar", "aria-label": "Mobile navigation" }, h("button", { type: "button", className: "icon-button mobile-drawer-close", onClick: closeMobile, "aria-label": "Close navigation menu" }, icon("fa-xmark")), h(SidebarContent, { active: active, onSelect: selectSection, runtime: runtime, mobile: true, firstNavRef: firstNavRef }))
             )
           ) : null,
           paletteOpen ? h(CommandPalette, { commands: paletteCommands, onClose: function () { setPaletteOpen(false); } }) : null,
+          snapshotPanelOpen ? h(SnapshotPanel, { snapshots: readWorkspaceSnapshots(), onSave: function (name) { saveWorkspaceSnapshot(name); setSnapshotPanelOpen(false); }, onRestore: function (name) { restoreWorkspaceSnapshot(name); setSnapshotPanelOpen(false); }, onDelete: function (name) { persistWorkspaceSnapshots(readWorkspaceSnapshots().filter(function (s) { return s.name !== name; })); }, onClose: function () { setSnapshotPanelOpen(false); } }) : null,
           catalogOpen ? h(WidgetCatalogModal, { workspace: workspace, catalog: catalog, onAdd: addWorkspaceWidget, onClose: function () { setCatalogOpen(false); } }) : null,
           customizerOpen ? h(CustomizerPanel, { workspace: workspace, saving: workspaceSaving, onTheme: updateWorkspaceTheme, onGuide: requestConfigurationGuide, onApplyGuide: applyGuideProposal, onReset: resetWorkspace, onSave: function () { saveWorkspace(true); }, onClose: function () { setCustomizerOpen(false); } }) : null,
           assistantOpen ? h(AssistantPanel, {
@@ -9965,11 +11331,14 @@
             onSubmit: submitAssistant,
             onQuick: runAssistant,
             onClose: function () { setAssistantOpen(false); },
-            onClear: function () { setMessages([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: "Conversation cleared. I’m ready for the next operational command." }]); },
+            onClear: function () { setMessages([{ id: "msg-" + messageIdRef.current++, role: "assistant", text: "Conversation cleared. I’m ready for the next message." }]); },
             runtime: runtime,
+            assistantModel: assistantModel,
+            focused: assistantContext,
+            onClearFocus: clearAssistantFocus,
             inputRef: assistantInputRef,
             endRef: assistantEndRef
-          }) : h("button", { type: "button", className: "assistant-fab", onClick: function () { setAssistantOpen(true); }, "aria-label": "Open JoeOS AI assistant", title: "Ask JoeOS AI" }, icon("fa-wand-magic-sparkles")),
+          }) : h("button", { type: "button", className: "assistant-fab", onClick: function () { setAssistantOpen(true); }, "aria-label": "Open JoeOS local AI", title: "Chat with JoeOS local AI (Ollama)" }, icon("fa-wand-magic-sparkles")),
           deployOpen ? h(DeployModal, { name: agentName, role: agentRole, onName: setAgentName, onRole: setAgentRole, onClose: function () { setDeployOpen(false); }, onSubmit: deployAgent }) : null,
           selectedNode ? h(NodeModal, { node: selectedNode, onClose: function () { setSelectedNode(null); }, onRefresh: refreshNode }) : null,
           h(ShortcutsDialog, { open: shortcutsOpen, onClose: function () { setShortcutsOpen(false); } }),
@@ -9983,6 +11352,31 @@
       if ("serviceWorker" in navigator && window.isSecureContext) {
         navigator.serviceWorker.register("/sw.js").catch(function () {});
       }
+
+      // ---- WebCapabilityRegistry: honest feature detection (never UA-guessing) ----
+      window.joeosCapabilities = function () {
+        var secure = !!window.isSecureContext;
+        var online = navigator.onLine !== false;
+        return {
+          secureContext: secure,
+          serviceWorker: !!("serviceWorker" in navigator) && secure,
+          push: !!(("PushManager" in window) && ("Notification" in window) && secure),
+          notifications: !!("Notification" in window) && secure,
+          webAuthn: !!(navigator.credentials && window.PublicKeyCredential && secure),
+          mic: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && secure,
+          camera: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && secure,
+          mediaRecorder: !!(window.MediaRecorder) && secure,
+          share: !!(navigator.share) && secure,
+          fileSystemAccess: !!(window.showOpenFilePicker) && secure,
+          clipboard: !!(navigator.clipboard && navigator.clipboard.writeText) && secure,
+          indexedDB: !!window.indexedDB,
+          webSocket: !!window.WebSocket,
+          badge: !!(navigator.setAppBadge) && secure,
+          wakeLock: !!(navigator.wakeLock) && secure,
+          online: online,
+          offlineCapable: online && !!window.indexedDB,
+        };
+      };
     })();
   </script>
 </body>

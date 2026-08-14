@@ -5911,7 +5911,7 @@
       }
 
       function DesktopSidebar(props) {
-        return h("aside", { className: "sidebar desktop-sidebar", "aria-label": "Primary navigation" }, h(SidebarContent, props));
+        return h("aside", { role: "navigation", className: "sidebar desktop-sidebar", "aria-label": "Primary navigation" }, h(SidebarContent, props));
       }
 
       function DashboardSection(props) {
@@ -11281,10 +11281,10 @@
                 h(
                   "div",
                   { className: "notification-wrap" },
-                  h("button", { type: "button", className: "icon-button", onClick: function () { setNotificationsOpen(!notificationsOpen); }, "aria-label": unread ? unread + " unread notifications" : "Notifications", "aria-expanded": notificationsOpen }, icon("fa-bell"), unread ? h("span", { className: "notification-count" }, unread) : null),
+                  h("button", { type: "button", className: "icon-button", onClick: function () { setNotificationsOpen(!notificationsOpen); }, "aria-label": unread ? unread + " unread notifications" : "Notifications", "aria-expanded": notificationsOpen }, icon("fa-bell"), unread ? h("span", { className: "notification-count" }, h("span", { className: "sr-only" }, unread + " unread notifications"), unread) : null),
                   notificationsOpen ? h(
                     "div",
-                    { className: "notification-panel" },
+                    { className: "notification-panel", role: "region", "aria-label": "Operational notices" },
                     h("div", { className: "notification-header" }, h("strong", null, "Operational notices"), h("button", { type: "button", className: "text-button", onClick: function () { setNotifications(notifications.map(function (item) { return Object.assign({}, item, { unread: false }); })); } }, "Mark all read")),
                     notifications.map(function (notification) {
                       return h("div", { className: "notification-item " + (notification.unread ? "unread" : ""), key: notification.id }, icon(notification.icon), h("div", null, h("strong", null, notification.title), h("p", null, notification.text), h("time", null, notification.time)));
@@ -11296,7 +11296,7 @@
             ),
             banners.length ? h(
               "div",
-              { className: "banner-stack", role: "region", "aria-label": "System conditions" },
+              { className: "banner-stack", role: "region", "aria-label": "System conditions", "aria-live": "polite", "aria-atomic": "true" },
               banners.map(function (banner) {
                 return h(
                   "div",
@@ -11316,7 +11316,7 @@
             h(
               "div",
               { className: "mobile-drawer", id: "mobile-navigation", role: "dialog", "aria-modal": "true", "aria-label": "Mobile navigation", ref: mobileDrawerRef },
-              h("aside", { className: "sidebar", "aria-label": "Mobile navigation" }, h("button", { type: "button", className: "icon-button mobile-drawer-close", onClick: closeMobile, "aria-label": "Close navigation menu" }, icon("fa-xmark")), h(SidebarContent, { active: active, onSelect: selectSection, runtime: runtime, mobile: true, firstNavRef: firstNavRef }))
+              h("aside", { role: "navigation", className: "sidebar", "aria-label": "Mobile navigation" }, h("button", { type: "button", className: "icon-button mobile-drawer-close", onClick: closeMobile, "aria-label": "Close navigation menu" }, icon("fa-xmark")), h(SidebarContent, { active: active, onSelect: selectSection, runtime: runtime, mobile: true, firstNavRef: firstNavRef }))
             )
           ) : null,
           paletteOpen ? h(CommandPalette, { commands: paletteCommands, onClose: function () { setPaletteOpen(false); } }) : null,

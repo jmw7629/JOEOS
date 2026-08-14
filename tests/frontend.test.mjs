@@ -173,6 +173,20 @@ test("ships a keyboard-first focus system with skip link and focus traps", () =>
   assert.match(html, /document\.activeElement/);
 });
 
+test("has navigation landmarks, live system regions, and sr-only unread context", () => {
+  assert.match(html, /role: "navigation"/);
+  assert.match(html, /"aria-label": "Primary navigation"/);
+  assert.match(html, /"aria-label": "Mobile navigation"/);
+  assert.match(html, /"aria-label": "System conditions"/);
+  assert.match(html, /banner-stack/);
+  assert.match(html, /"aria-live": "polite"/);
+  assert.match(html, /sr-only/);
+  assert.match(html, /className: "sr-only"/);
+  assert.match(html, /unread notifications/);
+  assert.match(html, /"aria-label": "Operational notices"/);
+  assert.match(html, /"aria-current": props\.active === item\.id/);
+});
+
 test("centralizes keyboard shortcuts in one registry with a reference dialog", () => {
   assert.match(html, /var KEYBOARD_SHORTCUTS\s*=/);
   assert.match(html, /Open Command Palette/);
