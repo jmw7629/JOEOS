@@ -152,8 +152,8 @@ Updated continuously by the autonomous completion loop.
 |----|------|-------------|-----|--------|------|--------|
 | M-1201 | UX | Global search across agents/tasks/automations/memory/files/… | M-501 | DONE | — | — |
 | M-1202 | UX | Command palette | M-501 | DONE (required commands added) | — | — |
-| M-1203 | UX | Shortcuts (no conflicts) | M-501 | PARTIAL | — | — |
-| M-1204 | UX | Visual acceptance 1440x900 / 1024x768 / 390x844 | M-501 | NOT_STARTED | — | — |
-| M-1205 | UX | Accessibility pass | M-501 | NOT_STARTED | — | — |
-| M-1206 | QA | Full regression (backend/runner/frontend/E2E/security) | all | NOT_STARTED | — | — |
+| M-1203 | UX | Shortcuts (no conflicts) | M-501 | DONE (registry/handler synced; Ctrl+F search; Ctrl+G conflict removed) | 38/38 frontend | 717bb65 |
+| M-1204 | UX | Visual acceptance 1440x900 / 1024x768 / 390x844 | M-501 | DONE (CDP: 9 combos, 0 overflow, responsive sidebar/drawer) | docs/audits/VISUAL_ACCEPTANCE.md | — |
+| M-1205 | UX | Accessibility pass | M-501 | DONE (nav landmarks, live regions, sr-only unread, focus traps) | 38/38 frontend | 657974e |
+| M-1206 | QA | Full regression (backend/runner/frontend/E2E/security) | all | IN_PROGRESS | 1026+61 backend, 38 frontend | — |
 | M-1207 | QA | Final completion audit doc | all | NOT_STARTED | — | — |
