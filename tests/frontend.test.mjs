@@ -181,6 +181,25 @@ test("centralizes keyboard shortcuts in one registry with a reference dialog", (
   assert.match(html, /event\.key === "\?"/);
 });
 
+test("every registered shortcut has a matching global keydown handler (no drift)", () => {
+  const registry = html.match(/var KEYBOARD_SHORTCUTS\s*=\s*\[([\s\S]*?)\];/)[1];
+  const handlerSource = html.slice(html.indexOf("var meta = event.metaKey || event.ctrlKey;"));
+  const checks = [
+    ["Ctrl+K", /meta && key === "k"/],
+    ["Ctrl+Shift+K", /meta && key === "k"[\s\S]*?event\.shiftKey[\s\S]*?setAssistantOpen/],
+    ["Ctrl+Shift+N", /event\.shiftKey && key === "n"/],
+    ["Ctrl+,", /meta && key === ","/],
+    ["Ctrl+F", /meta && key === "f"/],
+    ["Ctrl+/", /meta && key === "\/"/],
+    ["?", /event\.key === "\?"/],
+    ["Esc", /event\.key === "Escape"/],
+    ["Alt+1..0", /event\.altKey/],
+  ];
+  for (const [, re] of checks) assert.match(handlerSource, re);
+  assert.match(registry, /Ctrl\+F/);
+  assert.doesNotMatch(handlerSource, /meta && key === "g"/);
+});
+
 test("command palette ranks results, groups by category, and marks risk", () => {
   assert.match(html, /function paletteScore\(/);
   assert.match(html, /palette-group/);

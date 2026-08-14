@@ -10508,6 +10508,11 @@
               selectSection("settings");
               return;
             }
+            if (meta && key === "f" && !inEditable(event.target)) {
+              event.preventDefault();
+              selectSection("search");
+              return;
+            }
             if (meta && key === "/") {
               event.preventDefault();
               setShortcutsOpen(true);
@@ -10526,10 +10531,6 @@
                 selectSection(item.id);
               }
               return;
-            }
-            if ((meta && key === "g") && !inEditable(event.target)) {
-              event.preventDefault();
-              setPaletteOpen(true);
             }
           }
           window.addEventListener("keydown", onKeyDown);
