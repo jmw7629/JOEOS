@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 ROOT=os.path.dirname(os.path.abspath(__file__))
 DB=os.path.join(ROOT,'kanban.db')
 LOCK=threading.Lock()
+SECRET_FILE=os.path.join(ROOT,'admin.secret')
 
 SEED=[
 ('Make every Studio tool functional','StickDeath Infinity','Active','Critical','Complete timeline, drawing, animation, upload, export, and all visible controls.'),
@@ -34,6 +35,13 @@ def con():
     c=sqlite3.connect(DB)
     c.row_factory=sqlite3.Row
     return c
+
+def admin_secret():
+    if not os.path.exists(SECRET_FILE):
+        secret=uuid.uuid4().hex+uuid.uuid4().hex[:8]
+        fd=os.open(SECRET_FILE,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+        with os.fdopen(fd,'w') as f: f.write(secret)
+    with open(SECRET_FILE) as f: return f.read().strip()
 
 def init_db():
     with con() as c:
@@ -70,8 +78,16 @@ class H(SimpleHTTPRequestHandler):
         if p=='/api/tasks': return self.sendj({'tasks':rows()})
         if p=='/': self.path='/index.html'
         return super().do_GET()
+    def authorized(self):
+        supplied=self.headers.get('X-Admin-Key','')
+        try: return bool(supplied) and __import__('hmac').compare_digest(supplied,admin_secret())
+        except Exception: return False
     def do_POST(self):
-        if urlparse(self.path).path!='/api/tasks': return self.sendj({'error':'not found'},404)
+        path=urlparse(self.path).path
+        if path=='/api/auth':
+            return self.sendj({'ok':self.authorized()},200 if self.authorized() else 401)
+        if path!='/api/tasks': return self.sendj({'error':'not found'},404)
+        if not self.authorized(): return self.sendj({'error':'owner key required'},401)
         d=read_json(self)
         if not isinstance(d,dict): return self.sendj({'error':'invalid json'},400)
         title=str(d.get('title','')).strip()[:120]; project=str(d.get('project','')).strip()[:80]
@@ -83,6 +99,7 @@ class H(SimpleHTTPRequestHandler):
     def do_PATCH(self):
         p=urlparse(self.path).path
         if not p.startswith('/api/tasks/'): return self.sendj({'error':'not found'},404)
+        if not self.authorized(): return self.sendj({'error':'owner key required'},401)
         tid=p.split('/')[-1]; d=read_json(self)
         if not isinstance(d,dict): return self.sendj({'error':'invalid json'},400)
         allowed={}
@@ -104,6 +121,7 @@ class H(SimpleHTTPRequestHandler):
     def do_DELETE(self):
         p=urlparse(self.path).path
         if not p.startswith('/api/tasks/'): return self.sendj({'error':'not found'},404)
+        if not self.authorized(): return self.sendj({'error':'owner key required'},401)
         tid=p.split('/')[-1]
         with LOCK, con() as c:
             cur=c.execute('delete from tasks where id=?',(tid,))
@@ -111,7 +129,7 @@ class H(SimpleHTTPRequestHandler):
         return self.sendj({'ok':True})
 
 if __name__=='__main__':
-    init_db()
+    init_db(); admin_secret()
     host=os.getenv('KANBAN_HOST','127.0.0.1'); port=int(os.getenv('KANBAN_PORT','8094'))
     print(f'PROJECT_BYTE listening on http://{host}:{port}')
     ThreadingHTTPServer((host,port),H).serve_forever()
