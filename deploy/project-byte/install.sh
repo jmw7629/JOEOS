@@ -45,6 +45,10 @@ sleep 1
 curl -fsS http://127.0.0.1:8094/healthz >/dev/null
 
 echo "PROJECT_BYTE backend is healthy on 127.0.0.1:8094"
+echo
+echo "OWNER KEY (save this; share only with trusted editors):"
+cat "$DEST/admin.secret"
+echo
 
 if command -v tailscale >/dev/null 2>&1; then
   echo "Configuring public HTTPS through Tailscale Funnel..."
