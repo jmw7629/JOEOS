@@ -54,6 +54,7 @@ DEFAULT_SETTINGS = {
     "notifications": {"in_app":True,"browser":True,"ai_success":True,"ai_failure":True,"blocked":True,"overdue":True,"due_soon":True,"security":True,"quiet_enabled":False,"quiet_start":"22:00","quiet_end":"07:00"},
     "ai": {"default_agent":"executive","default_model":"","confirm_queue":True,"auto_terminal":True},
     "security": {"session_minutes":480},
+    "filters": {"saved_views":[],"default_saved_view":""},
 }
 
 
@@ -78,6 +79,12 @@ def normalize_settings(data: dict) -> dict:
         v=txt(n.get(k) or d,5);n[k]=v if re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d",v) else d
     a=x["ai"];a["default_agent"]=valid_hint(a.get("default_agent") or "executive");a["default_model"]=valid_hint(a.get("default_model"));a["confirm_queue"]=bool(a.get("confirm_queue",True));a["auto_terminal"]=bool(a.get("auto_terminal",True))
     s=x["security"];s["session_minutes"]=max(15,min(int(s.get("session_minutes") or 480),1440))
+    f=x["filters"];raw=f.get("saved_views") if isinstance(f.get("saved_views"),list) else [];clean=[]
+    for item in raw[:30]:
+        if not isinstance(item,dict):continue
+        name=txt(item.get("name"),60);criteria=item.get("criteria") if isinstance(item.get("criteria"),dict) else {}
+        if name:clean.append({"id":txt(item.get("id") or uuid.uuid4().hex[:12],40),"name":name,"criteria":{txt(k,40):txt(v,160) if not isinstance(v,bool) else v for k,v in list(criteria.items())[:30]}})
+    f["saved_views"]=clean;f["default_saved_view"]=txt(f.get("default_saved_view"),40)
     return x
 
 
