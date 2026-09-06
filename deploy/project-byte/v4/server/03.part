@@ -49,6 +49,77 @@ def activity_rows() -> list[dict]: return rows("select * from activity order by 
 def team_rows() -> list[dict]: return [{k:v for k,v in r.items() if k != "token_hash"} for r in rows("select * from collaborators order by name")]
 
 
+DEFAULT_SETTINGS = {
+    "general": {"default_view":"portfolio","default_project":"","refresh_seconds":10,"density":"comfortable","show_completed":True,"reduced_motion":False,"large_text":False,"timezone":"America/New_York"},
+    "notifications": {"in_app":True,"browser":True,"ai_success":True,"ai_failure":True,"blocked":True,"overdue":True,"due_soon":True,"security":True,"quiet_enabled":False,"quiet_start":"22:00","quiet_end":"07:00"},
+    "ai": {"default_agent":"executive","default_model":"","confirm_queue":True,"auto_terminal":True},
+    "security": {"session_minutes":480},
+}
+
+
+def settings_subject(user: dict) -> str:
+    return txt(user.get("subject"),100) if user.get("ok") else ""
+
+
+def _merge_dict(base: dict, patch: dict) -> dict:
+    out=json.loads(json.dumps(base))
+    for k,v in (patch or {}).items():
+        if isinstance(v,dict) and isinstance(out.get(k),dict):out[k]=_merge_dict(out[k],v)
+        elif k in out:out[k]=v
+    return out
+
+
+def normalize_settings(data: dict) -> dict:
+    x=_merge_dict(DEFAULT_SETTINGS,data if isinstance(data,dict) else {})
+    g=x["general"];g["default_view"]=g["default_view"] if g["default_view"] in ("portfolio","board","intelligence","ai","agents","terminalView","models","team","activity","help","settings") else "portfolio";g["default_project"]=txt(g.get("default_project"),80);g["refresh_seconds"]=max(5,min(int(g.get("refresh_seconds") or 10),120));g["density"]=g["density"] if g["density"] in ("comfortable","compact") else "comfortable";g["show_completed"]=bool(g.get("show_completed",True));g["reduced_motion"]=bool(g.get("reduced_motion"));g["large_text"]=bool(g.get("large_text"));g["timezone"]=txt(g.get("timezone") or "America/New_York",80)
+    n=x["notifications"]
+    for k in ("in_app","browser","ai_success","ai_failure","blocked","overdue","due_soon","security","quiet_enabled"):n[k]=bool(n.get(k))
+    for k,d in (("quiet_start","22:00"),("quiet_end","07:00")):
+        v=txt(n.get(k) or d,5);n[k]=v if re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d",v) else d
+    a=x["ai"];a["default_agent"]=valid_hint(a.get("default_agent") or "executive");a["default_model"]=valid_hint(a.get("default_model"));a["confirm_queue"]=bool(a.get("confirm_queue",True));a["auto_terminal"]=bool(a.get("auto_terminal",True))
+    s=x["security"];s["session_minutes"]=max(15,min(int(s.get("session_minutes") or 480),1440))
+    return x
+
+
+def get_settings(subject: str) -> dict:
+    if not subject:return normalize_settings({})
+    with con() as c:r=c.execute("select data from user_settings where subject=?",(subject,)).fetchone()
+    if not r:return normalize_settings({})
+    try:return normalize_settings(json.loads(r["data"]))
+    except Exception:return normalize_settings({})
+
+
+def save_settings(subject: str, patch: dict) -> dict:
+    current=get_settings(subject);merged=normalize_settings(_merge_dict(current,patch));payload=json.dumps(merged,separators=(",",":"))
+    with con() as c:c.execute("insert into user_settings(subject,data,updated_at) values(?,?,?) on conflict(subject) do update set data=excluded.data,updated_at=excluded.updated_at",(subject,payload,now()))
+    return merged
+
+
+def notify(c, kind: str, severity: str, title: str, message: str, link: str="", project: str="", task_id: str="", nid: str="") -> None:
+    c.execute("insert or ignore into notifications(id,ts,kind,severity,title,message,link,project,task_id) values(?,?,?,?,?,?,?,?,?)",(nid or str(uuid.uuid4()),now(),txt(kind,40),txt(severity,20),txt(title,140),txt(message,500),txt(link,500),txt(project,80),txt(task_id,80)))
+
+
+def notification_rows(subject: str) -> list[dict]:
+    prefs=get_settings(subject)["notifications"]
+    enabled={"ai_success":prefs["ai_success"],"ai_failure":prefs["ai_failure"],"blocked":prefs["blocked"],"overdue":prefs["overdue"],"due_soon":prefs["due_soon"],"security":prefs["security"]}
+    rs=rows("""select n.*,case when r.read_at is null then 1 else 0 end unread
+               from notifications n left join notification_reads r on r.notification_id=n.id and r.subject=?
+               order by n.ts desc limit 120""",(subject,))
+    return [r for r in rs if enabled.get(r["kind"],True)]
+
+
+def sweep_notifications() -> None:
+    today=date.today();stamp=today.isoformat();
+    with con() as c:
+        for t in c.execute("select * from tasks where status<>'Done'"):
+            if t["status"]=="Blocked" and t["priority"]=="Critical":notify(c,"blocked","critical","Critical work is blocked",t["title"],"#board",t["project"],t["id"],f"blocked:{stamp}:{t['id']}")
+            if t["due_date"]:
+                try:days=(datetime.strptime(t["due_date"],"%Y-%m-%d").date()-today).days
+                except ValueError:continue
+                if days<0:notify(c,"overdue","critical","Work item overdue",f"{t['title']} · due {t['due_date']}","#board",t["project"],t["id"],f"overdue:{stamp}:{t['id']}")
+                elif days<=2:notify(c,"due_soon","warning","Work item due soon",f"{t['title']} · due {t['due_date']}","#board",t["project"],t["id"],f"due:{stamp}:{t['id']}")
+
+
 def memory_rows(agent="", project="") -> list[dict]:
     q = "select * from agent_memory where archived=0"; args=[]
     if agent: q += " and agent_key=?"; args.append(agent)
@@ -71,23 +142,23 @@ def auth(headers, ip="") -> dict:
     key = headers.get("X-Access-Key", "")
     with AUTH_LOCK:
         rec=AUTH_FAILS.get(ip, {"count":0,"until":0})
-        if rec["until"] > now(): return {"ok":False,"role":"locked","name":"","level":0}
+        if rec["until"] > now(): return {"ok":False,"role":"locked","name":"","level":0,"subject":""}
     if key and hmac.compare_digest(key, owner_secret()):
         with AUTH_LOCK: AUTH_FAILS.pop(ip, None)
-        return {"ok":True,"role":"owner","name":"Joe","level":4}
+        return {"ok":True,"role":"owner","name":"Joe","level":4,"subject":"owner"}
     if key:
         with con() as c:
             r=c.execute("select id,name,role,active from collaborators where token_hash=?",(digest(key),)).fetchone()
             if r and r["active"]:
                 c.execute("update collaborators set last_seen=? where id=?",(now(),r["id"]))
                 with AUTH_LOCK: AUTH_FAILS.pop(ip, None)
-                return {"ok":True,"role":r["role"],"name":r["name"],"level":ROLES.get(r["role"],0)}
+                return {"ok":True,"role":r["role"],"name":r["name"],"level":ROLES.get(r["role"],0),"subject":"collab:"+r["id"]}
     if key and ip:
         with AUTH_LOCK:
             rec=AUTH_FAILS.get(ip,{"count":0,"until":0});rec["count"]+=1
             if rec["count"] >= 5: rec={"count":0,"until":now()+900}
             AUTH_FAILS[ip]=rec
-    return {"ok":False,"role":"public","name":"Public","level":0}
+    return {"ok":False,"role":"public","name":"Public","level":0,"subject":""}
 
 
 def task_by_id(task_id: str):
