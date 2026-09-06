@@ -15,6 +15,24 @@
     def do_POST(self):
         p=urlparse(self.path).path;u=self.who()
         if p=="/api/auth":return self.sendj(u,200 if u["ok"] else 401)
+        if p=="/api/settings":
+            if not (u:=self.need(1)):return
+            d=self.body()
+            if not isinstance(d,dict):return self.sendj({"error":"invalid settings"},400)
+            try:s=save_settings(settings_subject(u),d)
+            except Exception:return self.sendj({"error":"invalid settings"},400)
+            with con() as c:audit(c,"settings_updated","","",", ".join(d.keys()),u["name"])
+            return self.sendj({"ok":True,"settings":s})
+        if p=="/api/notifications/read":
+            if not (u:=self.need(1)):return
+            d=self.body() or {};subject=settings_subject(u);nid=txt(d.get("id"),120)
+            with con() as c:
+                if d.get("all"):
+                    c.execute("insert or replace into notification_reads(notification_id,subject,read_at) select id,?,? from notifications",(subject,now()))
+                elif nid:
+                    c.execute("insert or replace into notification_reads values(?,?,?)",(nid,subject,now()))
+                else:return self.sendj({"error":"notification id or all required"},400)
+            return self.sendj({"ok":True})
         if p=="/api/tasks":
             if not (u:=self.need(2)):return
             d=self.body();
