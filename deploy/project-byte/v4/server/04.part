@@ -1,0 +1,130 @@
+l"]
+        if pref in ms:return pref
+        for k in parse_json_column(agent["fallback_models"]):
+            if k in ms:return k
+    if "ollama-local" in ms:return "ollama-local"
+    return next(iter(ms),"")
+
+
+def discover_ollama_model(endpoint: str) -> str:
+    try:
+        with ur.urlopen(endpoint.rstrip("/")+"/api/tags",timeout=3) as r:data=json.loads(r.read())
+        models=data.get("models") or []
+        if models:return models[0].get("name","")
+    except Exception:pass
+    return ""
+
+
+def call_model(model_key: str, messages: list[dict]) -> tuple[str,int]:
+    model=next((m for m in model_rows() if m["model_key"]==model_key and m["enabled"]),None)
+    if not model:raise RuntimeError("Model is not enabled")
+    start=time.time(); provider=model["provider"]; endpoint=model["endpoint"].rstrip("/")
+    if provider=="ollama":
+        name=model["model_name"] or discover_ollama_model(endpoint)
+        if not name:raise RuntimeError("No Ollama model is installed or reachable")
+        payload=json.dumps({"model":name,"messages":messages,"stream":False}).encode()
+        req=ur.Request(endpoint+"/api/chat",data=payload,headers={"Content-Type":"application/json"})
+        with ur.urlopen(req,timeout=120) as r:data=json.loads(r.read())
+        text=(data.get("message") or {}).get("content","")
+    elif provider=="openai-responses":
+        secret=os.getenv(model["secret_env"] or "","")
+        if not secret:raise RuntimeError(f"Server environment variable {model['secret_env']} is not configured")
+        name=model["model_name"] or "gpt-5.6-sol"
+        payload=json.dumps({"model":name,"input":messages}).encode()
+        req=ur.Request(endpoint+"/responses",data=payload,headers={"Content-Type":"application/json","Authorization":"Bearer "+secret})
+        with ur.urlopen(req,timeout=120) as r:data=json.loads(r.read())
+        text=data.get("output_text","")
+        if not text:
+            parts=[]
+            for item in data.get("output",[]):
+                for c in item.get("content",[]):
+                    if c.get("type") in ("output_text","text"):parts.append(c.get("text", ""))
+            text="\n".join(parts)
+    else:raise RuntimeError("Unsupported model provider")
+    return text.strip(),int((time.time()-start)*1000)
+
+
+HELP_GUIDE = """PROJECT_BYTE is the company operating console. Core navigation:
+Portfolio: project health, goals, target dates, links and progress.
+Kanban: create and move work across Backlog, Active, Blocked, Review and Done.
+Work Next: deterministic priority ranking.
+AI: discuss a selected project/task, draft execution prompts, then explicitly Queue to AI.
+Agents: inspect agent roles, live runs, performance, memory and learning.
+Terminal: read-only execution stream from OpenCode bridge logs; not a raw shell.
+Models: connect local/Ollama or OpenAI models; secrets stay server-side in environment variables.
+Team: create revocable collaborator access; never share the owner key.
+Activity: audited changes.
+Help: task-oriented instructions and troubleshooting with deep links.
+Queue to AI requires a configured project repository plus an existing bridge marker. Queueing creates a GitHub [OC] issue. Existing VPS bridge services pick it up, execute in an isolated worktree, and create a PR; they never auto-merge.
+If an agent is stuck: open Agents > select run > Terminal, inspect last event, then open the GitHub issue/PR. If a model fails: Models > Test connection; inspect endpoint/model name/server-side environment secret. If queue is unavailable: Project > Edit > verify repository and bridge marker."""
+
+
+def prompt_for_task(task: dict, project: dict, agent_key: str, model_key: str) -> str:
+    agent=next((a for a in agent_rows() if a["agent_key"]==agent_key),None)
+    mem=memory_rows(agent_key,task["project"])[:8]
+    memory_text="\n".join("- "+m["content"] for m in mem) or "- No relevant stored memory yet."
+    dep=task_by_id(task.get("depends_on", "")) if task.get("depends_on") else None
+    return f"""Mission
+{task['title']}
+
+Project
+{task['project']}
+Repository
+{project.get('repo','')}
+
+Agent role
+{agent.get('name') if agent else agent_key}: {agent.get('system_prompt','') if agent else ''}
+Requested model
+{model_key or 'bridge default'}
+
+Current task state
+- Status: {task['status']}
+- Priority: {task['priority']}
+- Progress: {task.get('progress',0)}%
+- Milestone: {task.get('milestone') or 'None'}
+- Due: {task.get('due_date') or 'None'}
+- Dependency: {dep['title'] if dep else 'None'}
+- Next action / notes: {task.get('note') or 'None'}
+
+Relevant agent memory
+{memory_text}
+
+Execution requirements
+- Inspect the existing implementation before editing.
+- Preserve working architecture and existing visual/product behavior unless this task explicitly requires change.
+- Implement real functionality; no fake, simulated, placeholder or success-only behavior.
+- Keep the change bounded to this task.
+- Run relevant tests/checks available in the environment and report exact results.
+- Never expose secrets or privileged credentials.
+- Do not merge automatically. Produce a reviewable PR through the bridge.
+- If blocked, report the exact blocker and evidence instead of guessing.
+"""
+
+
+def create_github_issue(repo: str, title: str, body: str) -> tuple[int,str]:
+    if repo not in BRIDGES:raise RuntimeError("No approved OpenCode bridge is connected for this repository")
+    with tempfile.NamedTemporaryFile("w",delete=False,encoding="utf-8") as f:
+        f.write(body); path=f.name
+    try:
+        p=subprocess.run(["gh","issue","create","--repo",repo,"--title","[OC] "+title[:180],"--body-file",path],text=True,capture_output=True,timeout=30)
+        if p.returncode!=0:raise RuntimeError(sanitize((p.stderr or p.stdout or "GitHub issue creation failed")[-1200:]))
+        url=(p.stdout or "").strip().splitlines()[-1];num=int(url.rstrip("/").split("/")[-1]);return num,url
+    finally:
+        try:os.unlink(path)
+        except OSError:pass
+
+
+def add_run_event(run_id,kind,message,agent="",detail=""):
+    with con() as c:c.execute("insert into run_events(run_id,ts,kind,agent,message,detail) values(?,?,?,?,?,?)",(run_id,now(),kind,txt(agent,80),txt(message,1000),txt(detail,4000)))
+
+
+def learn_from_run(run: dict, status: str, detail: str=""):
+    if run.get("learned"):return
+    agent=next((a for a in agent_rows() if a["agent_key"]==run["agent_key"]),None)
+    if not agent or not agent["learning_enabled"]:return
+    outcome="success" if status=="pr-created" else "failure"
+    content=f"{outcome.upper()}: {run['project']} task produced {status}. Model={run['model_key'] or 'bridge-default'}. {detail[:500]}"
+    with con() as c:
+        c.execute("insert into agent_memory values(?,?,?,?,?,?,?,?,?,?,?)",(str(uuid.uuid4()),run["agent_key"],run["project"],run["task_id"],"execution-outcome",content,.75,"run",outcome,now(),0))
+        if outcome=="success":
+            c.execute("update agents set success_count=success_count+1 where agent_key=?",(run["agent_key"],));c.execute("update
