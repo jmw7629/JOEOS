@@ -50,7 +50,7 @@ def team_rows() -> list[dict]: return [{k:v for k,v in r.items() if k != "token_
 
 
 DEFAULT_SETTINGS = {
-    "general": {"default_view":"portfolio","default_project":"","refresh_seconds":10,"density":"comfortable","show_completed":True,"reduced_motion":False,"large_text":False,"timezone":"America/New_York"},
+    "general": {"default_view":"home","default_project":"","refresh_seconds":10,"density":"comfortable","show_completed":True,"reduced_motion":False,"large_text":False,"timezone":"America/New_York"},
     "notifications": {"in_app":True,"browser":True,"ai_success":True,"ai_failure":True,"blocked":True,"overdue":True,"due_soon":True,"security":True,"quiet_enabled":False,"quiet_start":"22:00","quiet_end":"07:00"},
     "ai": {"default_agent":"executive","default_model":"","confirm_queue":True,"auto_terminal":True},
     "security": {"session_minutes":480},
@@ -72,7 +72,7 @@ def _merge_dict(base: dict, patch: dict) -> dict:
 
 def normalize_settings(data: dict) -> dict:
     x=_merge_dict(DEFAULT_SETTINGS,data if isinstance(data,dict) else {})
-    g=x["general"];g["default_view"]=g["default_view"] if g["default_view"] in ("portfolio","board","intelligence","ai","agents","terminalView","models","team","activity","help","settings") else "portfolio";g["default_project"]=txt(g.get("default_project"),80);g["refresh_seconds"]=max(5,min(int(g.get("refresh_seconds") or 10),120));g["density"]=g["density"] if g["density"] in ("comfortable","compact") else "comfortable";g["show_completed"]=bool(g.get("show_completed",True));g["reduced_motion"]=bool(g.get("reduced_motion"));g["large_text"]=bool(g.get("large_text"));g["timezone"]=txt(g.get("timezone") or "America/New_York",80)
+    g=x["general"];g["default_view"]=g["default_view"] if g["default_view"] in ("home","portfolio","board","intelligence","ai","agents","terminalView","models","team","activity","help","settings") else "home";g["default_project"]=txt(g.get("default_project"),80);g["refresh_seconds"]=max(5,min(int(g.get("refresh_seconds") or 10),120));g["density"]=g["density"] if g["density"] in ("comfortable","compact") else "comfortable";g["show_completed"]=bool(g.get("show_completed",True));g["reduced_motion"]=bool(g.get("reduced_motion"));g["large_text"]=bool(g.get("large_text"));g["timezone"]=txt(g.get("timezone") or "America/New_York",80)
     n=x["notifications"]
     for k in ("in_app","browser","ai_success","ai_failure","blocked","overdue","due_soon","security","quiet_enabled"):n[k]=bool(n.get(k))
     for k,d in (("quiet_start","22:00"),("quiet_end","07:00")):
