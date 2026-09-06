@@ -1,0 +1,65 @@
+:
+            if not self.need(2):return
+            return self.sendj({"messages":chat_rows(txt((q.get('project') or [''])[0],80),txt((q.get('task') or [''])[0],80))})
+        if p.startswith("/api/runs/") and p.endswith("/terminal"):
+            if not self.need(2):return
+            return self.sendj(tail_run(p.split("/")[3]))
+        if p=="/api/help":return self.sendj({"guide":HELP_GUIDE})
+        if p=="/":self.path="/index.html"
+        return super().do_GET()
+    def do_POST(self):
+        p=urlparse(self.path).path;u=self.who()
+        if p=="/api/auth":return self.sendj(u,200 if u["ok"] else 401)
+        if p=="/api/tasks":
+            if not (u:=self.need(2)):return
+            d=self.body();
+            if not isinstance(d,dict):return self.sendj({"error":"invalid json"},400)
+            try:
+                title=txt(d.get("title"),120);project=txt(d.get("project"),80);status=d.get("status","Backlog");priority=d.get("priority","Medium");note=txt(d.get("note"),800);due=valid_date(d.get("due_date"));progress=max(0,min(int(d.get("progress") or 0),100));milestone=txt(d.get("milestone"),120);dep=txt(d.get("depends_on"),80);url=valid_url(d.get("url"));owner=txt(d.get("owner"),80);executor=txt(d.get("executor","human"),20);agent=valid_hint(d.get("agent_key"));model=valid_hint(d.get("model_key"))
+            except Exception:return self.sendj({"error":"invalid fields"},400)
+            if not title or not project or status not in STATUSES or priority not in PRIORITIES:return self.sendj({"error":"invalid fields"},400)
+            tid=str(uuid.uuid4());ts=now()
+            with LOCK,con() as c:
+                c.execute("insert or ignore into projects(name,updated_at) values(?,?)",(project,ts));c.execute("""insert into tasks(id,title,project,status,priority,note,created_at,updated_at,due_date,progress,milestone,depends_on,url,owner,executor,agent_key,model_key) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",(tid,title,project,status,priority,note,ts,ts,due,progress,milestone,dep,url,owner,executor,agent,model));audit(c,"task_created",tid,project,title,u["name"])
+            return self.sendj({"ok":True,"id":tid},201)
+        if p.startswith("/api/tasks/") and p.endswith("/queue"):
+            if not (u:=self.need(2)):return
+            tid=p.split("/")[3];task=task_by_id(tid)
+            if not task:return self.sendj({"error":"task not found"},404)
+            project=project_by_name(task["project"])
+            if not project or not project.get("repo") or project["repo"] not in BRIDGES:return self.sendj({"error":"No OpenCode bridge is connected for this project"},409)
+            if task.get("depends_on"):
+                dep=task_by_id(task["depends_on"])
+                if dep and dep["status"]!="Done":return self.sendj({"error":"Task has an unfinished dependency","dependency":dep["title"]},409)
+            d=self.body() or {};agent=valid_hint(d.get("agent_key") or task.get("agent_key") or "builder");model=route_model(agent,valid_hint(d.get("model_key") or task.get("model_key")));prompt=txt(d.get("prompt"),12000) or prompt_for_task(task,project,agent,model)
+            marker=BRIDGES[project["repo"]];body=f"{marker}\n\nPROJECT_BYTE_TASK_ID: {tid}\nPROJECT_BYTE_AGENT_HINT: {agent}\nPROJECT_BYTE_MODEL_HINT: {model}\n\n{prompt}"
+            try:num,url=create_github_issue(project["repo"],task["title"],body)
+            except Exception as e:return self.sendj({"error":str(e)},502)
+            rid=str(uuid.uuid4())
+            with LOCK,con() as c:
+                c.execute("insert into runs(id,task_id,project,repo,agent_key,model_key,status,issue_number,issue_url,prompt,updated_at) values(?,?,?,?,?,?,?,?,?,?,?)",(rid,tid,task["project"],project["repo"],agent,model,"queued",num,url,prompt,now()));c.execute("update tasks set executor='ai',agent_key=?,model_key=?,ai_state='queued',ai_prompt=?,github_issue=?,github_issue_url=?,last_run_id=?,updated_at=? where id=?",(agent,model,prompt,num,url,rid,now(),tid));audit(c,"ai_queued",tid,task["project"],url,u["name"])
+            add_run_event(rid,"queued",f"Queued GitHub issue #{num}",agent,url)
+            return self.sendj({"ok":True,"run_id":rid,"issue":num,"issue_url":url},201)
+        if p=="/api/chat":
+            if not (u:=self.need(2)):return
+            d=self.body();
+            if not isinstance(d,dict):return self.sendj({"error":"invalid json"},400)
+            user_text=txt(d.get("message"),8000);project=txt(d.get("project"),80);tid=txt(d.get("task_id"),80);agent_key=valid_hint(d.get("agent_key") or "executive");model_key=route_model(agent_key,valid_hint(d.get("model_key")))
+            if not user_text:return self.sendj({"error":"message required"},400)
+            task=task_by_id(tid) if tid else None;proj=project_by_name(project) if project else None;agent=next((a for a in agent_rows() if a["agent_key"]==agent_key),None);mem=memory_rows(agent_key,project)[:10]
+            context={"project":proj,"task":task,"memory":[m["content"] for m in mem],"help":HELP_GUIDE}
+            system=(agent["system_prompt"] if agent else "You are PROJECT_BYTE's executive AI assistant.")+"\nYou operate inside PROJECT_BYTE. Ground advice in provided context. Never claim actions happened unless execution records prove it. When asked for a prompt, produce a bounded implementation prompt with acceptance gates.\n"+json.dumps(context,ensure_ascii=False)
+            with con() as c:c.execute("insert into chat_messages(ts,actor,role,project,task_id,model_key,content) values(?,?,?,?,?,?,?)",(now(),u["name"],"user",project,tid,model_key,user_text))
+            try:answer,latency=call_model(model_key,[{"role":"system","content":system},{"role":"user","content":user_text}])
+            except Exception as e:return self.sendj({"error":str(e),"model_key":model_key},502)
+            with con() as c:
+                c.execute("insert into chat_messages(ts,actor,role,project,task_id,model_key,content) values(?,?,?,?,?,?,?)",(now(),agent["name"] if agent else "AI","assistant",project,tid,model_key,answer));c.execute("update models set last_status='ok',last_latency_ms=?,updated_at=? where model_key=?",(latency,now(),model_key));audit(c,"ai_chat",tid,project,f"{agent_key}/{model_key}",u["name"])
+            return self.sendj({"answer":answer,"model_key":model_key,"agent_key":agent_key,"latency_ms":latency})
+        if p=="/api/models/test":
+            if not (u:=self.need(3)):return
+            d=self.body() or {};key=valid_hint(d.get("model_key"))
+            try:answer,latency=call_model(key,[{"role":"user","content":"Reply with exactly PROJECT_BYTE_OK"}]);ok="PROJECT_BYTE_OK" in answer
+            except Exception as e:
+                with con() as c:c.execute("update models set last_status=?,updated_at=? where model_key=?",(txt(str(e),200),now(),key))
+                return self.sendj({"ok":False,"error":str(e)},502)
+            with con() as c:c.execute("update models set last_status='ok',last_latency_ms=?,updated_at=? where model_key=?",(late
