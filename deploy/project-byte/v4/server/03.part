@@ -1,0 +1,116 @@
+repo=case when repo='' then ? else repo end,
+                live_url=case when live_url='' then ? else live_url end,
+                stage=case when stage='' then ? else stage end,
+                lead=case when lead='' then ? else lead end,
+                bridge_marker=case when bridge_marker='' then ? else bridge_marker end
+                where name=?""", (repo, live, stage, lead, marker, name))
+        default_models = [
+            ("ollama-local", "Ollama · VPS", "ollama", "http://127.0.0.1:11434", "", "", '["coding","chat","private","local"]', 1, 1, "Auto-discovers installed Ollama models.", ts),
+            ("openai", "OpenAI", "openai-responses", "https://api.openai.com/v1", "gpt-5.6-sol", "PROJECT_BYTE_OPENAI_API_KEY", '["reasoning","coding","research","vision","verification"]', 0, 0, "Enable after setting the server-side API key environment variable.", ts),
+        ]
+        c.executemany("""insert or ignore into models(model_key,display_name,provider,endpoint,model_name,secret_env,capabilities,enabled,local,notes,updated_at)
+                         values(?,?,?,?,?,?,?,?,?,?,?)""", default_models)
+        default_agents = [
+            ("executive", "Executive", "COO", "Portfolio synthesis and sequencing.", "Optimize throughput, risk, quality and sequencing. Never fabricate status.", "openai", '["ollama-local"]', '["planning","reasoning"]', "", 1, 1, 1, ts),
+            ("architect", "Architect", "Architecture", "Bounded technical planning.", "Inspect architecture first; define interfaces, risks and acceptance gates.", "openai", '["ollama-local"]', '["architecture","reasoning","coding"]', "", 1, 1, 1, ts),
+            ("builder", "Builder", "Implementation", "Production implementation.", "Implement approved scope in existing architecture. No fake or simulated behavior.", "ollama-local", '["openai"]', '["coding","refactor"]', "", 1, 1, 1, ts),
+            ("verifier", "Verifier", "Verification", "Independent review and testing.", "Assume implementation may be wrong. Verify behavior, security, persistence and claims.", "openai", '["ollama-local"]', '["verification","security","testing"]', "", 1, 1, 1, ts),
+            ("researcher", "Researcher", "Research", "Evidence gathering.", "Gather evidence before conclusions; separate facts from recommendations.", "openai", '["ollama-local"]', '["research","reasoning"]', "", 1, 1, 1, ts),
+            ("release", "Release", "Release", "CI and production readiness.", "Verify build, CI, migration safety, rollback and health before release.", "ollama-local", '["openai"]', '["deployment","verification"]', "", 1, 1, 1, ts),
+            ("help", "Help Agent", "Support", "PROJECT_BYTE instruction and troubleshooting assistant.", "Give grounded how-to instructions using the current PROJECT_BYTE guide. Prefer direct navigation steps and truthful troubleshooting.", "ollama-local", '["openai"]', '["support","documentation","troubleshooting"]', "", 1, 1, 1, ts),
+        ]
+        c.executemany("""insert or ignore into agents(agent_key,name,role,description,system_prompt,preferred_model,fallback_models,capabilities,opencode_agent,memory_enabled,learning_enabled,enabled,updated_at)
+                         values(?,?,?,?,?,?,?,?,?,?,?,?,?)""", default_agents)
+    owner_secret()
+
+
+def rows(sql: str, args=()) -> list[dict]:
+    with con() as c:
+        return [dict(r) for r in c.execute(sql, args)]
+
+
+def task_rows() -> list[dict]:
+    out = rows("select * from tasks order by created_at,id")
+    attach = rows("select * from attachments order by created_at")
+    by = {}
+    for a in attach:
+        a["url"] = "/uploads/" + a["stored_name"]
+        by.setdefault(a["task_id"], []).append(a)
+    for t in out:
+        t["attachments"] = by.get(t["id"], [])
+    return out
+
+
+def project_rows() -> list[dict]: return rows("select * from projects order by name")
+def model_rows() -> list[dict]: return rows("select * from models order by display_name")
+def agent_rows() -> list[dict]: return rows("select * from agents order by name")
+def run_rows() -> list[dict]: return rows("select * from runs order by updated_at desc limit 160")
+def activity_rows() -> list[dict]: return rows("select * from activity order by id desc limit 200")
+def team_rows() -> list[dict]: return [{k:v for k,v in r.items() if k != "token_hash"} for r in rows("select * from collaborators order by name")]
+
+
+def memory_rows(agent="", project="") -> list[dict]:
+    q = "select * from agent_memory where archived=0"; args=[]
+    if agent: q += " and agent_key=?"; args.append(agent)
+    if project: q += " and project=?"; args.append(project)
+    q += " order by confidence desc,created_at desc limit 180"
+    return rows(q, args)
+
+
+def chat_rows(project="", task="") -> list[dict]:
+    q="select * from chat_messages where 1=1"; args=[]
+    if project: q += " and project=?"; args.append(project)
+    if task: q += " and task_id=?"; args.append(task)
+    q += " order by id desc limit 100"
+    return list(reversed(rows(q, args)))
+
+
+AUTH_FAILS = {}
+AUTH_LOCK = threading.Lock()
+def auth(headers, ip="") -> dict:
+    key = headers.get("X-Access-Key", "")
+    with AUTH_LOCK:
+        rec=AUTH_FAILS.get(ip, {"count":0,"until":0})
+        if rec["until"] > now(): return {"ok":False,"role":"locked","name":"","level":0}
+    if key and hmac.compare_digest(key, owner_secret()):
+        with AUTH_LOCK: AUTH_FAILS.pop(ip, None)
+        return {"ok":True,"role":"owner","name":"Joe","level":4}
+    if key:
+        with con() as c:
+            r=c.execute("select id,name,role,active from collaborators where token_hash=?",(digest(key),)).fetchone()
+            if r and r["active"]:
+                c.execute("update collaborators set last_seen=? where id=?",(now(),r["id"]))
+                with AUTH_LOCK: AUTH_FAILS.pop(ip, None)
+                return {"ok":True,"role":r["role"],"name":r["name"],"level":ROLES.get(r["role"],0)}
+    if key and ip:
+        with AUTH_LOCK:
+            rec=AUTH_FAILS.get(ip,{"count":0,"until":0});rec["count"]+=1
+            if rec["count"] >= 5: rec={"count":0,"until":now()+900}
+            AUTH_FAILS[ip]=rec
+    return {"ok":False,"role":"public","name":"Public","level":0}
+
+
+def task_by_id(task_id: str):
+    with con() as c:
+        r=c.execute("select * from tasks where id=?",(task_id,)).fetchone()
+        return dict(r) if r else None
+
+
+def project_by_name(name: str):
+    with con() as c:
+        r=c.execute("select * from projects where name=?",(name,)).fetchone()
+        return dict(r) if r else None
+
+
+def parse_json_column(value: str) -> list:
+    try:
+        x=json.loads(value or "[]"); return x if isinstance(x,list) else []
+    except Exception:return []
+
+
+def route_model(agent_key: str, requested: str="") -> str:
+    ms={m["model_key"]:m for m in model_rows() if m["enabled"]}
+    if requested and requested in ms:return requested
+    agent=next((a for a in agent_rows() if a["agent_key"]==agent_key and a["enabled"]),None)
+    if agent:
+        pref=agent["preferred_mode
