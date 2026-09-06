@@ -1,4 +1,6 @@
- models set success_count=success_count+1 where model_key=?",(run["model_key"],))
+ome",content,.75,"run",outcome,now(),0))
+        if outcome=="success":
+            c.execute("update agents set success_count=success_count+1 where agent_key=?",(run["agent_key"],));c.execute("update models set success_count=success_count+1 where model_key=?",(run["model_key"],))
         else:
             c.execute("update agents set failure_count=failure_count+1 where agent_key=?",(run["agent_key"],));c.execute("update models set failure_count=failure_count+1 where model_key=?",(run["model_key"],))
         c.execute("update runs set learned=1 where id=?",(run["id"],))
@@ -98,13 +100,8 @@ class H(SimpleHTTPRequestHandler):
         if p=="/api/projects":return self.sendj({"projects":project_rows()})
         if p=="/api/intelligence":return self.sendj(intelligence())
         if p=="/api/activity":return self.sendj({"activity":activity_rows()})
-        if p=="/api/models":return self.sendj({"models":model_rows()})
-        if p=="/api/agents":return self.sendj({"agents":agent_rows()})
-        if p=="/api/runs":return self.sendj({"runs":run_rows()})
+        if p=="/api/models":return self.sendj({"models":model_rows() if u["level"]>=1 else []})
+        if p=="/api/agents":return self.sendj({"agents":agent_rows() if u["level"]>=1 else []})
+        if p=="/api/runs":return self.sendj({"runs":run_rows() if u["level"]>=1 else []})
         if p=="/api/team":
             if not self.need(3):return
-            return self.sendj({"team":team_rows()})
-        if p=="/api/memory":
-            if not self.need(2):return
-            return self.sendj({"memory":memory_rows(txt((q.get('agent') or [''])[0],80),txt((q.get('project') or [''])[0],80))})
-        if p=="/api/chat"
