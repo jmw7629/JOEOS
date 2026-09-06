@@ -1,4 +1,9 @@
-,800),("notes",1800),("stage",80),("lead",80),("bridge_marker",120)]:
+  name=unquote(p[len("/api/projects/"):]);d=self.body() or {};fields={}
+            try:
+                if "health" in d:
+                    if d["health"] not in HEALTH:raise ValueError()
+                    fields["health"]=d["health"]
+                for k,l in [("goal",800),("notes",1800),("stage",80),("lead",80),("bridge_marker",120)]:
                     if k in d:fields[k]=txt(d[k],l)
                 if "target_date" in d:fields["target_date"]=valid_date(d["target_date"])
                 if "repo" in d:fields["repo"]=valid_repo(d["repo"])
