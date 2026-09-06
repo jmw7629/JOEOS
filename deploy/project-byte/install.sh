@@ -8,7 +8,7 @@ DEST="/home/joevps/PROJECT_BYTE"
 SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 EXPECTED_SERVER="132218e2cc255ce7a58ca0adc7ee91cbdefca8033ecdd22721dd4ce3efb69aa1"
-EXPECTED_INDEX="09e774e9d37f0140f39095401e3d02b52f2656806c4f3141b1869fdda20f91b7"
+EXPECTED_INDEX="1dcb65c05ee2b4df81f780145db66dfb4fa42637f7adb115bdf961bc8587326f"
 
 if [ "$(id -un)" != "joevps" ]; then
   echo "Run this as joevps, not root." >&2
