@@ -7,8 +7,8 @@ V4="$BASE/v4"
 DEST="/home/joevps/PROJECT_BYTE"
 SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-EXPECTED_SERVER="cfb281901ab291790e0e50ac888572ab5a5de06998b697e8fdb1d4cf1bc88e43"
-EXPECTED_INDEX="3077ff205f0e6ca79e6df6802f5983f1acc1ced817e43e5636efa8413125c078"
+EXPECTED_SERVER="132218e2cc255ce7a58ca0adc7ee91cbdefca8033ecdd22721dd4ce3efb69aa1"
+EXPECTED_INDEX="09e774e9d37f0140f39095401e3d02b52f2656806c4f3141b1869fdda20f91b7"
 
 if [ "$(id -un)" != "joevps" ]; then
   echo "Run this as joevps, not root." >&2
@@ -55,7 +55,7 @@ python3 -m py_compile "$TMP/server.py"
 if command -v node >/dev/null 2>&1; then
   node - "$TMP/index.html" <<'NODE'
 const fs=require('fs');const h=fs.readFileSync(process.argv[2],'utf8');const m=h.match(/<script>([\s\S]*)<\/script>/);if(!m)throw new Error('inline script missing');new Function(m[1]);
-for(const x of ['Portfolio','Kanban','Work next','AI','Agents','Terminal','Models','Team','Activity','Help / How-To'])if(!h.includes(x))throw new Error('missing '+x);
+for(const x of ['Portfolio','Kanban','Work next','AI','Agents','Terminal','Models','Team','Activity','Settings','Help / How-To','Notification center'])if(!h.includes(x))throw new Error('missing '+x);
 NODE
 fi
 
