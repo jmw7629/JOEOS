@@ -1,4 +1,9 @@
-:
+
+            return self.sendj({"team":team_rows()})
+        if p=="/api/memory":
+            if not self.need(2):return
+            return self.sendj({"memory":memory_rows(txt((q.get('agent') or [''])[0],80),txt((q.get('project') or [''])[0],80))})
+        if p=="/api/chat":
             if not self.need(2):return
             return self.sendj({"messages":chat_rows(txt((q.get('project') or [''])[0],80),txt((q.get('task') or [''])[0],80))})
         if p.startswith("/api/runs/") and p.endswith("/terminal"):
@@ -60,6 +65,4 @@
             d=self.body() or {};key=valid_hint(d.get("model_key"))
             try:answer,latency=call_model(key,[{"role":"user","content":"Reply with exactly PROJECT_BYTE_OK"}]);ok="PROJECT_BYTE_OK" in answer
             except Exception as e:
-                with con() as c:c.execute("update models set last_status=?,updated_at=? where model_key=?",(txt(str(e),200),now(),key))
-                return self.sendj({"ok":False,"error":str(e)},502)
-            with con() as c:c.execute("update models set last_status='ok',last_latency_ms=?,updated_at=? where model_key=?",(late
+                with con() as c:c.execute("update models 
