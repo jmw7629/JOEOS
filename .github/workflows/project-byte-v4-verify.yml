@@ -28,7 +28,7 @@ jobs:
       - name: Compile backend
         run: python3 -m py_compile /tmp/project-byte-v4/server.py
 
-      - name: Parse browser JavaScript
+      - name: Parse browser JavaScript and required surfaces
         shell: bash
         run: |
           set -euo pipefail
@@ -38,13 +38,16 @@ jobs:
           const m = html.match(/<script>([\s\S]*)<\/script>/);
           if (!m) throw new Error('PROJECT_BYTE inline script missing');
           new Function(m[1]);
-          for (const required of ['Portfolio','Kanban','Work next','AI','Agents','Terminal','Models','Team','Activity','Help / How-To']) {
+          for (const required of ['Portfolio','Kanban','Work next','AI','Agents','Terminal','Models','Team','Activity','Settings','Help / How-To','Notification center']) {
             if (!html.includes(required)) throw new Error(`missing UI surface: ${required}`);
           }
-          console.log('UI_JS_PARSE=PASS');
+          for (const id of ['ownerFilter','leadFilter','statusFilter','healthFilter','stageFilter','executorFilter','agentFilter','modelFilter','aiStateFilter','dueFilter','completionFilter','dependencyFilter','activityFilter','milestoneFilter','repoFilter','runFilter','scopeFilter','savedView']) {
+            if (!html.includes(`id="${id}"`)) throw new Error(`missing filter control: ${id}`);
+          }
+          console.log('UI_JS_AND_FILTER_SURFACES=PASS');
           NODE
 
-      - name: Smoke migration, auth, queue, APIs and Help
+      - name: Smoke migration, auth, settings, notifications, queue and APIs
         shell: bash
         run: |
           set -euo pipefail
@@ -85,18 +88,43 @@ jobs:
 
           curl -fsS http://127.0.0.1:18094/healthz | tee health.json
           grep -q '"version":4' health.json
+          grep -q '"settings":true' health.json
+          grep -q '"notifications":true' health.json
           curl -fsS http://127.0.0.1:18094/api/tasks | tee tasks.json
           grep -q 'LEGACY_V2_TASK' tasks.json
           curl -fsS http://127.0.0.1:18094/api/projects | tee projects.json
           grep -q 'LEGACY_GOAL' projects.json
           curl -fsS http://127.0.0.1:18094/api/help | grep -q 'Queue to AI'
           curl -fsS http://127.0.0.1:18094/ | grep -q 'Help / How-To'
+          curl -fsS http://127.0.0.1:18094/ | grep -q 'Notification center'
+          curl -fsS http://127.0.0.1:18094/ | grep -q 'ownerFilter'
+          curl -fsS http://127.0.0.1:18094/ | grep -q 'savedView'
 
           OWNER=$(cat admin.secret)
           curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/session | tee session.json
           grep -q '"role":"owner"' session.json
+
+          curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/settings | tee settings-before.json
+          grep -q '"default_view":"portfolio"' settings-before.json
+          curl -fsS -X POST -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" \
+            -d '{"general":{"default_view":"board","refresh_seconds":30,"density":"compact"},"notifications":{"browser":false,"quiet_enabled":true,"quiet_start":"21:00","quiet_end":"06:00"},"filters":{"saved_views":[{"id":"mike-risk","name":"Mike Delivery Risk","criteria":{"ownerFilter":"Mike","priorityFilter":"Critical","statusFilter":"Blocked"}}]}}' \
+            http://127.0.0.1:18094/api/settings | tee settings-after.json
+          grep -q '"default_view":"board"' settings-after.json
+          grep -q '"refresh_seconds":30' settings-after.json
+          grep -q 'Mike Delivery Risk' settings-after.json
+          grep -q '"ownerFilter":"Mike"' settings-after.json
+
           curl -fsS -X PATCH -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" \
-            -d '{"executor":"ai","agent_key":"builder","model_key":"ollama-local"}' \
+            -d '{"status":"Blocked","priority":"Critical"}' \
+            http://127.0.0.1:18094/api/tasks/legacy >/dev/null
+          curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/notifications | tee notifications.json
+          grep -q 'Critical work is blocked' notifications.json
+          curl -fsS -X POST -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" \
+            -d '{"all":true}' http://127.0.0.1:18094/api/notifications/read >/dev/null
+          curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/notifications | grep -q '"unread":0'
+
+          curl -fsS -X PATCH -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" \
+            -d '{"status":"Backlog","executor":"ai","agent_key":"builder","model_key":"ollama-local"}' \
             http://127.0.0.1:18094/api/tasks/legacy >/dev/null
           curl -fsS -X POST -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" \
             -d '{"agent_key":"builder","model_key":"ollama-local"}' \
@@ -104,7 +132,7 @@ jobs:
           grep -q '"issue":999' queue.json
           curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/runs | grep -q '"issue_number":999'
 
-          echo 'PROJECT_BYTE_V4_INTEGRATION=PASS'
+          echo 'PROJECT_BYTE_V4_SETTINGS_FILTERS_NOTIFICATIONS_INTEGRATION=PASS'
 
       - name: Upload verified reconstruction
         uses: actions/upload-artifact@v4
