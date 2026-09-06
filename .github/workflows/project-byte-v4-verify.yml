@@ -132,7 +132,7 @@ jobs:
           grep -q '"role":"owner"' session.json
 
           curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/settings | tee settings-before.json
-          grep -q '"default_view":"portfolio"' settings-before.json
+          grep -q '"default_view":"home"' settings-before.json
           curl -fsS -X POST -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" \
             -d '{"general":{"default_view":"board","refresh_seconds":30,"density":"compact"},"notifications":{"browser":false,"quiet_enabled":true,"quiet_start":"21:00","quiet_end":"06:00"},"filters":{"saved_views":[{"id":"mike-risk","name":"Mike Delivery Risk","criteria":{"ownerFilter":"Mike","priorityFilter":"Critical","statusFilter":"Blocked"}}]}}' \
             http://127.0.0.1:18094/api/settings | tee settings-after.json
