@@ -1,0 +1,40 @@
+,800),("notes",1800),("stage",80),("lead",80),("bridge_marker",120)]:
+                    if k in d:fields[k]=txt(d[k],l)
+                if "target_date" in d:fields["target_date"]=valid_date(d["target_date"])
+                if "repo" in d:fields["repo"]=valid_repo(d["repo"])
+                if "live_url" in d:fields["live_url"]=valid_url(d["live_url"])
+            except Exception:return self.sendj({"error":"invalid project fields"},400)
+            fields["updated_at"]=now()
+            with con() as c:
+                if not c.execute("select 1 from projects where name=?",(name,)).fetchone():return self.sendj({"error":"project not found"},404)
+                c.execute("update projects set "+",".join(f"{k}=?" for k in fields)+" where name=?",list(fields.values())+[name]);audit(c,"project_updated","",name,", ".join(fields),u["name"])
+            return self.sendj({"ok":True})
+        if p.startswith("/api/team/"):
+            if u["level"]<3:return self.sendj({"error":"admin required"},403)
+            cid=p.split("/")[3];d=self.body() or {};active=1 if d.get("active",True) else 0;role=txt(d.get("role") or "editor",20)
+            if role not in ("viewer","editor","admin"):return self.sendj({"error":"invalid role"},400)
+            with con() as c:c.execute("update collaborators set role=?,active=? where id=?",(role,active,cid));audit(c,"collaborator_updated","","",cid,u["name"])
+            return self.sendj({"ok":True})
+        return self.sendj({"error":"not found"},404)
+    def do_DELETE(self):
+        p=urlparse(self.path).path;u=self.need(2)
+        if not u:return
+        if p.startswith("/api/tasks/"):
+            tid=p.split("/")[3]
+            with con() as c:
+                row=c.execute("select project,title from tasks where id=?",(tid,)).fetchone()
+                if not row:return self.sendj({"error":"not found"},404)
+                fs=[r["stored_name"] for r in c.execute("select stored_name from attachments where task_id=?",(tid,))];c.execute("delete from attachments where task_id=?",(tid,));c.execute("delete from tasks where id=?",(tid,));audit(c,"task_deleted",tid,row["project"],row["title"],u["name"])
+            for f in fs:
+                try:(UPLOADS/f).unlink()
+                except FileNotFoundError:pass
+            return self.sendj({"ok":True})
+        return self.sendj({"error":"not found"},404)
+
+
+if __name__ == "__main__":
+    init_db()
+    threading.Thread(target=sync_loop,daemon=True).start()
+    host=os.getenv("KANBAN_HOST","127.0.0.1");port=int(os.getenv("KANBAN_PORT","8094"))
+    print(f"PROJECT_BYTE v4 listening on http://{host}:{port}")
+    ThreadingHTTPServer((host,port),H).serve_forever()
