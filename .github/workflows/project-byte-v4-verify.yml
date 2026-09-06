@@ -23,8 +23,9 @@ jobs:
           cat deploy/project-byte/v4/server/*.part > /tmp/project-byte-v4/server.py
           cat deploy/project-byte/v4/index/*.part > /tmp/project-byte-v4/index.html
           cp deploy/project-byte/v4/home.js /tmp/project-byte-v4/home.js
-          wc -c /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js
-          sha256sum /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js | tee /tmp/project-byte-v4/SHA256SUMS
+          cp deploy/project-byte/v4/home-inspector.js /tmp/project-byte-v4/home-inspector.js
+          wc -c /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js /tmp/project-byte-v4/home-inspector.js
+          sha256sum /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js /tmp/project-byte-v4/home-inspector.js | tee /tmp/project-byte-v4/SHA256SUMS
 
       - name: Compile backend
         run: python3 -m py_compile /tmp/project-byte-v4/server.py
@@ -40,7 +41,9 @@ jobs:
           if (!m) throw new Error('PROJECT_BYTE inline script missing');
           new Function(m[1]);
           const home = fs.readFileSync('/tmp/project-byte-v4/home.js','utf8');
+          const inspector = fs.readFileSync('/tmp/project-byte-v4/home-inspector.js','utf8');
           new Function(home);
+          new Function(inspector);
           for (const required of ['Portfolio','Kanban','Work next','AI','Agents','Terminal','Models','Team','Activity','Settings','Help / How-To','Notification center']) {
             if (!html.includes(required)) throw new Error(`missing UI surface: ${required}`);
           }
@@ -50,7 +53,10 @@ jobs:
           for (const required of ['Joe AI','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','Portfolio pulse','homeCommandInput','home-nav']) {
             if (!home.includes(required)) throw new Error(`missing Home command-center surface: ${required}`);
           }
-          console.log('UI_JS_FILTERS_AND_HOME=PASS');
+          for (const required of ['homeAgentInspector','homeAgentLens','Execution log details require Editor or Owner access','data-inspect-run','Full terminal','Agent workspace']) {
+            if (!inspector.includes(required)) throw new Error(`missing agent-inspector surface: ${required}`);
+          }
+          console.log('UI_JS_FILTERS_HOME_AND_INSPECTOR=PASS');
           NODE
 
       - name: Smoke migration, auth, settings, notifications, queue and APIs
@@ -59,14 +65,15 @@ jobs:
           set -euo pipefail
           RUN=/tmp/project-byte-v4/runtime
           mkdir -p "$RUN/bin"
-          cp /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js "$RUN/"
+          cp /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js /tmp/project-byte-v4/home-inspector.js "$RUN/"
           python3 - "$RUN/index.html" <<'PY'
           from pathlib import Path
           p=Path(__import__('sys').argv[1])
           text=p.read_text()
-          marker='<script src="/home.js"></script>'
-          if marker not in text:
-              text=text.replace('</body>', marker+'</body>')
+          markers=['<script src="/home.js"></script>','<script src="/home-inspector.js"></script>']
+          for marker in markers:
+              if marker not in text:
+                  text=text.replace('</body>', marker+'</body>')
           p.write_text(text)
           PY
 
@@ -115,8 +122,10 @@ jobs:
           curl -fsS http://127.0.0.1:18094/ | grep -q 'ownerFilter'
           curl -fsS http://127.0.0.1:18094/ | grep -q 'savedView'
           curl -fsS http://127.0.0.1:18094/ | grep -q '<script src="/home.js"></script>'
+          curl -fsS http://127.0.0.1:18094/ | grep -q '<script src="/home-inspector.js"></script>'
           curl -fsS http://127.0.0.1:18094/home.js | grep -q 'Joe AI'
-          curl -fsS http://127.0.0.1:18094/home.js | grep -q 'Live agents'
+          curl -fsS http://127.0.0.1:18094/home-inspector.js | grep -q 'homeAgentInspector'
+          curl -fsS http://127.0.0.1:18094/home-inspector.js | grep -q 'data-inspect-run'
 
           OWNER=$(cat admin.secret)
           curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/session | tee session.json
@@ -150,7 +159,7 @@ jobs:
           grep -q '"issue":999' queue.json
           curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/runs | grep -q '"issue_number":999'
 
-          echo 'PROJECT_BYTE_V4_HOME_COMMAND_CENTER_INTEGRATION=PASS'
+          echo 'PROJECT_BYTE_V4_HOME_INSPECTOR_INTEGRATION=PASS'
 
       - name: Upload verified reconstruction
         uses: actions/upload-artifact@v4
@@ -160,5 +169,6 @@ jobs:
             /tmp/project-byte-v4/server.py
             /tmp/project-byte-v4/index.html
             /tmp/project-byte-v4/home.js
+            /tmp/project-byte-v4/home-inspector.js
             /tmp/project-byte-v4/SHA256SUMS
           retention-days: 14
