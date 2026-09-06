@@ -1,0 +1,37 @@
+name: PROJECT_BYTE Installer Verify
+
+on:
+  push:
+    branches: [project-byte-deploy]
+    paths:
+      - 'deploy/project-byte/install.sh'
+      - 'deploy/project-byte/v4/**'
+      - '.github/workflows/project-byte-installer-verify.yml'
+  workflow_dispatch:
+
+jobs:
+  installer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate installer and locked artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n deploy/project-byte/install.sh
+          TMP="$(mktemp -d)"
+          cat deploy/project-byte/v4/server/*.part > "$TMP/server.py"
+          cat deploy/project-byte/v4/index/*.part > "$TMP/index.html"
+          cp deploy/project-byte/v4/home.js "$TMP/home.js"
+          SERVER_SHA="$(sha256sum "$TMP/server.py" | awk '{print $1}')"
+          INDEX_SHA="$(sha256sum "$TMP/index.html" | awk '{print $1}')"
+          HOME_SHA="$(sha256sum "$TMP/home.js" | awk '{print $1}')"
+          grep -q "EXPECTED_SERVER=\"$SERVER_SHA\"" deploy/project-byte/install.sh
+          grep -q "EXPECTED_INDEX=\"$INDEX_SHA\"" deploy/project-byte/install.sh
+          grep -q "EXPECTED_HOME=\"$HOME_SHA\"" deploy/project-byte/install.sh
+          grep -q 'home.js' deploy/project-byte/install.sh
+          grep -q 'Home command center is loaded and verified' deploy/project-byte/install.sh
+          node --check "$TMP/home.js"
+          python3 -m py_compile "$TMP/server.py"
+          echo "INSTALLER_LOCK=PASS server=$SERVER_SHA ui=$INDEX_SHA home=$HOME_SHA"
