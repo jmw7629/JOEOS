@@ -1,0 +1,78 @@
+ncy,now(),key))
+            return self.sendj({"ok":ok,"latency_ms":latency,"reply":answer[:120]})
+        if p=="/api/models":
+            if not (u:=self.need(3)):return
+            d=self.body() or {}
+            try:key=valid_hint(d.get("model_key"));display=txt(d.get("display_name"),80);provider=txt(d.get("provider"),40);endpoint=valid_url(d.get("endpoint"));model_name=valid_hint(d.get("model_name"));secret_env=valid_hint(d.get("secret_env"));caps=json.dumps(d.get("capabilities") if isinstance(d.get("capabilities"),list) else []);local=1 if d.get("local") else 0
+            except Exception:return self.sendj({"error":"invalid model fields"},400)
+            if not key or not display or provider not in ("ollama","openai-responses"):return self.sendj({"error":"invalid model fields"},400)
+            with con() as c:c.execute("insert into models(model_key,display_name,provider,endpoint,model_name,secret_env,capabilities,enabled,local,notes,updated_at) values(?,?,?,?,?,?,?,?,?,?,?)",(key,display,provider,endpoint,model_name,secret_env,caps,1,local,txt(d.get("notes"),500),now()));audit(c,"model_added","","",display,u["name"])
+            return self.sendj({"ok":True},201)
+        if p=="/api/agents":
+            if not (u:=self.need(3)):return
+            d=self.body() or {}
+            try:key=valid_hint(d.get("agent_key"));name=txt(d.get("name"),80);role=txt(d.get("role"),80);pref=valid_hint(d.get("preferred_model"));opencode=valid_hint(d.get("opencode_agent"));fallback=json.dumps(d.get("fallback_models") if isinstance(d.get("fallback_models"),list) else []);caps=json.dumps(d.get("capabilities") if isinstance(d.get("capabilities"),list) else [])
+            except Exception:return self.sendj({"error":"invalid agent fields"},400)
+            if not key or not name:return self.sendj({"error":"agent key and name required"},400)
+            with con() as c:c.execute("insert into agents(agent_key,name,role,description,system_prompt,preferred_model,fallback_models,capabilities,opencode_agent,memory_enabled,learning_enabled,enabled,updated_at) values(?,?,?,?,?,?,?,?,?,?,?,?,?)",(key,name,role,txt(d.get("description"),500),txt(d.get("system_prompt"),3000),pref,fallback,caps,opencode,1,1,1,now()));audit(c,"agent_added","","",name,u["name"])
+            return self.sendj({"ok":True},201)
+        if p=="/api/memory":
+            if not (u:=self.need(2)):return
+            d=self.body() or {};agent=valid_hint(d.get("agent_key"));project=txt(d.get("project"),80);content=txt(d.get("content"),2000);kind=txt(d.get("kind") or "decision",60)
+            if not content:return self.sendj({"error":"memory content required"},400)
+            with con() as c:c.execute("insert into agent_memory values(?,?,?,?,?,?,?,?,?,?,?)",(str(uuid.uuid4()),agent,project,txt(d.get("task_id"),80),kind,content,float(d.get("confidence") or .8),"manual","",now(),0));audit(c,"memory_added",txt(d.get("task_id"),80),project,content[:160],u["name"])
+            return self.sendj({"ok":True},201)
+        if p=="/api/team":
+            if not (u:=self.need(3)):return
+            d=self.body() or {};name=txt(d.get("name"),80);role=txt(d.get("role") or "editor",20)
+            if not name or role not in ("viewer","editor","admin"):return self.sendj({"error":"invalid collaborator"},400)
+            token="pb_"+uuid.uuid4().hex+uuid.uuid4().hex[:8]
+            try:
+                with con() as c:c.execute("insert into collaborators values(?,?,?,?,?,?,?)",(str(uuid.uuid4()),name,role,digest(token),1,now(),0));audit(c,"collaborator_added","","",name+"/"+role,u["name"])
+            except sqlite3.IntegrityError:return self.sendj({"error":"collaborator name already exists"},409)
+            return self.sendj({"ok":True,"name":name,"role":role,"access_key":token},201)
+        if p=="/api/upload":
+            if not (u:=self.need(2)):return
+            tid=txt(self.headers.get("X-Task-ID"),80);filename=os.path.basename(txt(self.headers.get("X-Filename"),180))
+            try:n=int(self.headers.get("Content-Length","0"))
+            except ValueError:n=0
+            ext=Path(filename).suffix.lower();task=task_by_id(tid)
+            if not task or not filename or n<=0 or n>MAX_UPLOAD or ext not in ALLOWED_EXT:return self.sendj({"error":"invalid upload"},400)
+            data=self.rfile.read(n);aid=str(uuid.uuid4());stored=aid+ext;(UPLOADS/stored).write_bytes(data);ctype=self.headers.get("Content-Type") or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+            with con() as c:c.execute("insert into attachments values(?,?,?,?,?,?,?)",(aid,tid,filename,stored,ctype,n,now()));audit(c,"file_attached",tid,task["project"],filename,u["name"])
+            return self.sendj({"ok":True,"id":aid,"url":"/uploads/"+stored},201)
+        return self.sendj({"error":"not found"},404)
+    def do_PATCH(self):
+        p=urlparse(self.path).path;u=self.need(2)
+        if not u:return
+        if p.startswith("/api/tasks/"):
+            tid=p.split("/")[3];d=self.body()
+            if not isinstance(d,dict):return self.sendj({"error":"invalid json"},400)
+            allowed={}
+            try:
+                for k,l in [("title",120),("project",80),("note",800),("milestone",120),("depends_on",80),("owner",80),("executor",20),("agent_key",140),("model_key",140),("ai_prompt",12000)]:
+                    if k in d:allowed[k]=txt(d[k],l) if k not in ("agent_key","model_key") else valid_hint(d[k])
+                if "url" in d:allowed["url"]=valid_url(d["url"])
+                if "due_date" in d:allowed["due_date"]=valid_date(d["due_date"])
+                if "progress" in d:allowed["progress"]=max(0,min(int(d["progress"] or 0),100))
+                if "status" in d:
+                    if d["status"] not in STATUSES:raise ValueError()
+                    allowed["status"]=d["status"]
+                if "priority" in d:
+                    if d["priority"] not in PRIORITIES:raise ValueError()
+                    allowed["priority"]=d["priority"]
+            except Exception:return self.sendj({"error":"invalid fields"},400)
+            if not allowed:return self.sendj({"error":"nothing to update"},400)
+            allowed["updated_at"]=now()
+            with con() as c:
+                old=c.execute("select * from tasks where id=?",(tid,)).fetchone()
+                if not old:return self.sendj({"error":"not found"},404)
+                c.execute("update tasks set "+",".join(f"{k}=?" for k in allowed)+" where id=?",list(allowed.values())+[tid]);audit(c,"task_updated",tid,allowed.get("project",old["project"]),", ".join(k for k in allowed if k!="updated_at"),u["name"])
+            return self.sendj({"ok":True})
+        if p.startswith("/api/projects/"):
+            name=unquote(p[len("/api/projects/"):]);d=self.body() or {};fields={}
+            try:
+                if "health" in d:
+                    if d["health"] not in HEALTH:raise ValueError()
+                    fields["health"]=d["health"]
+                for k,l in [("goal"
