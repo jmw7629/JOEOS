@@ -1,0 +1,78 @@
+ text not null default '',created_at integer not null,updated_at integer not null)""")
+        task_cols = [
+            ("due_date", "text not null default ''"), ("progress", "integer not null default 0"),
+            ("milestone", "text not null default ''"), ("depends_on", "text not null default ''"),
+            ("url", "text not null default ''"), ("owner", "text not null default ''"),
+            ("executor", "text not null default 'human'"), ("agent_key", "text not null default ''"),
+            ("model_key", "text not null default ''"), ("ai_state", "text not null default ''"),
+            ("ai_prompt", "text not null default ''"), ("github_issue", "integer not null default 0"),
+            ("github_issue_url", "text not null default ''"), ("github_pr_url", "text not null default ''"),
+            ("last_run_id", "text not null default ''"),
+        ]
+        for n, d in task_cols: addcol(c, "tasks", n, d)
+        c.execute("""create table if not exists projects(
+            name text primary key,health text not null default 'On track',goal text not null default '',
+            target_date text not null default '',notes text not null default '',updated_at integer not null)""")
+        for n, d in [("repo", "text not null default ''"), ("live_url", "text not null default ''"),
+                     ("stage", "text not null default 'Build'"), ("lead", "text not null default ''"),
+                     ("bridge_marker", "text not null default ''")]:
+            addcol(c, "projects", n, d)
+        c.execute("""create table if not exists activity(
+            id integer primary key autoincrement,ts integer not null,action text not null,
+            task_id text not null default '',project text not null default '',detail text not null default '')""")
+        addcol(c, "activity", "actor", "text not null default 'system'")
+        c.execute("""create table if not exists attachments(
+            id text primary key,task_id text not null,original_name text not null,stored_name text not null,
+            content_type text not null,size integer not null,created_at integer not null,
+            foreign key(task_id) references tasks(id) on delete cascade)""")
+        c.execute("""create table if not exists collaborators(
+            id text primary key,name text not null unique,role text not null,token_hash text not null unique,
+            active integer not null default 1,created_at integer not null,last_seen integer not null default 0)""")
+        c.execute("""create table if not exists models(
+            model_key text primary key,display_name text not null,provider text not null,endpoint text not null default '',
+            model_name text not null default '',secret_env text not null default '',capabilities text not null default '[]',
+            enabled integer not null default 1,local integer not null default 0,notes text not null default '',
+            last_status text not null default 'unknown',last_latency_ms integer not null default 0,
+            success_count integer not null default 0,failure_count integer not null default 0,updated_at integer not null)""")
+        c.execute("""create table if not exists agents(
+            agent_key text primary key,name text not null,role text not null,description text not null default '',
+            system_prompt text not null default '',preferred_model text not null default '',fallback_models text not null default '[]',
+            capabilities text not null default '[]',opencode_agent text not null default '',memory_enabled integer not null default 1,
+            learning_enabled integer not null default 1,enabled integer not null default 1,success_count integer not null default 0,
+            failure_count integer not null default 0,updated_at integer not null)""")
+        c.execute("""create table if not exists agent_memory(
+            id text primary key,agent_key text not null default '',project text not null default '',task_id text not null default '',
+            kind text not null,content text not null,confidence real not null default .5,source text not null default 'manual',
+            outcome text not null default '',created_at integer not null,archived integer not null default 0)""")
+        c.execute("""create table if not exists runs(
+            id text primary key,task_id text not null,project text not null,repo text not null,agent_key text not null default '',
+            model_key text not null default '',status text not null,issue_number integer not null default 0,issue_url text not null default '',
+            pr_url text not null default '',prompt text not null,updated_at integer not null,finished_at integer not null default 0,
+            last_event text not null default '',last_comment_count integer not null default 0,learned integer not null default 0)""")
+        c.execute("""create table if not exists run_events(
+            id integer primary key autoincrement,run_id text not null,ts integer not null,kind text not null,
+            agent text not null default '',message text not null,detail text not null default '')""")
+        c.execute("""create table if not exists approvals(
+            id text primary key,run_id text not null default '',task_id text not null default '',kind text not null,
+            summary text not null,status text not null default 'pending',created_at integer not null,
+            decided_at integer not null default 0,decided_by text not null default '')""")
+        c.execute("""create table if not exists chat_messages(
+            id integer primary key autoincrement,ts integer not null,actor text not null,role text not null,
+            project text not null default '',task_id text not null default '',model_key text not null default '',content text not null)""")
+        if c.execute("select count(*) from tasks").fetchone()[0] == 0:
+            ts = now()
+            for title, project, status, priority, note in SEED:
+                c.execute("insert into tasks(id,title,project,status,priority,note,created_at,updated_at) values(?,?,?,?,?,?,?,?)",
+                          (str(uuid.uuid4()), title, project, status, priority, note, ts, ts))
+        ts = now()
+        names = [r[0] for r in c.execute("select distinct project from tasks where project<>''")]
+        c.executemany("insert or ignore into projects(name,updated_at) values(?,?)", [(x, ts) for x in names])
+        defaults = {
+            "StickDeath Infinity": ("jmw7629/StickDeath-Infinity-", "https://stickdeathinfinity.com", "Build", "Joe", BRIDGES["jmw7629/StickDeath-Infinity-"]),
+            "DASH_BYTE / VITROS": ("jmw7629/vitros-web-dashboard", "", "Build", "Joe", BRIDGES["jmw7629/vitros-web-dashboard"]),
+            "JoeOS": ("jmw7629/JOEOS", "", "Build", "Joe", ""),
+        }
+        for name, (repo, live, stage, lead, marker) in defaults.items():
+            c.execute("insert or ignore into projects(name,updated_at) values(?,?)", (name, ts))
+            c.execute("""update projects set
+                
