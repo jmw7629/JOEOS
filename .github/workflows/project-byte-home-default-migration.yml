@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   migrate:
+    if: github.event.head_commit.message != 'Make Home the first-class PROJECT_BYTE default view'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -51,10 +52,6 @@ jobs:
           if old not in s and new not in s: raise SystemExit('client settings default point missing')
           s=s.replace(old,new,1)
           p.write_text(s)
-
-          p=Path('.github/workflows/project-byte-v4-verify.yml')
-          s=p.read_text().replace("grep -q '\"default_view\":\"portfolio\"' settings-before.json", "grep -q '\"default_view\":\"home\"' settings-before.json")
-          p.write_text(s)
           PY
 
           cat deploy/project-byte/v4/server/*.part > /tmp/project-byte-server.py
@@ -72,13 +69,12 @@ jobs:
           grep -q '"home","portfolio"' /tmp/project-byte-server.py
           git diff --check
 
-      - name: Commit migration and remove one-off workflow
+      - name: Commit product migration
         shell: bash
         run: |
           set -euo pipefail
-          rm .github/workflows/project-byte-home-default-migration.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
+          git add deploy/project-byte/v4/server/03.part deploy/project-byte/v4/index/03.part deploy/project-byte/v4/index/04.part
           git commit -m 'Make Home the first-class PROJECT_BYTE default view'
           git push origin HEAD:project-byte-deploy
