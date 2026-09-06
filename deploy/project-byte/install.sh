@@ -3,20 +3,31 @@ set -euo pipefail
 
 BRANCH="project-byte-deploy"
 BASE="https://raw.githubusercontent.com/jmw7629/JOEOS/${BRANCH}/deploy/project-byte"
+V4="$BASE/v4"
 DEST="/home/joevps/PROJECT_BYTE"
 SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
+EXPECTED_SERVER="8363094ecbea889df196a706b4c874c9f007cc62d463d36ce434ecc1b388f084"
+EXPECTED_INDEX="2b2ee55855dda56133d849946b458a39434b49987019f9906001d9b374159b8c"
 
 if [ "$(id -un)" != "joevps" ]; then
-  echo "Run this as joevps (the VPS account), not root." >&2
+  echo "Run this as joevps, not root." >&2
   exit 1
 fi
 
 mkdir -p "$DEST" "$DEST/backups" "$DEST/uploads"
 
-# Preserve live data and the currently working app before touching anything.
+# Consistent SQLite backup, including any WAL state.
 if [ -f "$DEST/kanban.db" ]; then
-  cp -p "$DEST/kanban.db" "$DEST/backups/kanban-${STAMP}.db"
+  python3 - "$DEST/kanban.db" "$DEST/backups/kanban-${STAMP}.db" <<'PY'
+import sqlite3, sys
+src, dst = sys.argv[1:3]
+a = sqlite3.connect(src)
+b = sqlite3.connect(dst)
+with b:
+    a.backup(b)
+b.close(); a.close()
+PY
   echo "Database backup: $DEST/backups/kanban-${STAMP}.db"
 fi
 if [ -f "$DEST/server.py" ]; then cp -p "$DEST/server.py" "$DEST/backups/server-${STAMP}.py"; fi
@@ -25,33 +36,40 @@ if [ -f "$DEST/admin.secret" ]; then cp -p "$DEST/admin.secret" "$DEST/backups/a
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+mkdir -p "$TMP/server" "$TMP/index"
 
-# IMPORTANT: use ordinary source files. The previous V3 .gz.b64 artifacts were malformed.
-curl --fail --silent --show-error --location "$BASE/server.py" -o "$TMP/server.py"
-curl --fail --silent --show-error --location "$BASE/index.html" -o "$TMP/index.html"
+for n in 01 02 03 04 05 06 07 08; do
+  curl --fail --silent --show-error --location "$V4/server/$n.part" -o "$TMP/server/$n.part"
+done
+for n in 01 02 03 04 05 06 07; do
+  curl --fail --silent --show-error --location "$V4/index/$n.part" -o "$TMP/index/$n.part"
+done
+cat "$TMP"/server/*.part > "$TMP/server.py"
+cat "$TMP"/index/*.part > "$TMP/index.html"
 
-# Refuse suspicious/truncated downloads.
-test -s "$TMP/server.py"
-test -s "$TMP/index.html"
-grep -q 'PROJECT_BYTE' "$TMP/server.py"
-grep -q 'PROJECT_BYTE' "$TMP/index.html"
+SERVER_SHA="$(sha256sum "$TMP/server.py" | awk '{print $1}')"
+INDEX_SHA="$(sha256sum "$TMP/index.html" | awk '{print $1}')"
+[ "$SERVER_SHA" = "$EXPECTED_SERVER" ] || { echo "Server checksum mismatch; refusing deployment." >&2; exit 5; }
+[ "$INDEX_SHA" = "$EXPECTED_INDEX" ] || { echo "UI checksum mismatch; refusing deployment." >&2; exit 5; }
 python3 -m py_compile "$TMP/server.py"
-
-SERVER_BYTES="$(wc -c < "$TMP/server.py")"
-INDEX_BYTES="$(wc -c < "$TMP/index.html")"
-if [ "$SERVER_BYTES" -lt 10000 ] || [ "$INDEX_BYTES" -lt 10000 ]; then
-  echo "Downloaded source is unexpectedly small; refusing deployment." >&2
-  exit 5
+if command -v node >/dev/null 2>&1; then
+  node - "$TMP/index.html" <<'NODE'
+const fs=require('fs');const h=fs.readFileSync(process.argv[2],'utf8');const m=h.match(/<script>([\s\S]*)<\/script>/);if(!m)throw new Error('inline script missing');new Function(m[1]);
+for(const x of ['Portfolio','Kanban','Work next','AI','Agents','Terminal','Models','Team','Activity','Help / How-To'])if(!h.includes(x))throw new Error('missing '+x);
+NODE
 fi
 
-echo "Validated source: server=${SERVER_BYTES} bytes, ui=${INDEX_BYTES} bytes"
+echo "Verified V4 source: server=$SERVER_SHA ui=$INDEX_SHA"
 
 install -m 0644 "$TMP/server.py" "$DEST/server.py"
 install -m 0644 "$TMP/index.html" "$DEST/index.html"
+# Optional server-side AI secrets can be placed here later; never in browser code.
+touch "$DEST/project-byte.env"
+chmod 600 "$DEST/project-byte.env"
 
 sudo tee "$SERVICE" >/dev/null <<'UNIT'
 [Unit]
-Description=PROJECT_BYTE portfolio command center
+Description=PROJECT_BYTE executive AI operations command center
 After=network.target
 
 [Service]
@@ -63,6 +81,7 @@ Restart=always
 RestartSec=3
 Environment=KANBAN_HOST=127.0.0.1
 Environment=KANBAN_PORT=8094
+EnvironmentFile=-/home/joevps/PROJECT_BYTE/project-byte.env
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
@@ -78,14 +97,14 @@ sudo systemctl enable project-byte.service >/dev/null
 sudo systemctl restart project-byte.service
 
 HEALTH=""
-for _ in 1 2 3 4 5 6 7 8 9 10; do
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
   if HEALTH="$(curl -fsS http://127.0.0.1:8094/healthz 2>/dev/null)"; then break; fi
   sleep 1
 done
 
-if ! echo "$HEALTH" | grep -q '"ok":true'; then
-  echo "PROJECT_BYTE health check failed after restart: $HEALTH" >&2
-  echo "Restoring previous application files..." >&2
+if ! echo "$HEALTH" | grep -q '"version":4'; then
+  echo "PROJECT_BYTE V4 health check failed: $HEALTH" >&2
+  echo "Rolling application code back to the previous known-good version..." >&2
   LAST_SERVER="$(ls -1t "$DEST"/backups/server-*.py 2>/dev/null | head -1 || true)"
   LAST_INDEX="$(ls -1t "$DEST"/backups/index-*.html 2>/dev/null | head -1 || true)"
   [ -n "$LAST_SERVER" ] && cp -p "$LAST_SERVER" "$DEST/server.py"
@@ -94,8 +113,8 @@ if ! echo "$HEALTH" | grep -q '"ok":true'; then
   exit 6
 fi
 
-echo "PROJECT_BYTE is healthy: $HEALTH"
-echo "Existing database, attachments, and owner key were preserved."
+echo "PROJECT_BYTE V4 is healthy: $HEALTH"
+echo "Existing tasks, projects, attachments, database, and owner key were preserved."
 
 if command -v tailscale >/dev/null 2>&1; then
   echo "Ensuring public HTTPS through Tailscale Funnel..."
@@ -105,4 +124,5 @@ if command -v tailscale >/dev/null 2>&1; then
 fi
 
 echo
-echo "PROJECT_BYTE deployment complete."
+echo "PROJECT_BYTE V4 deployment complete."
+echo "Open: https://mcso9tqzb9-1.tailb9395f.ts.net/"
