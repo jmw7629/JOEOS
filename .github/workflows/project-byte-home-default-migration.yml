@@ -1,0 +1,84 @@
+name: PROJECT_BYTE Home default migration
+
+on:
+  push:
+    branches: [project-byte-deploy]
+    paths:
+      - '.github/workflows/project-byte-home-default-migration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: project-byte-deploy
+          fetch-depth: 0
+
+      - name: Promote Home to first-class default
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          p=Path('deploy/project-byte/v4/server/03.part')
+          s=p.read_text()
+          s=s.replace('"general": {"default_view":"portfolio"', '"general": {"default_view":"home"', 1)
+          old='g["default_view"] if g["default_view"] in ("portfolio","board","intelligence","ai","agents","terminalView","models","team","activity","help","settings") else "portfolio"'
+          new='g["default_view"] if g["default_view"] in ("home","portfolio","board","intelligence","ai","agents","terminalView","models","team","activity","help","settings") else "home"'
+          if old not in s and new not in s: raise SystemExit('server default-view normalization point missing')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+
+          p=Path('deploy/project-byte/v4/index/03.part')
+          s=p.read_text()
+          old='<label class="label">Default view<select id="setDefaultView"><option value="portfolio">Portfolio</option>'
+          new='<label class="label">Default view<select id="setDefaultView"><option value="home">Home</option><option value="portfolio">Portfolio</option>'
+          if old not in s and new not in s: raise SystemExit('Settings default-view option point missing')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+
+          p=Path('deploy/project-byte/v4/index/04.part')
+          s=p.read_text()
+          old="settings={general:{default_view:'portfolio'"
+          new="settings={general:{default_view:'home'"
+          if old not in s and new not in s: raise SystemExit('client settings default point missing')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+
+          p=Path('.github/workflows/project-byte-v4-verify.yml')
+          s=p.read_text().replace("grep -q '\"default_view\":\"portfolio\"' settings-before.json", "grep -q '\"default_view\":\"home\"' settings-before.json")
+          p.write_text(s)
+          PY
+
+          cat deploy/project-byte/v4/server/*.part > /tmp/project-byte-server.py
+          cat deploy/project-byte/v4/index/*.part > /tmp/project-byte-index.html
+          python3 -m py_compile /tmp/project-byte-server.py
+          node <<'NODE'
+          const fs=require('fs');
+          const html=fs.readFileSync('/tmp/project-byte-index.html','utf8');
+          const m=html.match(/<script>([\s\S]*)<\/script>/);
+          if(!m)throw new Error('inline script missing');
+          new Function(m[1]);
+          if(!html.includes('<option value="home">Home</option>'))throw new Error('Home setting option missing');
+          NODE
+          grep -q '"default_view":"home"' /tmp/project-byte-server.py
+          grep -q '"home","portfolio"' /tmp/project-byte-server.py
+          git diff --check
+
+      - name: Commit migration and remove one-off workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/project-byte-home-default-migration.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Make Home the first-class PROJECT_BYTE default view'
+          git push origin HEAD:project-byte-deploy
