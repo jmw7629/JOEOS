@@ -1,4 +1,6 @@
-ncy,now(),key))
+set last_status=?,updated_at=? where model_key=?",(txt(str(e),200),now(),key))
+                return self.sendj({"ok":False,"error":str(e)},502)
+            with con() as c:c.execute("update models set last_status='ok',last_latency_ms=?,updated_at=? where model_key=?",(latency,now(),key))
             return self.sendj({"ok":ok,"latency_ms":latency,"reply":answer[:120]})
         if p=="/api/models":
             if not (u:=self.need(3)):return
@@ -70,9 +72,4 @@ ncy,now(),key))
                 c.execute("update tasks set "+",".join(f"{k}=?" for k in allowed)+" where id=?",list(allowed.values())+[tid]);audit(c,"task_updated",tid,allowed.get("project",old["project"]),", ".join(k for k in allowed if k!="updated_at"),u["name"])
             return self.sendj({"ok":True})
         if p.startswith("/api/projects/"):
-            name=unquote(p[len("/api/projects/"):]);d=self.body() or {};fields={}
-            try:
-                if "health" in d:
-                    if d["health"] not in HEALTH:raise ValueError()
-                    fields["health"]=d["health"]
-                for k,l in [("goal"
+           
