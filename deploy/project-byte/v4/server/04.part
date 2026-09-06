@@ -1,4 +1,8 @@
-l"]
+d"]}
+    if requested and requested in ms:return requested
+    agent=next((a for a in agent_rows() if a["agent_key"]==agent_key and a["enabled"]),None)
+    if agent:
+        pref=agent["preferred_model"]
         if pref in ms:return pref
         for k in parse_json_column(agent["fallback_models"]):
             if k in ms:return k
@@ -125,6 +129,4 @@ def learn_from_run(run: dict, status: str, detail: str=""):
     outcome="success" if status=="pr-created" else "failure"
     content=f"{outcome.upper()}: {run['project']} task produced {status}. Model={run['model_key'] or 'bridge-default'}. {detail[:500]}"
     with con() as c:
-        c.execute("insert into agent_memory values(?,?,?,?,?,?,?,?,?,?,?)",(str(uuid.uuid4()),run["agent_key"],run["project"],run["task_id"],"execution-outcome",content,.75,"run",outcome,now(),0))
-        if outcome=="success":
-            c.execute("update agents set success_count=success_count+1 where agent_key=?",(run["agent_key"],));c.execute("update
+        c.execute("insert into agent_memory values(?,?,?,?,?,?,?,?,?,?,?)",(str(uuid.uuid4()),run["agent_key"],run["project"],run["task_id"],"execution-outc
