@@ -19,15 +19,15 @@ fi
 if [ -f "$DEST/server.py" ]; then cp -p "$DEST/server.py" "$DEST/backups/server-${STAMP}.py"; fi
 if [ -f "$DEST/index.html" ]; then cp -p "$DEST/index.html" "$DEST/backups/index-${STAMP}.html"; fi
 
-curl -fsSL "$BASE/server.py" -o "$DEST/server.py.new"
-curl -fsSL "$BASE/index.html" -o "$DEST/index.html.new"
+curl -fsSL "$BASE/server_v3.py.gz.b64" | base64 -d | gzip -d > "$DEST/server.py.new"
+curl -fsSL "$BASE/index_v3.html.gz.b64" | base64 -d | gzip -d > "$DEST/index.html.new"
 python3 -m py_compile "$DEST/server.py.new"
 mv "$DEST/server.py.new" "$DEST/server.py"
 mv "$DEST/index.html.new" "$DEST/index.html"
 
 sudo tee "$SERVICE" >/dev/null <<'UNIT'
 [Unit]
-Description=PROJECT_BYTE shared Kanban
+Description=PROJECT_BYTE portfolio command center
 After=network.target
 
 [Service]
@@ -54,10 +54,11 @@ sudo systemctl enable project-byte.service >/dev/null
 sudo systemctl restart project-byte.service
 sleep 1
 HEALTH="$(curl -fsS http://127.0.0.1:8094/healthz)"
-echo "$HEALTH" | grep -q '"version":2' || { echo "PROJECT_BYTE v2 health check failed: $HEALTH" >&2; exit 4; }
+echo "$HEALTH" | grep -q '"version":3' || { echo "PROJECT_BYTE v3 health check failed: $HEALTH" >&2; exit 4; }
 
-echo "PROJECT_BYTE v2 backend is healthy on 127.0.0.1:8094"
-echo "Existing database and owner key were preserved."
+echo "PROJECT_BYTE v3 backend is healthy on 127.0.0.1:8094"
+echo "Existing database, attachments, and owner key were preserved."
+echo "V3 adds per-collaborator access, roles, comments, handoffs, workload, project links/stages, and dependency-aware prioritization."
 
 if [ -f "$DEST/admin.secret" ]; then
   echo
@@ -70,14 +71,14 @@ if command -v tailscale >/dev/null 2>&1; then
     echo
     sudo tailscale funnel status || true
     echo
-    echo "PROJECT_BYTE v2 is public through the HTTPS URL shown above."
+    echo "PROJECT_BYTE v3 is public through the HTTPS URL shown above."
   else
     echo
-    echo "PROJECT_BYTE v2 is running locally, but Funnel needs attention."
+    echo "PROJECT_BYTE v3 is running locally, but Funnel needs attention."
     echo "Run: sudo tailscale funnel --bg --https=443 8094"
     exit 2
   fi
 else
-  echo "PROJECT_BYTE v2 is running locally, but Tailscale is not installed on this VPS."
+  echo "PROJECT_BYTE v3 is running locally, but Tailscale is not installed on this VPS."
   exit 3
 fi
