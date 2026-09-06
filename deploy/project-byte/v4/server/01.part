@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+import hashlib, hmac, json, mimetypes, os, re, sqlite3, subprocess, tempfile, threading, time, uuid
+from datetime import date, datetime
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
+from pathlib import Path
+from urllib import request as ur
+from urllib.parse import unquote, urlparse, parse_qs
+
+ROOT = Path(__file__).resolve().parent
+DB = ROOT / "kanban.db"
+SECRET = ROOT / "admin.secret"
+UPLOADS = ROOT / "uploads"
+LOCK = threading.RLock()
+STATUSES = ["Backlog", "Active", "Blocked", "Review", "Done"]
+PRIORITIES = ["Critical", "High", "Medium", "Low"]
+HEALTH = ["On track", "At risk", "Blocked", "Paused"]
+ROLES = {"viewer": 1, "editor": 2, "admin": 3, "owner": 4}
+MAX_UPLOAD = 10 * 1024 * 1024
+ALLOWED_EXT = {".pdf", ".txt", ".md", ".csv", ".png", ".jpg", ".jpeg", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".zip"}
+REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+HINT_RE = re.compile(r"^[A-Za-z0-9_.:/@+\-]{1,140}$")
+SECRET_RE = re.compile(r"(?i)(authorization:\s*(?:bearer|basic)\s+\S+|(?:token|secret|password|api[_-]?key)\s*[=:]\s*\S+|sk-[A-Za-z0-9_-]{10,}|ghp_[A-Za-z0-9]{10,}|github_pat_[A-Za-z0-9_]{10,})")
+BRIDGES = {
+    "jmw7629/StickDeath-Infinity-": "<!-- joeos-opencode-bridge:v1 -->",
+    "jmw7629/vitros-web-dashboard": "<!-- vitros-opencode-bridge:v1 -->",
+}
+BRIDGE_STATE = {
+    "jmw7629/StickDeath-Infinity-": Path.home() / ".local/state/joeos-opencode-bridge/jmw7629__StickDeath-Infinity-",
+    "jmw7629/vitros-web-dashboard": Path.home() / ".local/state/joeos-opencode-bridge/jmw7629__vitros-web-dashboard",
+}
+SEED = [
+    ("Make every Studio tool functional", "StickDeath Infinity", "Active", "Critical", "Complete timeline, drawing, animation, upload, export, and all visible controls."),
+    ("Finish Spatter AI production workflow", "StickDeath Infinity", "Active", "Critical", "AI must understand the app, assist creation, and build/export video workflows."),
+    ("Stabilize Studio layout and interactions", "StickDeath Infinity", "Review", "High", "Preserve the approved studio structure while fixing non-functional controls."),
+    ("Complete REM workbook ingestion", "DASH_BYTE / VITROS", "Active", "Critical", "Parse authoritative workbook content independent of filename and update tracker records with audit history."),
+    ("Complete DHR consumption integration", "DASH_BYTE / VITROS", "Active", "Critical", "Consume parts from DHR data and reflect updates in stock summary and archive."),
+    ("Repair incoming stock intake AI workflow", "DASH_BYTE / VITROS", "Backlog", "High", "Ensure incoming-stock image workflow is separated from DHR scanning logic."),
+    ("Enterprise dashboard hardening", "DASH_BYTE / VITROS", "Backlog", "High", "Fix synchronized table headers, tracker completeness, auditability, and enterprise controls."),
+    ("Finish dynamic G2 dashboard", "BRAIN_BYTE", "Active", "Critical", "Contextual dashboard that changes with the current task instead of copying Iris."),
+    ("R1 ring navigation across app", "BRAIN_BYTE", "Backlog", "High", "Use ring input to navigate primary app workflows and contextual G2 views."),
+    ("Background execution behavior", "BRAIN_BYTE", "Review", "High", "Support continued operation where platform permits and require explicit close intent."),
+    ("Unify local AI orchestration framework", "JoeOS", "Active", "Critical", "Create a stable personal OS layer for assistants, coding agents, routing, and local compute."),
+    ("Harden remote app-building workflow", "JoeOS", "Backlog", "High", "Reliable iPhone-to-VPS-to-Mac development path with OpenAI and local models."),
+    ("Resolve Go AI pass and capture rules", "GO_BYTE", "Blocked", "Critical", "AI must pass legally, never permit user to act for AI, and enforce Go capture/suicide rules correctly."),
+    ("Fix 19x19 board selection", "GO_BYTE", "Backlog", "High", "Selected board size must always match actual rendered and played board."),
+    ("Repair transient controller behavior", "RETRO_BYTE", "Blocked", "High", "Controller must remain mounted and all prototype controls must remain functional."),
+    ("Harden Even Hub connection layer", "PRFKT_BYTE", "Review", "High", "Keep provider routing, setup, security, agents, and G2 connection workflows reliable."),
+    ("Prepare Nintendo x Even execution package", "Nintendo × Even G2", "Active", "High", "Maintain partnership strategy, testing framework, stakeholder plan, and technical POC readiness."),
+    ("Define mirrored G2 + audio architecture", "Nintendo × Even G2", "Backlog", "High", "Specify display mirroring, R1 controls, Bluetooth audio, performance constraints, and acceptance gates."),
+]
+
+
+def now() -> int:
+    return int(time.time())
+
+
+def con() -> sqlite3.Connection:
+    c = sqlite3.connect(DB, timeout=15)
+    c.row_factory = sqlite3.Row
+    c.execute("pragma foreign_keys=on")
+    c.execute("pragma journal_mode=WAL")
+    return c
+
+
+def digest(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def txt(value, limit: int) -> str:
+    return str(value or "").strip()[:limit]
+
+
+def sanitize(value: str) -> str:
+    return SECRET_RE.sub("[REDACTED]", value or "")
+
+
+def addcol(c: sqlite3.Connection, table: str, name: str, definition: str) -> None:
+    if name not in {r["name"] for r in c.execute(f"pragma table_info({table})")}:
+        c.execute(f"alter table {table} add column {name} {definition}")
+
+
+def valid_date(value) -> str:
+    value = txt(value, 10)
+    if value:
+        datetime.strptime(value, "%Y-%m-%d")
+    return value
+
+
+def valid_url(value) -> str:
+    value = txt(value, 600)
+    if value:
+        u = urlparse(value)
+        if u.scheme not in ("http", "https") or not u.netloc:
+            raise ValueError("invalid url")
+    return value
+
+
+def valid_repo(value) -> str:
+    value = txt(value, 160)
+    if value and not REPO_RE.fullmatch(value):
+        raise ValueError("invalid repo")
+    return value
+
+
+def valid_hint(value) -> str:
+    value = txt(value, 140)
+    if value and not HINT_RE.fullmatch(value):
+        raise ValueError("invalid execution hint")
+    return value
+
+
+def owner_secret() -> str:
+    if not SECRET.exists():
+        fd = os.open(SECRET, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(uuid.uuid4().hex + uuid.uuid4().hex[:8])
+    return SECRET.read_text().strip()
+
+
+def audit(c, action: str, task: str = "", project: str = "", detail: str = "", actor: str = "system") -> None:
+    c.execute(
+        "insert into activity(ts,action,task_id,project,detail,actor) values(?,?,?,?,?,?)",
+        (now(), action, task, project, txt(detail, 800), txt(actor, 80)),
+    )
+
+
+def init_db() -> None:
+    UPLOADS.mkdir(exist_ok=True)
+    with con() as c:
+        c.execute("""create table if not exists tasks(
+            id text primary key,title text not null,project text not null,status text not null,
+            priority text not null,note
