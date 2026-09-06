@@ -116,6 +116,41 @@ fi
 echo "PROJECT_BYTE V4 is healthy: $HEALTH"
 echo "Existing tasks, projects, attachments, database, and owner key were preserved."
 
+refresh_bridge() {
+  local env_file="$1"
+  local service_name="$2"
+  local root=""
+  local dirty=""
+  local unsafe=""
+
+  [ -f "$env_file" ] || return 0
+  root="$(grep '^BRIDGE_ROOT=' "$env_file" 2>/dev/null | head -1 | cut -d= -f2- || true)"
+  [ -n "$root" ] && [ -d "$root/.git" ] || return 0
+
+  dirty="$(git -C "$root" status --porcelain 2>/dev/null || true)"
+  if [ -n "$dirty" ]; then
+    # Permit only the known stale Python-bytecode hygiene artifact. Never discard source changes.
+    unsafe="$(printf '%s\n' "$dirty" | grep -Ev '^\?\? .*(__pycache__/|\.py[co]$)' || true)"
+    if [ -n "$unsafe" ]; then
+      echo "Bridge refresh skipped for $service_name: control checkout has real changes."
+      printf '%s\n' "$unsafe" | sed 's/^/  /'
+      return 0
+    fi
+  fi
+
+  echo "Refreshing bridge checkout for $service_name..."
+  if git -C "$root" fetch --prune origin main && git -C "$root" merge --ff-only origin/main; then
+    systemctl --user restart "$service_name" || true
+    echo "Bridge refreshed: $service_name"
+  else
+    echo "Bridge refresh skipped for $service_name: fast-forward was not safe."
+  fi
+}
+
+# Unblock existing JoeVPS issue pollers without ever resetting or overwriting source changes.
+refresh_bridge "$HOME/.config/joeos-opencode-bridge/stickdeath.env" "stickdeath-opencode-bridge.service"
+refresh_bridge "$HOME/.config/joeos-opencode-bridge/vitros.env" "vitros-opencode-bridge.service"
+
 if command -v tailscale >/dev/null 2>&1; then
   echo "Ensuring public HTTPS through Tailscale Funnel..."
   sudo tailscale funnel --bg --https=443 --yes 8094
