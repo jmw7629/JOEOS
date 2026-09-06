@@ -9,6 +9,7 @@ SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 EXPECTED_SERVER="132218e2cc255ce7a58ca0adc7ee91cbdefca8033ecdd22721dd4ce3efb69aa1"
 EXPECTED_INDEX="1dcb65c05ee2b4df81f780145db66dfb4fa42637f7adb115bdf961bc8587326f"
+EXPECTED_HOME="fa0c8322e0f22154c5f0d255510ee792758049e89fc744cb0c526a00a21d2a50"
 
 if [ "$(id -un)" != "joevps" ]; then
   echo "Run this as joevps, not root." >&2
@@ -32,6 +33,7 @@ PY
 fi
 if [ -f "$DEST/server.py" ]; then cp -p "$DEST/server.py" "$DEST/backups/server-${STAMP}.py"; fi
 if [ -f "$DEST/index.html" ]; then cp -p "$DEST/index.html" "$DEST/backups/index-${STAMP}.html"; fi
+if [ -f "$DEST/home.js" ]; then cp -p "$DEST/home.js" "$DEST/backups/home-${STAMP}.js"; fi
 if [ -f "$DEST/admin.secret" ]; then cp -p "$DEST/admin.secret" "$DEST/backups/admin-${STAMP}.secret"; fi
 
 TMP="$(mktemp -d)"
@@ -44,25 +46,50 @@ done
 for n in 01 02 03 04 05 06 07; do
   curl --fail --silent --show-error --location "$V4/index/$n.part" -o "$TMP/index/$n.part"
 done
+curl --fail --silent --show-error --location "$V4/home.js" -o "$TMP/home.js"
 cat "$TMP"/server/*.part > "$TMP/server.py"
 cat "$TMP"/index/*.part > "$TMP/index.html"
 
 SERVER_SHA="$(sha256sum "$TMP/server.py" | awk '{print $1}')"
 INDEX_SHA="$(sha256sum "$TMP/index.html" | awk '{print $1}')"
+HOME_SHA="$(sha256sum "$TMP/home.js" | awk '{print $1}')"
 [ "$SERVER_SHA" = "$EXPECTED_SERVER" ] || { echo "Server checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$INDEX_SHA" = "$EXPECTED_INDEX" ] || { echo "UI checksum mismatch; refusing deployment." >&2; exit 5; }
+[ "$HOME_SHA" = "$EXPECTED_HOME" ] || { echo "Home module checksum mismatch; refusing deployment." >&2; exit 5; }
 python3 -m py_compile "$TMP/server.py"
 if command -v node >/dev/null 2>&1; then
-  node - "$TMP/index.html" <<'NODE'
-const fs=require('fs');const h=fs.readFileSync(process.argv[2],'utf8');const m=h.match(/<script>([\s\S]*)<\/script>/);if(!m)throw new Error('inline script missing');new Function(m[1]);
-for(const x of ['Portfolio','Kanban','Work next','AI','Agents','Terminal','Models','Team','Activity','Settings','Help / How-To','Notification center'])if(!h.includes(x))throw new Error('missing '+x);
+  node - "$TMP/index.html" "$TMP/home.js" <<'NODE'
+const fs=require('fs');
+const h=fs.readFileSync(process.argv[2],'utf8');
+const m=h.match(/<script>([\s\S]*)<\/script>/);
+if(!m)throw new Error('inline script missing');
+new Function(m[1]);
+const home=fs.readFileSync(process.argv[3],'utf8');
+new Function(home);
+for(const x of ['Portfolio','Kanban','Work next','AI','Agents','Terminal','Models','Team','Activity','Settings','Help / How-To'])if(!h.includes(x))throw new Error('missing '+x);
+for(const x of ['Joe AI','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','Portfolio pulse'])if(!home.includes(x))throw new Error('missing Home '+x);
 NODE
 fi
 
-echo "Verified V4 source: server=$SERVER_SHA ui=$INDEX_SHA"
+echo "Verified V4 source: server=$SERVER_SHA ui=$INDEX_SHA home=$HOME_SHA"
+
+# Inject only the verified Home loader into the verified base UI.
+python3 - "$TMP/index.html" <<'PY'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1])
+text=p.read_text()
+marker='<script src="/home.js"></script>'
+if marker not in text:
+    if '</body>' not in text:
+        raise SystemExit('index.html body close missing')
+    text=text.replace('</body>', marker+'</body>')
+p.write_text(text)
+PY
 
 install -m 0644 "$TMP/server.py" "$DEST/server.py"
 install -m 0644 "$TMP/index.html" "$DEST/index.html"
+install -m 0644 "$TMP/home.js" "$DEST/home.js"
 # Optional server-side AI secrets can be placed here later; never in browser code.
 touch "$DEST/project-byte.env"
 chmod 600 "$DEST/project-byte.env"
@@ -97,23 +124,34 @@ sudo systemctl enable project-byte.service >/dev/null
 sudo systemctl restart project-byte.service
 
 HEALTH=""
+HOME_OK=0
 for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
-  if HEALTH="$(curl -fsS http://127.0.0.1:8094/healthz 2>/dev/null)"; then break; fi
+  if HEALTH="$(curl -fsS http://127.0.0.1:8094/healthz 2>/dev/null)"; then
+    if curl -fsS http://127.0.0.1:8094/ | grep -q '<script src="/home.js"></script>' \
+      && curl -fsS http://127.0.0.1:8094/home.js | grep -q 'Joe AI' \
+      && curl -fsS http://127.0.0.1:8094/home.js | grep -q 'Live agents'; then
+      HOME_OK=1
+      break
+    fi
+  fi
   sleep 1
 done
 
-if ! echo "$HEALTH" | grep -q '"version":4'; then
-  echo "PROJECT_BYTE V4 health check failed: $HEALTH" >&2
+if ! echo "$HEALTH" | grep -q '"version":4' || [ "$HOME_OK" -ne 1 ]; then
+  echo "PROJECT_BYTE V4/Home health check failed: $HEALTH home=$HOME_OK" >&2
   echo "Rolling application code back to the previous known-good version..." >&2
   LAST_SERVER="$(ls -1t "$DEST"/backups/server-*.py 2>/dev/null | head -1 || true)"
   LAST_INDEX="$(ls -1t "$DEST"/backups/index-*.html 2>/dev/null | head -1 || true)"
+  LAST_HOME="$(ls -1t "$DEST"/backups/home-*.js 2>/dev/null | head -1 || true)"
   [ -n "$LAST_SERVER" ] && cp -p "$LAST_SERVER" "$DEST/server.py"
   [ -n "$LAST_INDEX" ] && cp -p "$LAST_INDEX" "$DEST/index.html"
+  if [ -n "$LAST_HOME" ]; then cp -p "$LAST_HOME" "$DEST/home.js"; else rm -f "$DEST/home.js"; fi
   sudo systemctl restart project-byte.service
   exit 6
 fi
 
 echo "PROJECT_BYTE V4 is healthy: $HEALTH"
+echo "Home command center is loaded and verified."
 echo "Existing tasks, projects, attachments, database, and owner key were preserved."
 
 refresh_bridge() {
@@ -159,5 +197,5 @@ if command -v tailscale >/dev/null 2>&1; then
 fi
 
 echo
-echo "PROJECT_BYTE V4 deployment complete."
+echo "PROJECT_BYTE V4 Home Command Center deployment complete."
 echo "Open: https://mcso9tqzb9-1.tailb9395f.ts.net/"
