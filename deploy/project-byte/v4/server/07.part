@@ -72,4 +72,4 @@ set last_status=?,updated_at=? where model_key=?",(txt(str(e),200),now(),key))
                 c.execute("update tasks set "+",".join(f"{k}=?" for k in allowed)+" where id=?",list(allowed.values())+[tid]);audit(c,"task_updated",tid,allowed.get("project",old["project"]),", ".join(k for k in allowed if k!="updated_at"),u["name"])
             return self.sendj({"ok":True})
         if p.startswith("/api/projects/"):
-           
+          
