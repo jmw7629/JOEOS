@@ -59,6 +59,15 @@
         c.execute("""create table if not exists chat_messages(
             id integer primary key autoincrement,ts integer not null,actor text not null,role text not null,
             project text not null default '',task_id text not null default '',model_key text not null default '',content text not null)""")
+        c.execute("""create table if not exists user_settings(
+            subject text primary key,data text not null default '{}',updated_at integer not null)""")
+        c.execute("""create table if not exists notifications(
+            id text primary key,ts integer not null,kind text not null,severity text not null default 'info',
+            title text not null,message text not null,link text not null default '',project text not null default '',
+            task_id text not null default '')""")
+        c.execute("""create table if not exists notification_reads(
+            notification_id text not null,subject text not null,read_at integer not null,
+            primary key(notification_id,subject),foreign key(notification_id) references notifications(id) on delete cascade)""")
         if c.execute("select count(*) from tasks").fetchone()[0] == 0:
             ts = now()
             for title, project, status, priority, note in SEED:
