@@ -66,9 +66,9 @@ jobs:
                   sqlite: {state: 'healthy'},
                   sync: {state: 'healthy'},
                   bridges: {
-                    stickdeath: {state: 'healthy', progress_state: 'running', required: true},
-                    vitros: {state: 'healthy', progress_state: 'idle', required: true},
-                    vitros_verifier: {state: 'healthy', progress_state: 'idle-or-external', required: true},
+                    stickdeath: {state: 'healthy', progress_state: 'running', execution_state: 'ready', execution_reason: 'last execution completed successfully', required: true},
+                    vitros: {state: 'healthy', progress_state: 'idle', execution_state: 'ready', execution_reason: 'last execution completed successfully', required: true},
+                    vitros_verifier: {state: 'healthy', progress_state: 'idle-or-external', execution_state: 'ready', execution_reason: 'last execution completed successfully', required: true},
                   },
                   models: {state: 'unknown', tested_ok: 0, failed: 0, unknown: 1},
                 },
@@ -85,9 +85,9 @@ jobs:
             if (system.textContent !== 'Systems operational · 1 warning') throw new Error(`unexpected system evidence: ${system.textContent}`);
             if (ai.textContent !== 'AI CHAT UNTESTED') throw new Error(`unexpected AI evidence: ${ai.textContent}`);
             if (dot.dataset.health !== 'unknown') throw new Error(`unexpected evidence class: ${dot.dataset.health}`);
-            if (!ops.innerHTML.includes('StickDeath healthy/running')) throw new Error(`missing StickDeath progress: ${ops.innerHTML}`);
-            if (!ops.innerHTML.includes('VITROS builder healthy/idle')) throw new Error(`missing VITROS builder progress: ${ops.innerHTML}`);
-            if (!ops.innerHTML.includes('VITROS verifier healthy/idle-or-external')) throw new Error(`missing VITROS verifier evidence: ${ops.innerHTML}`);
+            if (!ops.innerHTML.includes('StickDeath Process: healthy/running · Execution: ready')) throw new Error(`missing StickDeath execution evidence: ${ops.innerHTML}`);
+            if (!ops.innerHTML.includes('VITROS builder Process: healthy/idle · Execution: ready')) throw new Error(`missing VITROS builder execution evidence: ${ops.innerHTML}`);
+            if (!ops.innerHTML.includes('VITROS verifier Process: healthy/idle-or-external · Execution: ready')) throw new Error(`missing VITROS verifier execution evidence: ${ops.innerHTML}`);
             if (ops.innerHTML.includes('optional')) throw new Error(`verifier incorrectly labeled optional: ${ops.innerHTML}`);
             const event = events.find(e => e.type === 'project-byte-health');
             if (!event || event.detail?.operational !== true) throw new Error('health evidence event was not emitted');
@@ -116,6 +116,9 @@ jobs:
           python3 -m py_compile "$runtime"
           grep -q 'BRIDGE_STALL_SECONDS = 2700' "$runtime"
           grep -q 'MODEL_STATUS_FRESH_SECONDS = 1800' "$runtime"
+          grep -q 'EXECUTION_EVIDENCE_FRESH_SECONDS = 1800' "$runtime"
+          grep -q 'execution_state' "$runtime"
+          grep -q 'execution_reason' "$runtime"
           grep -q 'freshness_window_seconds' "$runtime"
           grep -q 'ai_chat_ready' "$runtime"
           grep -q 'operational-with-warnings' "$runtime"
@@ -127,6 +130,8 @@ jobs:
           grep -q 'AI CHAT TESTED OK' "$health"
           grep -q 'AI CHAT UNTESTED' "$health"
           grep -q 'bridgeSummary' "$health"
+          grep -q 'Process:' "$health"
+          grep -q 'Execution:' "$health"
           ! grep -q '(optional)' "$health"
           ! grep -q "textContent = 'AI VERIFIED'" "$health"
           grep -q 'open Agents or Help for details' "$health"
