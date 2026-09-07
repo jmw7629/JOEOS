@@ -1,0 +1,75 @@
+name: PROJECT_BYTE UX Verify
+
+on:
+  pull_request:
+    branches: [project-byte-deploy]
+    paths:
+      - 'deploy/project-byte/v4/health-runtime.js'
+      - 'deploy/project-byte/v4/home.js'
+      - 'deploy/project-byte/v4/index/**'
+      - 'deploy/project-byte/install.sh'
+      - '.github/workflows/project-byte-ux-verify.yml'
+  push:
+    branches: [project-byte-deploy]
+    paths:
+      - 'deploy/project-byte/v4/health-runtime.js'
+      - 'deploy/project-byte/v4/home.js'
+      - 'deploy/project-byte/v4/index/**'
+      - 'deploy/project-byte/install.sh'
+      - '.github/workflows/project-byte-ux-verify.yml'
+  workflow_dispatch:
+
+jobs:
+  verify-command-center-ux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify executable browser source
+        run: |
+          set -euo pipefail
+          node --check deploy/project-byte/v4/health-runtime.js
+          cat deploy/project-byte/v4/index/*.part > /tmp/project-byte-index.html
+          node - /tmp/project-byte-index.html <<'NODE'
+          const fs=require('fs');
+          const html=fs.readFileSync(process.argv[2],'utf8');
+          const match=html.match(/<script>([\s\S]*)<\/script>/);
+          if(!match) throw new Error('inline application script missing');
+          new Function(match[1]);
+          NODE
+      - name: Verify truthful health and model wording
+        run: |
+          set -euo pipefail
+          f=deploy/project-byte/v4/health-runtime.js
+          grep -q "health?.operational" "$f"
+          grep -q "Core healthy · execution incomplete" "$f"
+          grep -q "VITROS verifier" "$f"
+          grep -q "Models .*tested OK" "$f"
+          grep -q "Last test OK" "$f"
+          grep -q "data.modelEvidence = 'historical'\|dataset.modelEvidence = 'historical'" "$f"
+          ! grep -q "● Connected" "$f"
+          echo 'TRUTHFUL_HEALTH_AND_MODEL_WORDING=PASS'
+      - name: Verify workspace-wide refresh semantics
+        run: |
+          set -euo pipefail
+          f=deploy/project-byte/v4/health-runtime.js
+          for endpoint in session tasks projects intelligence activity models agents runs; do
+            grep -q "api('/api/$endpoint')" "$f"
+          done
+          grep -q "api('/api/notifications')" "$f"
+          grep -q 'workspaceRefreshBusy' "$f"
+          grep -q 'userIsEditing' "$f"
+          grep -q "document.querySelector('.modalwrap.open')" "$f"
+          grep -q 'refreshTimer = setInterval(refreshWorkspace, ms)' "$f"
+          echo 'WORKSPACE_REFRESH=PASS'
+      - name: Verify mobile navigation, filters, and Kanban
+        run: |
+          set -euo pipefail
+          f=deploy/project-byte/v4/health-runtime.js
+          grep -q 'data-home-go="board"' "$f"
+          grep -q 'data-home-go="help"' "$f"
+          grep -q 'body:not(\[data-pb-view="home"\]) .filters{display:grid!important' "$f"
+          grep -q 'scroll-snap-type:x mandatory' "$f"
+          grep -q 'calc(100vw - 36px)' "$f"
+          grep -q 'grid-template-columns:repeat(7' "$f"
+          echo 'MOBILE_COMMAND_CENTER=PASS'
