@@ -69,7 +69,7 @@ jobs:
           for (const required of ['homeAgentInspector','homeAgentLens','Execution log details require Editor or Owner access','data-inspect-run','Full terminal','Agent workspace']) {
             if (!inspector.includes(required)) throw new Error(`missing agent-inspector surface: ${required}`);
           }
-          for (const required of ['Verifying system health','Systems verified operational','Core healthy · execution health incomplete','System degraded','AI TESTED OK','AI DEGRADED','AI UNKNOWN']) {
+          for (const required of ['Verifying system health','Systems verified operational','Core healthy · execution health incomplete','System degraded','AI CHAT TESTED OK','AI CHAT DEGRADED','AI CHAT UNTESTED','VITROS verifier']) {
             if (!health.includes(required)) throw new Error(`missing truthful health behavior: ${required}`);
           }
           console.log('UI_JS_FILTERS_HOME_INSPECTOR_AND_HEALTH=PASS');
@@ -142,6 +142,10 @@ jobs:
           grep -q '"models":{"state":"unknown"' health.json
           grep -q '"settings":true' health.json
           grep -q '"notifications":true' health.json
+          grep -q '"required":true' health.json
+          grep -q '"required":false' health.json
+          grep -q '"progress_state":' health.json
+          grep -q '"pending_observable":' health.json
           curl -fsS http://127.0.0.1:18094/api/tasks | tee tasks.json
           grep -q 'LEGACY_V2_TASK' tasks.json
           curl -fsS http://127.0.0.1:18094/api/projects | tee projects.json
@@ -159,6 +163,7 @@ jobs:
           curl -fsS http://127.0.0.1:18094/home-inspector.js | grep -q 'data-inspect-run'
           curl -fsS http://127.0.0.1:18094/health-runtime.js | grep -q 'Verifying system health'
           curl -fsS http://127.0.0.1:18094/health-runtime.js | grep -q 'Core healthy · execution health incomplete'
+          curl -fsS http://127.0.0.1:18094/health-runtime.js | grep -q 'AI CHAT UNTESTED'
 
           deny_runtime_path() {
             local path="$1"
@@ -225,6 +230,7 @@ jobs:
           curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/runs | grep -q '"issue_number":999'
 
           echo 'TRUTHFUL_HEALTH_COMPONENTS=PASS'
+          echo 'BRIDGE_PROGRESS_EVIDENCE=PASS'
           echo 'HOME_STATUS_EVIDENCE_GATED=PASS'
           echo 'RUNTIME_ROOT_GENERIC_STATIC_SERVING=REMOVED'
           echo 'SENSITIVE_RUNTIME_HTTP=DENIED'
