@@ -66,7 +66,7 @@ jobs:
           for (const forbidden of ['All systems operational','AI READY','AI CONNECTED']) {
             if (home.includes(forbidden)) throw new Error(`legacy false-green Home writer remains: ${forbidden}`);
           }
-          for (const required of ['homeAgentInspector','homeAgentLens','Execution log details require Editor or Owner access','data-inspect-run','Full terminal','Agent workspace']) {
+          for (const required of ['homeAgentInspector','homeAgentLens','Execution log details require Editor or Owner access','data-inspect-run','data-inspect-external','running (external)','external-bridge','External runs cannot be killed, restarted, merged or deployed','Full terminal','Agent workspace']) {
             if (!inspector.includes(required)) throw new Error(`missing agent-inspector surface: ${required}`);
           }
           for (const required of ['Verifying system health','Systems verified operational','Core healthy · execution health incomplete','System degraded','AI CHAT TESTED OK','AI CHAT DEGRADED','AI CHAT UNTESTED']) {
@@ -112,8 +112,8 @@ jobs:
 
           cat > "$RUN/bin/gh" <<'SH'
           #!/usr/bin/env bash
-          if [[ "$*" == *"issue create"* ]]; then
-            echo 'https://github.com/jmw7629/StickDeath-Infinity-/issues/999'
+          if [[ "$*" == *"issue create"* && "$*" == *"--repo jmw7629/stickdeath-byte"* ]]; then
+            echo 'https://github.com/jmw7629/stickdeath-byte/issues/999'
             exit 0
           fi
           echo 'fake gh only permits issue create in CI' >&2
@@ -221,14 +221,22 @@ jobs:
           curl -fsS -X PATCH -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" \
             -d '{"status":"Backlog","executor":"ai","agent_key":"builder","model_key":"ollama-local"}' \
             http://127.0.0.1:18094/api/tasks/legacy >/dev/null
+          test "$(curl -sS -o r3-queue.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" -d '{"agent_key":"builder","model_key":"ollama-local"}' http://127.0.0.1:18094/api/tasks/legacy/queue)" = '409'
+          grep -q 'No OpenCode bridge is connected' r3-queue.json
+          echo 'R3_READ_ONLY_EXECUTION_REJECTED=PASS'
+
+          BYTE_TASK_JSON="$(curl -fsS -X POST -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" -d '{"title":"BYTE_EXECUTION_TEST","project":"STICKDEATH_BYTE","status":"Backlog","priority":"High","executor":"ai","agent_key":"builder","model_key":"ollama-local"}' http://127.0.0.1:18094/api/tasks)"
+          BYTE_TASK_ID="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<<"$BYTE_TASK_JSON")"
           curl -fsS -X POST -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" \
             -d '{"agent_key":"builder","model_key":"ollama-local"}' \
-            http://127.0.0.1:18094/api/tasks/legacy/queue | tee queue.json
+            "http://127.0.0.1:18094/api/tasks/${BYTE_TASK_ID}/queue" | tee queue.json
           grep -q '"issue":999' queue.json
+          grep -q 'jmw7629/stickdeath-byte' queue.json
+          echo 'BYTE_EXECUTION_ROUTING=PASS'
           python3 - <<'PY'
           import sqlite3,time
           db=sqlite3.connect('/tmp/project-byte-v4/runtime/kanban.db')
-          db.execute("update runs set status='pr-created',pr_url='https://github.com/jmw7629/StickDeath-Infinity-/pull/999',finished_at=?,updated_at=? where issue_number=999",(int(time.time()),int(time.time())))
+          db.execute("update runs set status='pr-created',pr_url='https://github.com/jmw7629/stickdeath-byte/pull/999',finished_at=?,updated_at=? where issue_number=999",(int(time.time()),int(time.time())))
           db.commit();db.close()
           PY
           curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/approvals | tee approvals.json

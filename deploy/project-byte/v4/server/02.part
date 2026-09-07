@@ -77,7 +77,9 @@
         names = [r[0] for r in c.execute("select distinct project from tasks where project<>''")]
         c.executemany("insert or ignore into projects(name,updated_at) values(?,?)", [(x, ts) for x in names])
         defaults = {
-            "StickDeath Infinity": ("jmw7629/StickDeath-Infinity-", "https://stickdeathinfinity.com", "Build", "Joe", BRIDGES["jmw7629/StickDeath-Infinity-"]),
+            # R3 is authoritative product evidence only; PROJECT_BYTE must never queue it.
+            "StickDeath Infinity": ("jmw7629/StickDeath-Infinity-", "https://stickdeathinfinity.com", "Build", "Joe", ""),
+            "STICKDEATH_BYTE": ("jmw7629/stickdeath-byte", "", "Build", "Joe", BRIDGES["jmw7629/stickdeath-byte"]),
             "DASH_BYTE / VITROS": ("jmw7629/vitros-web-dashboard", "", "Build", "Joe", BRIDGES["jmw7629/vitros-web-dashboard"]),
             "JoeOS": ("jmw7629/JOEOS", "", "Build", "Joe", ""),
         }

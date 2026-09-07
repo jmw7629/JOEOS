@@ -115,7 +115,8 @@ jobs:
               proc = root / 'proc'
               cache = root / 'cache'
               proc.mkdir()
-              worktree = cache / 'jmw7629__StickDeath-Infinity-' / 'worktrees' / 'issue-105'
+              (proc / 'uptime').write_text('1000.0 0.0')
+              worktree = cache / 'jmw7629__stickdeath-byte' / 'worktrees' / 'issue-105'
               worktree.mkdir(parents=True)
               outside = root / 'outside'
               outside.mkdir()
@@ -126,15 +127,18 @@ jobs:
                   uid = os.getuid()
                   (process / 'status').write_text(f'Name:\topencode\nUid:\t{uid}\t{uid}\t{uid}\t{uid}\n')
                   (process / 'cmdline').write_bytes(b'\0'.join(x.encode() for x in args) + b'\0')
+                  fields = ['S'] + ['0'] * 18 + ['5000']
+                  (process / 'stat').write_text(f'{pid} (opencode) ' + ' '.join(fields) + '\n')
 
               fake_process(11, ['/x/opencode', 'run', '--dir', str(worktree), '--model', 'opencode/nemotron-3.5-lightning-free', 'PROMPT token=SUPERSECRET'])
               fake_process(12, ['/x/opencode', 'run', '--dir', str(outside), '--model', 'bad/provider', 'PROMPT other-secret'])
               fake_process(13, ['/x/opencode', 'tui', '--dir', str(worktree), 'PROMPT third-secret'])
-              observed = mod._active_executor('jmw7629/StickDeath-Infinity-', boundary='stickdeath', proc_root=proc, cache_root=cache)
+              observed = mod._active_executor('jmw7629/stickdeath-byte', boundary='stickdeath', proc_root=proc, cache_root=cache)
               assert observed['running'] is True and observed['count'] == 1, observed
               assert observed['active_run_ref'] == 'issue-105', observed
               assert observed['active_issue_number'] == 105, observed
               assert observed['active_model'] == 'opencode/nemotron-3.5-lightning-free', observed
+              assert observed['elapsed_seconds'] == 950, observed
               assert 'SECRET' not in repr(observed) and 'PROMPT' not in repr(observed), observed
 
               vitros_live = cache / 'jmw7629__vitros-web-dashboard' / 'project-byte-live-builder' / 'issue-324'
@@ -156,7 +160,7 @@ jobs:
               assert 'secret' not in repr(vitros_observed).lower(), vitros_observed
               assert 'secret' not in repr(verifier_observed).lower(), verifier_observed
 
-              unavailable = mod._active_executor('jmw7629/StickDeath-Infinity-', boundary='stickdeath', proc_root=root / 'missing-proc', cache_root=cache)
+              unavailable = mod._active_executor('jmw7629/stickdeath-byte', boundary='stickdeath', proc_root=root / 'missing-proc', cache_root=cache)
               assert unavailable['running'] is False and unavailable['evidence_complete'] is False, unavailable
               invalid_boundary = mod._active_executor('jmw7629/vitros-web-dashboard', boundary='unknown', proc_root=proc, cache_root=cache)
               assert invalid_boundary['running'] is False and invalid_boundary['evidence_complete'] is False, invalid_boundary
@@ -199,14 +203,14 @@ jobs:
               'oldest_age_seconds': mod.BRIDGE_STALL_SECONDS + 30,
               'active_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 30),
               'active_issue_number': 101,
-          } if 'StickDeath' in repo else {
+          } if 'stickdeath-byte' in repo else {
               'count': 0,
               'oldest_age_seconds': None,
               'active_updated_at': None,
               'active_issue_number': 0,
           }
           mod._latest_bridge_activity = lambda repo, **kwargs: (
-              now - mod.BRIDGE_STALL_SECONDS - 10 if 'StickDeath' in repo else None,
+              now - mod.BRIDGE_STALL_SECONDS - 10 if 'stickdeath-byte' in repo else None,
               True,
           )
           mod._active_executor = lambda repo, boundary: {
@@ -239,8 +243,12 @@ jobs:
           assert externally_running['stickdeath']['state'] == 'healthy', externally_running
           assert externally_running['stickdeath']['progress_state'] == 'running', externally_running
           assert externally_running['stickdeath']['active_run_ref'] == 'issue-105', externally_running
-          assert externally_running['stickdeath']['active_model'] == 'opencode/nemotron-3.5-lightning-free', externally_running
-          assert externally_running['stickdeath']['pending_count'] == 1, externally_running
+          assert externally_running['stickdeath']['active_model'] == '', externally_running
+          assert externally_running['stickdeath']['pending_count'] == 0, externally_running
+          assert externally_running['stickdeath']['execution_source'] == 'external-bridge', externally_running
+          assert externally_running['stickdeath']['external_running'] is True, externally_running
+          assert externally_running['stickdeath']['external_executor_count'] == 1, externally_running
+          assert externally_running['stickdeath']['external_issue_number'] == 105, externally_running
 
           mod.BRIDGE_CACHE['at'] = 0.0
           mod.BRIDGE_CACHE['value'] = {}
@@ -272,6 +280,10 @@ jobs:
           print('EXTERNAL_EXECUTOR_UNRELATED_IGNORED=PASS')
           print('EXTERNAL_EXECUTOR_PROMPT_NOT_EXPOSED=PASS')
           print('EXTERNAL_EXECUTOR_RUNNING_OVERRIDES_IDLE=PASS')
+          print('PROJECT_BYTE_PENDING_SEMANTICS_PRESERVED=PASS')
+          print('EXTERNAL_SOURCE_EXPLICIT=PASS')
+          print('STICKDEATH_WRITABLE_TARGET=stickdeath-byte')
+          print('LEGACY_STICKDEATH_EXECUTOR_REFERENCES=0')
           print('EXTERNAL_EXECUTOR_UNAVAILABLE_FAILS_UNKNOWN=PASS')
           PY
       - name: Prove health path is local, bounded and non-mutating
@@ -290,11 +302,18 @@ jobs:
           grep -q 'EXECUTOR_PROCESS_SCAN_MAX_ENTRIES = 8192' "$runtime"
           grep -q 'EXECUTOR_CMDLINE_READ_BYTES = 16384' "$runtime"
           grep -q '"stickdeath": "worktrees"' "$runtime"
+          grep -Fq '"stickdeath": ("stickdeath-byte-opencode-bridge.service", "jmw7629/stickdeath-byte", True)' "$runtime"
+          ! grep -q 'stickdeath-opencode-bridge.service' "$runtime"
+          ! grep -q 'jmw7629/StickDeath-Infinity-' "$runtime"
           grep -q '"vitros": "project-byte-live-builder"' "$runtime"
           grep -q '"vitros_verifier": "verifier-sandboxes"' "$runtime"
           grep -q '_active_executor' "$runtime"
           grep -q 'active_run_ref' "$runtime"
           grep -q 'active_model' "$runtime"
+          grep -q 'execution_source' "$runtime"
+          grep -q 'external_running' "$runtime"
+          grep -q 'external_elapsed_seconds' "$runtime"
+          grep -q 'external_activity_age_seconds' "$runtime"
           grep -q 'executor_evidence_complete' "$runtime"
           grep -q "status in ('queued','running')" "$runtime"
           grep -q '_processed_issue_activity' "$runtime"
@@ -309,6 +328,8 @@ jobs:
           ! grep -q 'github.com' "$runtime"
           ! grep -q 'journalctl' "$runtime"
           ! grep -q 'systemctl.*restart' "$runtime"
+          grep -q 'if ! refresh_bridge "$HOME/.config/joeos-opencode-bridge/stickdeath-byte.env" "stickdeath-byte-opencode-bridge.service"; then BRIDGE_REFRESH_FAILURES=1; fi' "$installer"
+          ! grep -q 'stickdeath-opencode-bridge.service' "$installer"
           grep -q 'if ! check_bridge_service "vitros-opencode-verifier.service"; then BRIDGE_REFRESH_FAILURES=1; fi' "$installer"
           ! grep -q 'Optional VITROS verifier' "$installer"
           grep -q 'bridgeSummary' "$health"
