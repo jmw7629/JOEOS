@@ -5,6 +5,7 @@ on:
     branches: [project-byte-deploy]
     paths:
       - 'deploy/project-byte/v4/health-runtime.js'
+      - 'deploy/project-byte/v4/home.js'
       - 'deploy/project-byte/v4/runtime_server.py'
       - 'deploy/project-byte/install.sh'
       - '.github/workflows/project-byte-health-runtime-verify.yml'
@@ -12,6 +13,7 @@ on:
     branches: [project-byte-deploy]
     paths:
       - 'deploy/project-byte/v4/health-runtime.js'
+      - 'deploy/project-byte/v4/home.js'
       - 'deploy/project-byte/v4/runtime_server.py'
       - 'deploy/project-byte/install.sh'
       - '.github/workflows/project-byte-health-runtime-verify.yml'
@@ -23,28 +25,18 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Prove health UI owns status labels
+      - name: Prove health UI renders evidence directly
         shell: bash
         run: |
           set -euo pipefail
           node --check deploy/project-byte/v4/health-runtime.js
+          node --check deploy/project-byte/v4/home.js
+          ! grep -q 'MutationObserver' deploy/project-byte/v4/health-runtime.js
           node <<'NODE'
           const fs = require('fs');
           const vm = require('vm');
-          let observerCallback = null;
-          class FakeMutationObserver {
-            constructor(cb) { observerCallback = cb; }
-            observe() {}
-          }
           class FakeElement {
-            constructor(text = '') { this._text = text; this.dataset = {}; this.style = {}; }
-            get textContent() { return this._text; }
-            set textContent(value) {
-              const next = String(value);
-              const changed = this._text !== next;
-              this._text = next;
-              if (changed && observerCallback) queueMicrotask(() => observerCallback([]));
-            }
+            constructor(text = '') { this.textContent = text; this.dataset = {}; this.style = {}; }
           }
           const system = new FakeElement('legacy');
           const ai = new FakeElement('legacy');
@@ -53,16 +45,14 @@ jobs:
           const context = {
             window: windowObject,
             document: {
-              readyState: 'complete',
+              activeElement: null,
               getElementById: id => id === 'homeSystemState' ? system : id === 'homeAIState' ? ai : null,
               querySelector: selector => selector === '.home-status-dot' ? dot : null,
             },
-            MutationObserver: FakeMutationObserver,
             fetch: async () => ({
               ok: true,
               json: async () => ({ok: true, operational: false, components: {models: {state: 'unknown'}}}),
             }),
-            queueMicrotask,
             console,
           };
           vm.createContext(context);
@@ -71,18 +61,23 @@ jobs:
             await Promise.resolve();
             await Promise.resolve();
             await new Promise(resolve => setImmediate(resolve));
-            if (system.textContent !== 'Core healthy · execution health incomplete') throw new Error(`unexpected initial system state: ${system.textContent}`);
-            if (ai.textContent !== 'AI UNKNOWN') throw new Error(`unexpected initial AI state: ${ai.textContent}`);
-            system.textContent = 'All systems operational';
-            ai.textContent = 'AI CONNECTED';
-            await Promise.resolve();
-            await Promise.resolve();
-            await new Promise(resolve => setImmediate(resolve));
-            if (system.textContent !== 'Core healthy · execution health incomplete') throw new Error(`legacy system overwrite won: ${system.textContent}`);
-            if (ai.textContent !== 'AI UNKNOWN') throw new Error(`legacy AI overwrite won: ${ai.textContent}`);
-            console.log('HOME_STATUS_EVIDENCE_OWNERSHIP=PASS');
+            if (system.textContent !== 'Core healthy · execution health incomplete') throw new Error(`unexpected system evidence: ${system.textContent}`);
+            if (ai.textContent !== 'AI UNKNOWN') throw new Error(`unexpected AI evidence: ${ai.textContent}`);
+            if (dot.dataset.health !== 'unknown') throw new Error(`unexpected evidence class: ${dot.dataset.health}`);
+            console.log('HOME_STATUS_DIRECT_EVIDENCE_OWNERSHIP=PASS');
           })().catch(error => { console.error(error); process.exit(1); });
           NODE
+      - name: Prove Home has no local false-green health writers
+        shell: bash
+        run: |
+          set -euo pipefail
+          home=deploy/project-byte/v4/home.js
+          grep -q 'Verifying system health…' "$home"
+          grep -q 'AI UNKNOWN' "$home"
+          ! grep -q 'All systems operational' "$home"
+          ! grep -q 'AI READY' "$home"
+          ! grep -q 'AI CONNECTED' "$home"
+          echo 'HOME_LOCAL_HEALTH_WRITERS=REMOVED'
       - name: Prove model freshness and verifier Funnel gate are explicit
         shell: bash
         run: |
