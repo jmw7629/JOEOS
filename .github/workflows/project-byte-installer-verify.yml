@@ -32,24 +32,42 @@ jobs:
           cat deploy/project-byte/v4/index/*.part > "$TMP/index.html"
           cp deploy/project-byte/v4/home.js "$TMP/home.js"
           cp deploy/project-byte/v4/home-inspector.js "$TMP/home-inspector.js"
+          cp deploy/project-byte/v4/health-runtime.js "$TMP/health-runtime.js"
           BACKEND_SHA="$(sha256sum "$TMP/backend.py" | awk '{print $1}')"
           SERVER_SHA="$(sha256sum "$TMP/server.py" | awk '{print $1}')"
           INDEX_SHA="$(sha256sum "$TMP/index.html" | awk '{print $1}')"
           HOME_SHA="$(sha256sum "$TMP/home.js" | awk '{print $1}')"
           INSPECTOR_SHA="$(sha256sum "$TMP/home-inspector.js" | awk '{print $1}')"
+          HEALTH_SHA="$(sha256sum "$TMP/health-runtime.js" | awk '{print $1}')"
           grep -q "EXPECTED_BACKEND=\"$BACKEND_SHA\"" deploy/project-byte/install.sh
           grep -q "EXPECTED_SERVER=\"$SERVER_SHA\"" deploy/project-byte/install.sh
           grep -q "EXPECTED_INDEX=\"$INDEX_SHA\"" deploy/project-byte/install.sh
           grep -q "EXPECTED_HOME=\"$HOME_SHA\"" deploy/project-byte/install.sh
           grep -q "EXPECTED_INSPECTOR=\"$INSPECTOR_SHA\"" deploy/project-byte/install.sh
+          grep -q "EXPECTED_HEALTH=\"$HEALTH_SHA\"" deploy/project-byte/install.sh
+          grep -q 'SERVER_SHA=.*sha256sum' deploy/project-byte/install.sh
+          grep -q '\[ "$SERVER_SHA" = "$EXPECTED_SERVER" \]' deploy/project-byte/install.sh
           grep -q 'runtime_server.py' deploy/project-byte/install.sh
-          grep -q 'Home command center and live agent inspector are loaded and verified' deploy/project-byte/install.sh
+          grep -q 'health-runtime.js' deploy/project-byte/install.sh
+          grep -q 'evidence-backed health UI' deploy/project-byte/install.sh
+          grep -q '"ok":true' deploy/project-byte/install.sh
           ! grep -nE 'curl .*\| *grep -q' deploy/project-byte/install.sh
           grep -q 'live-index.html' deploy/project-byte/install.sh
           grep -q 'live-home-inspector.js' deploy/project-byte/install.sh
+          grep -q 'live-health-runtime.js' deploy/project-byte/install.sh
           grep -q 'PROJECT_BYTE_ENABLE_FUNNEL' deploy/project-byte/install.sh
           grep -q 'tailscale funnel --https=443 off' deploy/project-byte/install.sh
           ! grep -q 'sudo tailscale funnel --bg --https=443 --yes 8094$' deploy/project-byte/install.sh
+          grep -q 'symbolic-ref --quiet --short HEAD' deploy/project-byte/install.sh
+          grep -q '\[ "$branch" != "main" \]' deploy/project-byte/install.sh
+          grep -q 'merge --ff-only origin/main' deploy/project-byte/install.sh
+          grep -q 'systemctl --user restart "$service_name"' deploy/project-byte/install.sh
+          grep -q 'systemctl --user is-active --quiet "$service_name"' deploy/project-byte/install.sh
+          ! grep -q 'systemctl --user restart "$service_name" || true' deploy/project-byte/install.sh
+          grep -q 'Bridge refreshed and active:' deploy/project-byte/install.sh
+          grep -q 'configuration file is absent, so liveness cannot be verified' deploy/project-byte/install.sh
+          grep -q 'check_bridge_service "vitros-opencode-verifier.service"' deploy/project-byte/install.sh
+          ! grep -q 'refresh_bridge .*vitros-opencode-verifier.service' deploy/project-byte/install.sh
           grep -q 'data-home-kpi' "$TMP/home.js"
           grep -q 'function homeKpiScope' "$TMP/home.js"
           grep -q 'function renderActivity(scoped)' "$TMP/home.js"
@@ -62,9 +80,23 @@ jobs:
           grep -q 'data-home-agent="${key}"' "$TMP/home.js"
           grep -q "control.value=control.value===pair\[1\]?'':pair\[1\]" "$TMP/home.js"
           grep -q 'class SafeHandler(app.H)' "$TMP/server.py"
+          grep -q 'health_snapshot' "$TMP/server.py"
+          grep -q 'truthful_sync_loop' "$TMP/server.py"
+          grep -q 'BRIDGE_CACHE_SECONDS = 10.0' "$TMP/server.py"
+          grep -q 'MODEL_STATUS_FRESH_SECONDS = 1800' "$TMP/server.py"
+          grep -q 'freshness_window_seconds' "$TMP/server.py"
+          grep -Fq 'bridges["vitros_verifier"]["state"] == "healthy"' "$TMP/server.py"
+          grep -q 'systemctl.*--user.*is-active' "$TMP/server.py"
           grep -q 'Path(stored).name != stored' "$TMP/server.py"
           grep -q 'select stored_name,content_type from attachments where stored_name=?' "$TMP/server.py"
+          grep -q 'Verifying system health' "$TMP/health-runtime.js"
+          grep -q 'Systems verified operational' "$TMP/health-runtime.js"
+          grep -q 'AI TESTED OK' "$TMP/health-runtime.js"
+          grep -q 'AI UNKNOWN' "$TMP/health-runtime.js"
+          grep -q 'MutationObserver' "$TMP/health-runtime.js"
+          grep -q 'open Agents or Help for details' "$TMP/health-runtime.js"
           node --check "$TMP/home.js"
           node --check "$TMP/home-inspector.js"
+          node --check "$TMP/health-runtime.js"
           python3 -m py_compile "$TMP/backend.py" "$TMP/server.py"
-          echo "INSTALLER_LOCK=PASS backend=$BACKEND_SHA runtime=$SERVER_SHA ui=$INDEX_SHA home=$HOME_SHA inspector=$INSPECTOR_SHA"
+          echo "INSTALLER_LOCK=PASS backend=$BACKEND_SHA runtime=$SERVER_SHA ui=$INDEX_SHA home=$HOME_SHA inspector=$INSPECTOR_SHA health=$HEALTH_SHA"
