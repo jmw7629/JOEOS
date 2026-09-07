@@ -114,8 +114,17 @@ git -C "$ROOT" merge --ff-only origin/main
 [ "$(git -C "$ROOT" rev-parse HEAD)" = "$(git -C "$ROOT" rev-parse origin/main)" ] || \
   fail "HEAD does not exactly match origin/main after fast-forward"
 
-python3 -m py_compile "$ROOT/bridge/runner.py"
-python3 "$ROOT/bridge/runner.py" --self-test
+# Verification must not create __pycache__ inside the bridge control checkout.
+# This was a previous source of self-inflicted dirty-control failures.
+verify_tmp="$(mktemp -d)"
+trap 'rm -rf "$verify_tmp"' EXIT
+PYTHONPYCACHEPREFIX="$verify_tmp/pycache" python3 -m py_compile "$ROOT/bridge/runner.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/bridge/runner.py" --self-test
+rm -rf "$verify_tmp"
+trap - EXIT
+
+[ -z "$(git -C "$ROOT" status --porcelain=v1 --untracked-files=all)" ] || \
+  fail "bridge verification dirtied the control checkout; service was not restarted"
 
 if [ "$SKIP_SERVICE" != "1" ]; then
   systemctl --user restart "$SERVICE_NAME"
