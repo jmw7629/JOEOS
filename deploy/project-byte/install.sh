@@ -8,11 +8,11 @@ DEST="/home/joevps/PROJECT_BYTE"
 SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 EXPECTED_BACKEND="86c64e3a06e5c76240753063c01b02c7aa8c83eb5b8f3bf64338a03c11d3a765"
-EXPECTED_SERVER="bb48fb8baecc9e7dd98e57c8e4e3d71ab63ea0b771579edf7b38fa85ad25878d"
+EXPECTED_SERVER="d338ec8134b952a0bb3b844dabb4a6afea6705dd1cb0f091ba684aacf275fe22"
 EXPECTED_INDEX="08a324ae21ab0c19128d0dd0ce6ce9739515a03f740119ce8cd680fe5ef273c7"
 EXPECTED_HOME="a9ddd2250e62b045c39c61c53ef17265d6f20ee99ebaf24d84f64663c6973fe3"
 EXPECTED_INSPECTOR="bffa6d45adaafade420b27bf0dcd9717fd8783c3cee1ce73c6550c8752d4cba4"
-EXPECTED_HEALTH="64229cb90783fe3810e5ddc9db330a8f1dba46621e423da98d8d50f7c390e69e"
+EXPECTED_HEALTH="86be374df8196aa15a10f2118127898ce33bb2203185e21ced28fcebac986413"
 
 if [ "$(id -un)" != "joevps" ]; then
   echo "Run this as joevps, not root." >&2
@@ -90,7 +90,7 @@ new Function(home); new Function(inspector); new Function(health);
 for(const x of ['Portfolio','Kanban','Work next','AI','Agents','Terminal','Models','Team','Activity','Settings','Help / How-To'])if(!h.includes(x))throw new Error('missing '+x);
 for(const x of ['Joe AI','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','Portfolio pulse'])if(!home.includes(x))throw new Error('missing Home '+x);
 for(const x of ['homeAgentInspector','homeAgentLens','data-inspect-run','Full terminal','Agent workspace'])if(!inspector.includes(x))throw new Error('missing inspector '+x);
-for(const x of ['Verifying system health','Systems verified operational','AI TESTED OK','AI UNKNOWN'])if(!health.includes(x))throw new Error('missing health behavior '+x);
+for(const x of ['Verifying system health','Systems verified operational','AI CHAT TESTED OK','AI CHAT UNTESTED'])if(!health.includes(x))throw new Error('missing health behavior '+x);
 NODE
 fi
 
@@ -164,7 +164,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
       && grep -Fq 'homeAgentInspector' "$TMP/live-home-inspector.js" \
       && grep -Fq 'data-inspect-run' "$TMP/live-home-inspector.js" \
       && grep -Fq 'Verifying system health' "$TMP/live-health-runtime.js" \
-      && grep -Fq 'AI TESTED OK' "$TMP/live-health-runtime.js"; then
+      && grep -Fq 'AI CHAT TESTED OK' "$TMP/live-health-runtime.js"; then
       HOME_OK=1
       break
     fi
@@ -276,8 +276,11 @@ check_bridge_service() {
 
 if ! refresh_bridge "$HOME/.config/joeos-opencode-bridge/stickdeath.env" "stickdeath-opencode-bridge.service"; then BRIDGE_REFRESH_FAILURES=1; fi
 if ! refresh_bridge "$HOME/.config/joeos-opencode-bridge/vitros.env" "vitros-opencode-bridge.service"; then BRIDGE_REFRESH_FAILURES=1; fi
-# The verifier shares VITROS control state; gate Funnel on its liveness without mutating its checkout.
-if ! check_bridge_service "vitros-opencode-verifier.service"; then BRIDGE_REFRESH_FAILURES=1; fi
+# Verifier mode is optional until the VITROS bridge actually installs/supports that worker.
+# Report its liveness, but never mark builder execution unhealthy solely because an obsolete/absent verifier unit is inactive.
+if ! check_bridge_service "vitros-opencode-verifier.service"; then
+  echo "Optional VITROS verifier is not active; builder execution remains eligible while verifier recovery is tracked separately." >&2
+fi
 
 if [ "$BRIDGE_REFRESH_FAILURES" -ne 0 ]; then
   echo "One or more bridge refresh/liveness checks failed. PROJECT_BYTE remains local and reports execution health as degraded/unknown until corrected." >&2

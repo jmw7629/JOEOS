@@ -47,9 +47,9 @@ BRIDGE_CACHE_SECONDS = 10.0
 MODEL_STATUS_FRESH_SECONDS = 1800
 
 BRIDGE_SERVICES = {
-    "stickdeath": ("stickdeath-opencode-bridge.service", "jmw7629/StickDeath-Infinity-"),
-    "vitros": ("vitros-opencode-bridge.service", "jmw7629/vitros-web-dashboard"),
-    "vitros_verifier": ("vitros-opencode-verifier.service", "jmw7629/vitros-web-dashboard"),
+    "stickdeath": ("stickdeath-opencode-bridge.service", "jmw7629/StickDeath-Infinity-", True),
+    "vitros": ("vitros-opencode-bridge.service", "jmw7629/vitros-web-dashboard", True),
+    "vitros_verifier": ("vitros-opencode-verifier.service", "jmw7629/vitros-web-dashboard", False),
 }
 
 
@@ -139,10 +139,11 @@ def _bridge_health():
             return _copy_bridge_health(cached)
 
         result = {}
-        for key, (service, repo) in BRIDGE_SERVICES.items():
+        for key, (service, repo, required) in BRIDGE_SERVICES.items():
             last_activity = _latest_bridge_activity(repo)
             result[key] = {
                 "state": _service_state(service),
+                "required": bool(required),
                 "last_activity_age_seconds": max(0, int(current - last_activity)) if last_activity else None,
             }
         BRIDGE_CACHE["at"] = current
@@ -219,19 +220,36 @@ def health_snapshot():
     bridges = _bridge_health()
     models = _model_health()
     core_ok = database["state"] == "healthy" and sync_state == "healthy"
-    execution_ok = (
-        bridges["stickdeath"]["state"] == "healthy"
-        and bridges["vitros"]["state"] == "healthy"
-        and bridges["vitros_verifier"]["state"] == "healthy"
-        and models["state"] == "tested_ok"
+    required_bridges_ok = all(
+        item.get("state") == "healthy"
+        for item in bridges.values()
+        if item.get("required")
     )
+    execution_ok = bool(required_bridges_ok)
+    chat_ready = models["state"] == "tested_ok"
+    warnings = []
+    for key, item in bridges.items():
+        if not item.get("required") and item.get("state") != "healthy":
+            warnings.append(f"{key}-optional-{item.get('state') or 'unknown'}")
+    if not chat_ready:
+        warnings.append(f"models-{models.get('state') or 'unknown'}")
     operational = bool(core_ok and execution_ok)
+    if operational and warnings:
+        status = "operational-with-warnings"
+    elif operational:
+        status = "healthy"
+    elif core_ok:
+        status = "core-healthy"
+    else:
+        status = "degraded"
     return {
         "ok": bool(core_ok),
         "operational": operational,
-        "status": "healthy" if operational else "core-healthy" if core_ok else "degraded",
+        "status": status,
         "version": 4,
         "ai_ops": bool(execution_ok),
+        "ai_chat_ready": bool(chat_ready),
+        "warnings": warnings,
         "settings": database["state"] == "healthy",
         "notifications": sync_state == "healthy",
         "components": {
