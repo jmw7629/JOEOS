@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -45,6 +46,10 @@ BRIDGE_CACHE_LOCK = threading.Lock()
 BRIDGE_CACHE = {"at": 0.0, "value": {}}
 BRIDGE_CACHE_SECONDS = 10.0
 BRIDGE_STALL_SECONDS = 2700
+BRIDGE_ACTIVITY_SCAN_MAX_ENTRIES = 6000
+BRIDGE_ACTIVITY_SKIP_DIRS = frozenset(
+    {".git", ".build", ".venv", "__pycache__", "DerivedData", "dist", "node_modules"}
+)
 MODEL_STATUS_FRESH_SECONDS = 1800
 
 BRIDGE_SERVICES = {
@@ -91,6 +96,48 @@ def _sqlite_health():
         return {"state": "failed", "error_type": type(exc).__name__}
 
 
+def _latest_tree_activity(root: Path):
+    try:
+        latest = root.stat().st_mtime
+    except OSError:
+        return None, False
+
+    stack = [root]
+    seen = 0
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as entries:
+                for entry in entries:
+                    if seen >= BRIDGE_ACTIVITY_SCAN_MAX_ENTRIES:
+                        return latest, False
+                    seen += 1
+                    try:
+                        stat = entry.stat(follow_symlinks=False)
+                    except OSError:
+                        return latest, False
+                    latest = max(latest, stat.st_mtime)
+                    try:
+                        is_dir = entry.is_dir(follow_symlinks=False)
+                    except OSError:
+                        return latest, False
+                    if is_dir and entry.name not in BRIDGE_ACTIVITY_SKIP_DIRS:
+                        stack.append(Path(entry.path))
+        except OSError:
+            return latest, False
+    return latest, True
+
+
+def _processed_issue_activity(state_file: Path, issue_number: int):
+    try:
+        data = json.loads(state_file.read_text())
+        record = (data.get("processed") or {}).get(str(issue_number)) or {}
+        stamp = int(record.get("time") or 0)
+        return float(stamp) if stamp > 0 else None
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
 def _latest_bridge_activity(
     repo: str,
     *,
@@ -99,40 +146,63 @@ def _latest_bridge_activity(
 ):
     state_dir = app.BRIDGE_STATE.get(repo)
     if not state_dir:
-        return None
+        return None, False
 
     logs = state_dir / "logs"
+    candidates: list[float] = []
+    evidence_complete = True
+
     if verifier:
-        candidates = [state_dir / "verifier-processed.json"]
+        paths = [state_dir / "verifier-processed.json"]
         try:
             if logs.is_dir():
-                candidates.extend(logs.glob("verify-*.log"))
+                paths.extend(logs.glob("verify-*.log"))
         except OSError:
-            return None
-    else:
-        candidates = [state_dir / "processed.json"]
-        if issue_number:
-            candidates.append(logs / f"issue-{issue_number}.log")
-            candidates.append(
-                Path.home()
-                / ".cache"
-                / "joeos-opencode-bridge"
-                / repo.replace("/", "__")
-                / "worktrees"
-                / f"issue-{issue_number}"
-            )
-        else:
-            try:
-                if logs.is_dir():
-                    candidates.extend(logs.glob("issue-*.log"))
-            except OSError:
-                return None
+            return None, False
+        try:
+            candidates.extend(p.stat().st_mtime for p in paths if p.exists())
+        except OSError:
+            return None, False
+    elif issue_number:
+        issue_log = logs / f"issue-{issue_number}.log"
+        try:
+            if issue_log.exists():
+                candidates.append(issue_log.stat().st_mtime)
+        except OSError:
+            return None, False
 
-    try:
-        mtimes = [p.stat().st_mtime for p in candidates if p.exists()]
-    except OSError:
-        return None
-    return max(mtimes) if mtimes else None
+        issue_state_activity = _processed_issue_activity(
+            state_dir / "processed.json", issue_number
+        )
+        if issue_state_activity is not None:
+            candidates.append(issue_state_activity)
+
+        worktree = (
+            Path.home()
+            / ".cache"
+            / "joeos-opencode-bridge"
+            / repo.replace("/", "__")
+            / "worktrees"
+            / f"issue-{issue_number}"
+        )
+        if worktree.exists():
+            tree_activity, tree_complete = _latest_tree_activity(worktree)
+            if tree_activity is not None:
+                candidates.append(tree_activity)
+            evidence_complete = evidence_complete and tree_complete
+    else:
+        paths = [state_dir / "processed.json"]
+        try:
+            if logs.is_dir():
+                paths.extend(logs.glob("issue-*.log"))
+        except OSError:
+            return None, False
+        try:
+            candidates.extend(p.stat().st_mtime for p in paths if p.exists())
+        except OSError:
+            return None, False
+
+    return (max(candidates) if candidates else None), evidence_complete
 
 
 def _pending_runs(repo: str, current: float):
@@ -200,6 +270,7 @@ def _evaluate_bridge_health(
     current: float,
     *,
     pending_observable: bool = True,
+    activity_evidence_complete: bool = True,
 ):
     activity_age = max(0, int(current - last_activity)) if last_activity else None
     result = {
@@ -210,6 +281,7 @@ def _evaluate_bridge_health(
         "last_activity_age_seconds": activity_age,
         "stall_after_seconds": BRIDGE_STALL_SECONDS,
         "pending_observable": bool(pending_observable),
+        "progress_evidence_complete": bool(activity_evidence_complete),
     }
     if service_state == "failed":
         result["state"] = "failed"
@@ -237,20 +309,27 @@ def _evaluate_bridge_health(
     active_updated_at = pending.get("active_updated_at")
     result["oldest_pending_age_seconds"] = oldest_age
 
-    if last_activity is None or not active_updated_at or last_activity < float(active_updated_at):
-        if oldest_age is not None and oldest_age > BRIDGE_STALL_SECONDS:
-            result["state"] = "failed"
-            result["progress_state"] = "stalled"
-        else:
-            result["progress_state"] = "awaiting-evidence"
+    evidence_fresh = (
+        last_activity is not None
+        and active_updated_at
+        and last_activity >= float(active_updated_at)
+        and activity_age is not None
+        and activity_age <= BRIDGE_STALL_SECONDS
+    )
+    if evidence_fresh:
+        result["state"] = "healthy"
+        result["progress_state"] = "running"
         return result
 
-    if activity_age is not None and activity_age > BRIDGE_STALL_SECONDS:
+    if not activity_evidence_complete:
+        result["progress_state"] = "evidence-incomplete"
+        return result
+
+    if oldest_age is not None and oldest_age > BRIDGE_STALL_SECONDS:
         result["state"] = "failed"
         result["progress_state"] = "stalled"
     else:
-        result["state"] = "healthy"
-        result["progress_state"] = "running"
+        result["progress_state"] = "awaiting-evidence"
     return result
 
 
@@ -279,7 +358,7 @@ def _bridge_health():
                 pending_by_repo[repo] = _pending_runs(repo, current)
             pending = pending_by_repo.get(repo) if pending_observable else {"count": 0}
             active_issue = int((pending or {}).get("active_issue_number") or 0)
-            last_activity = _latest_bridge_activity(
+            last_activity, evidence_complete = _latest_bridge_activity(
                 repo,
                 issue_number=active_issue,
                 verifier=(key == "vitros_verifier"),
@@ -290,6 +369,7 @@ def _bridge_health():
                 last_activity,
                 current,
                 pending_observable=pending_observable,
+                activity_evidence_complete=evidence_complete,
             )
             item["required"] = bool(required)
             result[key] = item
