@@ -16,7 +16,7 @@ on:
 jobs:
   verify-command-center-ux:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Verify executable browser source
@@ -84,7 +84,7 @@ jobs:
           grep -q 'data-home-go="agents"' deploy/project-byte/v4/home.js
           grep -q 'data-home-go="ai"' deploy/project-byte/v4/home.js
           grep -q 'data-home-go="settings"' deploy/project-byte/v4/home.js
-          grep -q '>New work</button>' deploy/project-byte/v4/home.js
+          grep -q 'New work</button>' deploy/project-byte/v4/home.js
           ! grep -q '>Queue work</button>' deploy/project-byte/v4/home.js
           grep -q 'targetOwner===who' deploy/project-byte/v4/home.js
           grep -q 'data-home-approval' deploy/project-byte/v4/home.js
@@ -96,3 +96,25 @@ jobs:
           grep -q "CustomEvent('project-byte-health'" deploy/project-byte/v4/health-runtime.js
           echo 'HOME_REVIEW_AND_SCOPE_UX=PASS'
           echo 'MOBILE_COMMAND_CENTER=PASS'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated browser test tooling
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pb-browser" --ignore-scripts --no-audit --no-fund playwright@1.57.0
+          node "$RUNNER_TEMP/pb-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Exercise actual Home on mobile and desktop
+        env:
+          PB_SCREENSHOTS: ${{ runner.temp }}/pb-orbital-screenshots
+        run: |
+          PB_PLAYWRIGHT_MODULE="$RUNNER_TEMP/pb-browser/node_modules/playwright/index.mjs" \
+            node deploy/project-byte/v4/test_home_browser.mjs
+      - name: Retain browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-byte-orbital-browser-evidence
+          path: ${{ runner.temp }}/pb-orbital-screenshots
+          retention-days: 7
+          if-no-files-found: ignore

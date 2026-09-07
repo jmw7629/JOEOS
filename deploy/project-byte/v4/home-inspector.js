@@ -282,13 +282,7 @@
     renderAgents=function(){priorRenderAgents();appendExternalRunsToAgents();};
   }
 
-  const priorRenderHome = typeof renderHome === 'function' ? renderHome : null;
-  if (priorRenderHome) {
-    renderHome = function() {
-      priorRenderHome();
-      refreshInspector();
-    };
-  }
+  window.addEventListener('project-byte-home-render',refreshInspector);
 
   // Capture agent-node taps before the Home module's original navigation handler.
   document.addEventListener('click', e => {
@@ -331,10 +325,6 @@
     if(selectedHoldKey)inspectOwnerHold(selectedHoldKey);
     else if(selectedExternalKey)inspectExternal(selectedExternalKey);
   });
-
-  // Clarify the action: it creates work; actual execution still requires Queue to AI.
-  const createAction=document.querySelector('[data-home-action="create"]');
-  if(createAction)createAction.textContent='New work';
 
   setTimeout(refreshInspector, 0);
 })();
