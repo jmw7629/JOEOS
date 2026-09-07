@@ -121,25 +121,16 @@
         .board{grid-template-columns:repeat(5,minmax(calc(100vw - 36px),calc(100vw - 36px)));min-width:max-content;gap:10px}
         .col{width:calc(100vw - 36px);min-width:calc(100vw - 36px);scroll-snap-align:start;scroll-snap-stop:always}
         .taskactions{grid-template-columns:44px minmax(0,1fr) 44px 44px}
-        .home-nav{grid-template-columns:repeat(7,minmax(50px,1fr));overflow-x:auto;scrollbar-width:none}
-        .home-nav::-webkit-scrollbar{display:none}
+        .home-nav{grid-template-columns:repeat(5,minmax(0,1fr));overflow:visible}
       }
     `;
     document.head.appendChild(style);
     const nav = document.querySelector('.home-nav');
-    if (nav && !nav.querySelector('[data-home-go="board"]')) {
-      const board = document.createElement('button');
-      board.type = 'button';
-      board.dataset.homeGo = 'board';
-      board.innerHTML = '<i>▤</i>Board';
-      nav.insertBefore(board, nav.querySelector('[data-home-go="agents"]'));
-    }
-    if (nav && !nav.querySelector('[data-home-go="help"]')) {
-      const help = document.createElement('button');
-      help.type = 'button';
-      help.dataset.homeGo = 'help';
-      help.innerHTML = '<i>?</i>Help';
-      nav.appendChild(help);
+    if (nav) {
+      // Keep the accepted five-primary mobile navigation model. Board remains
+      // reachable from Projects/Kanban; Help remains available from Troubleshoot/settings.
+      nav.querySelector('[data-home-go="board"]')?.remove();
+      nav.querySelector('[data-home-go="help"]')?.remove();
     }
   };
 
