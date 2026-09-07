@@ -10,7 +10,10 @@
   const bridgeSummary = value => {
     const state = stateLabel(value);
     const progress = String(value?.progress_state || '').toLowerCase();
-    return progress && progress !== 'unknown' ? `${state}/${progress}` : state;
+    const execution = String(value?.execution_state || 'unknown').toLowerCase();
+    const reason = String(value?.execution_reason || '').trim();
+    const process = progress && progress !== 'unknown' ? `${state}/${progress}` : state;
+    return `Process: ${process} · Execution: ${execution}${reason ? ' · ' + reason : ''}`;
   };
 
   const setState = (text, kind = 'unknown') => {

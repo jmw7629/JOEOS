@@ -139,6 +139,8 @@ jobs:
           grep -q '"sqlite":{"state":"healthy"}' health.json
           grep -q '"sync":{"state":"healthy"' health.json
           grep -q '"bridges":' health.json
+          grep -q '"execution_state":"unknown"' health.json
+          grep -q '"ai_ops":false' health.json
           grep -q '"models":{"state":"unknown"' health.json
           grep -q '"settings":true' health.json
           grep -q '"notifications":true' health.json

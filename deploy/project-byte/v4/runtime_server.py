@@ -52,6 +52,8 @@ BRIDGE_ACTIVITY_SKIP_DIRS = frozenset(
     {".git", ".build", ".venv", "__pycache__", "DerivedData", "dist", "node_modules"}
 )
 MODEL_STATUS_FRESH_SECONDS = 1800
+EXECUTION_EVIDENCE_FRESH_SECONDS = 1800
+EXECUTION_LOG_READ_BYTES = 32768
 
 BRIDGE_SERVICES = {
     "stickdeath": ("stickdeath-opencode-bridge.service", "jmw7629/StickDeath-Infinity-", True),
@@ -204,6 +206,93 @@ def _latest_bridge_activity(
             return None, False
 
     return (max(candidates) if candidates else None), evidence_complete
+
+
+def _execution_failure_reason(text: str):
+    lower = text.lower()
+    if "insufficient balance" in lower or "creditserror" in lower:
+        return "provider-balance", "provider balance unavailable"
+    if re.search(r"(?:statuscode|status)[^\n]{0,24}429|rate[ -]?limit|too many requests", lower):
+        return "provider-rate-limit", "provider rate limit reached"
+    if re.search(r"(?:statuscode|status)[^\n]{0,24}40[13]|unauthori[sz]ed|authentication failed|invalid api key", lower):
+        return "provider-auth", "provider authentication unavailable"
+    if "timeout_type=idle" in lower or ("watchdog_success=false" in lower and "timeout_type=" in lower):
+        return "executor-timeout", "executor watchdog timeout"
+    if "model not found" in lower or "unknown model" in lower:
+        return "model-unavailable", "selected model unavailable"
+    classification = re.search(r"(?m)^classification=([A-Za-z0-9_-]{1,60})\s*$", text)
+    if classification and classification.group(1):
+        return "executor-" + classification.group(1).lower(), "executor reported a classified failure"
+    return "execution-failed", "executor exited before completing work"
+
+
+def _execution_readiness(repo: str, current: float, *, verifier: bool = False):
+    result = {
+        "state": "unknown",
+        "reason_code": "no-evidence",
+        "reason": "no recent completed execution evidence",
+        "last_execution_age_seconds": None,
+        "last_run_ref": "",
+        "freshness_window_seconds": EXECUTION_EVIDENCE_FRESH_SECONDS,
+    }
+    state_dir = app.BRIDGE_STATE.get(repo)
+    if not state_dir:
+        return result
+    logs = state_dir / "logs"
+    try:
+        entries = []
+        with os.scandir(logs) as scan:
+            for index, entry in enumerate(scan):
+                if index >= BRIDGE_ACTIVITY_SCAN_MAX_ENTRIES:
+                    result["reason_code"] = "evidence-incomplete"
+                    result["reason"] = "execution evidence scan incomplete"
+                    return result
+                name = entry.name
+                if verifier:
+                    match = name.startswith("verify-") and name.endswith(".log")
+                else:
+                    match = name.startswith("issue-") and name.endswith(".log")
+                if not match or not entry.is_file(follow_symlinks=False):
+                    continue
+                stat = entry.stat(follow_symlinks=False)
+                entries.append((stat.st_mtime, Path(entry.path), name[:-4]))
+    except OSError:
+        result["reason_code"] = "evidence-unavailable"
+        result["reason"] = "execution evidence unavailable"
+        return result
+    if not entries:
+        return result
+    modified, path, run_ref = max(entries, key=lambda item: item[0])
+    age = max(0, int(current - modified))
+    result["last_execution_age_seconds"] = age
+    result["last_run_ref"] = run_ref
+    if age > EXECUTION_EVIDENCE_FRESH_SECONDS:
+        result["reason_code"] = "stale-evidence"
+        result["reason"] = "no recent completed execution evidence"
+        return result
+    try:
+        with path.open("rb") as stream:
+            raw = stream.read(EXECUTION_LOG_READ_BYTES)
+        text = raw.decode("utf-8", errors="replace")
+    except OSError:
+        result["reason_code"] = "evidence-unavailable"
+        result["reason"] = "execution evidence unavailable"
+        return result
+    exit_match = re.search(r"(?m)^exit=(-?\d+)\s*$", text)
+    if not exit_match:
+        result["reason_code"] = "incomplete-evidence"
+        result["reason"] = "latest execution has no completed result yet"
+        return result
+    if int(exit_match.group(1)) == 0:
+        result["state"] = "ready"
+        result["reason_code"] = "success"
+        result["reason"] = "last execution completed successfully"
+        return result
+    code, reason = _execution_failure_reason(text)
+    result["state"] = "blocked"
+    result["reason_code"] = code
+    result["reason"] = reason
+    return result
 
 
 def _pending_runs(repo: str, current: float):
@@ -372,6 +461,15 @@ def _bridge_health():
                 pending_observable=pending_observable,
                 activity_evidence_complete=evidence_complete,
             )
+            execution = _execution_readiness(
+                repo, current, verifier=(key == "vitros_verifier")
+            )
+            item["execution_state"] = execution["state"]
+            item["execution_reason_code"] = execution["reason_code"]
+            item["execution_reason"] = execution["reason"]
+            item["last_execution_age_seconds"] = execution["last_execution_age_seconds"]
+            item["last_run_ref"] = execution["last_run_ref"]
+            item["execution_freshness_seconds"] = execution["freshness_window_seconds"]
             item["required"] = bool(required)
             result[key] = item
 
@@ -456,13 +554,20 @@ def health_snapshot():
         for item in bridges.values()
         if item.get("required")
     )
-    execution_ok = bool(required_bridges_ok)
+    required_execution_ready = all(
+        item.get("execution_state") == "ready"
+        for item in bridges.values()
+        if item.get("required")
+    )
+    execution_ok = bool(required_bridges_ok and required_execution_ready)
     chat_ready = models["state"] == "tested_ok"
 
     warnings = []
     for key, item in bridges.items():
         if not item.get("required") and item.get("state") != "healthy":
             warnings.append(f"{key}-optional-{item.get('state') or 'unknown'}")
+        if item.get("required") and item.get("execution_state") != "ready":
+            warnings.append(f"{key}-execution-{item.get('execution_state') or 'unknown'}")
     if not chat_ready:
         warnings.append(f"models-{models.get('state') or 'unknown'}")
 
