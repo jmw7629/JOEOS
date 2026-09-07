@@ -1,0 +1,124 @@
+name: PROJECT_BYTE Bridge Liveness Verify
+
+on:
+  pull_request:
+    branches: [project-byte-deploy]
+    paths:
+      - 'deploy/project-byte/v4/runtime_server.py'
+      - 'deploy/project-byte/install.sh'
+      - '.github/workflows/project-byte-bridge-liveness-verify.yml'
+  push:
+    branches: [project-byte-deploy]
+    paths:
+      - 'deploy/project-byte/v4/runtime_server.py'
+      - 'deploy/project-byte/install.sh'
+      - '.github/workflows/project-byte-bridge-liveness-verify.yml'
+  workflow_dispatch:
+
+jobs:
+  verify-bridge-liveness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compile runtime
+        run: python3 -m py_compile deploy/project-byte/v4/runtime_server.py
+      - name: Prove bounded local liveness semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import importlib.util
+          import sys
+          import types
+          from pathlib import Path
+
+          stub = types.ModuleType('backend')
+          stub.H = object
+          stub.BRIDGE_STATE = {}
+          sys.modules['backend'] = stub
+          path = Path('deploy/project-byte/v4/runtime_server.py')
+          spec = importlib.util.spec_from_file_location('project_byte_runtime', path)
+          mod = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+
+          now = 1_800_000_000.0
+
+          def check(name, service, pending, activity, expected_state, expected_progress, observable=True):
+              got = mod._evaluate_bridge_health(service, pending, activity, now, pending_observable=observable)
+              assert got['state'] == expected_state, (name, got)
+              assert got['progress_state'] == expected_progress, (name, got)
+              assert 'path' not in got and 'log' not in got and 'repo' not in got, (name, got)
+              return got
+
+          check('idle-active', 'active', {'count': 0}, None, 'healthy', 'idle')
+          check(
+              'fresh-running', 'active',
+              {'count': 1, 'oldest_age_seconds': 20, 'latest_updated_at': int(now - 10)},
+              now - 5, 'healthy', 'running'
+          )
+          check(
+              'stalled-running', 'active',
+              {'count': 1, 'oldest_age_seconds': mod.BRIDGE_STALL_SECONDS + 20, 'latest_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 20)},
+              now - mod.BRIDGE_STALL_SECONDS - 5, 'failed', 'stalled'
+          )
+          check(
+              'fresh-missing-evidence', 'active',
+              {'count': 1, 'oldest_age_seconds': 20, 'latest_updated_at': int(now - 20)},
+              None, 'unknown', 'awaiting-evidence'
+          )
+          check(
+              'stale-missing-evidence', 'active',
+              {'count': 1, 'oldest_age_seconds': mod.BRIDGE_STALL_SECONDS + 1, 'latest_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 1)},
+              None, 'failed', 'stalled'
+          )
+          check('inactive', 'failed', {'count': 0}, None, 'failed', 'inactive')
+          check('verifier-external', 'active', {'count': 0}, None, 'healthy', 'idle-or-external', observable=False)
+
+          mod.BRIDGE_CACHE['at'] = 0.0
+          mod.BRIDGE_CACHE['value'] = {}
+          mod.time.time = lambda: now
+          mod._service_state = lambda service: 'active'
+          mod._pending_runs = lambda repo, current: {
+              'count': 1,
+              'oldest_age_seconds': mod.BRIDGE_STALL_SECONDS + 30,
+              'latest_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 30),
+          } if 'StickDeath' in repo else {'count': 0, 'oldest_age_seconds': None, 'latest_updated_at': None}
+          mod._latest_bridge_activity = lambda repo: now - mod.BRIDGE_STALL_SECONDS - 10 if 'StickDeath' in repo else None
+          bridges = mod._bridge_health()
+          assert bridges['stickdeath']['state'] == 'failed', bridges
+          assert bridges['stickdeath']['progress_state'] == 'stalled', bridges
+          assert bridges['stickdeath']['required'] is True, bridges
+          assert bridges['vitros']['state'] == 'healthy', bridges
+          assert bridges['vitros']['progress_state'] == 'idle', bridges
+          assert bridges['vitros']['required'] is True, bridges
+          assert bridges['vitros_verifier']['state'] == 'healthy', bridges
+          assert bridges['vitros_verifier']['required'] is False, bridges
+          assert bridges['vitros_verifier']['pending_observable'] is False, bridges
+          print('BRIDGE_IDLE_HEALTHY=PASS')
+          print('BRIDGE_RUNNING_FRESH=PASS')
+          print('BRIDGE_STALLED_FAILS_CLOSED=PASS')
+          print('BRIDGE_MISSING_EVIDENCE_UNKNOWN=PASS')
+          print('BRIDGE_REQUIRED_OPTIONAL_SEMANTICS=PASS')
+          PY
+      - name: Prove health path is local and bounded
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime=deploy/project-byte/v4/runtime_server.py
+          grep -q 'BRIDGE_STALL_SECONDS = 2700' "$runtime"
+          grep -q "status in ('queued','running')" "$runtime"
+          grep -q 'last_activity_age_seconds' "$runtime"
+          grep -q 'oldest_pending_age_seconds' "$runtime"
+          grep -q 'pending_observable' "$runtime"
+          grep -q 'progress_state' "$runtime"
+          grep -q 'item.get("required")' "$runtime"
+          ! grep -q 'urllib.request' "$runtime"
+          ! grep -q 'api.github.com' "$runtime"
+          ! grep -q 'github.com' "$runtime"
+          ! grep -q 'journalctl' "$runtime"
+          sha256sum "$runtime"
+          git diff --check origin/project-byte-deploy...HEAD
+          echo 'BRIDGE_LIVENESS_LOCAL_ONLY=PASS'
