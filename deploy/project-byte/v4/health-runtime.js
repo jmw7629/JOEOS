@@ -60,6 +60,9 @@
   const render = health => {
     lastHealth = health || null;
     window.__PROJECT_BYTE_HEALTH_LAST__ = lastHealth;
+    if (typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('project-byte-health', {detail: lastHealth}));
+    }
     if (health?.unavailable) {
       setState('System health unavailable', 'degraded');
     } else if (health?.operational) {

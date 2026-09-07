@@ -91,5 +91,10 @@ jobs:
           grep -q 'targetOwner===who' deploy/project-byte/v4/home.js
           grep -q 'data-home-approval' deploy/project-byte/v4/home.js
           grep -q 'PROJECT_BYTE approval records your review decision only' deploy/project-byte/v4/home.js
+          grep -q 'homeExecutionFabric' deploy/project-byte/v4/home.js
+          grep -q 'VITROS verifier' deploy/project-byte/v4/home.js
+          grep -q 'Model Hub' deploy/project-byte/v4/home.js
+          grep -q 'project-byte-health' deploy/project-byte/v4/home.js
+          grep -q "CustomEvent('project-byte-health'" deploy/project-byte/v4/health-runtime.js
           echo 'HOME_REVIEW_AND_SCOPE_UX=PASS'
           echo 'MOBILE_COMMAND_CENTER=PASS'

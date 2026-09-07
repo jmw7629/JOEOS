@@ -42,9 +42,12 @@ jobs:
           const ai = new FakeElement('legacy');
           const ops = new FakeElement('legacy');
           const dot = new FakeElement();
-          const windowObject = {setInterval: () => 0};
+          const events = [];
+          class FakeCustomEvent { constructor(type, options={}) { this.type=type; this.detail=options.detail; } }
+          const windowObject = {setInterval: () => 0, dispatchEvent: event => events.push(event)};
           const context = {
             window: windowObject,
+            CustomEvent: FakeCustomEvent,
             document: {
               activeElement: null,
               getElementById: id => id === 'homeSystemState' ? system : id === 'homeAIState' ? ai : id === 'opsHealth' ? ops : null,
@@ -86,7 +89,10 @@ jobs:
             if (!ops.innerHTML.includes('VITROS builder healthy/idle')) throw new Error(`missing VITROS builder progress: ${ops.innerHTML}`);
             if (!ops.innerHTML.includes('VITROS verifier healthy/idle-or-external')) throw new Error(`missing VITROS verifier evidence: ${ops.innerHTML}`);
             if (ops.innerHTML.includes('optional')) throw new Error(`verifier incorrectly labeled optional: ${ops.innerHTML}`);
+            const event = events.find(e => e.type === 'project-byte-health');
+            if (!event || event.detail?.operational !== true) throw new Error('health evidence event was not emitted');
             console.log('HOME_STATUS_DIRECT_EVIDENCE_OWNERSHIP=PASS');
+            console.log('HOME_HEALTH_EVENT=PASS');
           })().catch(error => { console.error(error); process.exit(1); });
           NODE
       - name: Prove Home has no local false-green health writers
