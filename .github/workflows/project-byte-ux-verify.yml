@@ -29,6 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           node --check deploy/project-byte/v4/health-runtime.js
+          node --check deploy/project-byte/v4/home.js
           cat deploy/project-byte/v4/index/*.part > /tmp/project-byte-index.html
           node - /tmp/project-byte-index.html <<'NODE'
           const fs=require('fs');
@@ -37,10 +38,11 @@ jobs:
           if(!match) throw new Error('inline application script missing');
           new Function(match[1]);
           NODE
-      - name: Verify truthful health and model wording
+      - name: Verify truthful health and direct ownership
         run: |
           set -euo pipefail
           f=deploy/project-byte/v4/health-runtime.js
+          home=deploy/project-byte/v4/home.js
           grep -q "health?.operational" "$f"
           grep -q "Core healthy · execution incomplete" "$f"
           grep -q "VITROS verifier" "$f"
@@ -49,7 +51,13 @@ jobs:
           grep -q "Last test OK" "$f"
           grep -q "dataset.modelEvidence = 'historical'" "$f"
           ! grep -q "● Connected" "$f"
-          echo 'TRUTHFUL_HEALTH_AND_MODEL_WORDING=PASS'
+          ! grep -q 'MutationObserver' "$f"
+          grep -q 'Verifying system health…' "$home"
+          grep -q 'AI UNKNOWN' "$home"
+          ! grep -q 'All systems operational' "$home"
+          ! grep -q 'AI READY' "$home"
+          ! grep -q 'AI CONNECTED' "$home"
+          echo 'TRUTHFUL_HEALTH_DIRECT_OWNERSHIP=PASS'
       - name: Verify workspace-wide refresh semantics
         run: |
           set -euo pipefail
