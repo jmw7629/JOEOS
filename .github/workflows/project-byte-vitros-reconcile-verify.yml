@@ -19,18 +19,21 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Exercise safe reconciliation and fail-closed cases
+      - name: Exercise semantic lock reconciliation and fail-closed cases
         shell: bash
         run: |
           set -euo pipefail
           SCRIPT="$PWD/deploy/project-byte/reconcile-vitros-control.sh"
           bash -n "$SCRIPT"
           grep -q 'merge --ff-only origin/main' "$SCRIPT"
-          grep -q 'cmp -s.*package-lock' "$SCRIPT"
+          grep -q 'semantically identical to origin/main' "$SCRIPT"
+          grep -q 'package-lock semantic mismatch paths' "$SCRIPT"
+          grep -q 'differs semantically from origin/main' "$SCRIPT"
           grep -q 'local .gitignore is not one of the reviewed safe reconciliation profiles' "$SCRIPT"
           grep -q 'unexpected local change' "$SCRIPT"
           grep -q 'merge-base --is-ancestor HEAD origin/main' "$SCRIPT"
-          grep -q 'python3 -m py_compile' "$SCRIPT"
+          grep -q 'PYTHONPYCACHEPREFIX' "$SCRIPT"
+          grep -q 'PYTHONDONTWRITEBYTECODE=1' "$SCRIPT"
           grep -q -- '--self-test' "$SCRIPT"
 
           TMP="$(mktemp -d)"
@@ -54,7 +57,9 @@ jobs:
           .env
           .env.local
           EOF
-          printf '%s\n' 'old-lock' > package-lock.json
+          cat > package-lock.json <<'JSON'
+          {"name":"fixture","lockfileVersion":3,"packages":{"":{"dependencies":{"x":"1.0.0"}}}}
+          JSON
           printf '%s\n' 'fixture' > README.md
           git add -A && git commit -m initial >/dev/null
           INITIAL="$(git rev-parse HEAD)"
@@ -73,7 +78,9 @@ jobs:
           .vercel
           tmp/
           EOF
-          printf '%s\n' 'new-lock-from-authoritative-main' > package-lock.json
+          cat > package-lock.json <<'JSON'
+          {"name":"fixture","lockfileVersion":3,"packages":{"":{"dependencies":{"x":"2.0.0","y":"1.0.0"}}}}
+          JSON
           git add .gitignore package-lock.json
           git commit -m latest >/dev/null
           LATEST="$(git rev-parse HEAD)"
@@ -87,7 +94,21 @@ jobs:
           .vercel
           .env*
           EOF
-          printf '%s\n' 'new-lock-from-authoritative-main' > "$TMP/control/package-lock.json"
+          # Same JSON value as origin/main, deliberately serialized/reordered differently.
+          cat > "$TMP/control/package-lock.json" <<'JSON'
+          {
+            "packages": {
+              "": {
+                "dependencies": {
+                  "y": "1.0.0",
+                  "x": "2.0.0"
+                }
+              }
+            },
+            "lockfileVersion": 3,
+            "name": "fixture"
+          }
+          JSON
 
           VITROS_ROOT="$TMP/control" \
           VITROS_EXPECTED_REPO='' \
@@ -100,6 +121,7 @@ jobs:
           grep -qx '.env.*.local' "$TMP/control/.gitignore"
           grep -qx '.vercel' "$TMP/control/.gitignore"
           ! grep -qxF '.env*' "$TMP/control/.gitignore"
+          grep -q 'semantically identical to origin/main' "$TMP/reconcile.log"
           grep -q 'VITROS_CONTROL_RECONCILE=PASS' "$TMP/reconcile.log"
           test "$(find "$TMP/backups" -name local.diff -type f | wc -l)" -eq 1
 
@@ -113,14 +135,17 @@ jobs:
           .vercel
           .env*
           EOF
-          printf '%s\n' 'TAMPERED-LOCK' > "$TMP/tampered/package-lock.json"
+          cat > "$TMP/tampered/package-lock.json" <<'JSON'
+          {"name":"fixture","lockfileVersion":3,"packages":{"":{"dependencies":{"x":"9.9.9","y":"1.0.0"}}}}
+          JSON
           if VITROS_ROOT="$TMP/tampered" VITROS_EXPECTED_REPO='' VITROS_SKIP_SERVICE=1 VITROS_RECONCILE_BACKUP_DIR="$TMP/tamper-backup" bash "$SCRIPT" >"$TMP/tampered.log" 2>&1; then
-            echo 'tampered package-lock was incorrectly accepted' >&2
+            echo 'semantically changed package-lock was incorrectly accepted' >&2
             exit 1
           fi
           test "$(git -C "$TMP/tampered" rev-parse HEAD)" = "$INITIAL"
-          grep -qx 'TAMPERED-LOCK' "$TMP/tampered/package-lock.json"
-          grep -q 'not byte-identical to origin/main' "$TMP/tampered.log"
+          grep -q '"x":"9.9.9"' "$TMP/tampered/package-lock.json"
+          grep -q 'package-lock semantic mismatch paths:' "$TMP/tampered.log"
+          grep -q 'differs semantically from origin/main' "$TMP/tampered.log"
 
           git clone "$TMP/origin.git" "$TMP/extra-dirty" >/dev/null
           git -C "$TMP/extra-dirty" reset --hard "$INITIAL" >/dev/null
@@ -132,4 +157,5 @@ jobs:
           test "$(git -C "$TMP/extra-dirty" rev-parse HEAD)" = "$INITIAL"
           grep -q 'unexpected local change' "$TMP/extra.log"
 
-          echo 'VITROS_CONTROL_RECONCILE_SAFETY=PASS'
+          echo 'VITROS_CONTROL_RECONCILE_SEMANTIC_LOCK=PASS'
+          echo 'VITROS_CONTROL_RECONCILE_FAIL_CLOSED=PASS'
