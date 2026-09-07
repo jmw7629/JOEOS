@@ -33,7 +33,10 @@ jobs:
           set -euo pipefail
           python3 <<'PY'
           import importlib.util
+          import json
+          import os
           import sys
+          import tempfile
           import types
           from pathlib import Path
 
@@ -92,6 +95,21 @@ jobs:
           check('verifier-active', 'active', {'count': 0}, None, 'healthy', 'idle-or-external', observable=False)
           check('verifier-inactive', 'failed', {'count': 0}, None, 'failed', 'inactive', observable=False)
 
+          with tempfile.TemporaryDirectory() as td:
+              state = Path(td) / 'processed.json'
+              state.write_text(json.dumps({'processed': {'100': {'time': 5000}, '101': {'time': 1200}}}))
+              os.utime(state, (9000, 9000))
+              assert mod._processed_issue_activity(state, 101) == 1200.0
+              assert mod._processed_issue_activity(state, 999) is None
+              nested = Path(td) / 'worktree' / 'Sources' / 'Feature'
+              nested.mkdir(parents=True)
+              target = nested / 'change.swift'
+              target.write_text('x')
+              os.utime(target, (7000, 7000))
+              activity, complete = mod._latest_tree_activity(Path(td) / 'worktree')
+              assert activity >= 7000
+              assert complete is True
+
           mod.BRIDGE_CACHE['at'] = 0.0
           mod.BRIDGE_CACHE['value'] = {}
           mod.time.time = lambda: now
@@ -125,6 +143,8 @@ jobs:
           print('BRIDGE_STALLED_FAILS_CLOSED=PASS')
           print('BRIDGE_MISSING_EVIDENCE_UNKNOWN=PASS')
           print('BRIDGE_BOUNDED_SCAN_INCOMPLETE_UNKNOWN=PASS')
+          print('BRIDGE_ISSUE_SPECIFIC_ACTIVITY=PASS')
+          print('BRIDGE_NESTED_WORKTREE_ACTIVITY=PASS')
           print('VITROS_VERIFIER_REQUIRED_SERVICE_GATE=PASS')
           PY
       - name: Prove health path is local, bounded and non-mutating
