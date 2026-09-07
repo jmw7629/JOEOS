@@ -8,7 +8,7 @@ DEST="/home/joevps/PROJECT_BYTE"
 SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 EXPECTED_BACKEND="86c64e3a06e5c76240753063c01b02c7aa8c83eb5b8f3bf64338a03c11d3a765"
-EXPECTED_SERVER="6fb4a428c57492c0a02070fee6283f6c83cf16c4cfc37e4399c278678c6c6bca"
+EXPECTED_SERVER_GIT="614aac08e109888bd314cddf9d9a022d65ee5fcc"
 EXPECTED_INDEX="08a324ae21ab0c19128d0dd0ce6ce9739515a03f740119ce8cd680fe5ef273c7"
 EXPECTED_HOME="3722fe80b6d1d316aecf39d354514ea55a48be17191c9ef5a1a734d764ee6ae2"
 EXPECTED_INSPECTOR="bffa6d45adaafade420b27bf0dcd9717fd8783c3cee1ce73c6550c8752d4cba4"
@@ -64,13 +64,13 @@ cat "$TMP"/backend/*.part > "$TMP/backend.py"
 cat "$TMP"/index/*.part > "$TMP/index.html"
 
 BACKEND_SHA="$(sha256sum "$TMP/backend.py" | awk '{print $1}')"
-SERVER_SHA="$(sha256sum "$TMP/server.py" | awk '{print $1}')"
+SERVER_GIT="$(git hash-object "$TMP/server.py")"
 INDEX_SHA="$(sha256sum "$TMP/index.html" | awk '{print $1}')"
 HOME_SHA="$(sha256sum "$TMP/home.js" | awk '{print $1}')"
 INSPECTOR_SHA="$(sha256sum "$TMP/home-inspector.js" | awk '{print $1}')"
 HEALTH_SHA="$(sha256sum "$TMP/health-runtime.js" | awk '{print $1}')"
 [ "$BACKEND_SHA" = "$EXPECTED_BACKEND" ] || { echo "Backend checksum mismatch; refusing deployment." >&2; exit 5; }
-[ "$SERVER_SHA" = "$EXPECTED_SERVER" ] || { echo "Runtime server checksum mismatch; refusing deployment." >&2; exit 5; }
+[ "$SERVER_GIT" = "$EXPECTED_SERVER_GIT" ] || { echo "Runtime server content hash mismatch; refusing deployment." >&2; exit 5; }
 [ "$INDEX_SHA" = "$EXPECTED_INDEX" ] || { echo "UI checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$HOME_SHA" = "$EXPECTED_HOME" ] || { echo "Home module checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$INSPECTOR_SHA" = "$EXPECTED_INSPECTOR" ] || { echo "Home inspector checksum mismatch; refusing deployment." >&2; exit 5; }
@@ -94,7 +94,7 @@ for(const x of ['Verifying system health','Systems verified operational','AI UNK
 NODE
 fi
 
-echo "Verified V4 source: backend=$BACKEND_SHA runtime=$SERVER_SHA ui=$INDEX_SHA home=$HOME_SHA inspector=$INSPECTOR_SHA health=$HEALTH_SHA"
+echo "Verified V4 source: backend=$BACKEND_SHA runtime_git=$SERVER_GIT ui=$INDEX_SHA home=$HOME_SHA inspector=$INSPECTOR_SHA health=$HEALTH_SHA"
 
 python3 - "$TMP/index.html" <<'PY'
 from pathlib import Path
