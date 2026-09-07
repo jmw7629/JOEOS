@@ -643,3 +643,190 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   window.addEventListener('project-byte-health',e=>{renderExecutionFabric(e.detail||null);renderLiveCrawl();});
   setTimeout(()=>{renderHome();void pollLiveCrawl();},0);
 })();
+
+(() => {
+  if(window.__PB_OBSERVATORY__)return;window.__PB_OBSERVATORY__=true;
+  const host=document.getElementById('agents');if(!host)return;
+  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const ui={data:null,trace:'',project:'',mode:'tree',tools:'pills',metric:'count',selected:'',search:'',zoom:1,paused:false,error:'',busy:false,identity:'',last:0};
+  const style=document.createElement('style');style.textContent=`
+  .obs-studio{border:1px solid #2c4864;border-radius:17px;background:#07101b;overflow:hidden;margin-bottom:16px;color:#dceaf9}.obs-studio *{box-sizing:border-box}
+  .obs-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 16px;border-bottom:1px solid #20354b}.obs-header h2{margin:0;font-size:18px}.obs-sub{font-size:11px;color:#97aec7;margin:5px 0 0}.obs-evidence{font-size:11px;padding:10px 15px;color:#c2a778;background:#101a25;border-bottom:1px solid #22384c;line-height:1.5}
+  .obs-toolbar,.obs-lenses,.obs-tools-switch{display:flex;gap:7px;flex-wrap:wrap;align-items:center;padding:10px 14px;border-bottom:1px solid #20354b}.obs-toolbar select,.obs-toolbar input{min-width:0;max-width:100%;padding:9px 10px;background:#101f31;color:#dbeaf8;border:1px solid #2c4864;border-radius:9px;min-height:42px;font-size:12px}.obs-toolbar input{flex:1;min-width:150px}
+  .obs-studio button{min-height:42px;padding:8px 11px;border:1px solid #2e4c6a;border-radius:9px;background:#12263c;color:#c8dff3;font-size:12px;cursor:pointer}.obs-studio button:disabled{opacity:.45;cursor:not-allowed}.obs-studio button[aria-pressed="true"]{color:#89d1ff;background:#163d61;border-color:#5994c3}.obs-studio button:focus-visible{outline:2px solid #a0d7ff;outline-offset:2px}
+  .obs-layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;min-height:390px}.obs-stage{min-width:0;position:relative}.obs-canvas{height:430px;overflow:auto;overscroll-behavior:contain;background:radial-gradient(circle at 50% 30%,#12263c66,transparent 60%),radial-gradient(circle,#44607a55 1px,transparent 1px);background-size:auto,22px 22px;position:relative}.obs-canvas:focus{outline:2px solid #77bafa;outline-offset:-2px}.obs-graph{position:relative;min-width:100%;min-height:100%;transform-origin:0 0}.obs-graph>svg{position:absolute;inset:0;pointer-events:none}.obs-edge{fill:none;stroke:#416889;stroke-width:1.4}.obs-edge.selected{stroke:#81ceff;stroke-width:2.3}
+  .obs-node{position:absolute;width:165px;min-height:69px;text-align:left;display:flex;flex-direction:column;justify-content:center;gap:5px;box-shadow:inset 0 1px #ffffff0d,0 5px 14px #0005}.obs-node{height:73px;overflow:hidden}.obs-node strong{font-size:12px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.obs-node span{font-size:10px;color:#9eb5cc}.obs-node[data-kind="agent"]{border-color:#6274bb;background:#15243d}.obs-node[data-kind="tool"]{border-color:#366b66;background:#10292d}.obs-node.selected{outline:2px solid #80cbff;box-shadow:0 0 18px #3f98ee22}.obs-node[data-status="error"]{border-color:#ce737b}.obs-node[data-kind="trace"]{background:#29231b;border-color:#876832}
+  .obs-inspector{border-left:1px solid #263d55;background:#0c1827;padding:15px;max-height:580px;overflow:auto;min-width:0}.obs-inspector h3{font-size:15px;line-height:1.4;margin:0 0 10px;overflow-wrap:anywhere}.obs-inspector dl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0;font-size:11px}.obs-inspector dt{color:#8da6bf}.obs-inspector dd{margin:0;color:#d9e9f8;overflow-wrap:anywhere}.obs-inspector pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#050d17;border:1px solid #233951;padding:10px;font-size:10px;line-height:1.5;border-radius:9px}.obs-inspector .obs-note{font-size:11px;color:#a5b5c8;line-height:1.5}.obs-inspector button{margin-top:10px}.obs-inspector-close{float:right}
+  .obs-summary{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;padding:10px 15px;color:#94b1ce;border-bottom:1px solid #20364b}.obs-summary b{color:#deedfc}.obs-legend{font-size:10px;padding:8px 14px;color:#90a6be;line-height:1.6}.obs-empty{padding:38px 18px;text-align:center;color:#9db3cc;font-size:13px;line-height:1.7}.obs-canvas .obs-map{width:100%;height:100%;min-height:350px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:5px;padding:12px}.obs-map .obs-block{min-width:80px;min-height:75px;flex-grow:1;text-align:left;overflow:hidden;border-color:#6b61b3;background:#302856}.obs-block.selected{outline:2px solid #9cd8ff}.obs-block b{display:block;font-size:17px}.obs-block small{font-size:10px;display:block;margin-top:4px}
+  .obs-flow{position:relative;min-width:690px;height:380px;padding:12px}.obs-flow svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.obs-flow path{fill:none;stroke:#528ccc88}.obs-flow button{position:absolute;width:142px;min-height:44px;text-align:left;font-size:11px;background:#152b40}.obs-flow button.selected{outline:2px solid #83ceff}
+  .obs-tool-body{padding:12px 15px;max-height:300px;overflow:auto}.obs-pills{display:flex;flex-wrap:wrap;gap:7px}.obs-pills button{font-size:11px;min-height:38px}.obs-pills button.selected{outline:2px solid #83ceff}.obs-table{border-collapse:collapse;width:100%;font-size:11px}.obs-table td,.obs-table th{padding:7px 10px;text-align:left;border-bottom:1px solid #21374e;white-space:nowrap}.obs-table th{color:#9bb6d1}.obs-table button{font-size:11px;min-height:32px;padding:4px 8px}.obs-table tr.selected{background:#19436555}.obs-bar-track{height:12px;background:#142b40;border-radius:4px;width:200px;position:relative}.obs-bar{position:absolute;height:12px;min-width:3px;background:#5cb4cf;border-radius:3px}.obs-bar.error{background:#ce7387}.obs-matrix td button{background:rgba(68,131,178,var(--intensity,.1));min-width:42px}
+  .obs-roles{padding:12px 0}.obs-roles>summary{cursor:pointer;min-height:44px;padding:12px;background:#0f2134;border:1px solid #2b435c;border-radius:12px;margin-bottom:12px;font-size:13px}.obs-approval-note{border:1px solid #4d4633;border-radius:11px;padding:11px;margin:12px 15px;font-size:11px;color:#d0ba95;line-height:1.6}.obs-zoom{margin-left:auto;display:flex;gap:5px}.obs-zoom button{min-width:38px}
+  @media(max-width:800px){.obs-layout{grid-template-columns:1fr}.obs-inspector{border-left:0;border-top:1px solid #294762;max-height:350px}.obs-inspector[hidden]{display:none}.obs-canvas{height:400px}.obs-toolbar{display:grid;grid-template-columns:1fr 1fr}.obs-toolbar input{grid-column:1/-1;width:100%;font-size:16px}.obs-toolbar select{font-size:14px;width:100%}.obs-lenses{gap:6px;padding:9px}.obs-lenses button{font-size:11px;padding:7px 10px}.obs-header{padding:12px}.obs-header h2{font-size:16px}.obs-summary{gap:9px}.obs-zoom{margin-left:0}.obs-tool-body{max-height:250px}.obs-flow{min-width:650px}}
+.obs-toolbar[hidden]{display:none!important}.obs-stage>.obs-zoom{position:absolute;bottom:52px;left:10px;z-index:2;margin:0;padding:5px;border-radius:11px;background:#071321e8;box-shadow:0 4px 12px #0005}.obs-zoom button{min-width:32px;min-height:35px;font-size:10px;padding:5px 8px}.obs-canvas{scrollbar-width:thin;scrollbar-color:#315471 #0a1624}.obs-focused{position:fixed!important;inset:8px;z-index:1500;margin:0;display:flex;flex-direction:column;overflow:hidden;background:#07101b}.obs-focused>.obs-layout{flex:1;min-height:0}.obs-focused .obs-stage{min-height:0;display:flex;flex-direction:column}.obs-focused .obs-canvas{height:auto;flex:1;min-height:150px}.obs-focused>.obs-tools-switch,.obs-focused>.obs-tool-body,.obs-focused>.obs-approval-note{display:none}.obs-focused .obs-inspector{max-height:100%}.obs-focused>.obs-evidence{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:7px 12px}.obs-focused .obs-legend{font-size:9px;min-height:34px}.obs-focused .obs-stage>.obs-zoom{bottom:44px}@media(max-width:800px){.obs-focused .obs-layout{grid-template-rows:minmax(150px,1fr) auto}.obs-focused .obs-inspector{max-height:200px}.obs-focused .obs-summary{display:none}.obs-header button{min-height:37px;font-size:11px}.obs-evidence{font-size:10px}.obs-toolbar select{min-height:40px;font-size:12px}.obs-toolbar{padding:8px 10px}.obs-lenses{padding:7px 9px}}
+.obs-linked-lens{padding:10px;min-width:0;border-right:1px solid #294359;background:#0b1624;display:none}.obs-linked-lens p{font-size:10px;color:#9eb8d2;margin:0 0 10px}.obs-linked-lens button{width:100%;font-size:10px;text-align:left;margin-bottom:5px;padding:6px;min-height:34px;border-color:#514984;background:#282449}.obs-linked-lens button.selected{outline:2px solid #7bcbff}.obs-linked-lens small{display:block;margin-top:3px;color:#a6bed5}@media(min-width:1100px){.obs-layout{grid-template-columns:150px minmax(0,1fr) 280px}.obs-linked-lens{display:block;max-height:530px;overflow:auto}.obs-focused .obs-linked-lens{max-height:100%}}
+  `;document.head.appendChild(style);
+  const legacy=document.createElement('details');legacy.className='obs-roles';legacy.innerHTML='<summary>Agent roles, existing runs &amp; memory</summary>';
+  while(host.firstChild)legacy.appendChild(host.firstChild);
+  const studio=document.createElement('section');studio.id='pbObservatory';studio.className='obs-studio';
+  studio.innerHTML=`<div class="obs-header"><div><h2>Agent Observatory</h2><p class="obs-sub">Runs, agents and tools · one linked view</p></div><div><button type="button" id="obsFocus">Focus</button> <button type="button" id="obsRefresh">Refresh</button></div></div>
+  <div id="obsEvidence" class="obs-evidence">Connecting to recorded execution evidence…</div>
+  <div class="obs-toolbar"><select id="obsProject" aria-label="Observation project"><option value="">All observed projects</option></select><select id="obsTrace" aria-label="Observed run"><option value="">All recorded runs</option></select><input id="obsSearch" type="search" placeholder="Find agent, tool or run…" aria-label="Search graph"></div>
+  <div class="obs-lenses" role="group" aria-label="Analysis lens"><button type="button" data-obs-mode="tree">Tree</button><button type="button" data-obs-mode="treemap">Treemap</button><button type="button" data-obs-mode="flow">Sankey</button><button type="button" data-obs-mode="timeline">Timeline</button><div class="obs-zoom"><button type="button" id="obsZoomOut" aria-label="Zoom out">−</button><button type="button" id="obsFit">Fit</button><button type="button" id="obsZoomIn" aria-label="Zoom in">+</button><button type="button" id="obsPause">Pause live</button></div></div>
+  <div class="obs-toolbar"><select id="obsMetric" aria-label="Analysis size metric"><option value="count">Event count</option><option value="duration">Recorded tool duration</option><option value="tokens">Recorded tokens</option></select><span class="obs-sub">Select a node to link graph, lens and tools.</span></div>
+  <div id="obsSummary" class="obs-summary"></div><div class="obs-layout"><aside id="obsLinkedLens" class="obs-linked-lens" aria-label="Cross-linked count lens"></aside><div class="obs-stage"><div id="obsCanvas" class="obs-canvas" tabindex="0" aria-label="Interactive execution graph"></div><div id="obsLegend" class="obs-legend"></div></div><aside id="obsInspector" class="obs-inspector" aria-label="Selected node details" hidden></aside></div>
+  <div class="obs-tools-switch" role="group" aria-label="Tool grouping"><b class="obs-sub">Tool calls</b><button type="button" data-obs-tools="pills">Pill grid</button><button type="button" data-obs-tools="timeline">Swimlanes</button><button type="button" data-obs-tools="matrix">Frequency matrix</button></div><div id="obsTools" class="obs-tool-body"></div>
+  <div class="obs-approval-note"><b>Execution permissions: not connected.</b> These traces are read-only. A code-review decision does not approve a tool, resume an agent or merge code. Live Approve / Deny requires a connected permission-capable runner; no such request is being fabricated here.</div>`;
+  host.append(studio,legacy);
+  const zoom=studio.querySelector('.obs-zoom');studio.querySelector('.obs-stage').appendChild(zoom);
+  const $=id=>document.getElementById(id),number=value=>value===null||value===undefined?'Not recorded':Number(value).toLocaleString([], {maximumFractionDigits:2});
+  const stamp=value=>value?new Date(value*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Not recorded';
+  const traces=()=>((ui.data?.traces)||[]).filter(t=>!ui.project||t.project===ui.project).filter(t=>!ui.trace||t.id===ui.trace);
+  const observedEvents=()=>traces().flatMap(t=>(t.events||[]).map(e=>({...e,trace:t.id,project:t.project,role:t.role})));
+  const sum=(items,fn)=>{const values=items.map(fn).filter(v=>v!==null&&v!==undefined);return values.length?values.reduce((a,b)=>a+Number(b),0):null;};
+  let nodes=[],nodeMap=new Map();
+  function makeNode(id,parent,kind,label,items,metadata={}){return {id,parent,kind,label,items,count:items.length,duration:sum(items,e=>e.duration_ms),tokens:sum(items,e=>e.tokens?.total),...metadata};}
+  function buildNodes(){
+    const result=[],list=traces();
+    result.push(makeNode('workspace','', 'root','Observed execution',observedEvents()));
+    for(const t of list){
+      const events=(t.events||[]).map(e=>({...e,trace:t.id,project:t.project,role:t.role}));
+      result.push(makeNode(t.id,'workspace','trace',t.project+' · '+t.label,events,{trace:t.id,status:t.status,metadata:t}));
+      const sessions=new Map();for(const e of events){if(!sessions.has(e.session))sessions.set(e.session,{label:t.role,items:[],parent:t.id});sessions.get(e.session).items.push(e);}
+      for(const e of events)if(e.child_session&&e.child_session!==e.session){if(!sessions.has(e.child_session))sessions.set(e.child_session,{label:e.delegate||'Delegated agent',items:[],parent:e.session});else {sessions.get(e.child_session).label=e.delegate||'Delegated agent';sessions.get(e.child_session).parent=e.session;}}
+      for(const [sid,group] of sessions){
+        let parent=group.parent,cursor=parent,seen=new Set([sid]);
+        while(sessions.has(cursor)){if(seen.has(cursor)){parent=t.id;break;}seen.add(cursor);cursor=sessions.get(cursor).parent;}
+        result.push(makeNode(sid,parent,'agent',group.label,group.items,{trace:t.id,referencedOnly:!group.items.length}));
+        const tools=new Map();for(const e of group.items){const name=e.kind==='tool_use'?e.tool:e.kind==='step_finish'?'Model steps':e.kind==='compaction'?'Compaction':'Session events';if(!tools.has(name))tools.set(name,[]);tools.get(name).push(e);}
+        for(const [name,items] of tools)result.push(makeNode(sid+':'+name,sid,'tool',name,items,{trace:t.id,status:items.some(e=>e.error_recorded)?'error':'recorded'}));
+      }
+    }
+    nodeMap=new Map(result.map(n=>[n.id,n]));nodes=result;
+    if(ui.selected&&!nodeMap.has(ui.selected))ui.selected='';
+  }
+  const selectedEvents=()=>ui.selected&&nodeMap.has(ui.selected)?nodeMap.get(ui.selected).items:observedEvents();
+  const nodeMatches=n=>!ui.search||`${n.label} ${n.kind} ${n.items.map(e=>e.tool).join(' ')}`.toLowerCase().includes(ui.search.toLowerCase());
+  function graphNodes(){
+    let list=nodes;if(!ui.trace&&traces().length>1)list=list.filter(n=>n.kind==='root'||n.kind==='trace');
+    if(ui.search){const ids=new Set();for(const n of list.filter(nodeMatches)){let x=n;for(let depth=0;x&&depth<20;depth++){ids.add(x.id);x=nodeMap.get(x.parent);}}list=list.filter(n=>ids.has(n.id));}
+    return list.slice(0,180);
+  }
+  function selectNode(id){ui.selected=id;renderVisuals();const el=$('obsCanvas').querySelector(`[data-obs-node="${CSS.escape(id)}"]`);if(el)el.setAttribute('aria-selected','true');}
+  function drawTree(){
+    const list=graphNodes(),position=new Map(),levels=new Map();
+    const depth=n=>{let value=0,seen=new Set([n.id]),parent=n.parent;while(nodeMap.has(parent)&&value<12&&!seen.has(parent)){seen.add(parent);value++;parent=nodeMap.get(parent).parent;}return value;};
+    for(const n of list){const d=depth(n);if(!levels.has(d))levels.set(d,[]);levels.get(d).push(n);}
+    let maximumRows=1;for(const [column,items] of levels){maximumRows=Math.max(maximumRows,items.length);items.forEach((n,index)=>position.set(n.id,{x:22+column*216,y:20+index*91}));}
+    const width=Math.max(500,(Math.max(0,...levels.keys())+1)*216),height=Math.max(400,maximumRows*91+45);
+    let edges='';for(const n of list){const a=position.get(n.parent),b=position.get(n.id);if(a&&b)edges+=`<path class="obs-edge ${ui.selected===n.id?'selected':''}" d="M${a.x+165} ${a.y+34} C${a.x+192} ${a.y+34},${b.x-30} ${b.y+34},${b.x} ${b.y+34}"/>`;}
+    $('obsCanvas').innerHTML=`<div style="width:${width*ui.zoom}px;height:${height*ui.zoom}px"><div class="obs-graph" style="width:${width}px;height:${height}px;transform:scale(${ui.zoom})"><svg width="${width}" height="${height}" aria-hidden="true">${edges}</svg>${list.map(n=>{const p=position.get(n.id);return `<button type="button" class="obs-node ${n.id===ui.selected?'selected':''}" style="left:${p.x}px;top:${p.y}px" data-obs-node="${escape(n.id)}" data-kind="${n.kind}" data-status="${escape(n.status||'')}" aria-label="Inspect ${escape(n.label)}"><strong>${escape(n.label)}</strong><span>${n.referencedOnly?'Referenced agent · no child trace':n.count+' recorded events'}</span></button>`;}).join('')}</div></div>`;
+    $('obsLegend').textContent='Tree: run → observed agent/session → grouped tools. Select a run and Open run to expand. Arrow keys navigate; drag empty canvas to pan, or swipe on your phone.';
+  }
+  function drawTreemap(){
+    const leaves=nodes.filter(n=>n.kind==='tool'&&nodeMatches(n)&&Number(n[ui.metric])>0).sort((a,b)=>b[ui.metric]-a[ui.metric]),rects=[];
+    function split(items,x,y,w,h){if(!items.length)return;if(items.length===1){rects.push({node:items[0],x,y,w,h});return;}const total=items.reduce((s,n)=>s+n[ui.metric],0);let acc=0,k=0;while(k<items.length-1&&acc<total/2){acc+=items[k][ui.metric];k++;}const ratio=acc/total;if(w>=h){split(items.slice(0,k),x,y,w*ratio,h);split(items.slice(k),x+w*ratio,y,w*(1-ratio),h);}else{split(items.slice(0,k),x,y,w,h*ratio);split(items.slice(k),x,y+h*ratio,w,h*(1-ratio));}}
+    split(leaves,0,0,100,100);
+    $('obsCanvas').innerHTML=rects.length?`<div class="obs-map" style="position:relative;display:block;height:400px;margin:8px;width:calc(100% - 16px)">${rects.map(({node:n,x,y,w,h})=>`<button type="button" class="obs-block ${ui.selected===n.id?'selected':''}" data-obs-node="${escape(n.id)}" style="position:absolute;left:${x}%;top:${y}%;width:${w}%;height:${h}%;min-width:0;min-height:0;padding:6px;border-radius:5px" aria-label="${escape(n.label)}: ${n[ui.metric]}"><b>${escape(n.label)}</b><small>${number(n[ui.metric])}${ui.metric==='duration'?' ms':''}</small></button>`).join('')}</div>`:'<div class="obs-empty">No measured values for this lens. Unknown token or duration values are not converted into invented estimates.</div>';
+    $('obsLegend').textContent=`Rectangle area represents ${ui.metric==='count'?'recorded event count':ui.metric==='duration'?'recorded tool duration in milliseconds':'recorded model-step tokens'}. Select a rectangle to cross-highlight the tree, tool list and inspector. Unknown values are excluded.`;
+  }
+  function drawFlow(){
+    const tools=nodes.filter(n=>n.kind==='tool'&&n.items.some(e=>e.kind==='tool_use')&&nodeMatches(n)).slice(0,24),agents=nodes.filter(n=>tools.some(t=>t.parent===n.id)),traceNodes=nodes.filter(n=>n.kind==='trace'&&agents.some(a=>a.trace===n.id)),position=new Map();
+    const height=Math.max(380,Math.max(tools.length,agents.length)*53+40),groups=[traceNodes,agents,tools];
+    groups.forEach((list,col)=>list.forEach((n,index)=>position.set(n.id,{x:15+col*230,y:18+index*(height-60)/Math.max(1,list.length)})));
+    const max=Math.max(1,...tools.map(n=>n.items.filter(e=>e.kind==='tool_use').length));let links='';
+    for(const n of [...agents,...tools]){const parent=n.kind==='agent'?n.trace:n.parent,a=position.get(parent),b=position.get(n.id);if(a&&b){const count=n.items.filter(e=>e.kind==='tool_use').length;links+=`<path d="M${a.x+142} ${a.y+22} C${a.x+194} ${a.y+22},${b.x-50} ${b.y+22},${b.x} ${b.y+22}" style="stroke-width:${Math.max(1,20*count/max)};${ui.selected===n.id?'stroke:#8ed3ff;':''}"/>`;}}
+    $('obsCanvas').innerHTML=tools.length?`<div class="obs-flow" style="height:${height}px"><svg viewBox="0 0 690 ${height}" preserveAspectRatio="none" aria-hidden="true">${links}</svg>${groups.flat().map(n=>{const p=position.get(n.id);return `<button type="button" class="${ui.selected===n.id?'selected':''}" data-obs-node="${escape(n.id)}" style="left:${p.x}px;top:${p.y}px">${escape(n.label)}<br><small>${n.items.filter(e=>e.kind==='tool_use').length} tools</small></button>`;}).join('')}</div>`:'<div class="obs-empty">No observed tool calls to draw a flow.</div>';
+    $('obsLegend').textContent='Sankey: observed runs → agents → tool groups. Flow width uses recorded tool-call counts, not estimated token usage. Up to 24 tool groups are shown.';
+  }
+  function toolNodeFor(event){return nodes.find(n=>n.kind==='tool'&&n.items.some(e=>e.id===event.id));}
+  function timelineHTML(events){
+    const list=events.filter(e=>e.time!==null).sort((a,b)=>a.time-b.time).slice(-100);if(!list.length)return '<div class="obs-empty">No timestamped events recorded.</div>';
+    const start=Math.min(...list.map(e=>e.time)),end=Math.max(...list.map(e=>e.end||e.time)),span=Math.max(.001,end-start);
+    return `<table class="obs-table"><thead><tr><th>Recorded event</th><th>Start</th><th>Duration</th><th>Relative timeline</th></tr></thead><tbody>${list.map(e=>{const n=toolNodeFor(e),left=(e.time-start)/span*96,width=e.duration_ms===null?1:Math.max(1,e.duration_ms/1000/span*96);return `<tr class="${n?.id===ui.selected?'selected':''}"><td><button type="button" data-obs-node="${escape(n?.id||e.trace)}">${escape(e.tool)}</button></td><td>${stamp(e.time)}</td><td>${e.duration_ms===null?'Not recorded':number(e.duration_ms)+' ms'}</td><td><div class="obs-bar-track"><i class="obs-bar ${e.error_recorded?'error':''}" style="left:${left}%;width:${Math.min(width,100-left)}%"></i></div></td></tr>`;}).join('')}</tbody></table>`;
+  }
+  function drawTimeline(){const events=observedEvents();$('obsCanvas').innerHTML=timelineHTML(events);$('obsLegend').textContent=`Timeline uses actual event timestamps. ${events.filter(e=>e.kind==='compaction').length} explicit compaction events observed; absent compaction markers are not inferred. Showing up to 100 events.`;}
+  function renderTools(){
+    const events=selectedEvents().filter(e=>e.kind==='tool_use');
+    studio.querySelectorAll('[data-obs-tools]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.obsTools===ui.tools)));
+    if(!events.length){$('obsTools').innerHTML='<div class="obs-empty">No tool events in this selection. Choose an observed run or agent.</div>';return;}
+    if(ui.tools==='timeline'){$('obsTools').innerHTML=timelineHTML(events);return;}
+    if(ui.tools==='pills'){$('obsTools').innerHTML=`<div class="obs-pills">${events.slice(-120).map(e=>{const n=toolNodeFor(e);return `<button type="button" data-obs-event="${escape(e.id)}" data-obs-node="${escape(n?.id||e.trace)}" class="${n?.id===ui.selected?'selected':''}">${escape(e.tool)} · ${escape(e.status)}${e.duration_ms===null?'':' · '+number(e.duration_ms)+'ms'}</button>`;}).join('')}</div>`;return;}
+    const names=[...new Set(events.map(e=>e.tool))],states=['completed','error','running','pending','recorded'];
+    const maximum=Math.max(1,...names.flatMap(name=>states.map(state=>events.filter(e=>e.tool===name&&e.status===state).length)));
+    $('obsTools').innerHTML=`<table class="obs-table obs-matrix"><thead><tr><th>Tool / event state</th>${states.map(s=>`<th>${s}</th>`).join('')}</tr></thead><tbody>${names.map(name=>`<tr><th>${escape(name)}</th>${states.map(status=>{const matches=events.filter(e=>e.tool===name&&e.status===status),n=matches.length?toolNodeFor(matches[0]):null;return `<td><button type="button" ${n?`data-obs-node="${escape(n.id)}"`:'disabled'} style="--intensity:${.12+.8*matches.length/maximum}">${matches.length}</button></td>`;}).join('')}</tr>`).join('')}</tbody></table>`;
+  }
+  function renderInspector(){
+    const panel=$('obsInspector'),node=nodeMap.get(ui.selected);panel.hidden=!node;if(!node)return;
+    const selectedEvent=node.items.find(e=>e.id===ui.event)||null,metadata=selectedEvent||{node_type:node.kind,recorded_events:node.count,observed_status:node.status||'recorded',source:node.metadata?.source||'bridge-log',partial_trace:node.metadata?.partial??null};
+    const ancestors=[];let p=node.parent;for(let i=0;p&&i<15;i++){const n=nodeMap.get(p);if(!n)break;ancestors.unshift(n.label);p=n.parent;}
+    panel.innerHTML=`<button type="button" class="obs-inspector-close" id="obsInspectorClose" aria-label="Close node inspector">×</button><h3>${escape(node.label)}</h3><div class="obs-note">${escape(ancestors.join(' › '))}</div><dl><dt>Events</dt><dd>${node.count}</dd><dt>Tool duration</dt><dd>${node.duration===null?'Not recorded':number(node.duration)+' ms'}</dd><dt>Tokens</dt><dd>${number(node.tokens)}</dd><dt>Source</dt><dd>Recorded bridge log</dd></dl><div class="obs-note">${node.referencedOnly?'Delegation reference recorded; child tool details are not captured.':'Counts reflect the available log window, not the complete lifetime of the agent.'}</div>${node.trace?`<button type="button" data-obs-open-run="${escape(node.trace)}">Open this run</button>`:''}<pre>${escape(JSON.stringify(metadata,null,2))}</pre><div class="obs-note">Sensitive argument values, response bodies and model text are deliberately withheld. Missing tokens or timings remain “Not recorded”.</div>`;
+    $('obsInspectorClose').onclick=()=>{ui.selected='';ui.event='';renderVisuals();};
+  }
+  function renderVisuals(){
+    buildNodes();const canvas=$('obsCanvas'),sx=canvas.scrollLeft,sy=canvas.scrollTop;
+    studio.querySelectorAll('[data-obs-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.obsMode===ui.mode)));
+    if(!ui.data?.traces?.length)canvas.innerHTML='<div class="obs-empty">'+(ui.error?escape(ui.error):'No supported execution traces are available yet. Real runs populate this view; sample data is not inserted.')+'</div>';
+    else if(ui.mode==='tree')drawTree();else if(ui.mode==='treemap')drawTreemap();else if(ui.mode==='flow')drawFlow();else drawTimeline();
+    canvas.scrollLeft=sx;canvas.scrollTop=sy;
+    $('obsMetric').parentElement.hidden=ui.mode!=='treemap';$('obsMetric').disabled=!['treemap'].includes(ui.mode);for(const id of ['obsZoomOut','obsZoomIn','obsFit'])$(id).disabled=ui.mode!=='tree';
+    const linked=nodes.filter(n=>n.kind==='tool'&&nodeMatches(n)).slice(0,24);
+    $('obsLinkedLens').innerHTML='<p>Linked tool groups<br>Click to inspect in any lens</p>'+linked.map(n=>`<button type="button" class="${ui.selected===n.id?'selected':''}" data-obs-node="${escape(n.id)}">${escape(n.label)}<small>${n.count} events</small></button>`).join('');
+    renderTools();renderInspector();
+    const list=traces(),events=observedEvents();$('obsSummary').innerHTML=`<span><b>${list.length}</b> recorded runs</span><span><b>${events.filter(e=>e.kind==='tool_use').length}</b> tool events</span><span><b>${number(sum(list,t=>t.tokens))}</b> recorded tokens</span><span><b>${list.filter(t=>t.partial).length}</b> partial log windows</span>`;
+  }
+  function renderEvidence(){
+    const sources=ui.data?.sources||[],failed=sources.filter(s=>s.state!=='available').length,partial=sources.some(s=>s.partial)||ui.data?.traces?.some(t=>t.partial);
+    $('obsEvidence').textContent=ui.error?'Observation unavailable: '+ui.error+(ui.data?' · last successful snapshot retained':''):ui.data?`${ui.paused?'Paused snapshot':'Updated '+stamp(ui.data.observed_at)} · read-only recorded evidence${failed?' · '+failed+' source unavailable':''}${partial?' · bounded/partial history':''} · running labels inside logs are historical event states, not proof of a live process.`:'Sign in as an editor or owner to inspect execution traces.';
+    $('obsPause').textContent=ui.paused?'Resume live':'Pause live';$('obsPause').setAttribute('aria-pressed',String(ui.paused));
+  }
+  function updateSelects(){
+    const all=ui.data?.traces||[],projects=[...new Set(all.map(t=>t.project))];
+    $('obsProject').innerHTML='<option value="">All observed projects</option>'+projects.map(p=>`<option>${escape(p)}</option>`).join('');$('obsProject').value=ui.project;
+    const list=all.filter(t=>!ui.project||t.project===ui.project);if(!list.some(t=>t.id===ui.trace))ui.trace='';
+    $('obsTrace').innerHTML='<option value="">All recorded runs</option>'+list.map(t=>`<option value="${t.id}">${escape(t.project+' · '+t.label)}</option>`).join('');$('obsTrace').value=ui.trace;
+  }
+  async function refresh(force=false){
+    const identity=`${session?.subject||''}:${session?.level||0}`;
+    if(identity!==ui.identity){ui.identity=identity;ui.data=null;ui.selected='';ui.error='';ui.last=0;ui.controller?.abort();renderVisuals();renderEvidence();}
+    if(!(session?.level>=2)){ui.error='Editor or owner access is required';renderEvidence();renderVisuals();return;}
+    if(document.hidden||!host.classList.contains('active')||ui.busy||ui.paused&&!force||!force&&Date.now()-ui.last<15000)return;
+    ui.busy=true;const controller=new AbortController();ui.controller=controller;const timeout=setTimeout(()=>controller.abort(),10000);
+    try{
+      const data=await api('/api/observatory',{signal:controller.signal});if(identity!==`${session?.subject||''}:${session?.level||0}`)return;
+      if(data.version!==1||!Array.isArray(data.traces))throw new Error('Invalid observation snapshot');
+      const changed=JSON.stringify(ui.data?.traces)!==JSON.stringify(data.traces)||ui.error;ui.data=data;ui.error='';updateSelects();if(changed)renderVisuals();renderEvidence();
+    }catch(error){if(identity===`${session?.subject||''}:${session?.level||0}`){ui.error=error.message||'Connection failed';renderEvidence();if(!ui.data)renderVisuals();}}
+    finally{clearTimeout(timeout);ui.busy=false;ui.last=Date.now();}
+  }
+  $('obsFocus').onclick=()=>{const on=studio.classList.toggle('obs-focused');$('obsFocus').textContent=on?'Exit focus':'Focus';$('obsFocus').setAttribute('aria-pressed',String(on));};
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&studio.classList.contains('obs-focused'))$('obsFocus').click();});
+  $('obsRefresh').onclick=()=>refresh(true);$('obsPause').onclick=()=>{ui.paused=!ui.paused;renderEvidence();if(!ui.paused)void refresh(true);};
+  $('obsProject').onchange=e=>{ui.project=e.target.value;ui.trace='';ui.selected='';updateSelects();renderVisuals();};$('obsTrace').onchange=e=>{ui.trace=e.target.value;ui.selected='';ui.zoom=1;renderVisuals();};$('obsSearch').oninput=e=>{ui.search=e.target.value;renderVisuals();};$('obsMetric').onchange=e=>{ui.metric=e.target.value;renderVisuals();};
+  $('obsZoomOut').onclick=()=>{ui.zoom=Math.max(.25,ui.zoom-.15);renderVisuals();};$('obsZoomIn').onclick=()=>{ui.zoom=Math.min(2.5,ui.zoom+.15);renderVisuals();};$('obsFit').onclick=()=>{const graph=$('obsCanvas').querySelector('.obs-graph');ui.zoom=graph?Math.max(.25,Math.min(1,$('obsCanvas').clientWidth/parseFloat(graph.style.width))):1;renderVisuals();$('obsCanvas').scrollTo(0,0);};
+  studio.addEventListener('click',e=>{
+    const b=e.target.closest('[data-obs-mode],[data-obs-node],[data-obs-tools],[data-obs-open-run]');if(!b)return;
+    if(b.dataset.obsMode){ui.mode=b.dataset.obsMode;renderVisuals();}
+    if(b.dataset.obsTools){ui.tools=b.dataset.obsTools;renderTools();}
+    if(b.dataset.obsNode){ui.event=b.dataset.obsEvent||'';selectNode(b.dataset.obsNode);}
+    if(b.dataset.obsOpenRun){ui.trace=b.dataset.obsOpenRun;ui.selected=ui.trace;ui.zoom=1;updateSelects();renderVisuals();$('obsCanvas').scrollTo(0,0);}
+  });
+  $('obsCanvas').addEventListener('keydown',e=>{
+    if(!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','[',']','Escape'].includes(e.key))return;
+    if(e.key==='Escape'){ui.selected='';renderVisuals();return;}
+    const list=graphNodes();if(!list.length)return;e.preventDefault();
+    const n=nodeMap.get(ui.selected)||list[0],siblings=list.filter(x=>x.parent===n.parent);let next;
+    if(e.key==='ArrowLeft')next=nodeMap.get(n.parent);
+    else if(e.key==='ArrowRight')next=list.find(x=>x.parent===n.id);
+    else {const seq=e.key==='['||e.key===']'?list:siblings;const delta=e.key==='ArrowUp'||e.key==='['?-1:1;next=seq[Math.max(0,Math.min(seq.length-1,seq.findIndex(x=>x.id===n.id)+delta))];}
+    if(next){selectNode(next.id);const target=$('obsCanvas').querySelector(`[data-obs-node="${CSS.escape(next.id)}"]`);target?.focus({preventScroll:true});target?.scrollIntoView({block:'nearest',inline:'nearest'});}
+  });
+  let drag=null;const canvas=$('obsCanvas');
+  canvas.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse'||e.button!==0||e.target.closest('button'))return;drag={x:e.clientX,y:e.clientY,sx:canvas.scrollLeft,sy:canvas.scrollTop};canvas.setPointerCapture(e.pointerId);});
+  canvas.addEventListener('pointermove',e=>{if(drag){canvas.scrollLeft=drag.sx-(e.clientX-drag.x);canvas.scrollTop=drag.sy-(e.clientY-drag.y);}});
+  for(const event of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(event,()=>{drag=null;});
+  document.addEventListener('click',e=>{if(e.target.closest('[data-view],[data-home-go],[data-home-action],[data-inspector-agent-workspace]'))setTimeout(()=>{if(host.classList.contains('active'))void refresh();},0);});
+  window.addEventListener('project-byte-home-render',()=>{if(ui.identity!==`${session?.subject||''}:${session?.level||0}`)void refresh(true);});
+  window.addEventListener('project-byte-health',()=>{if(host.classList.contains('active'))void refresh();});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});window.setInterval(refresh,15000);
+  renderEvidence();renderVisuals();setTimeout(()=>refresh(true),0);
+})();

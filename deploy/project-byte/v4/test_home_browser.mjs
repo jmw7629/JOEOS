@@ -2,6 +2,7 @@
 // Isolated database and credentials; GitHub execution is deliberately unavailable.
 import assert from 'node:assert/strict';
 import {verifyFocusedWorkspaces} from './test_focused_workspaces.mjs';
+import {prepareObservationFixtures,verifyObservatory} from './test_observatory_browser.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -23,6 +24,7 @@ await fs.mkdir(path.join(root,'bin'));
 await fs.writeFile(path.join(root,'bin','gh'),'#!/bin/sh\necho "GitHub disabled in browser acceptance runtime" >&2\nexit 2\n',{mode:0o700});
 const port=await new Promise(resolve=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>resolve(p));});});
 const base=`http://127.0.0.1:${port}`;
+await prepareObservationFixtures(root);
 const server=spawn('python3',[path.join(root,'server.py')],{cwd:root,env:{...process.env,HOME:root,PATH:path.join(root,'bin')+path.delimiter+process.env.PATH,KANBAN_HOST:'127.0.0.1',KANBAN_PORT:String(port),PYTHONDONTWRITEBYTECODE:'1'},stdio:['ignore','pipe','pipe']});
 let serverLog='',browser;
 for(const stream of [server.stdout,server.stderr])stream.on('data',b=>{serverLog=(serverLog+b.toString()).slice(-6000);});
@@ -83,6 +85,7 @@ try{
   }
   const out=process.env.PB_SCREENSHOTS||path.join(root,'screenshots');await fs.mkdir(out,{recursive:true});
   await verifyFocusedWorkspaces({page,api,base,out});
+  await verifyObservatory({page,api,base,out});
   for(const [width,height] of [[320,740],[390,844],[768,1024],[1440,1000]]){
     await page.setViewportSize({width,height});await page.evaluate(()=>renderAll());await sleep(200);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),`Home fits ${width}px`);
