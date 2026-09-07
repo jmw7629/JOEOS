@@ -68,6 +68,7 @@ jobs:
           grep -q 'configuration file is absent, so liveness cannot be verified' deploy/project-byte/install.sh
           grep -q 'check_bridge_service "vitros-opencode-verifier.service"' deploy/project-byte/install.sh
           ! grep -q 'refresh_bridge .*vitros-opencode-verifier.service' deploy/project-byte/install.sh
+          grep -q 'Optional VITROS verifier is not active' deploy/project-byte/install.sh
           grep -q 'data-home-kpi' "$TMP/home.js"
           grep -q 'function homeKpiScope' "$TMP/home.js"
           grep -q 'function renderActivity(scoped)' "$TMP/home.js"
@@ -88,16 +89,22 @@ jobs:
           grep -q 'health_snapshot' "$TMP/server.py"
           grep -q 'truthful_sync_loop' "$TMP/server.py"
           grep -q 'BRIDGE_CACHE_SECONDS = 10.0' "$TMP/server.py"
+          grep -q 'BRIDGE_STALL_SECONDS = 2700' "$TMP/server.py"
           grep -q 'MODEL_STATUS_FRESH_SECONDS = 1800' "$TMP/server.py"
           grep -q 'freshness_window_seconds' "$TMP/server.py"
-          grep -Fq 'bridges["vitros_verifier"]["state"] == "healthy"' "$TMP/server.py"
+          grep -q 'progress_state' "$TMP/server.py"
+          grep -q 'pending_observable' "$TMP/server.py"
+          grep -q 'item.get("required")' "$TMP/server.py"
+          grep -Fq '"vitros_verifier": ("vitros-opencode-verifier.service", "jmw7629/vitros-web-dashboard", False)' "$TMP/server.py"
           grep -q 'systemctl.*--user.*is-active' "$TMP/server.py"
           grep -q 'Path(stored).name != stored' "$TMP/server.py"
           grep -q 'select stored_name,content_type from attachments where stored_name=?' "$TMP/server.py"
           grep -q 'Verifying system health' "$TMP/health-runtime.js"
           grep -q 'Systems verified operational' "$TMP/health-runtime.js"
-          grep -q 'AI TESTED OK' "$TMP/health-runtime.js"
-          grep -q 'AI UNKNOWN' "$TMP/health-runtime.js"
+          grep -q 'AI CHAT TESTED OK' "$TMP/health-runtime.js"
+          grep -q 'AI CHAT DEGRADED' "$TMP/health-runtime.js"
+          grep -q 'AI CHAT UNTESTED' "$TMP/health-runtime.js"
+          grep -q 'VITROS verifier .*optional' "$TMP/health-runtime.js"
           ! grep -q 'MutationObserver' "$TMP/health-runtime.js"
           grep -q 'open Agents or Help for details' "$TMP/health-runtime.js"
           node --check "$TMP/home.js"
