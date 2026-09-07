@@ -5,12 +5,14 @@ on:
     branches: [project-byte-deploy]
     paths:
       - 'deploy/project-byte/v4/runtime_server.py'
+      - 'deploy/project-byte/v4/health-runtime.js'
       - 'deploy/project-byte/install.sh'
       - '.github/workflows/project-byte-bridge-liveness-verify.yml'
   push:
     branches: [project-byte-deploy]
     paths:
       - 'deploy/project-byte/v4/runtime_server.py'
+      - 'deploy/project-byte/v4/health-runtime.js'
       - 'deploy/project-byte/install.sh'
       - '.github/workflows/project-byte-bridge-liveness-verify.yml'
   workflow_dispatch:
@@ -31,7 +33,10 @@ jobs:
           set -euo pipefail
           python3 <<'PY'
           import importlib.util
+          import json
+          import os
           import sys
+          import tempfile
           import types
           from pathlib import Path
 
@@ -46,8 +51,15 @@ jobs:
 
           now = 1_800_000_000.0
 
-          def check(name, service, pending, activity, expected_state, expected_progress, observable=True):
-              got = mod._evaluate_bridge_health(service, pending, activity, now, pending_observable=observable)
+          def check(name, service, pending, activity, expected_state, expected_progress, observable=True, complete=True):
+              got = mod._evaluate_bridge_health(
+                  service,
+                  pending,
+                  activity,
+                  now,
+                  pending_observable=observable,
+                  activity_evidence_complete=complete,
+              )
               assert got['state'] == expected_state, (name, got)
               assert got['progress_state'] == expected_progress, (name, got)
               assert 'path' not in got and 'log' not in got and 'repo' not in got, (name, got)
@@ -56,26 +68,47 @@ jobs:
           check('idle-active', 'active', {'count': 0}, None, 'healthy', 'idle')
           check(
               'fresh-running', 'active',
-              {'count': 1, 'oldest_age_seconds': 20, 'latest_updated_at': int(now - 10)},
+              {'count': 1, 'oldest_age_seconds': 20, 'active_updated_at': int(now - 10)},
               now - 5, 'healthy', 'running'
           )
           check(
               'stalled-running', 'active',
-              {'count': 1, 'oldest_age_seconds': mod.BRIDGE_STALL_SECONDS + 20, 'latest_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 20)},
+              {'count': 1, 'oldest_age_seconds': mod.BRIDGE_STALL_SECONDS + 20, 'active_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 20)},
               now - mod.BRIDGE_STALL_SECONDS - 5, 'failed', 'stalled'
           )
           check(
               'fresh-missing-evidence', 'active',
-              {'count': 1, 'oldest_age_seconds': 20, 'latest_updated_at': int(now - 20)},
+              {'count': 1, 'oldest_age_seconds': 20, 'active_updated_at': int(now - 20)},
               None, 'unknown', 'awaiting-evidence'
           )
           check(
               'stale-missing-evidence', 'active',
-              {'count': 1, 'oldest_age_seconds': mod.BRIDGE_STALL_SECONDS + 1, 'latest_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 1)},
+              {'count': 1, 'oldest_age_seconds': mod.BRIDGE_STALL_SECONDS + 1, 'active_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 1)},
               None, 'failed', 'stalled'
           )
+          check(
+              'bounded-scan-incomplete', 'active',
+              {'count': 1, 'oldest_age_seconds': mod.BRIDGE_STALL_SECONDS + 1, 'active_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 1)},
+              now - mod.BRIDGE_STALL_SECONDS - 1, 'unknown', 'evidence-incomplete', complete=False
+          )
           check('inactive', 'failed', {'count': 0}, None, 'failed', 'inactive')
-          check('verifier-external', 'active', {'count': 0}, None, 'healthy', 'idle-or-external', observable=False)
+          check('verifier-active', 'active', {'count': 0}, None, 'healthy', 'idle-or-external', observable=False)
+          check('verifier-inactive', 'failed', {'count': 0}, None, 'failed', 'inactive', observable=False)
+
+          with tempfile.TemporaryDirectory() as td:
+              state = Path(td) / 'processed.json'
+              state.write_text(json.dumps({'processed': {'100': {'time': 5000}, '101': {'time': 1200}}}))
+              os.utime(state, (9000, 9000))
+              assert mod._processed_issue_activity(state, 101) == 1200.0
+              assert mod._processed_issue_activity(state, 999) is None
+              nested = Path(td) / 'worktree' / 'Sources' / 'Feature'
+              nested.mkdir(parents=True)
+              target = nested / 'change.swift'
+              target.write_text('x')
+              os.utime(target, (7000, 7000))
+              activity, complete = mod._latest_tree_activity(Path(td) / 'worktree')
+              assert activity >= 7000
+              assert complete is True
 
           mod.BRIDGE_CACHE['at'] = 0.0
           mod.BRIDGE_CACHE['value'] = {}
@@ -84,41 +117,65 @@ jobs:
           mod._pending_runs = lambda repo, current: {
               'count': 1,
               'oldest_age_seconds': mod.BRIDGE_STALL_SECONDS + 30,
-              'latest_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 30),
-          } if 'StickDeath' in repo else {'count': 0, 'oldest_age_seconds': None, 'latest_updated_at': None}
-          mod._latest_bridge_activity = lambda repo: now - mod.BRIDGE_STALL_SECONDS - 10 if 'StickDeath' in repo else None
+              'active_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 30),
+              'active_issue_number': 101,
+          } if 'StickDeath' in repo else {
+              'count': 0,
+              'oldest_age_seconds': None,
+              'active_updated_at': None,
+              'active_issue_number': 0,
+          }
+          mod._latest_bridge_activity = lambda repo, **kwargs: (
+              now - mod.BRIDGE_STALL_SECONDS - 10 if 'StickDeath' in repo else None,
+              True,
+          )
           bridges = mod._bridge_health()
           assert bridges['stickdeath']['state'] == 'failed', bridges
           assert bridges['stickdeath']['progress_state'] == 'stalled', bridges
-          assert bridges['stickdeath']['required'] is True, bridges
           assert bridges['vitros']['state'] == 'healthy', bridges
           assert bridges['vitros']['progress_state'] == 'idle', bridges
-          assert bridges['vitros']['required'] is True, bridges
           assert bridges['vitros_verifier']['state'] == 'healthy', bridges
-          assert bridges['vitros_verifier']['required'] is False, bridges
           assert bridges['vitros_verifier']['pending_observable'] is False, bridges
+          assert bridges['vitros_verifier']['required'] is True, bridges
+
           print('BRIDGE_IDLE_HEALTHY=PASS')
           print('BRIDGE_RUNNING_FRESH=PASS')
           print('BRIDGE_STALLED_FAILS_CLOSED=PASS')
           print('BRIDGE_MISSING_EVIDENCE_UNKNOWN=PASS')
-          print('BRIDGE_REQUIRED_OPTIONAL_SEMANTICS=PASS')
+          print('BRIDGE_BOUNDED_SCAN_INCOMPLETE_UNKNOWN=PASS')
+          print('BRIDGE_ISSUE_SPECIFIC_ACTIVITY=PASS')
+          print('BRIDGE_NESTED_WORKTREE_ACTIVITY=PASS')
+          print('VITROS_VERIFIER_REQUIRED_SERVICE_GATE=PASS')
           PY
-      - name: Prove health path is local and bounded
+      - name: Prove health path is local, bounded and non-mutating
         shell: bash
         run: |
           set -euo pipefail
           runtime=deploy/project-byte/v4/runtime_server.py
+          installer=deploy/project-byte/install.sh
+          health=deploy/project-byte/v4/health-runtime.js
           grep -q 'BRIDGE_STALL_SECONDS = 2700' "$runtime"
+          grep -q 'BRIDGE_ACTIVITY_SCAN_MAX_ENTRIES = 6000' "$runtime"
           grep -q "status in ('queued','running')" "$runtime"
+          grep -q '_processed_issue_activity' "$runtime"
+          grep -q 'progress_evidence_complete' "$runtime"
           grep -q 'last_activity_age_seconds' "$runtime"
           grep -q 'oldest_pending_age_seconds' "$runtime"
           grep -q 'pending_observable' "$runtime"
           grep -q 'progress_state' "$runtime"
-          grep -q 'item.get("required")' "$runtime"
+          grep -Fq '"vitros_verifier": ("vitros-opencode-verifier.service", "jmw7629/vitros-web-dashboard", True)' "$runtime"
           ! grep -q 'urllib.request' "$runtime"
           ! grep -q 'api.github.com' "$runtime"
           ! grep -q 'github.com' "$runtime"
           ! grep -q 'journalctl' "$runtime"
-          sha256sum "$runtime"
-          git diff --check origin/project-byte-deploy...HEAD
+          ! grep -q 'systemctl.*restart' "$runtime"
+          grep -q 'if ! check_bridge_service "vitros-opencode-verifier.service"; then BRIDGE_REFRESH_FAILURES=1; fi' "$installer"
+          ! grep -q 'Optional VITROS verifier' "$installer"
+          grep -q 'bridgeSummary' "$health"
+          ! grep -q '(optional)' "$health"
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            git diff --check HEAD^1...HEAD^2
+          else
+            git diff --check HEAD^
+          fi
           echo 'BRIDGE_LIVENESS_LOCAL_ONLY=PASS'

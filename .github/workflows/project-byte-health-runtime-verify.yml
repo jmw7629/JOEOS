@@ -40,13 +40,14 @@ jobs:
           }
           const system = new FakeElement('legacy');
           const ai = new FakeElement('legacy');
+          const ops = new FakeElement('legacy');
           const dot = new FakeElement();
           const windowObject = {setInterval: () => 0};
           const context = {
             window: windowObject,
             document: {
               activeElement: null,
-              getElementById: id => id === 'homeSystemState' ? system : id === 'homeAIState' ? ai : null,
+              getElementById: id => id === 'homeSystemState' ? system : id === 'homeAIState' ? ai : id === 'opsHealth' ? ops : null,
               querySelector: selector => selector === '.home-status-dot' ? dot : null,
             },
             fetch: async () => ({
@@ -62,9 +63,9 @@ jobs:
                   sqlite: {state: 'healthy'},
                   sync: {state: 'healthy'},
                   bridges: {
-                    stickdeath: {state: 'healthy', required: true},
-                    vitros: {state: 'healthy', required: true},
-                    vitros_verifier: {state: 'failed', required: false},
+                    stickdeath: {state: 'healthy', progress_state: 'running', required: true},
+                    vitros: {state: 'healthy', progress_state: 'idle', required: true},
+                    vitros_verifier: {state: 'healthy', progress_state: 'idle-or-external', required: true},
                   },
                   models: {state: 'unknown', tested_ok: 0, failed: 0, unknown: 1},
                 },
@@ -81,6 +82,10 @@ jobs:
             if (system.textContent !== 'Systems operational · 1 warning') throw new Error(`unexpected system evidence: ${system.textContent}`);
             if (ai.textContent !== 'AI CHAT UNTESTED') throw new Error(`unexpected AI evidence: ${ai.textContent}`);
             if (dot.dataset.health !== 'unknown') throw new Error(`unexpected evidence class: ${dot.dataset.health}`);
+            if (!ops.innerHTML.includes('StickDeath healthy/running')) throw new Error(`missing StickDeath progress: ${ops.innerHTML}`);
+            if (!ops.innerHTML.includes('VITROS builder healthy/idle')) throw new Error(`missing VITROS builder progress: ${ops.innerHTML}`);
+            if (!ops.innerHTML.includes('VITROS verifier healthy/idle-or-external')) throw new Error(`missing VITROS verifier evidence: ${ops.innerHTML}`);
+            if (ops.innerHTML.includes('optional')) throw new Error(`verifier incorrectly labeled optional: ${ops.innerHTML}`);
             console.log('HOME_STATUS_DIRECT_EVIDENCE_OWNERSHIP=PASS');
           })().catch(error => { console.error(error); process.exit(1); });
           NODE
@@ -95,23 +100,34 @@ jobs:
           ! grep -q 'AI READY' "$home"
           ! grep -q 'AI CONNECTED' "$home"
           echo 'HOME_LOCAL_HEALTH_WRITERS=REMOVED'
-      - name: Prove chat readiness and optional verifier semantics are explicit
+      - name: Prove required verifier, liveness and chat readiness semantics are explicit
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile deploy/project-byte/v4/runtime_server.py
-          grep -q 'MODEL_STATUS_FRESH_SECONDS = 1800' deploy/project-byte/v4/runtime_server.py
-          grep -q 'freshness_window_seconds' deploy/project-byte/v4/runtime_server.py
-          grep -q 'ai_chat_ready' deploy/project-byte/v4/runtime_server.py
-          grep -q 'operational-with-warnings' deploy/project-byte/v4/runtime_server.py
-          grep -Fq '"vitros_verifier": ("vitros-opencode-verifier.service", "jmw7629/vitros-web-dashboard", False)' deploy/project-byte/v4/runtime_server.py
-          grep -q 'AI CHAT TESTED OK' deploy/project-byte/v4/health-runtime.js
-          grep -q 'AI CHAT UNTESTED' deploy/project-byte/v4/health-runtime.js
-          ! grep -q "textContent = 'AI VERIFIED'" deploy/project-byte/v4/health-runtime.js
-          grep -q 'open Agents or Help for details' deploy/project-byte/v4/health-runtime.js
-          grep -q 'check_bridge_service "vitros-opencode-verifier.service"' deploy/project-byte/install.sh
-          grep -q 'Optional VITROS verifier is not active' deploy/project-byte/install.sh
-          ! grep -q 'refresh_bridge .*vitros-opencode-verifier.service' deploy/project-byte/install.sh
-          grep -q 'EXPECTED_SERVER="[0-9a-f]\{64\}"' deploy/project-byte/install.sh
-          grep -q 'SERVER_SHA=.*sha256sum' deploy/project-byte/install.sh
-          echo 'HEALTH_REQUIRED_EXECUTION_OPTIONAL_VERIFIER_AND_CHAT_READINESS=PASS'
+          runtime=deploy/project-byte/v4/runtime_server.py
+          installer=deploy/project-byte/install.sh
+          health=deploy/project-byte/v4/health-runtime.js
+          python3 -m py_compile "$runtime"
+          grep -q 'BRIDGE_STALL_SECONDS = 2700' "$runtime"
+          grep -q 'MODEL_STATUS_FRESH_SECONDS = 1800' "$runtime"
+          grep -q 'freshness_window_seconds' "$runtime"
+          grep -q 'ai_chat_ready' "$runtime"
+          grep -q 'operational-with-warnings' "$runtime"
+          grep -Fq '"vitros_verifier": ("vitros-opencode-verifier.service", "jmw7629/vitros-web-dashboard", True)' "$runtime"
+          grep -q "status in ('queued','running')" "$runtime"
+          grep -q 'progress_state' "$runtime"
+          grep -q 'stall_after_seconds' "$runtime"
+          grep -q 'pending_observable' "$runtime"
+          grep -q 'AI CHAT TESTED OK' "$health"
+          grep -q 'AI CHAT UNTESTED' "$health"
+          grep -q 'bridgeSummary' "$health"
+          ! grep -q '(optional)' "$health"
+          ! grep -q "textContent = 'AI VERIFIED'" "$health"
+          grep -q 'open Agents or Help for details' "$health"
+          grep -q 'check_bridge_service "vitros-opencode-verifier.service"' "$installer"
+          grep -q 'if ! check_bridge_service "vitros-opencode-verifier.service"; then BRIDGE_REFRESH_FAILURES=1; fi' "$installer"
+          ! grep -q 'Optional VITROS verifier' "$installer"
+          ! grep -q 'refresh_bridge .*vitros-opencode-verifier.service' "$installer"
+          grep -q 'EXPECTED_SERVER="[0-9a-f]\{64\}"' "$installer"
+          grep -q 'SERVER_SHA=.*sha256sum' "$installer"
+          echo 'HEALTH_REQUIRED_VERIFIER_LIVENESS_AND_CHAT_READINESS=PASS'

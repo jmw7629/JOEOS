@@ -8,6 +8,11 @@
   const safeText = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const componentState = value => String(value?.state || 'unknown').toLowerCase();
   const stateLabel = value => componentState(value) === 'healthy' ? 'healthy' : componentState(value) === 'failed' ? 'failed' : 'unknown';
+  const bridgeSummary = value => {
+    const state = stateLabel(value);
+    const progress = String(value?.progress_state || '').toLowerCase();
+    return progress && progress !== 'unknown' ? `${state}/${progress}` : state;
+  };
 
   const setState = (text, kind = 'unknown') => {
     const label = document.getElementById('homeSystemState');
@@ -45,9 +50,9 @@
       `PROJECT_BYTE v${safeText(health.version || 4)} · ${safeText(headline)}`,
       `SQLite ${safeText(stateLabel(components.sqlite))}`,
       `Sync ${safeText(stateLabel(components.sync))}`,
-      `StickDeath ${safeText(stateLabel(bridges.stickdeath))}`,
-      `VITROS builder ${safeText(stateLabel(bridges.vitros))}`,
-      `VITROS verifier ${safeText(stateLabel(bridges.vitros_verifier))} (optional)`,
+      `StickDeath ${safeText(bridgeSummary(bridges.stickdeath))}`,
+      `VITROS builder ${safeText(bridgeSummary(bridges.vitros))}`,
+      `VITROS verifier ${safeText(bridgeSummary(bridges.vitros_verifier))}`,
       `Models ${safeText(modelsHealth.state || 'unknown')} (${safeText(modelSummary)})`,
     ];
     el.innerHTML = pieces.join(' · ');
