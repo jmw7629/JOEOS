@@ -1,0 +1,135 @@
+name: PROJECT_BYTE VITROS Control Reconcile Verify
+
+on:
+  push:
+    branches: [project-byte-deploy]
+    paths:
+      - 'deploy/project-byte/reconcile-vitros-control.sh'
+      - '.github/workflows/project-byte-vitros-reconcile-verify.yml'
+  pull_request:
+    branches: [project-byte-deploy]
+    paths:
+      - 'deploy/project-byte/reconcile-vitros-control.sh'
+      - '.github/workflows/project-byte-vitros-reconcile-verify.yml'
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise safe reconciliation and fail-closed cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          SCRIPT="$PWD/deploy/project-byte/reconcile-vitros-control.sh"
+          bash -n "$SCRIPT"
+          grep -q 'merge --ff-only origin/main' "$SCRIPT"
+          grep -q 'cmp -s.*package-lock' "$SCRIPT"
+          grep -q 'local .gitignore is not one of the reviewed safe reconciliation profiles' "$SCRIPT"
+          grep -q 'unexpected local change' "$SCRIPT"
+          grep -q 'merge-base --is-ancestor HEAD origin/main' "$SCRIPT"
+          grep -q 'python3 -m py_compile' "$SCRIPT"
+          grep -q -- '--self-test' "$SCRIPT"
+
+          TMP="$(mktemp -d)"
+          trap 'rm -rf "$TMP"' EXIT
+          git init --bare "$TMP/origin.git" >/dev/null
+          git init "$TMP/seed" >/dev/null
+          cd "$TMP/seed"
+          git config user.name 'PROJECT_BYTE CI'
+          git config user.email 'ci@example.invalid'
+          git checkout -b main >/dev/null
+          mkdir -p bridge
+          cat > bridge/runner.py <<'PY'
+          #!/usr/bin/env python3
+          import argparse
+          p=argparse.ArgumentParser(); p.add_argument('--self-test',action='store_true'); a=p.parse_args()
+          if a.self_test: print('bridge self-test: PASS')
+          PY
+          cat > .gitignore <<'EOF'
+          node_modules
+          dist
+          .env
+          .env.local
+          EOF
+          printf '%s\n' 'old-lock' > package-lock.json
+          printf '%s\n' 'fixture' > README.md
+          git add -A && git commit -m initial >/dev/null
+          INITIAL="$(git rev-parse HEAD)"
+          git remote add origin "$TMP/origin.git"
+          git push -u origin main >/dev/null
+          git --git-dir="$TMP/origin.git" symbolic-ref HEAD refs/heads/main
+
+          git clone "$TMP/origin.git" "$TMP/control" >/dev/null
+
+          cat > .gitignore <<'EOF'
+          node_modules
+          dist
+          .env
+          .env.local
+          .env.*.local
+          .vercel
+          tmp/
+          EOF
+          printf '%s\n' 'new-lock-from-authoritative-main' > package-lock.json
+          git add .gitignore package-lock.json
+          git commit -m latest >/dev/null
+          LATEST="$(git rev-parse HEAD)"
+          git push origin main >/dev/null
+
+          cat > "$TMP/control/.gitignore" <<'EOF'
+          node_modules
+          dist
+          .env
+          .env.local
+          .vercel
+          .env*
+          EOF
+          printf '%s\n' 'new-lock-from-authoritative-main' > "$TMP/control/package-lock.json"
+
+          VITROS_ROOT="$TMP/control" \
+          VITROS_EXPECTED_REPO='' \
+          VITROS_SKIP_SERVICE=1 \
+          VITROS_RECONCILE_BACKUP_DIR="$TMP/backups" \
+          bash "$SCRIPT" | tee "$TMP/reconcile.log"
+
+          test "$(git -C "$TMP/control" rev-parse HEAD)" = "$LATEST"
+          test -z "$(git -C "$TMP/control" status --porcelain=v1 --untracked-files=all)"
+          grep -qx '.env.*.local' "$TMP/control/.gitignore"
+          grep -qx '.vercel' "$TMP/control/.gitignore"
+          ! grep -qxF '.env*' "$TMP/control/.gitignore"
+          grep -q 'VITROS_CONTROL_RECONCILE=PASS' "$TMP/reconcile.log"
+          test "$(find "$TMP/backups" -name local.diff -type f | wc -l)" -eq 1
+
+          git clone "$TMP/origin.git" "$TMP/tampered" >/dev/null
+          git -C "$TMP/tampered" reset --hard "$INITIAL" >/dev/null
+          cat > "$TMP/tampered/.gitignore" <<'EOF'
+          node_modules
+          dist
+          .env
+          .env.local
+          .vercel
+          .env*
+          EOF
+          printf '%s\n' 'TAMPERED-LOCK' > "$TMP/tampered/package-lock.json"
+          if VITROS_ROOT="$TMP/tampered" VITROS_EXPECTED_REPO='' VITROS_SKIP_SERVICE=1 VITROS_RECONCILE_BACKUP_DIR="$TMP/tamper-backup" bash "$SCRIPT" >"$TMP/tampered.log" 2>&1; then
+            echo 'tampered package-lock was incorrectly accepted' >&2
+            exit 1
+          fi
+          test "$(git -C "$TMP/tampered" rev-parse HEAD)" = "$INITIAL"
+          grep -qx 'TAMPERED-LOCK' "$TMP/tampered/package-lock.json"
+          grep -q 'not byte-identical to origin/main' "$TMP/tampered.log"
+
+          git clone "$TMP/origin.git" "$TMP/extra-dirty" >/dev/null
+          git -C "$TMP/extra-dirty" reset --hard "$INITIAL" >/dev/null
+          printf '%s\n' 'unexpected local work' >> "$TMP/extra-dirty/README.md"
+          if VITROS_ROOT="$TMP/extra-dirty" VITROS_EXPECTED_REPO='' VITROS_SKIP_SERVICE=1 bash "$SCRIPT" >"$TMP/extra.log" 2>&1; then
+            echo 'unexpected dirty file was incorrectly accepted' >&2
+            exit 1
+          fi
+          test "$(git -C "$TMP/extra-dirty" rev-parse HEAD)" = "$INITIAL"
+          grep -q 'unexpected local change' "$TMP/extra.log"
+
+          echo 'VITROS_CONTROL_RECONCILE_SAFETY=PASS'
