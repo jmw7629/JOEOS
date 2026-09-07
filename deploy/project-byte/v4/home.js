@@ -77,7 +77,7 @@
       </section>
       <section class="home-lower">
         <article class="home-card"><div class="home-card-head"><h3>Current activity</h3><button type="button" data-home-go="activity" aria-label="Open Activity">›</button></div><div id="homeActivity" class="activity-feed"></div></article>
-        <article class="home-card"><div class="home-card-head"><h3>My work</h3><button type="button" data-home-go="board" aria-label="Open Kanban">›</button></div><div id="homeWork" class="work-list"></div></article>
+        <article class="home-card"><div class="home-card-head"><h3 id="homeWorkTitle">My work</h3><button type="button" data-home-go="board" aria-label="Open Kanban">›</button></div><div id="homeWork" class="work-list"></div></article>
         <article class="home-card"><div class="home-card-head"><h3>Ready for review</h3><button type="button" data-home-go="agents" aria-label="Open review queue">›</button></div><div id="homeApprovals" class="approval-list"></div></article>
       </section>
       <section class="home-grid">
@@ -109,8 +109,10 @@
 
   function homeTaskScope(mode) {
     if (typeof clearFilters === 'function') clearFilters();
+    const selfName=session?.name&&session.name!=='Public'?session.name:'Joe';
     const map = {
-      joe: ['ownerFilter', session?.name && session.name !== 'Public' ? session.name : 'Joe'],
+      self: ['ownerFilter',selfName],
+      joe: ['ownerFilter','Joe'],
       mike: ['ownerFilter','Mike'],
       ai: ['executorFilter','ai'],
       critical: ['priorityFilter','Critical'],
@@ -124,7 +126,6 @@
   }
 
   function homeKpiScope(kind) {
-    if (typeof clearFilters === 'function') clearFilters();
     const map = {
       open: ['completionFilter','open'],
       active: ['statusFilter','Active'],
@@ -134,7 +135,8 @@
       due: ['dueFilter','7d']
     };
     const pair=map[kind];
-    if(pair&&document.getElementById(pair[0]))document.getElementById(pair[0]).value=pair[1];
+    const control=pair?document.getElementById(pair[0]):null;
+    if(control) control.value=control.value===pair[1]?'':pair[1];
     if(typeof renderAll==='function')renderAll();
     renderHome();
   }
@@ -170,29 +172,39 @@
 
   function renderScopes() {
     const c = typeof filterCriteria === 'function' ? filterCriteria() : {};
-    const active = c.ownerFilter==='Mike'?'mike':c.executorFilter==='ai'?'ai':c.priorityFilter==='Critical'?'critical':c.dueFilter==='7d'?'week':c.ownerFilter?'joe':'all';
+    const selfName=session?.name&&session.name!=='Public'?session.name:'';
+    const active=selfName&&c.ownerFilter===selfName?'self':c.ownerFilter==='Joe'?'joe':c.ownerFilter==='Mike'?'mike':c.executorFilter==='ai'?'ai':c.priorityFilter==='Critical'?'critical':c.dueFilter==='7d'?'week':'all';
     const el=document.getElementById('homeScopes'); if(!el)return;
-    const chips=[['all','All projects'],['joe',session?.name&&session.name!=='Public'?session.name:'Joe'],['mike','Mike'],['ai','AI work'],['critical','Critical'],['week','This week']];
+    const chips=[['all','All projects']];
+    if(selfName) chips.push(['self','My work']);
+    if(selfName!=='Joe') chips.push(['joe','Joe']);
+    if(selfName!=='Mike') chips.push(['mike','Mike']);
+    chips.push(['ai','AI work'],['critical','Critical'],['week','This week']);
     el.innerHTML=chips.map(([k,l])=>`<button type="button" class="home-chip ${active===k?'active':''}" data-home-scope="${k}">${escH(l)}</button>`).join('');
   }
 
-  function renderAgentMap() {
+  function renderAgentMap(scoped) {
     const el=document.getElementById('homeAgentMap'); if(!el)return;
-    const enabled=(agents||[]).filter(a=>a.enabled).slice(0,5);
+    const ids=new Set(scoped.map(t=>t.id)),selected=document.getElementById('agentFilter')?.value||'';
+    const activeKeys=new Set((runs||[]).filter(r=>ids.has(r.task_id)&&['queued','running'].includes(r.status)).map(r=>r.agent_key));
+    const enabled=(agents||[]).filter(a=>a.enabled&&a.agent_key!=='executive').sort((a,b)=>{
+      const ar=(a.agent_key===selected?2:0)+(activeKeys.has(a.agent_key)?1:0),br=(b.agent_key===selected?2:0)+(activeKeys.has(b.agent_key)?1:0);
+      return br-ar||String(a.name).localeCompare(String(b.name));
+    }).slice(0,5);
     const positions=[[50,13],[16,42],[84,42],[28,82],[72,82]];
     let svg='<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">';
     positions.forEach(([x,y])=>{svg+=`<line x1="50" y1="50" x2="${x}" y2="${y}"></line>`}); svg+='</svg>';
     const center=`<button type="button" class="agent-node center" style="left:50%;top:50%" data-home-go="ai"><b>${escH(session?.name&&session.name!=='Public'?session.name:'Joe')}</b><small>Executive</small></button>`;
-    const nodes=enabled.map((a,i)=>{const [x,y]=positions[i];const active=(runs||[]).some(r=>r.agent_key===a.agent_key&&['queued','running'].includes(r.status));return `<button type="button" class="agent-node ${active?'running':''}" style="left:${x}%;top:${y}%" data-home-agent="${escH(a.agent_key)}"><b>${escH(a.name)}</b><small>${active?'Running':escH(a.role)}</small></button>`}).join('');
+    const nodes=enabled.map((a,i)=>{const [x,y]=positions[i];const active=activeKeys.has(a.agent_key);return `<button type="button" class="agent-node ${active?'running':''}" style="left:${x}%;top:${y}%" data-home-agent="${escH(a.agent_key)}"><b>${escH(a.name)}</b><small>${active?'Running':escH(a.role)}</small></button>`}).join('');
     el.innerHTML=svg+center+nodes;
   }
 
   function renderOrg() {
     const el=document.getElementById('homeOrgMap');if(!el)return;
-    const people=(team||[]).filter(p=>p.active).slice(0,4);
     const who=session?.name&&session.name!=='Public'?session.name:'Joe';
+    const people=(team||[]).filter(p=>p.active&&p.name!==who).slice(0,4);
     const row=[...people.map(p=>({name:p.name,sub:p.role})),{name:'AI Agents',sub:`${(agents||[]).filter(a=>a.enabled).length} enabled`},{name:'Systems',sub:`${(projects||[]).filter(p=>p.repo).length} repos`}].slice(0,3);
-    el.innerHTML=`<div class="org-top"><b>${escH(who)}</b><small>Executive operator</small></div><div class="org-row">${row.map(p=>`<button type="button" class="org-person" data-home-person="${escH(p.name)}"><b>${escH(p.name)}</b><small>${escH(p.sub)}</small></button>`).join('')}</div><div class="org-row">${['Research','Development','Operations'].map((x,i)=>`<div class="org-person"><b>${x}</b><small>${i===0?'Evidence':i===1?'Build':'Release'}</small></div>`).join('')}</div>`;
+    el.innerHTML=`<div class="org-top"><b>${escH(who)}</b><small>Executive operator</small></div><div class="org-row">${row.map(p=>`<button type="button" class="org-person" data-home-person="${escH(p.name)}"><b>${escH(p.name)}</b><small>${escH(p.sub)}</small></button>`).join('')}</div><div class="org-row">${[['Research','researcher','Evidence'],['Development','builder','Build'],['Operations','release','Release']].map(([x,key,sub])=>`<button type="button" class="org-person" data-home-agent="${key}"><b>${x}</b><small>${sub}</small></button>`).join('')}</div>`;
   }
 
   function renderActivity(scoped) {
@@ -206,11 +218,14 @@
 
   function renderWork(scoped) {
     const el=document.getElementById('homeWork');if(!el)return;
-    const who=session?.name&&session.name!=='Public'?session.name:'Joe';
-    let items=scoped.filter(t=>t.status!=='Done'&&t.owner===who);
-    if(!items.length) items=scoped.filter(t=>t.status!=='Done').sort((a,b)=>({Critical:0,High:1,Medium:2,Low:3}[a.priority]-({Critical:0,High:1,Medium:2,Low:3}[b.priority]))).slice(0,4);
-    else items=items.slice(0,4);
-    el.innerHTML=items.length?items.map(t=>`<button type="button" class="work-item" data-home-task="${escH(t.id)}"><div class="work-top"><b>${escH(t.title)}</b><span class="home-priority ${escH(t.priority)}">${escH(t.priority)}</span></div><span>${escH(t.project)}${t.due_date?' · due '+escH(t.due_date):''}${t.ai_state?' · AI '+escH(t.ai_state):''}</span></button>`).join(''):'<div class="small">No open work in this scope.</div>';
+    const title=document.getElementById('homeWorkTitle');
+    const authenticated=session?.name&&session.name!=='Public',who=authenticated?session.name:'';
+    if(title)title.textContent=authenticated?'My work':'Open work';
+    let items=authenticated?scoped.filter(t=>t.status!=='Done'&&t.owner===who):scoped.filter(t=>t.status!=='Done');
+    const rank={Critical:0,High:1,Medium:2,Low:3};
+    items=items.sort((a,b)=>(rank[a.priority]??9)-(rank[b.priority]??9)).slice(0,4);
+    const empty=authenticated?`No open work assigned to ${escH(who)} in this scope.`:'No open work in this scope.';
+    el.innerHTML=items.length?items.map(t=>`<button type="button" class="work-item" data-home-task="${escH(t.id)}"><div class="work-top"><b>${escH(t.title)}</b><span class="home-priority ${escH(t.priority)}">${escH(t.priority)}</span></div><span>${escH(t.project)}${t.due_date?' · due '+escH(t.due_date):''}${t.ai_state?' · AI '+escH(t.ai_state):''}</span></button>`).join(''):`<div class="small">${empty}</div>`;
   }
 
   function renderApprovals(scoped) {
@@ -220,10 +235,14 @@
     el.innerHTML=ready.length?ready.map(r=>`<div class="approval-item"><b>${escH(r.project)} · #${r.issue_number}</b><span>${escH(r.agent_key||'agent')} finished work and produced a reviewable result.</span><div class="approval-actions">${r.pr_url?`<a href="${escH(r.pr_url)}" target="_blank" rel="noopener">Open PR</a>`:''}<button type="button" data-home-run="${escH(r.id)}">Terminal</button></div></div>`).join(''):'<div class="small">No agent work is waiting for review in this scope.</div>';
   }
 
-  function renderMemory() {
+  function renderMemory(scoped) {
     const el=document.getElementById('homeMemory');if(!el)return;
-    const items=(memory||[]).slice(0,5);
-    el.innerHTML=items.length?items.map(m=>`<div class="memory-item"><b>${escH(m.kind)} · ${escH(m.agent_key||'shared')}</b><span>${escH(m.content)}</span></div>`).join(''):'<div class="small">No agent memory available for this access level.</div>';
+    const allTasks=tasks||[],filtered=scoped.length!==allTasks.length,names=new Set(scoped.map(t=>t.project)),agent=document.getElementById('agentFilter')?.value||'';
+    let source=memory||[];
+    if(filtered)source=source.filter(m=>!m.project||names.has(m.project));
+    if(agent)source=source.filter(m=>!m.agent_key||m.agent_key===agent);
+    const items=source.slice(0,5);
+    el.innerHTML=items.length?items.map(m=>`<div class="memory-item"><b>${escH(m.kind)} · ${escH(m.agent_key||'shared')}</b><span>${escH(m.content)}</span></div>`).join(''):'<div class="small">No agent memory available in this scope.</div>';
   }
 
   function renderPortfolio(scoped) {
@@ -231,13 +250,13 @@
     const allTasks=tasks||[],filtered=scoped.length!==allTasks.length,names=new Set(scoped.map(t=>t.project));
     const chosen=document.getElementById('projectFilter')?.value||'';
     const list=(filtered?(projects||[]).filter(p=>names.has(p.name)||p.name===chosen):(projects||[])).slice(0,5);
-    el.innerHTML=list.map(p=>{const t=(tasks||[]).filter(x=>x.project===p.name),done=t.filter(x=>x.status==='Done').length,pct=t.length?Math.round(done/t.length*100):0;return `<button type="button" class="work-item" data-home-project="${escH(p.name)}"><div class="work-top"><b>${escH(p.name)}</b><span class="health" data-h="${escH(p.health)}">${escH(p.health)}</span></div><span>${escH(p.stage||'Build')} · Lead ${escH(p.lead||'—')} · ${pct}% complete</span></button>`}).join('')||'<div class="small">No projects in this scope.</div>';
+    el.innerHTML=list.map(p=>{const t=(filtered?scoped:(tasks||[])).filter(x=>x.project===p.name),done=t.filter(x=>x.status==='Done').length,pct=t.length?Math.round(done/t.length*100):0;return `<button type="button" class="work-item" data-home-project="${escH(p.name)}"><div class="work-top"><b>${escH(p.name)}</b><span class="health" data-h="${escH(p.health)}">${escH(p.health)}</span></div><span>${escH(p.stage||'Build')} · Lead ${escH(p.lead||'—')} · ${pct}% complete</span></button>`}).join('')||'<div class="small">No projects in this scope.</div>';
   }
 
   function renderHome() {
     if (!document.getElementById('home')) return;
     const scoped=safeVisible();
-    renderKpis(scoped); renderScopes(); renderAgentMap(); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(); renderPortfolio(scoped);
+    renderKpis(scoped); renderScopes(); renderAgentMap(scoped); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(scoped); renderPortfolio(scoped);
     const active=(runs||[]).filter(r=>['queued','running'].includes(r.status)).length;
     const state=document.getElementById('homeSystemState'); if(state) state.textContent=active?`${active} AI run${active===1?'':'s'} active`:'All systems operational';
     const aiState=document.getElementById('homeAIState'); if(aiState) aiState.textContent=(models||[]).some(m=>m.last_status==='ok')?'AI CONNECTED':'AI READY';
