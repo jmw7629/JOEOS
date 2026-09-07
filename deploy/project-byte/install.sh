@@ -8,11 +8,13 @@ DEST="/home/joevps/PROJECT_BYTE"
 SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 EXPECTED_BACKEND="86c64e3a06e5c76240753063c01b02c7aa8c83eb5b8f3bf64338a03c11d3a765"
-EXPECTED_SERVER_GIT="614aac08e109888bd314cddf9d9a022d65ee5fcc"
+EXPECTED_SERVER="bb48fb8baecc9e7dd98e57c8e4e3d71ab63ea0b771579edf7b38fa85ad25878d"
+# Retained only as a secondary Git-content consistency check for the existing CI surface.
+EXPECTED_SERVER_GIT="15f6d587a39ef164817efc14711b617cf6145766"
 EXPECTED_INDEX="08a324ae21ab0c19128d0dd0ce6ce9739515a03f740119ce8cd680fe5ef273c7"
 EXPECTED_HOME="3722fe80b6d1d316aecf39d354514ea55a48be17191c9ef5a1a734d764ee6ae2"
 EXPECTED_INSPECTOR="bffa6d45adaafade420b27bf0dcd9717fd8783c3cee1ce73c6550c8752d4cba4"
-EXPECTED_HEALTH="6df2eac11bfc0f9323792e6f45c005adc24cd250937e8eea182a145af1f92e45"
+EXPECTED_HEALTH="af8a95aeaa7033b30a1b7018c250194c38eeb2dfa0d64229ae729648d5b84e6b"
 
 if [ "$(id -un)" != "joevps" ]; then
   echo "Run this as joevps, not root." >&2
@@ -64,13 +66,15 @@ cat "$TMP"/backend/*.part > "$TMP/backend.py"
 cat "$TMP"/index/*.part > "$TMP/index.html"
 
 BACKEND_SHA="$(sha256sum "$TMP/backend.py" | awk '{print $1}')"
+SERVER_SHA="$(sha256sum "$TMP/server.py" | awk '{print $1}')"
 SERVER_GIT="$(git hash-object "$TMP/server.py")"
 INDEX_SHA="$(sha256sum "$TMP/index.html" | awk '{print $1}')"
 HOME_SHA="$(sha256sum "$TMP/home.js" | awk '{print $1}')"
 INSPECTOR_SHA="$(sha256sum "$TMP/home-inspector.js" | awk '{print $1}')"
 HEALTH_SHA="$(sha256sum "$TMP/health-runtime.js" | awk '{print $1}')"
 [ "$BACKEND_SHA" = "$EXPECTED_BACKEND" ] || { echo "Backend checksum mismatch; refusing deployment." >&2; exit 5; }
-[ "$SERVER_GIT" = "$EXPECTED_SERVER_GIT" ] || { echo "Runtime server content hash mismatch; refusing deployment." >&2; exit 5; }
+[ "$SERVER_SHA" = "$EXPECTED_SERVER" ] || { echo "Runtime server SHA-256 mismatch; refusing deployment." >&2; exit 5; }
+[ "$SERVER_GIT" = "$EXPECTED_SERVER_GIT" ] || { echo "Runtime server Git content hash mismatch; refusing deployment." >&2; exit 5; }
 [ "$INDEX_SHA" = "$EXPECTED_INDEX" ] || { echo "UI checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$HOME_SHA" = "$EXPECTED_HOME" ] || { echo "Home module checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$INSPECTOR_SHA" = "$EXPECTED_INSPECTOR" ] || { echo "Home inspector checksum mismatch; refusing deployment." >&2; exit 5; }
@@ -90,11 +94,11 @@ new Function(home); new Function(inspector); new Function(health);
 for(const x of ['Portfolio','Kanban','Work next','AI','Agents','Terminal','Models','Team','Activity','Settings','Help / How-To'])if(!h.includes(x))throw new Error('missing '+x);
 for(const x of ['Joe AI','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','Portfolio pulse'])if(!home.includes(x))throw new Error('missing Home '+x);
 for(const x of ['homeAgentInspector','homeAgentLens','data-inspect-run','Full terminal','Agent workspace'])if(!inspector.includes(x))throw new Error('missing inspector '+x);
-for(const x of ['Verifying system health','Systems verified operational','AI UNKNOWN'])if(!health.includes(x))throw new Error('missing health behavior '+x);
+for(const x of ['Verifying system health','Systems verified operational','AI TESTED OK','AI UNKNOWN'])if(!health.includes(x))throw new Error('missing health behavior '+x);
 NODE
 fi
 
-echo "Verified V4 source: backend=$BACKEND_SHA runtime_git=$SERVER_GIT ui=$INDEX_SHA home=$HOME_SHA inspector=$INSPECTOR_SHA health=$HEALTH_SHA"
+echo "Verified V4 source: backend=$BACKEND_SHA runtime=$SERVER_SHA runtime_git=$SERVER_GIT ui=$INDEX_SHA home=$HOME_SHA inspector=$INSPECTOR_SHA health=$HEALTH_SHA"
 
 python3 - "$TMP/index.html" <<'PY'
 from pathlib import Path
@@ -163,7 +167,8 @@ for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
       && grep -Fq 'Live agents' "$TMP/live-home.js" \
       && grep -Fq 'homeAgentInspector' "$TMP/live-home-inspector.js" \
       && grep -Fq 'data-inspect-run' "$TMP/live-home-inspector.js" \
-      && grep -Fq 'Verifying system health' "$TMP/live-health-runtime.js"; then
+      && grep -Fq 'Verifying system health' "$TMP/live-health-runtime.js" \
+      && grep -Fq 'AI TESTED OK' "$TMP/live-health-runtime.js"; then
       HOME_OK=1
       break
     fi
@@ -264,8 +269,19 @@ refresh_bridge() {
   echo "Bridge refreshed and active: $service_name @ ${local_head:0:12}"
 }
 
+check_bridge_service() {
+  local service_name="$1"
+  if ! systemctl --user is-active --quiet "$service_name"; then
+    echo "Bridge liveness check failed for $service_name: service is not active; no control checkout was changed." >&2
+    return 1
+  fi
+  echo "Bridge service active: $service_name"
+}
+
 if ! refresh_bridge "$HOME/.config/joeos-opencode-bridge/stickdeath.env" "stickdeath-opencode-bridge.service"; then BRIDGE_REFRESH_FAILURES=1; fi
 if ! refresh_bridge "$HOME/.config/joeos-opencode-bridge/vitros.env" "vitros-opencode-bridge.service"; then BRIDGE_REFRESH_FAILURES=1; fi
+# The verifier shares VITROS control state; gate Funnel on its liveness without mutating its checkout.
+if ! check_bridge_service "vitros-opencode-verifier.service"; then BRIDGE_REFRESH_FAILURES=1; fi
 
 if [ "$BRIDGE_REFRESH_FAILURES" -ne 0 ]; then
   echo "One or more bridge refresh/liveness checks failed. PROJECT_BYTE remains local and reports execution health as degraded/unknown until corrected." >&2
