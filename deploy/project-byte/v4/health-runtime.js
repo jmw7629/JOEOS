@@ -209,26 +209,14 @@
     }
   };
 
-  const installStatusDefense = () => {
-    if (typeof MutationObserver !== 'function') return;
-    const target = document.getElementById('homeSystemState');
-    const ai = document.getElementById('homeAIState');
-    if (!target && !ai) return;
-    const observer = new MutationObserver(() => { if (lastHealth) render(lastHealth); });
-    if (target) observer.observe(target, {childList:true,characterData:true,subtree:true});
-    if (ai) observer.observe(ai, {childList:true,characterData:true,subtree:true});
-  };
-
   const start = () => {
     setState('Verifying system health…', 'unknown');
     setAIState({state: 'unknown'});
-    // Compatibility token for the prior static verifier only: AI VERIFIED is never rendered.
     installTruthfulSettingsHealth();
     installHistoricalModelLabels();
     installHealthOwnership();
     installWorkspaceRefresh();
     installMobileUX();
-    installStatusDefense();
     if (typeof renderModels === 'function') renderModels();
     if (typeof setRefreshTimer === 'function') setRefreshTimer();
     poll();
