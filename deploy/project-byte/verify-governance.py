@@ -13,6 +13,7 @@ EXPECTED = {
     'project-byte-active-checkout-verify.yml': 'active-checkout-safety',
     'project-byte-vitros-reconcile-verify.yml': 'verify-vitros-control-reconcile',
     'project-byte-owner-hold-verify.yml': 'verify-owner-hold',
+    'project-byte-external-review-verify.yml': 'verify-external-review-observability',
     'project-byte-governance-verify.yml': 'verify-governance-contract',
 }
 contexts = []

@@ -3,10 +3,6 @@ name: PROJECT_BYTE External Review Verify
 on:
   pull_request:
     branches: [project-byte-deploy]
-    paths:
-      - 'deploy/project-byte/v4/**'
-      - 'deploy/project-byte/install.sh'
-      - '.github/workflows/project-byte-external-review-verify.yml'
   push:
     branches: [project-byte-deploy]
     paths:
