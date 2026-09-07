@@ -19,57 +19,66 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Exercise semantic lock reconciliation and fail-closed cases
+      - name: Prove dirty and active control checkouts are immutable
         shell: bash
         run: |
           set -euo pipefail
           SCRIPT="$PWD/deploy/project-byte/reconcile-vitros-control.sh"
           bash -n "$SCRIPT"
+          grep -q 'dirty control checkout detected' "$SCRIPT"
+          grep -q 'no fetch, merge, restore, reset, clean, stash, or restart was performed' "$SCRIPT"
+          grep -q 'service is active while control checkout is behind origin/main' "$SCRIPT"
           grep -q 'merge --ff-only origin/main' "$SCRIPT"
-          grep -q 'semantically identical to origin/main' "$SCRIPT"
-          grep -q 'package-lock semantic mismatch paths' "$SCRIPT"
-          grep -q 'differs semantically from origin/main' "$SCRIPT"
-          grep -q 'local .gitignore is not one of the reviewed safe reconciliation profiles' "$SCRIPT"
-          grep -q 'unexpected local change' "$SCRIPT"
-          grep -q 'merge-base --is-ancestor HEAD origin/main' "$SCRIPT"
           grep -q 'PYTHONPYCACHEPREFIX' "$SCRIPT"
           grep -q 'PYTHONDONTWRITEBYTECODE=1' "$SCRIPT"
-          grep -q -- '--self-test' "$SCRIPT"
+          ! grep -q 'git -C "$ROOT" restore' "$SCRIPT"
+          ! grep -q 'git -C "$ROOT" reset' "$SCRIPT"
+          ! grep -q 'git -C "$ROOT" clean' "$SCRIPT"
+          ! grep -q 'git -C "$ROOT" stash' "$SCRIPT"
 
           TMP="$(mktemp -d)"
           trap 'rm -rf "$TMP"' EXIT
-          git init --bare "$TMP/origin.git" >/dev/null
-          git init "$TMP/seed" >/dev/null
-          cd "$TMP/seed"
-          git config user.name 'PROJECT_BYTE CI'
-          git config user.email 'ci@example.invalid'
-          git checkout -b main >/dev/null
-          mkdir -p bridge
-          cat > bridge/runner.py <<'PY'
+          ORIGIN="$TMP/origin.git"
+          SEED="$TMP/seed"
+          FAKEBIN="$TMP/bin"
+          CALLS="$TMP/systemctl.calls"
+          STATE="$TMP/systemctl.state"
+          mkdir -p "$FAKEBIN"
+
+          cat > "$FAKEBIN/systemctl" <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          echo "$*" >> "$FAKE_SYSTEMCTL_CALLS"
+          if [[ " $* " == *" is-active "* ]]; then
+            if [ -f "$FAKE_SYSTEMCTL_STATE" ] || [ "${FAKE_SYSTEMCTL_MODE:-inactive}" = "active" ]; then
+              exit 0
+            fi
+            exit 3
+          fi
+          if [[ " $* " == *" restart "* ]]; then
+            touch "$FAKE_SYSTEMCTL_STATE"
+            exit 0
+          fi
+          exit 0
+          SH
+          chmod +x "$FAKEBIN/systemctl"
+          export PATH="$FAKEBIN:$PATH"
+          export FAKE_SYSTEMCTL_CALLS="$CALLS"
+          export FAKE_SYSTEMCTL_STATE="$STATE"
+
+          git init --bare "$ORIGIN" >/dev/null
+          git init "$SEED" >/dev/null
+          git -C "$SEED" config user.name 'PROJECT_BYTE CI'
+          git -C "$SEED" config user.email 'ci@example.invalid'
+          git -C "$SEED" checkout -b main >/dev/null
+          mkdir -p "$SEED/bridge"
+          cat > "$SEED/bridge/runner.py" <<'PY'
           #!/usr/bin/env python3
           import argparse
-          p=argparse.ArgumentParser(); p.add_argument('--self-test',action='store_true'); a=p.parse_args()
+          p=argparse.ArgumentParser(); p.add_argument('--self-test', action='store_true'); a=p.parse_args()
           if a.self_test: print('bridge self-test: PASS')
           PY
-          cat > .gitignore <<'EOF'
-          node_modules
-          dist
-          .env
-          .env.local
-          EOF
-          cat > package-lock.json <<'JSON'
-          {"name":"fixture","lockfileVersion":3,"packages":{"":{"dependencies":{"x":"1.0.0"}}}}
-          JSON
-          printf '%s\n' 'fixture' > README.md
-          git add -A && git commit -m initial >/dev/null
-          INITIAL="$(git rev-parse HEAD)"
-          git remote add origin "$TMP/origin.git"
-          git push -u origin main >/dev/null
-          git --git-dir="$TMP/origin.git" symbolic-ref HEAD refs/heads/main
-
-          git clone "$TMP/origin.git" "$TMP/control" >/dev/null
-
-          cat > .gitignore <<'EOF'
+          cat > "$SEED/.gitignore" <<'EOF'
           node_modules
           dist
           .env
@@ -78,84 +87,91 @@ jobs:
           .vercel
           tmp/
           EOF
-          cat > package-lock.json <<'JSON'
+          cat > "$SEED/package-lock.json" <<'JSON'
+          {"name":"fixture","lockfileVersion":3,"packages":{"":{"dependencies":{"x":"1.0.0"}}}}
+          JSON
+          printf '%s\n' 'initial' > "$SEED/README.md"
+          git -C "$SEED" add -A
+          git -C "$SEED" commit -m initial >/dev/null
+          INITIAL="$(git -C "$SEED" rev-parse HEAD)"
+          git -C "$SEED" remote add origin "$ORIGIN"
+          git -C "$SEED" push -u origin main >/dev/null
+          git --git-dir="$ORIGIN" symbolic-ref HEAD refs/heads/main
+
+          git clone "$ORIGIN" "$TMP/dirty" >/dev/null
+          git clone "$ORIGIN" "$TMP/active-behind" >/dev/null
+          git clone "$ORIGIN" "$TMP/inactive-behind" >/dev/null
+
+          cat > "$SEED/package-lock.json" <<'JSON'
           {"name":"fixture","lockfileVersion":3,"packages":{"":{"dependencies":{"x":"2.0.0","y":"1.0.0"}}}}
           JSON
-          git add .gitignore package-lock.json
-          git commit -m latest >/dev/null
-          LATEST="$(git rev-parse HEAD)"
-          git push origin main >/dev/null
+          printf '%s\n' 'latest' > "$SEED/README.md"
+          git -C "$SEED" add package-lock.json README.md
+          git -C "$SEED" commit -m latest >/dev/null
+          LATEST="$(git -C "$SEED" rev-parse HEAD)"
+          git -C "$SEED" push origin main >/dev/null
 
-          cat > "$TMP/control/.gitignore" <<'EOF'
-          node_modules
-          dist
-          .env
-          .env.local
-          .vercel
-          .env*
-          EOF
-          # Same JSON value as origin/main, deliberately serialized/reordered differently.
-          cat > "$TMP/control/package-lock.json" <<'JSON'
+          # Even a semantically identical lockfile is still local state: preserve it exactly.
+          cat > "$TMP/dirty/package-lock.json" <<'JSON'
           {
-            "packages": {
-              "": {
-                "dependencies": {
-                  "y": "1.0.0",
-                  "x": "2.0.0"
-                }
-              }
-            },
-            "lockfileVersion": 3,
-            "name": "fixture"
+            "packages":{"":{"dependencies":{"y":"1.0.0","x":"2.0.0"}}},
+            "lockfileVersion":3,
+            "name":"fixture"
           }
           JSON
-
-          VITROS_ROOT="$TMP/control" \
-          VITROS_EXPECTED_REPO='' \
-          VITROS_SKIP_SERVICE=1 \
-          VITROS_RECONCILE_BACKUP_DIR="$TMP/backups" \
-          bash "$SCRIPT" | tee "$TMP/reconcile.log"
-
-          test "$(git -C "$TMP/control" rev-parse HEAD)" = "$LATEST"
-          test -z "$(git -C "$TMP/control" status --porcelain=v1 --untracked-files=all)"
-          grep -qx '.env.*.local' "$TMP/control/.gitignore"
-          grep -qx '.vercel' "$TMP/control/.gitignore"
-          ! grep -qxF '.env*' "$TMP/control/.gitignore"
-          grep -q 'semantically identical to origin/main' "$TMP/reconcile.log"
-          grep -q 'VITROS_CONTROL_RECONCILE=PASS' "$TMP/reconcile.log"
-          test "$(find "$TMP/backups" -name local.diff -type f | wc -l)" -eq 1
-
-          git clone "$TMP/origin.git" "$TMP/tampered" >/dev/null
-          git -C "$TMP/tampered" reset --hard "$INITIAL" >/dev/null
-          cat > "$TMP/tampered/.gitignore" <<'EOF'
-          node_modules
-          dist
-          .env
-          .env.local
-          .vercel
-          .env*
-          EOF
-          cat > "$TMP/tampered/package-lock.json" <<'JSON'
-          {"name":"fixture","lockfileVersion":3,"packages":{"":{"dependencies":{"x":"9.9.9","y":"1.0.0"}}}}
-          JSON
-          if VITROS_ROOT="$TMP/tampered" VITROS_EXPECTED_REPO='' VITROS_SKIP_SERVICE=1 VITROS_RECONCILE_BACKUP_DIR="$TMP/tamper-backup" bash "$SCRIPT" >"$TMP/tampered.log" 2>&1; then
-            echo 'semantically changed package-lock was incorrectly accepted' >&2
+          DIRTY_HEAD="$(git -C "$TMP/dirty" rev-parse HEAD)"
+          DIRTY_HASH="$(sha256sum "$TMP/dirty/package-lock.json" | awk '{print $1}')"
+          : > "$CALLS"
+          rm -f "$STATE"
+          export FAKE_SYSTEMCTL_MODE=active
+          if VITROS_ROOT="$TMP/dirty" VITROS_EXPECTED_REPO='' bash "$SCRIPT" >"$TMP/dirty.log" 2>&1; then
+            echo 'dirty checkout was incorrectly reconciled' >&2
             exit 1
           fi
-          test "$(git -C "$TMP/tampered" rev-parse HEAD)" = "$INITIAL"
-          grep -q '"x":"9.9.9"' "$TMP/tampered/package-lock.json"
-          grep -q 'package-lock semantic mismatch paths:' "$TMP/tampered.log"
-          grep -q 'differs semantically from origin/main' "$TMP/tampered.log"
+          test "$(git -C "$TMP/dirty" rev-parse HEAD)" = "$DIRTY_HEAD"
+          test "$(sha256sum "$TMP/dirty/package-lock.json" | awk '{print $1}')" = "$DIRTY_HASH"
+          grep -q 'dirty control checkout detected' "$TMP/dirty.log"
+          test ! -s "$CALLS"
+          echo 'DIRTY_CHECKOUT_BYTE_PRESERVED=PASS'
 
-          git clone "$TMP/origin.git" "$TMP/extra-dirty" >/dev/null
-          git -C "$TMP/extra-dirty" reset --hard "$INITIAL" >/dev/null
-          printf '%s\n' 'unexpected local work' >> "$TMP/extra-dirty/README.md"
-          if VITROS_ROOT="$TMP/extra-dirty" VITROS_EXPECTED_REPO='' VITROS_SKIP_SERVICE=1 bash "$SCRIPT" >"$TMP/extra.log" 2>&1; then
-            echo 'unexpected dirty file was incorrectly accepted' >&2
+          # A clean executor behind origin/main must not have HEAD/worktree advanced underneath it.
+          ACTIVE_HEAD="$(git -C "$TMP/active-behind" rev-parse HEAD)"
+          ACTIVE_TREE="$(git -C "$TMP/active-behind" write-tree)"
+          : > "$CALLS"
+          rm -f "$STATE"
+          export FAKE_SYSTEMCTL_MODE=active
+          if VITROS_ROOT="$TMP/active-behind" VITROS_EXPECTED_REPO='' bash "$SCRIPT" >"$TMP/active.log" 2>&1; then
+            echo 'active behind checkout was incorrectly advanced' >&2
             exit 1
           fi
-          test "$(git -C "$TMP/extra-dirty" rev-parse HEAD)" = "$INITIAL"
-          grep -q 'unexpected local change' "$TMP/extra.log"
+          test "$(git -C "$TMP/active-behind" rev-parse HEAD)" = "$ACTIVE_HEAD"
+          test "$(git -C "$TMP/active-behind" write-tree)" = "$ACTIVE_TREE"
+          test -z "$(git -C "$TMP/active-behind" status --porcelain=v1 --untracked-files=all)"
+          grep -q 'HEAD/worktree were left unchanged' "$TMP/active.log"
+          ! grep -q ' restart ' "$CALLS"
+          echo 'ACTIVE_BEHIND_CHECKOUT_PRESERVED=PASS'
 
-          echo 'VITROS_CONTROL_RECONCILE_SEMANTIC_LOCK=PASS'
+          # A clean inactive checkout is the only state allowed to fast-forward and restart.
+          : > "$CALLS"
+          rm -f "$STATE"
+          export FAKE_SYSTEMCTL_MODE=inactive
+          VITROS_ROOT="$TMP/inactive-behind" VITROS_EXPECTED_REPO='' bash "$SCRIPT" | tee "$TMP/inactive.log"
+          test "$(git -C "$TMP/inactive-behind" rev-parse HEAD)" = "$LATEST"
+          test -z "$(git -C "$TMP/inactive-behind" status --porcelain=v1 --untracked-files=all)"
+          grep -q ' restart ' "$CALLS"
+          grep -q 'VITROS_CONTROL_RECONCILE=PASS' "$TMP/inactive.log"
+          echo 'INACTIVE_CLEAN_FAST_FORWARD_RESTART=PASS'
+
+          # Current + active is preserved in place and never restarted.
+          git clone "$ORIGIN" "$TMP/current-active" >/dev/null
+          : > "$CALLS"
+          rm -f "$STATE"
+          export FAKE_SYSTEMCTL_MODE=active
+          VITROS_ROOT="$TMP/current-active" VITROS_EXPECTED_REPO='' bash "$SCRIPT" | tee "$TMP/current.log"
+          test "$(git -C "$TMP/current-active" rev-parse HEAD)" = "$LATEST"
+          ! grep -q ' restart ' "$CALLS"
+          grep -q 'already current and active; restart not required' "$TMP/current.log"
+          echo 'CURRENT_ACTIVE_NO_RESTART=PASS'
+
+          git diff --check
           echo 'VITROS_CONTROL_RECONCILE_FAIL_CLOSED=PASS'
