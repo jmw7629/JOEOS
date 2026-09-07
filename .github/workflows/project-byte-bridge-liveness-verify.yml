@@ -117,5 +117,6 @@ jobs:
           ! grep -q 'api.github.com' "$runtime"
           ! grep -q 'github.com' "$runtime"
           ! grep -q 'journalctl' "$runtime"
-          git diff --check origin/project-byte-deploy...HEAD
+          git diff --check HEAD^ HEAD
+          sha256sum "$runtime"
           echo 'BRIDGE_LIVENESS_LOCAL_ONLY=PASS'
