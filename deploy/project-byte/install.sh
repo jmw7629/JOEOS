@@ -9,12 +9,10 @@ SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 EXPECTED_BACKEND="86c64e3a06e5c76240753063c01b02c7aa8c83eb5b8f3bf64338a03c11d3a765"
 EXPECTED_SERVER="bb48fb8baecc9e7dd98e57c8e4e3d71ab63ea0b771579edf7b38fa85ad25878d"
-# Retained only as a secondary Git-content consistency check for the existing CI surface.
-EXPECTED_SERVER_GIT="15f6d587a39ef164817efc14711b617cf6145766"
 EXPECTED_INDEX="08a324ae21ab0c19128d0dd0ce6ce9739515a03f740119ce8cd680fe5ef273c7"
 EXPECTED_HOME="3722fe80b6d1d316aecf39d354514ea55a48be17191c9ef5a1a734d764ee6ae2"
 EXPECTED_INSPECTOR="bffa6d45adaafade420b27bf0dcd9717fd8783c3cee1ce73c6550c8752d4cba4"
-EXPECTED_HEALTH="af8a95aeaa7033b30a1b7018c250194c38eeb2dfa0d64229ae729648d5b84e6b"
+EXPECTED_HEALTH="6d0beec20bbaba3d75feadde556251ec7c54bc89085bd10a7c95a3f5343aa165"
 
 if [ "$(id -un)" != "joevps" ]; then
   echo "Run this as joevps, not root." >&2
@@ -67,14 +65,12 @@ cat "$TMP"/index/*.part > "$TMP/index.html"
 
 BACKEND_SHA="$(sha256sum "$TMP/backend.py" | awk '{print $1}')"
 SERVER_SHA="$(sha256sum "$TMP/server.py" | awk '{print $1}')"
-SERVER_GIT="$(git hash-object "$TMP/server.py")"
 INDEX_SHA="$(sha256sum "$TMP/index.html" | awk '{print $1}')"
 HOME_SHA="$(sha256sum "$TMP/home.js" | awk '{print $1}')"
 INSPECTOR_SHA="$(sha256sum "$TMP/home-inspector.js" | awk '{print $1}')"
 HEALTH_SHA="$(sha256sum "$TMP/health-runtime.js" | awk '{print $1}')"
 [ "$BACKEND_SHA" = "$EXPECTED_BACKEND" ] || { echo "Backend checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$SERVER_SHA" = "$EXPECTED_SERVER" ] || { echo "Runtime server SHA-256 mismatch; refusing deployment." >&2; exit 5; }
-[ "$SERVER_GIT" = "$EXPECTED_SERVER_GIT" ] || { echo "Runtime server Git content hash mismatch; refusing deployment." >&2; exit 5; }
 [ "$INDEX_SHA" = "$EXPECTED_INDEX" ] || { echo "UI checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$HOME_SHA" = "$EXPECTED_HOME" ] || { echo "Home module checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$INSPECTOR_SHA" = "$EXPECTED_INSPECTOR" ] || { echo "Home inspector checksum mismatch; refusing deployment." >&2; exit 5; }
@@ -98,7 +94,7 @@ for(const x of ['Verifying system health','Systems verified operational','AI TES
 NODE
 fi
 
-echo "Verified V4 source: backend=$BACKEND_SHA runtime=$SERVER_SHA runtime_git=$SERVER_GIT ui=$INDEX_SHA home=$HOME_SHA inspector=$INSPECTOR_SHA health=$HEALTH_SHA"
+echo "Verified V4 source: backend=$BACKEND_SHA runtime=$SERVER_SHA ui=$INDEX_SHA home=$HOME_SHA inspector=$INSPECTOR_SHA health=$HEALTH_SHA"
 
 python3 - "$TMP/index.html" <<'PY'
 from pathlib import Path
@@ -211,8 +207,8 @@ refresh_bridge() {
   local local_head=""
 
   if [ ! -f "$env_file" ]; then
-    echo "Bridge refresh skipped for $service_name: configuration file is absent."
-    return 0
+    echo "Bridge refresh skipped for $service_name: configuration file is absent, so liveness cannot be verified." >&2
+    return 1
   fi
   root="$(grep '^BRIDGE_ROOT=' "$env_file" 2>/dev/null | head -1 | cut -d= -f2- || true)"
   if [ -z "$root" ] || [ ! -d "$root/.git" ]; then
