@@ -1,0 +1,139 @@
+name: PROJECT_BYTE health semantics once
+
+on:
+  push:
+    branches: [fix/project-byte-health-semantics]
+    paths:
+      - '.github/workflows/project-byte-health-semantics-once.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/project-byte-health-semantics
+          fetch-depth: 0
+
+      - name: Patch truthful required-vs-optional execution health
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          runtime=Path('deploy/project-byte/v4/runtime_server.py')
+          s=runtime.read_text()
+          old='''BRIDGE_SERVICES = {\n    "stickdeath": ("stickdeath-opencode-bridge.service", "jmw7629/StickDeath-Infinity-"),\n    "vitros": ("vitros-opencode-bridge.service", "jmw7629/vitros-web-dashboard"),\n    "vitros_verifier": ("vitros-opencode-verifier.service", "jmw7629/vitros-web-dashboard"),\n}\n'''
+          new='''BRIDGE_SERVICES = {\n    "stickdeath": ("stickdeath-opencode-bridge.service", "jmw7629/StickDeath-Infinity-", True),\n    "vitros": ("vitros-opencode-bridge.service", "jmw7629/vitros-web-dashboard", True),\n    "vitros_verifier": ("vitros-opencode-verifier.service", "jmw7629/vitros-web-dashboard", False),\n}\n'''
+          if old not in s: raise SystemExit('BRIDGE_SERVICES anchor missing')
+          s=s.replace(old,new,1)
+
+          old='''        for key, (service, repo) in BRIDGE_SERVICES.items():\n            last_activity = _latest_bridge_activity(repo)\n            result[key] = {\n                "state": _service_state(service),\n                "last_activity_age_seconds": max(0, int(current - last_activity)) if last_activity else None,\n            }\n'''
+          new='''        for key, (service, repo, required) in BRIDGE_SERVICES.items():\n            last_activity = _latest_bridge_activity(repo)\n            result[key] = {\n                "state": _service_state(service),\n                "required": bool(required),\n                "last_activity_age_seconds": max(0, int(current - last_activity)) if last_activity else None,\n            }\n'''
+          if old not in s: raise SystemExit('bridge health loop anchor missing')
+          s=s.replace(old,new,1)
+
+          old='''    core_ok = database["state"] == "healthy" and sync_state == "healthy"\n    execution_ok = (\n        bridges["stickdeath"]["state"] == "healthy"\n        and bridges["vitros"]["state"] == "healthy"\n        and bridges["vitros_verifier"]["state"] == "healthy"\n        and models["state"] == "tested_ok"\n    )\n    operational = bool(core_ok and execution_ok)\n    return {\n        "ok": bool(core_ok),\n        "operational": operational,\n        "status": "healthy" if operational else "core-healthy" if core_ok else "degraded",\n        "version": 4,\n        "ai_ops": bool(execution_ok),\n        "settings": database["state"] == "healthy",\n        "notifications": sync_state == "healthy",\n        "components": {\n            "sqlite": database,\n            "sync": sync_component,\n            "bridges": bridges,\n            "models": models,\n        },\n    }\n'''
+          new='''    core_ok = database["state"] == "healthy" and sync_state == "healthy"\n    required_bridges_ok = all(\n        item.get("state") == "healthy"\n        for item in bridges.values()\n        if item.get("required")\n    )\n    execution_ok = bool(required_bridges_ok)\n    chat_ready = models["state"] == "tested_ok"\n    warnings = []\n    for key, item in bridges.items():\n        if not item.get("required") and item.get("state") != "healthy":\n            warnings.append(f"{key}-optional-{item.get('state') or 'unknown'}")\n    if not chat_ready:\n        warnings.append(f"models-{models.get('state') or 'unknown'}")\n    operational = bool(core_ok and execution_ok)\n    if operational and warnings:\n        status = "operational-with-warnings"\n    elif operational:\n        status = "healthy"\n    elif core_ok:\n        status = "core-healthy"\n    else:\n        status = "degraded"\n    return {\n        "ok": bool(core_ok),\n        "operational": operational,\n        "status": status,\n        "version": 4,\n        "ai_ops": bool(execution_ok),\n        "ai_chat_ready": bool(chat_ready),\n        "warnings": warnings,\n        "settings": database["state"] == "healthy",\n        "notifications": sync_state == "healthy",\n        "components": {\n            "sqlite": database,\n            "sync": sync_component,\n            "bridges": bridges,\n            "models": models,\n        },\n    }\n'''
+          if old not in s: raise SystemExit('health snapshot anchor missing')
+          s=s.replace(old,new,1)
+          runtime.write_text(s)
+
+          health=Path('deploy/project-byte/v4/health-runtime.js')
+          h=health.read_text()
+          h=h.replace("const text = state === 'tested_ok' ? 'AI TESTED OK' : state === 'failed' ? 'AI DEGRADED' : 'AI UNKNOWN';", "const text = state === 'tested_ok' ? 'AI CHAT TESTED OK' : state === 'failed' ? 'AI CHAT DEGRADED' : 'AI CHAT UNTESTED';")
+          h=h.replace("const headline = health.operational ? 'Operational' : health.ok ? 'Core healthy · execution incomplete' : 'Degraded';", "const headline = health.operational ? ((health.warnings || []).length ? 'Operational · warnings' : 'Operational') : health.ok ? 'Core healthy · execution incomplete' : 'Degraded';")
+          h=h.replace("`VITROS verifier ${safeText(stateLabel(bridges.vitros_verifier))}`,", "`VITROS verifier ${safeText(stateLabel(bridges.vitros_verifier))} (optional)`,")
+          old="""    } else if (health?.operational) {\n      setState('Systems verified operational', 'healthy');\n    } else if (health?.ok) {"""
+          new="""    } else if (health?.operational) {\n      const count = (health.warnings || []).length;\n      setState(count ? `Systems operational · ${count} warning${count === 1 ? '' : 's'}` : 'Systems verified operational', count ? 'unknown' : 'healthy');\n    } else if (health?.ok) {"""
+          if old not in h: raise SystemExit('health UI operational anchor missing')
+          h=h.replace(old,new,1)
+          health.write_text(h)
+
+          installer=Path('deploy/project-byte/install.sh')
+          i=installer.read_text()
+          i=i.replace("['Verifying system health','Systems verified operational','AI TESTED OK','AI UNKNOWN']", "['Verifying system health','Systems verified operational','AI CHAT TESTED OK','AI CHAT UNTESTED']")
+          i=i.replace("grep -Fq 'AI TESTED OK' \"$TMP/live-health-runtime.js\"", "grep -Fq 'AI CHAT TESTED OK' \"$TMP/live-health-runtime.js\"")
+          old='''# The verifier shares VITROS control state; gate Funnel on its liveness without mutating its checkout.\nif ! check_bridge_service "vitros-opencode-verifier.service"; then BRIDGE_REFRESH_FAILURES=1; fi\n'''
+          new='''# Verifier mode is optional until the VITROS bridge actually installs/supports that worker.\n# Report its liveness, but never mark builder execution unhealthy solely because an obsolete/absent verifier unit is inactive.\nif ! check_bridge_service "vitros-opencode-verifier.service"; then\n  echo "Optional VITROS verifier is not active; builder execution remains eligible while verifier recovery is tracked separately." >&2\nfi\n'''
+          if old not in i: raise SystemExit('installer verifier anchor missing')
+          i=i.replace(old,new,1)
+          installer.write_text(i)
+          PY
+
+          python3 -m py_compile deploy/project-byte/v4/runtime_server.py
+          node --check deploy/project-byte/v4/health-runtime.js
+          bash -n deploy/project-byte/install.sh
+
+          TMP="$(mktemp -d)"
+          cat deploy/project-byte/v4/server/*.part > "$TMP/backend.py"
+          cp deploy/project-byte/v4/runtime_server.py "$TMP/server.py"
+          cd "$TMP"
+          python3 <<'PY'
+          import os, sys, time
+          sys.path.insert(0, os.getcwd())
+          import server
+          server._sqlite_health=lambda:{'state':'healthy'}
+          with server.SYNC_LOCK:
+              server.SYNC_STATE['last_attempt']=int(time.time())
+              server.SYNC_STATE['last_ok']=int(time.time())
+              server.SYNC_STATE['last_error']=''
+          server._bridge_health=lambda:{
+              'stickdeath':{'state':'healthy','required':True,'last_activity_age_seconds':10},
+              'vitros':{'state':'healthy','required':True,'last_activity_age_seconds':20},
+              'vitros_verifier':{'state':'failed','required':False,'last_activity_age_seconds':999},
+          }
+          server._model_health=lambda:{'state':'unknown','enabled':1,'tested_ok':0,'failed':0,'unknown':1,'freshness_window_seconds':1800}
+          snap=server.health_snapshot()
+          assert snap['ok'] is True, snap
+          assert snap['operational'] is True, snap
+          assert snap['ai_ops'] is True, snap
+          assert snap['ai_chat_ready'] is False, snap
+          assert snap['status']=='operational-with-warnings', snap
+          assert 'vitros_verifier-optional-failed' in snap['warnings'], snap
+          assert 'models-unknown' in snap['warnings'], snap
+          print('OPTIONAL_VERIFIER_AND_MODEL_WARNING_SEMANTICS=PASS')
+          PY
+          cd - >/dev/null
+
+          SERVER_SHA="$(sha256sum deploy/project-byte/v4/runtime_server.py | awk '{print $1}')"
+          HEALTH_SHA="$(sha256sum deploy/project-byte/v4/health-runtime.js | awk '{print $1}')"
+          python3 - "$SERVER_SHA" "$HEALTH_SHA" <<'PY'
+          from pathlib import Path
+          import re,sys
+          server_sha,health_sha=sys.argv[1:3]
+          p=Path('deploy/project-byte/install.sh')
+          s=p.read_text()
+          s,n1=re.subn(r'EXPECTED_SERVER="[0-9a-f]{64}"',f'EXPECTED_SERVER="{server_sha}"',s,count=1)
+          s,n2=re.subn(r'EXPECTED_HEALTH="[0-9a-f]{64}"',f'EXPECTED_HEALTH="{health_sha}"',s,count=1)
+          if n1!=1 or n2!=1: raise SystemExit('installer hash anchors missing')
+          p.write_text(s)
+          PY
+          bash -n deploy/project-byte/install.sh
+          grep -q '"required": bool(required)' deploy/project-byte/v4/runtime_server.py
+          grep -q 'ai_chat_ready' deploy/project-byte/v4/runtime_server.py
+          grep -q 'operational-with-warnings' deploy/project-byte/v4/runtime_server.py
+          grep -q 'AI CHAT UNTESTED' deploy/project-byte/v4/health-runtime.js
+          grep -q 'VITROS verifier.*optional' deploy/project-byte/v4/health-runtime.js
+          grep -q 'Optional VITROS verifier is not active' deploy/project-byte/install.sh
+          grep -q "EXPECTED_SERVER=\"$SERVER_SHA\"" deploy/project-byte/install.sh
+          grep -q "EXPECTED_HEALTH=\"$HEALTH_SHA\"" deploy/project-byte/install.sh
+          git diff --check
+          echo "PROJECT_BYTE_HEALTH_SEMANTICS=PASS runtime=$SERVER_SHA health=$HEALTH_SHA"
+
+      - name: Commit gated production files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add deploy/project-byte/v4/runtime_server.py deploy/project-byte/v4/health-runtime.js deploy/project-byte/install.sh
+          git commit -m 'Separate required execution health from optional verifier and chat readiness'
+          git push origin HEAD:fix/project-byte-health-semantics
