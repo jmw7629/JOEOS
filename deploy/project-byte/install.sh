@@ -133,12 +133,15 @@ HEALTH=""
 HOME_OK=0
 for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
   if HEALTH="$(curl -fsS http://127.0.0.1:8094/healthz 2>/dev/null)"; then
-    if curl -fsS http://127.0.0.1:8094/ | grep -q '<script src="/home.js"></script>' \
-      && curl -fsS http://127.0.0.1:8094/ | grep -q '<script src="/home-inspector.js"></script>' \
-      && curl -fsS http://127.0.0.1:8094/home.js | grep -q 'Joe AI' \
-      && curl -fsS http://127.0.0.1:8094/home.js | grep -q 'Live agents' \
-      && curl -fsS http://127.0.0.1:8094/home-inspector.js | grep -q 'homeAgentInspector' \
-      && curl -fsS http://127.0.0.1:8094/home-inspector.js | grep -q 'data-inspect-run'; then
+    if curl -fsS http://127.0.0.1:8094/ -o "$TMP/live-index.html" \
+      && curl -fsS http://127.0.0.1:8094/home.js -o "$TMP/live-home.js" \
+      && curl -fsS http://127.0.0.1:8094/home-inspector.js -o "$TMP/live-home-inspector.js" \
+      && grep -Fq '<script src="/home.js"></script>' "$TMP/live-index.html" \
+      && grep -Fq '<script src="/home-inspector.js"></script>' "$TMP/live-index.html" \
+      && grep -Fq 'Joe AI' "$TMP/live-home.js" \
+      && grep -Fq 'Live agents' "$TMP/live-home.js" \
+      && grep -Fq 'homeAgentInspector' "$TMP/live-home-inspector.js" \
+      && grep -Fq 'data-inspect-run' "$TMP/live-home-inspector.js"; then
       HOME_OK=1
       break
     fi
