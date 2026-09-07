@@ -63,10 +63,13 @@ jobs:
           for (const required of ['Joe AI','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','Portfolio pulse','homeCommandInput','home-nav']) {
             if (!home.includes(required)) throw new Error(`missing Home command-center surface: ${required}`);
           }
+          for (const forbidden of ['All systems operational','AI READY','AI CONNECTED']) {
+            if (home.includes(forbidden)) throw new Error(`legacy false-green Home writer remains: ${forbidden}`);
+          }
           for (const required of ['homeAgentInspector','homeAgentLens','Execution log details require Editor or Owner access','data-inspect-run','Full terminal','Agent workspace']) {
             if (!inspector.includes(required)) throw new Error(`missing agent-inspector surface: ${required}`);
           }
-          for (const required of ['Verifying system health','Systems verified operational','Core healthy · execution health incomplete','System degraded','AI VERIFIED','AI DEGRADED','AI UNKNOWN']) {
+          for (const required of ['Verifying system health','Systems verified operational','Core healthy · execution health incomplete','System degraded','AI TESTED OK','AI DEGRADED','AI UNKNOWN']) {
             if (!health.includes(required)) throw new Error(`missing truthful health behavior: ${required}`);
           }
           console.log('UI_JS_FILTERS_HOME_INSPECTOR_AND_HEALTH=PASS');
