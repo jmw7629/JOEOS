@@ -980,6 +980,191 @@ def health_snapshot():
     }
 
 
+# Native observation adapter. No arbitrary paths, hooks, shell execution or writes.
+OBS_REPOS = (("stickdeath", "STICKDEATH_BYTE", "jmw7629/stickdeath-byte"), ("vitros", "DASH_BYTE / VITROS", "jmw7629/vitros-web-dashboard"))
+OBS_CACHE = {"at": 0.0, "value": None}
+OBS_LOCK = threading.Lock()
+OBS_LOG_BYTES = 262144
+OBS_LOG_LIMIT = 6
+OBS_SCAN_LIMIT = 1000
+OBS_EVENT_LIMIT = 320
+OBS_LOG_RE = re.compile(r"^(?:issue-\d+|verify-\d+-[a-f0-9]{6,64})\.log$")
+
+
+def _obs_id(*parts):
+    import hashlib
+    return hashlib.sha256("|".join(str(p) for p in parts).encode()).hexdigest()[:20]
+
+
+def _obs_label(value, maximum=100):
+    text = str(value or "")[:2000]
+    text = re.sub(r"(?i)(?:sk-|gh[pousr]_|github_pat_|pb_)[A-Za-z0-9_-]{8,}", "[redacted]", text)
+    text = re.sub(r"(?i)(?:bearer\s+|(?:password|secret|api.?key|token)\s*[=:]\s*)\S+", "[redacted]", text)
+    return re.sub(r"[\x00-\x1f\x7f]", " ", text)[:maximum]
+
+
+def _obs_number(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value) if 0 <= value <= 1e15 else None
+
+
+def _obs_time(value):
+    number = _obs_number(value)
+    return number / 1000 if number is not None and number > 1e11 else number
+
+
+def _obs_event(raw, trace_id, ordinal):
+    part = raw.get("part") if isinstance(raw.get("part"), dict) else {}
+    kind = str(raw.get("type") or part.get("type") or "")
+    if kind not in {"tool_use", "step_start", "step_finish", "text", "error", "compaction"}:
+        return None
+    state = part.get("state") if isinstance(part.get("state"), dict) else {}
+    timing = state.get("time") if isinstance(state.get("time"), dict) else {}
+    start = _obs_time(timing.get("start")) or _obs_time(raw.get("timestamp"))
+    end = _obs_time(timing.get("end"))
+    status = state.get("status") if state.get("status") in {"pending", "running", "completed", "error"} else "recorded"
+    tool = _obs_label(part.get("tool"), 60) if kind == "tool_use" else kind.replace("_", " ")
+    inputs = state.get("input") if isinstance(state.get("input"), dict) else {}
+    metadata = state.get("metadata") if isinstance(state.get("metadata"), dict) else {}
+    tokens = part.get("tokens") if isinstance(part.get("tokens"), dict) else {}
+    measured = {k: _obs_number(tokens.get(k)) for k in ("input", "output", "reasoning", "total")}
+    sid = _obs_id(trace_id, raw.get("sessionID") or part.get("sessionID") or "default")
+    child = metadata.get("sessionId") or metadata.get("sessionID")
+    event_id = _obs_id(trace_id, part.get("id") or part.get("callID") or json.dumps(raw, sort_keys=True))
+    return {"id": event_id, "session": sid, "kind": kind, "tool": tool, "status": status,
+            "time": start, "end": end, "duration_ms": round((end-start)*1000, 2) if start and end and end >= start else None,
+            "tokens": measured, "cost": _obs_number(part.get("cost")),
+            "argument_fields": [_obs_label(k, 50) for k in list(inputs)[:20]],
+            "response_chars": len(state["output"]) if isinstance(state.get("output"), str) else None,
+            "error_recorded": bool(state.get("error")) or kind == "error",
+            "delegate": _obs_label(inputs.get("subagent_type"), 60) if tool == "task" else "",
+            "child_session": _obs_id(trace_id, child) if isinstance(child, str) and child else "",
+            "payload_policy": "Argument values, response bodies and model text are withheld to protect credentials and project content."}
+
+
+def _obs_parse_log(path, repo, project, record=None):
+    import stat
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(descriptor, "rb") as handle:
+        info = os.fstat(handle.fileno())
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError("not a regular log")
+        offset = max(0, info.st_size - OBS_LOG_BYTES)
+        handle.seek(offset)
+        data = handle.read(OBS_LOG_BYTES)
+    lines = data.splitlines()
+    if offset and lines:
+        lines = lines[1:]
+    trace_id = _obs_id(repo, path.name)
+    events, seen, skipped = [], {}, 0
+    for ordinal, line in enumerate(lines):
+        if len(line) > 131072:
+            skipped += 1
+            continue
+        try:
+            raw = json.loads(line)
+            event = _obs_event(raw, trace_id, ordinal) if isinstance(raw, dict) else None
+        except (ValueError, TypeError, RecursionError, OverflowError):
+            if line.lstrip().startswith(b"{"):
+                skipped += 1
+            continue
+        if event:
+            if event["id"] in seen:
+                events[seen[event["id"]]] = event
+            else:
+                seen[event["id"]] = len(events); events.append(event)
+    clipped = len(events) > OBS_EVENT_LIMIT
+    events = events[-OBS_EVENT_LIMIT:]
+    stamps = [e["time"] for e in events if e["time"] is not None]
+    total_values = [e["tokens"]["total"] for e in events if e["kind"] == "step_finish" and e["tokens"]["total"] is not None]
+    tools = [e for e in events if e["kind"] == "tool_use"]
+    status = str((record or {}).get("status") or "historical")
+    if status not in {"pr-created", "opencode-failed", "bridge-error", "no-changes", "diff-check-failed", "historical"}:
+        status = "historical"
+    return {"id": trace_id, "label": path.stem, "project": project, "repo": repo,
+            "role": "verifier" if path.name.startswith("verify-") else "builder", "status": status,
+            "updated_at": info.st_mtime, "started_at": min(stamps) if stamps else None,
+            "ended_at": max(stamps) if stamps else None, "tokens": sum(total_values) if total_values else None,
+            "tool_count": len(tools), "event_count": len(events), "events": events,
+            "partial": bool(offset or clipped or skipped), "skipped_records": skipped,
+            "source": "bridge-log", "owner": "", "task_id": ""}
+
+
+def _obs_processed(state_dir):
+    path = state_dir / "processed.json"
+    if path.is_symlink():
+        return {}
+    try:
+        import stat
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(descriptor, "rb") as handle:
+            if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                return {}
+            data = handle.read(1048577)
+        if len(data) > 1048576:
+            return {}
+        raw = json.loads(data)
+        return raw.get("processed", {}) if isinstance(raw, dict) else {}
+    except (OSError, ValueError, RecursionError):
+        return {}
+
+
+def _obs_build_snapshot():
+    traces, sources = [], []
+    for key, project, repo in OBS_REPOS:
+        root = app.BRIDGE_STATE.get(repo)
+        source = {"project": project, "repo": repo, "state": "unavailable", "files_scanned": 0, "partial": False}
+        sources.append(source)
+        if not root:
+            continue
+        root = Path(root); logs = root / "logs"
+        if root.is_symlink() or logs.is_symlink():
+            continue
+        records = _obs_processed(root)
+        candidates = []
+        try:
+            with os.scandir(logs) as listing:
+                for count, entry in enumerate(listing):
+                    if count >= OBS_SCAN_LIMIT:
+                        source["partial"] = True; break
+                    if OBS_LOG_RE.fullmatch(entry.name) and entry.is_file(follow_symlinks=False):
+                        candidates.append((entry.stat(follow_symlinks=False).st_mtime, Path(entry.path)))
+            candidates.sort(reverse=True)
+            source["files_scanned"] = len(candidates)
+            source["partial"] |= len(candidates) > OBS_LOG_LIMIT
+            for _, path in candidates[:OBS_LOG_LIMIT]:
+                number = path.stem.split("-")[1]
+                record = records.get(number) if path.name.startswith("issue-") else None
+                traces.append(_obs_parse_log(path, repo, project, record if isinstance(record, dict) else None))
+            source["state"] = "available"
+        except (OSError, ValueError, TypeError, RecursionError) as exc:
+            source["state"] = "unavailable"; source["error_type"] = type(exc).__name__
+    try:
+        work = {t["id"]: t for t in app.task_rows()}
+        for run in app.run_rows():
+            match = next((t for t in traces if t["repo"] == run["repo"] and t["label"] == "issue-"+str(run["issue_number"])), None)
+            if match:
+                task = work.get(run["task_id"], {})
+                match["owner"] = _obs_label(task.get("owner"), 80)
+                match["task_id"] = _obs_label(run["task_id"], 100)
+                match["project"] = _obs_label(run["project"], 100)
+    except Exception:
+        sources.append({"project": "Workspace associations", "state": "unavailable", "partial": True})
+    traces.sort(key=lambda item: item["updated_at"], reverse=True)
+    return {"version": 1, "observed_at": int(time.time()), "traces": traces, "sources": sources,
+            "state": "available" if all(s["state"] == "available" for s in sources) else "partial",
+            "limits": {"logs_per_repository": OBS_LOG_LIMIT, "bytes_per_log": OBS_LOG_BYTES, "events_per_log": OBS_EVENT_LIMIT},
+            "capabilities": {"read_only": True, "execution_permissions": False, "token_metrics": "recorded step totals only", "payloads": "metadata only"}}
+
+
+def observatory_snapshot():
+    with OBS_LOCK:
+        if OBS_CACHE["value"] is None or time.monotonic()-OBS_CACHE["at"] > 15:
+            OBS_CACHE["value"] = _obs_build_snapshot(); OBS_CACHE["at"] = time.monotonic()
+        return OBS_CACHE["value"]
+
+
 class SafeHandler(app.H):
     """Production HTTP boundary with evidence-backed health."""
 
@@ -1063,6 +1248,10 @@ class SafeHandler(app.H):
         path = unquote(urlparse(self.path).path)
         if path == "/healthz":
             return self.sendj(health_snapshot())
+        if path == "/api/observatory":
+            if not self.need(2):
+                return
+            return self.sendj(observatory_snapshot())
         if path == "/api/external-reviews":
             if not self.need(1):
                 return
