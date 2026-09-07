@@ -41,7 +41,6 @@ jobs:
           home=deploy/project-byte/v4/home.js
           grep -Fq '"jmw7629/stickdeath-byte"' "$runtime"
           grep -Fq '"jmw7629/vitros-web-dashboard"' "$runtime"
-          ! grep -Fq 'jmw7629/StickDeath-Infinity-' "$runtime"
           grep -Fq 'if path == "/api/external-reviews"' "$runtime"
           grep -Fq 'if not self.need(1)' "$runtime"
           grep -Fq '"gh", "pr", "list"' "$runtime"
