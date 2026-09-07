@@ -41,6 +41,9 @@ GET_API_PATHS = frozenset(
 RUN_TERMINAL_RE = re.compile(r"^/api/runs/[^/]+/terminal$")
 SYNC_LOCK = threading.Lock()
 SYNC_STATE = {"last_attempt": 0, "last_ok": 0, "last_error": ""}
+BRIDGE_CACHE_LOCK = threading.Lock()
+BRIDGE_CACHE = {"at": 0.0, "value": {}}
+BRIDGE_CACHE_SECONDS = 10.0
 
 BRIDGE_SERVICES = {
     "stickdeath": ("stickdeath-opencode-bridge.service", "jmw7629/StickDeath-Infinity-"),
@@ -109,7 +112,7 @@ def _service_state(service: str):
             ["systemctl", "--user", "is-active", service],
             text=True,
             capture_output=True,
-            timeout=2,
+            timeout=1,
             env=env,
         )
     except (OSError, subprocess.SubprocessError):
@@ -122,16 +125,28 @@ def _service_state(service: str):
     return "unknown"
 
 
+def _copy_bridge_health(value: dict) -> dict:
+    return {key: dict(item) for key, item in value.items()}
+
+
 def _bridge_health():
     current = time.time()
-    result = {}
-    for key, (service, repo) in BRIDGE_SERVICES.items():
-        last_activity = _latest_bridge_activity(repo)
-        result[key] = {
-            "state": _service_state(service),
-            "last_activity_age_seconds": max(0, int(current - last_activity)) if last_activity else None,
-        }
-    return result
+    with BRIDGE_CACHE_LOCK:
+        cached_at = float(BRIDGE_CACHE.get("at") or 0.0)
+        cached = BRIDGE_CACHE.get("value") or {}
+        if cached and current - cached_at <= BRIDGE_CACHE_SECONDS:
+            return _copy_bridge_health(cached)
+
+        result = {}
+        for key, (service, repo) in BRIDGE_SERVICES.items():
+            last_activity = _latest_bridge_activity(repo)
+            result[key] = {
+                "state": _service_state(service),
+                "last_activity_age_seconds": max(0, int(current - last_activity)) if last_activity else None,
+            }
+        BRIDGE_CACHE["at"] = current
+        BRIDGE_CACHE["value"] = result
+        return _copy_bridge_health(result)
 
 
 def _model_health():
@@ -183,6 +198,7 @@ def health_snapshot():
     execution_ok = (
         bridges["stickdeath"]["state"] == "healthy"
         and bridges["vitros"]["state"] == "healthy"
+        and bridges["vitros_verifier"]["state"] == "healthy"
         and models["state"] == "tested_ok"
     )
     operational = bool(core_ok and execution_ok)
