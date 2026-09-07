@@ -1,0 +1,107 @@
+name: PROJECT_BYTE Home identity polish once
+
+on:
+  push:
+    branches: [project-byte-deploy]
+    paths:
+      - '.github/workflows/project-byte-home-identity-polish-once.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: project-byte-deploy
+          fetch-depth: 0
+      - name: Refine Home identity and scoped semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          p=Path('deploy/project-byte/v4/home.js')
+          s=p.read_text()
+
+          # My Work heading becomes addressable so public/auth views can be truthful.
+          s=s.replace('<h3>My work</h3><button type="button" data-home-go="board" aria-label="Open Kanban">›</button></div><div id="homeWork"', '<h3 id="homeWorkTitle">My work</h3><button type="button" data-home-go="board" aria-label="Open Kanban">›</button></div><div id="homeWork"', 1)
+
+          old='''  function homeTaskScope(mode) {\n    if (typeof clearFilters === 'function') clearFilters();\n    const map = {\n      joe: ['ownerFilter', session?.name && session.name !== 'Public' ? session.name : 'Joe'],\n      mike: ['ownerFilter','Mike'],\n      ai: ['executorFilter','ai'],\n      critical: ['priorityFilter','Critical'],\n      week: ['dueFilter','7d']\n    };\n    if (mode === 'all') { renderHome(); return; }\n    const pair = map[mode];\n    if (pair && document.getElementById(pair[0])) document.getElementById(pair[0]).value = pair[1];\n    if (typeof renderAll === 'function') renderAll();\n    renderHome();\n  }\n'''
+          new='''  function homeTaskScope(mode) {\n    if (typeof clearFilters === 'function') clearFilters();\n    const selfName=session?.name&&session.name!=='Public'?session.name:'Joe';\n    const map = {\n      self: ['ownerFilter',selfName],\n      joe: ['ownerFilter','Joe'],\n      mike: ['ownerFilter','Mike'],\n      ai: ['executorFilter','ai'],\n      critical: ['priorityFilter','Critical'],\n      week: ['dueFilter','7d']\n    };\n    if (mode === 'all') { renderHome(); return; }\n    const pair = map[mode];\n    if (pair && document.getElementById(pair[0])) document.getElementById(pair[0]).value = pair[1];\n    if (typeof renderAll === 'function') renderAll();\n    renderHome();\n  }\n'''
+          if old in s:s=s.replace(old,new,1)
+          elif 'self: [\'ownerFilter\',selfName]' not in s:raise SystemExit('homeTaskScope anchor missing')
+
+          old='''  function homeKpiScope(kind) {\n    if (typeof clearFilters === 'function') clearFilters();\n    const map = {\n      open: ['completionFilter','open'],\n      active: ['statusFilter','Active'],\n      blocked: ['statusFilter','Blocked'],\n      critical: ['priorityFilter','Critical'],\n      ai: ['runFilter','active'],\n      due: ['dueFilter','7d']\n    };\n    const pair=map[kind];\n    if(pair&&document.getElementById(pair[0]))document.getElementById(pair[0]).value=pair[1];\n    if(typeof renderAll==='function')renderAll();\n    renderHome();\n  }\n'''
+          new='''  function homeKpiScope(kind) {\n    const map = {\n      open: ['completionFilter','open'],\n      active: ['statusFilter','Active'],\n      blocked: ['statusFilter','Blocked'],\n      critical: ['priorityFilter','Critical'],\n      ai: ['runFilter','active'],\n      due: ['dueFilter','7d']\n    };\n    const pair=map[kind];\n    const control=pair?document.getElementById(pair[0]):null;\n    if(control)control.value=control.value===pair[1]?'':pair[1];\n    if(typeof renderAll==='function')renderAll();\n    renderHome();\n  }\n'''
+          if old in s:s=s.replace(old,new,1)
+          elif "control.value=control.value===pair[1]?'':pair[1]" not in s:raise SystemExit('homeKpiScope anchor missing')
+
+          old='''  function renderScopes() {\n    const c = typeof filterCriteria === 'function' ? filterCriteria() : {};\n    const active = c.ownerFilter==='Mike'?'mike':c.executorFilter==='ai'?'ai':c.priorityFilter==='Critical'?'critical':c.dueFilter==='7d'?'week':c.ownerFilter?'joe':'all';\n    const el=document.getElementById('homeScopes'); if(!el)return;\n    const chips=[['all','All projects'],['joe',session?.name&&session.name!=='Public'?session.name:'Joe'],['mike','Mike'],['ai','AI work'],['critical','Critical'],['week','This week']];\n    el.innerHTML=chips.map(([k,l])=>`<button type="button" class="home-chip ${active===k?'active':''}" data-home-scope="${k}">${escH(l)}</button>`).join('');\n  }\n'''
+          new='''  function renderScopes() {\n    const c = typeof filterCriteria === 'function' ? filterCriteria() : {};\n    const selfName=session?.name&&session.name!=='Public'?session.name:'';\n    const active = selfName&&c.ownerFilter===selfName?'self':c.ownerFilter==='Joe'?'joe':c.ownerFilter==='Mike'?'mike':c.executorFilter==='ai'?'ai':c.priorityFilter==='Critical'?'critical':c.dueFilter==='7d'?'week':'all';\n    const el=document.getElementById('homeScopes'); if(!el)return;\n    const chips=[['all','All projects']];\n    if(selfName)chips.push(['self','My work']);\n    if(selfName!=='Joe')chips.push(['joe','Joe']);\n    if(selfName!=='Mike')chips.push(['mike','Mike']);\n    chips.push(['ai','AI work'],['critical','Critical'],['week','This week']);\n    el.innerHTML=chips.map(([k,l])=>`<button type="button" class="home-chip ${active===k?'active':''}" data-home-scope="${k}">${escH(l)}</button>`).join('');\n  }\n'''
+          if old in s:s=s.replace(old,new,1)
+          elif "chips.push(['self','My work'])" not in s:raise SystemExit('renderScopes anchor missing')
+
+          old='''  function renderAgentMap() {\n    const el=document.getElementById('homeAgentMap'); if(!el)return;\n    const enabled=(agents||[]).filter(a=>a.enabled).slice(0,5);\n    const positions=[[50,13],[16,42],[84,42],[28,82],[72,82]];\n'''
+          new='''  function renderAgentMap(scoped) {\n    const el=document.getElementById('homeAgentMap'); if(!el)return;\n    const ids=new Set(scoped.map(t=>t.id)),selected=document.getElementById('agentFilter')?.value||'';\n    const activeKeys=new Set((runs||[]).filter(r=>ids.has(r.task_id)&&['queued','running'].includes(r.status)).map(r=>r.agent_key));\n    const enabled=(agents||[]).filter(a=>a.enabled&&a.agent_key!=='executive').sort((a,b)=>{\n      const ar=(a.agent_key===selected?2:0)+(activeKeys.has(a.agent_key)?1:0),br=(b.agent_key===selected?2:0)+(activeKeys.has(b.agent_key)?1:0);\n      return br-ar||String(a.name).localeCompare(String(b.name));\n    }).slice(0,5);\n    const positions=[[50,13],[16,42],[84,42],[28,82],[72,82]];\n'''
+          if old in s:s=s.replace(old,new,1)
+          elif 'a.agent_key!==\'executive\'' not in s:raise SystemExit('renderAgentMap anchor missing')
+
+          old="const nodes=enabled.map((a,i)=>{const [x,y]=positions[i];const active=(runs||[]).some(r=>r.agent_key===a.agent_key&&['queued','running'].includes(r.status));return"
+          new="const nodes=enabled.map((a,i)=>{const [x,y]=positions[i];const active=activeKeys.has(a.agent_key);return"
+          if old in s:s=s.replace(old,new,1)
+          elif 'const active=activeKeys.has(a.agent_key);return' not in s:raise SystemExit('agent active anchor missing')
+
+          old="const people=(team||[]).filter(p=>p.active).slice(0,4);\n    const who=session?.name&&session.name!=='Public'?session.name:'Joe';"
+          new="const who=session?.name&&session.name!=='Public'?session.name:'Joe';\n    const people=(team||[]).filter(p=>p.active&&p.name!==who).slice(0,4);"
+          if old in s:s=s.replace(old,new,1)
+          elif 'p.active&&p.name!==who' not in s:raise SystemExit('org people anchor missing')
+
+          old="<div class=\"org-row\">${['Research','Development','Operations'].map((x,i)=>`<div class=\"org-person\"><b>${x}</b><small>${i===0?'Evidence':i===1?'Build':'Release'}</small></div>`).join('')}</div>"
+          new="<div class=\"org-row\">${[['Research','researcher','Evidence'],['Development','builder','Build'],['Operations','release','Release']].map(([x,key,sub])=>`<button type=\"button\" class=\"org-person\" data-home-agent=\"${key}\"><b>${x}</b><small>${sub}</small></button>`).join('')}</div>"
+          if old in s:s=s.replace(old,new,1)
+          elif "['Research','researcher','Evidence']" not in s:raise SystemExit('org department anchor missing')
+
+          old='''  function renderWork(scoped) {\n    const el=document.getElementById('homeWork');if(!el)return;\n    const who=session?.name&&session.name!=='Public'?session.name:'Joe';\n    let items=scoped.filter(t=>t.status!=='Done'&&t.owner===who);\n    if(!items.length) items=scoped.filter(t=>t.status!=='Done').sort((a,b)=>({Critical:0,High:1,Medium:2,Low:3}[a.priority]-({Critical:0,High:1,Medium:2,Low:3}[b.priority]))).slice(0,4);\n    else items=items.slice(0,4);\n    el.innerHTML=items.length?items.map(t=>`<button type="button" class="work-item" data-home-task="${escH(t.id)}"><div class="work-top"><b>${escH(t.title)}</b><span class="home-priority ${escH(t.priority)}">${escH(t.priority)}</span></div><span>${escH(t.project)}${t.due_date?' · due '+escH(t.due_date):''}${t.ai_state?' · AI '+escH(t.ai_state):''}</span></button>`).join(''):'<div class="small">No open work in this scope.</div>';\n  }\n'''
+          new='''  function renderWork(scoped) {\n    const el=document.getElementById('homeWork');if(!el)return;\n    const title=document.getElementById('homeWorkTitle');\n    const authenticated=session?.name&&session.name!=='Public',who=authenticated?session.name:'';\n    if(title)title.textContent=authenticated?'My work':'Open work';\n    let items=authenticated?scoped.filter(t=>t.status!=='Done'&&t.owner===who):scoped.filter(t=>t.status!=='Done');\n    items=items.sort((a,b)=>({Critical:0,High:1,Medium:2,Low:3}[a.priority]-({Critical:0,High:1,Medium:2,Low:3}[b.priority])).slice(0,4);\n    const empty=authenticated?`No open work assigned to ${escH(who)} in this scope.`:'No open work in this scope.';\n    el.innerHTML=items.length?items.map(t=>`<button type="button" class="work-item" data-home-task="${escH(t.id)}"><div class="work-top"><b>${escH(t.title)}</b><span class="home-priority ${escH(t.priority)}">${escH(t.priority)}</span></div><span>${escH(t.project)}${t.due_date?' · due '+escH(t.due_date):''}${t.ai_state?' · AI '+escH(t.ai_state):''}</span></button>`).join(''):`<div class="small">${empty}</div>`;\n  }\n'''
+          if old in s:s=s.replace(old,new,1)
+          elif 'No open work assigned to ${escH(who)}' not in s:raise SystemExit('renderWork anchor missing')
+
+          old='''  function renderMemory() {\n    const el=document.getElementById('homeMemory');if(!el)return;\n    const items=(memory||[]).slice(0,5);\n    el.innerHTML=items.length?items.map(m=>`<div class="memory-item"><b>${escH(m.kind)} · ${escH(m.agent_key||'shared')}</b><span>${escH(m.content)}</span></div>`).join(''):'<div class="small">No agent memory available for this access level.</div>';\n  }\n'''
+          new='''  function renderMemory(scoped) {\n    const el=document.getElementById('homeMemory');if(!el)return;\n    const allTasks=tasks||[],filtered=scoped.length!==allTasks.length,names=new Set(scoped.map(t=>t.project)),agent=document.getElementById('agentFilter')?.value||'';\n    let source=memory||[];\n    if(filtered)source=source.filter(m=>!m.project||names.has(m.project));\n    if(agent)source=source.filter(m=>!m.agent_key||m.agent_key===agent);\n    const items=source.slice(0,5);\n    el.innerHTML=items.length?items.map(m=>`<div class="memory-item"><b>${escH(m.kind)} · ${escH(m.agent_key||'shared')}</b><span>${escH(m.content)}</span></div>`).join(''):'<div class="small">No agent memory available in this scope.</div>';\n  }\n'''
+          if old in s:s=s.replace(old,new,1)
+          elif 'function renderMemory(scoped)' not in s:raise SystemExit('renderMemory anchor missing')
+
+          # Portfolio progress respects scoped tasks when a filter is active.
+          old="el.innerHTML=list.map(p=>{const t=(tasks||[]).filter(x=>x.project===p.name),done=t.filter(x=>x.status==='Done').length,pct=t.length?Math.round(done/t.length*100):0;return"
+          new="el.innerHTML=list.map(p=>{const t=(filtered?scoped:(tasks||[])).filter(x=>x.project===p.name),done=t.filter(x=>x.status==='Done').length,pct=t.length?Math.round(done/t.length*100):0;return"
+          if old in s:s=s.replace(old,new,1)
+          elif 'const t=(filtered?scoped:(tasks||[])).filter' not in s:raise SystemExit('portfolio scoped progress anchor missing')
+
+          old='renderKpis(scoped); renderScopes(); renderAgentMap(); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(); renderPortfolio(scoped);'
+          new='renderKpis(scoped); renderScopes(); renderAgentMap(scoped); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(scoped); renderPortfolio(scoped);'
+          if old in s:s=s.replace(old,new,1)
+          elif new not in s:raise SystemExit('renderHome scoped call anchor missing')
+
+          p.write_text(s)
+          PY
+          node --check deploy/project-byte/v4/home.js
+          grep -q "chips.push(\['self','My work'\])" deploy/project-byte/v4/home.js
+          grep -q "a.agent_key!=='executive'" deploy/project-byte/v4/home.js
+          grep -q 'function renderMemory(scoped)' deploy/project-byte/v4/home.js
+          grep -q 'No open work assigned to' deploy/project-byte/v4/home.js
+          grep -q "control.value=control.value===pair\[1\]?'':pair\[1\]" deploy/project-byte/v4/home.js
+          git diff --check
+      - name: Commit Home refinement
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add deploy/project-byte/v4/home.js
+          git commit -m 'Refine Home identity, scopes, and agent semantics'
+          git push origin HEAD:project-byte-deploy
