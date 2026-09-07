@@ -46,17 +46,23 @@ class SafeHandler(app.H):
     fall through to SimpleHTTPRequestHandler's runtime-directory file server.
     """
 
-    def _not_found(self):
-        return self.sendj({"error": "not found"}, 404)
+    def _not_found(self, *, head: bool = False):
+        if not head:
+            return self.sendj({"error": "not found"}, 404)
+        self.send_response(404)
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
 
     def _send_file(self, path: Path, content_type: str, *, head: bool = False):
         try:
             resolved = path.resolve(strict=True)
             stat = resolved.stat()
             if not resolved.is_file():
-                return self._not_found()
+                return self._not_found(head=head)
         except (FileNotFoundError, OSError):
-            return self._not_found()
+            return self._not_found(head=head)
 
         self.send_response(200)
         self.send_header("Content-Type", content_type)
@@ -77,14 +83,14 @@ class SafeHandler(app.H):
     def _public_file(self, path: str, *, head: bool = False):
         item = PUBLIC_FILES.get(path)
         if not item:
-            return self._not_found()
+            return self._not_found(head=head)
         name, content_type = item
         candidate = (app.ROOT / name).resolve()
         try:
             if candidate.parent != app.ROOT.resolve():
-                return self._not_found()
+                return self._not_found(head=head)
         except OSError:
-            return self._not_found()
+            return self._not_found(head=head)
         return self._send_file(candidate, content_type, head=head)
 
     def _attachment_file(self, path: str, *, head: bool = False):
@@ -96,7 +102,7 @@ class SafeHandler(app.H):
             or Path(stored).name != stored
             or len(stored) > 180
         ):
-            return self._not_found()
+            return self._not_found(head=head)
 
         try:
             with app.con() as conn:
@@ -105,14 +111,14 @@ class SafeHandler(app.H):
                     (stored,),
                 ).fetchone()
         except Exception:
-            return self._not_found()
+            return self._not_found(head=head)
         if not record:
-            return self._not_found()
+            return self._not_found(head=head)
 
         uploads_root = app.UPLOADS.resolve()
         candidate = (app.UPLOADS / stored).resolve()
         if candidate.parent != uploads_root:
-            return self._not_found()
+            return self._not_found(head=head)
         content_type = record["content_type"] or "application/octet-stream"
         return self._send_file(candidate, content_type, head=head)
 
@@ -132,7 +138,7 @@ class SafeHandler(app.H):
             return self._public_file(path, head=True)
         if path.startswith("/uploads/"):
             return self._attachment_file(path, head=True)
-        return self._not_found()
+        return self._not_found(head=True)
 
 
 if __name__ == "__main__":
