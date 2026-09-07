@@ -35,6 +35,9 @@ jobs:
           grep -q "EXPECTED_INSPECTOR=\"$INSPECTOR_SHA\"" deploy/project-byte/install.sh
           grep -q 'home-inspector.js' deploy/project-byte/install.sh
           grep -q 'Home command center and live agent inspector are loaded and verified' deploy/project-byte/install.sh
+          ! grep -nE 'curl .*\| *grep -q' deploy/project-byte/install.sh
+          grep -q 'live-index.html' deploy/project-byte/install.sh
+          grep -q 'live-home-inspector.js' deploy/project-byte/install.sh
           node --check "$TMP/home.js"
           node --check "$TMP/home-inspector.js"
           python3 -m py_compile "$TMP/server.py"
