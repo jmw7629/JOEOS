@@ -55,6 +55,7 @@ Work Next: deterministic priority ranking.
 AI: discuss a selected project/task, draft execution prompts, then explicitly Queue to AI.
 Agents: inspect agent roles, live runs, performance, memory and learning.
 Terminal: read-only execution stream from OpenCode bridge logs; not a raw shell.
+Owner holds: an explicitly paused BYTE worker cannot receive queued work. Inspect its paused status in Agents. A restart does not clear an owner hold.
 Models: connect local/Ollama or OpenAI models; secrets stay server-side in environment variables.
 Team: create revocable collaborator access; never share the owner key.
 Activity: audited changes.
@@ -107,9 +108,11 @@ Execution requirements
 
 def create_github_issue(repo: str, title: str, body: str) -> tuple[int,str]:
     if repo not in BRIDGES:raise RuntimeError("No approved OpenCode bridge is connected for this repository")
+    require_no_execution_hold(repo)
     with tempfile.NamedTemporaryFile("w",delete=False,encoding="utf-8") as f:
         f.write(body); path=f.name
     try:
+        require_no_execution_hold(repo)
         p=subprocess.run(["gh","issue","create","--repo",repo,"--title","[OC] "+title[:180],"--body-file",path],text=True,capture_output=True,timeout=30)
         if p.returncode!=0:raise RuntimeError(sanitize((p.stderr or p.stdout or "GitHub issue creation failed")[-1200:]))
         url=(p.stdout or "").strip().splitlines()[-1];num=int(url.rstrip("/").split("/")[-1]);return num,url

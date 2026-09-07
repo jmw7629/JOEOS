@@ -5,6 +5,7 @@
   let selectedAgentKey = '';
   let selectedRunId = '';
   let selectedExternalKey = '';
+  let selectedHoldKey = '';
   let inspectorRequest = 0;
   let lastHealth = window.__PROJECT_BYTE_HEALTH_LAST__ || null;
 
@@ -28,6 +29,7 @@
     .home-event-list{display:grid;gap:5px;margin-top:8px}.home-event-row{display:grid;grid-template-columns:auto 1fr;gap:7px;padding:6px 0;border-bottom:1px solid rgba(103,130,158,.12)}.home-event-row:last-child{border-bottom:0}.home-event-row time{font:9px ui-monospace,SFMono-Regular,Menlo,monospace;color:#73899f}.home-event-row b{display:block;font-size:9px}.home-event-row span{display:block;color:var(--muted);font-size:9px;margin-top:1px}
     .home-log-preview{margin-top:8px;border:1px solid rgba(87,112,137,.20);background:#04080d;border-radius:9px;padding:8px;max-height:138px;overflow:auto;white-space:pre-wrap;font:9px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:#bcd2c4}
     .agent-node.inspecting{border-color:rgba(112,200,255,.78)!important;box-shadow:0 0 0 2px rgba(112,200,255,.10),0 0 24px rgba(56,139,198,.14)!important}
+    .home-run-pill[data-state="paused"],.owner-hold-action{min-height:44px}.home-inspector-close{min-width:44px;min-height:44px}
     @media(max-width:650px){.home-inspector-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.home-run-pill{min-width:136px}.home-log-preview{max-height:118px}}
   `;
   document.head.appendChild(style);
@@ -94,6 +96,27 @@
     });
   }
 
+  function ownerHeldTargets() {
+    const health=lastHealth || window.__PROJECT_BYTE_HEALTH_LAST__ || null;
+    return Object.entries(EXTERNAL_TARGETS).filter(([key])=>health?.components?.bridges?.[key]?.owner_paused===true)
+      .map(([key,target])=>({key,target,running:health.components.bridges[key].external_running===true,observable:health.components.bridges[key].external_evidence_complete===true}));
+  }
+
+  function inspectOwnerHold(key) {
+    const item=ownerHeldTargets().find(x=>x.key===key);
+    if(!item){selectedHoldKey='';document.getElementById('homeAgentInspector')?.classList.remove('open');return;}
+    const current=document.body.dataset.pbView || location.hash.replace('#','');
+    if(current!=='home')document.querySelector('.tab[data-view="home"]')?.click();
+    selectedHoldKey=key;selectedExternalKey='';selectedAgentKey='';selectedRunId='';++inspectorRequest;
+    const panel=ensureInspector();if(!panel)return;
+    panel.classList.add('open');markSelectedNode();
+    panel.innerHTML=`<div class="home-inspector-head"><div><h4>${escI(item.target.project)}</h4><p>Paused by owner · read-only status</p></div>
+      <button type="button" class="home-inspector-close" data-inspector-close aria-label="Close agent inspector">×</button></div>
+      <div class="home-inspector-body"><div class="notice">Queue and execution are disabled by an explicit owner hold. No work has been dispatched by this inspector.</div>
+      <p class="small">${item.running?'An executor is still observed; this status does not claim it has stopped.':item.observable?'No active external executor is observed for this held worker.':'Executor activity is not observable; the owner hold still blocks new dispatch.'}</p>
+      <p class="small">The installer and dashboard cannot clear the hold. A service restart is not a remedy for an intentional stop.</p></div>`;
+  }
+
   function renderLens() {
     ensureInspector();
     const lens = document.getElementById('homeAgentLens');
@@ -106,6 +129,7 @@
       })
       .slice(0,6);
     const external = externalExecutions();
+    const holdsHtml=ownerHeldTargets().map(x=>`<button type="button" class="home-run-pill" data-inspect-hold="${escI(x.key)}" data-state="paused"><b>${escI(x.target.project)} · Paused by owner</b><span>Queue disabled · inspect hold</span></button>`).join('');
     const externalHtml=external.map(x=>`
       <button type="button" class="home-run-pill" data-inspect-external="${escI(x.key)}" data-state="running-external">
         <b>${escI(x.target.agent)} · running (external)</b>
@@ -116,7 +140,7 @@
         <b>${escI(r.agent_key || 'agent')} · ${escI(r.status || 'unknown')}</b>
         <span>${escI(r.project || '—')} · #${Number(r.issue_number||0) || '—'} · PROJECT_BYTE</span>
       </button>`).join('');
-    lens.innerHTML = externalHtml || ownedHtml ? externalHtml+ownedHtml : '<span class="small">No observed agent runs.</span>';
+    lens.innerHTML = holdsHtml || externalHtml || ownedHtml ? holdsHtml+externalHtml+ownedHtml : '<span class="small">No observed agent runs.</span>';
   }
 
   function markSelectedNode() {
@@ -179,7 +203,7 @@
     if(!item)return;
     const current=document.body.dataset.pbView || location.hash.replace('#','');
     if(current!=='home')document.querySelector('.tab[data-view="home"]')?.click();
-    selectedExternalKey=key;selectedAgentKey='';selectedRunId='';++inspectorRequest;
+    selectedHoldKey='';selectedExternalKey=key;selectedAgentKey='';selectedRunId='';++inspectorRequest;
     const panel=ensureInspector();if(!panel)return;
     panel.classList.add('open');markSelectedNode();
     const issueUrl=item.issue>0?`https://github.com/${item.target.repo}/issues/${item.issue}`:'';
@@ -205,7 +229,7 @@
 
   function inspectAgent(key, preferredRunId='') {
     if (!key) return;
-    selectedExternalKey='';
+    selectedHoldKey='';selectedExternalKey='';
     selectedAgentKey = key;
     const list = latestRunsForAgent(key);
     const run = (preferredRunId && list.find(r => r.id === preferredRunId)) || list[0] || null;
@@ -227,17 +251,23 @@
 
   function refreshInspector() {
     renderLens();
-    if (selectedExternalKey) inspectExternal(selectedExternalKey);
+    if (selectedHoldKey) inspectOwnerHold(selectedHoldKey);
+    else if (selectedExternalKey) inspectExternal(selectedExternalKey);
     else if (selectedAgentKey) inspectAgent(selectedAgentKey, selectedRunId);
     else markSelectedNode();
   }
 
   function appendExternalRunsToAgents() {
     const el=document.getElementById('runList');if(!el)return;
-    el.querySelectorAll('[data-external-agent-row]').forEach(x=>x.remove());
-    const external=externalExecutions();
-    if(!external.length)return;
+    el.querySelectorAll('[data-external-agent-row],[data-owner-hold-row]').forEach(x=>x.remove());
+    const external=externalExecutions(),holds=ownerHeldTargets();
+    if(!external.length&&!holds.length)return;
     const fragment=document.createDocumentFragment();
+    holds.forEach(item=>{
+      const row=document.createElement('div');row.className='run';row.dataset.ownerHoldRow=item.key;
+      row.innerHTML=`<div><b>${escI(item.target.project)}</b><div class="small">Paused by owner · queue disabled</div></div><button class="mini owner-hold-action" data-inspect-hold="${escI(item.key)}">Inspect hold</button>`;
+      fragment.appendChild(row);
+    });
     external.forEach(item=>{
       const row=document.createElement('div');
       row.className='run';row.dataset.externalAgentRow=item.key;
@@ -270,12 +300,13 @@
   }, true);
 
   document.addEventListener('click', e => {
-    const target = e.target.closest('[data-inspect-run],[data-inspect-external],[data-inspector-close],[data-inspector-agent-workspace],[data-inspector-terminal]');
+    const target = e.target.closest('[data-inspect-run],[data-inspect-external],[data-inspect-hold],[data-inspector-close],[data-inspector-agent-workspace],[data-inspector-terminal]');
     if (!target) return;
     if (target.dataset.inspectRun) { inspectRun(target.dataset.inspectRun); return; }
     if (target.dataset.inspectExternal) { inspectExternal(target.dataset.inspectExternal); return; }
+    if (target.dataset.inspectHold) { inspectOwnerHold(target.dataset.inspectHold); return; }
     if (target.hasAttribute('data-inspector-close')) {
-      selectedAgentKey='';selectedRunId='';selectedExternalKey='';++inspectorRequest;
+      selectedAgentKey='';selectedRunId='';selectedExternalKey='';selectedHoldKey='';++inspectorRequest;
       document.getElementById('homeAgentInspector')?.classList.remove('open');
       markSelectedNode();
       return;
@@ -297,7 +328,8 @@
     lastHealth=e.detail || null;
     renderLens();
     appendExternalRunsToAgents();
-    if(selectedExternalKey)inspectExternal(selectedExternalKey);
+    if(selectedHoldKey)inspectOwnerHold(selectedHoldKey);
+    else if(selectedExternalKey)inspectExternal(selectedExternalKey);
   });
 
   // Clarify the action: it creates work; actual execution still requires Queue to AI.

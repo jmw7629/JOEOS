@@ -8,6 +8,7 @@
   const componentState = value => String(value?.state || 'unknown').toLowerCase();
   const stateLabel = value => componentState(value) === 'healthy' ? 'healthy' : componentState(value) === 'failed' ? 'failed' : 'unknown';
   const bridgeSummary = value => {
+    if (value?.owner_paused && !value?.external_running) return 'Paused by owner · execution disabled';
     const state = stateLabel(value);
     const progress = String(value?.progress_state || '').toLowerCase();
     const execution = String(value?.execution_state || 'unknown').toLowerCase();
