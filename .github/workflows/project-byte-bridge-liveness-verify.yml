@@ -3,11 +3,6 @@ name: PROJECT_BYTE Bridge Liveness Verify
 on:
   pull_request:
     branches: [project-byte-deploy]
-    paths:
-      - 'deploy/project-byte/v4/runtime_server.py'
-      - 'deploy/project-byte/v4/health-runtime.js'
-      - 'deploy/project-byte/install.sh'
-      - '.github/workflows/project-byte-bridge-liveness-verify.yml'
   push:
     branches: [project-byte-deploy]
     paths:

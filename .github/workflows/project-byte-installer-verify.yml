@@ -9,10 +9,6 @@ on:
       - '.github/workflows/project-byte-installer-verify.yml'
   pull_request:
     branches: [project-byte-deploy]
-    paths:
-      - 'deploy/project-byte/install.sh'
-      - 'deploy/project-byte/v4/**'
-      - '.github/workflows/project-byte-installer-verify.yml'
   workflow_dispatch:
 
 jobs:
