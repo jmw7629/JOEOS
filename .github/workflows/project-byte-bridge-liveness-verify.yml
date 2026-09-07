@@ -43,6 +43,7 @@ jobs:
           stub = types.ModuleType('backend')
           stub.H = object
           stub.BRIDGE_STATE = {}
+          stub.execution_hold = lambda repo: None
           sys.modules['backend'] = stub
           path = Path('deploy/project-byte/v4/runtime_server.py')
           spec = importlib.util.spec_from_file_location('project_byte_runtime', path)

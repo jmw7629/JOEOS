@@ -7,12 +7,12 @@ V4="$BASE/v4"
 DEST="/home/joevps/PROJECT_BYTE"
 SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-EXPECTED_BACKEND="7e221bba0a3a6774d8526575ac4cf442f73b6576db65c3e54eb2bc3ed2cfc629"
-EXPECTED_SERVER="fed880ef28c6e33548ab6ca8edd2f01a8a90dde204e566bf8ee283ec9b63514c"
+EXPECTED_BACKEND="7df2ed5c0e32ebca1bc2efce46ecdc3a393318e833bc4c6ee8754404fc642526"
+EXPECTED_SERVER="b7e4a1173e2a2455114a1554d3cb656ed700d4bf5da916dc8752ab029b1fb38c"
 EXPECTED_INDEX="e1d84e8c05d4f4207708f69c5fcc5d4e8e45c6976b048541c23094e89d9fc785"
-EXPECTED_HOME="71cb5ea64fa5a03ed1acb80ccba76f5723b2a2e1efc109a50c117114af357ff7"
-EXPECTED_INSPECTOR="ecb0848082bb026b0ec7dfe8d61d980d1a9329b330571f2e9e91cd2464e43ba0"
-EXPECTED_HEALTH="3408f4c12277ab69ca6fdb311a57bb753d3832ce42b5360ce84551b42b19f621"
+EXPECTED_HOME="81d8a618807346574cf5bcdf0d73f2a59c195e4e6ddec2d5087d11d9ca06fbca"
+EXPECTED_INSPECTOR="0394bb704eec5ea4b8bd3d50a058defcb016bef1791060b44e4a2544d2bfcabf"
+EXPECTED_HEALTH="f189f4673a0610671839f9f43f59a404e9001e9a923f83ffe70ee363f61cc12d"
 
 if [ "$(id -un)" != "joevps" ]; then
   echo "Run this as joevps, not root." >&2
@@ -196,6 +196,22 @@ echo "Home command center, agent inspector, and evidence-backed health UI are lo
 echo "Existing tasks, projects, attachments, database, and owner key were preserved."
 
 BRIDGE_REFRESH_FAILURES=0
+byte_owner_hold_clear() {
+  python3 - "$HOME/.config/joeos-opencode-bridge/STICKDEATH_BYTE_STOPPED_BY_OWNER" <<'OWNER_HOLD_PY'
+from pathlib import Path
+import sys
+try:
+    Path(sys.argv[1]).lstat()
+except FileNotFoundError:
+    raise SystemExit(0)
+except OSError:
+    print("BYTE owner-stop evidence unavailable; checkout and service left untouched.", file=sys.stderr)
+    raise SystemExit(1)
+print("BYTE paused by owner; checkout and service left untouched.", file=sys.stderr)
+raise SystemExit(1)
+OWNER_HOLD_PY
+}
+
 refresh_bridge() {
   local env_file="$1"
   local service_name="$2"
@@ -206,6 +222,10 @@ refresh_bridge() {
   local remote_head=""
   local local_head=""
   local service_active=0
+
+  if [ "$service_name" = "stickdeath-byte-opencode-bridge.service" ] && ! byte_owner_hold_clear; then
+    return 1
+  fi
 
   if [ ! -f "$env_file" ]; then
     echo "Bridge refresh skipped for $service_name: configuration file is absent, so liveness cannot be verified." >&2
@@ -233,6 +253,10 @@ refresh_bridge() {
     fi
   fi
 
+  if [ "$service_name" = "stickdeath-byte-opencode-bridge.service" ] && ! byte_owner_hold_clear; then
+    return 1
+  fi
+
   echo "Refreshing bridge checkout for $service_name..."
   if ! git -C "$root" fetch --prune origin main; then
     echo "Bridge refresh failed for $service_name: git fetch failed." >&2
@@ -258,6 +282,9 @@ refresh_bridge() {
     echo "Bridge update is available for $service_name, but the service is active; control checkout and HEAD were left unchanged and restart deferred." >&2
     return 1
   else
+    if [ "$service_name" = "stickdeath-byte-opencode-bridge.service" ] && ! byte_owner_hold_clear; then
+      return 1
+    fi
     if ! git -C "$root" merge --ff-only origin/main; then
       echo "Bridge refresh skipped for $service_name: fast-forward was not safe." >&2
       return 1
@@ -267,6 +294,10 @@ refresh_bridge() {
       echo "Bridge refresh failed for $service_name: checkout is not at origin/main after refresh." >&2
       return 1
     fi
+  fi
+
+  if [ "$service_name" = "stickdeath-byte-opencode-bridge.service" ] && ! byte_owner_hold_clear; then
+    return 1
   fi
 
   if ! systemctl --user restart "$service_name"; then
@@ -296,7 +327,7 @@ if ! refresh_bridge "$HOME/.config/joeos-opencode-bridge/vitros.env" "vitros-ope
 if ! check_bridge_service "vitros-opencode-verifier.service"; then BRIDGE_REFRESH_FAILURES=1; fi
 
 if [ "$BRIDGE_REFRESH_FAILURES" -ne 0 ]; then
-  echo "One or more bridge refresh/liveness checks failed. PROJECT_BYTE remains local and reports execution health as degraded/unknown until corrected." >&2
+  echo "One or more bridges are paused, unavailable or unverified. PROJECT_BYTE remains local; owner holds are never cleared by this installer." >&2
 fi
 
 if command -v tailscale >/dev/null 2>&1; then

@@ -676,6 +676,19 @@ def _bridge_health():
             item["last_execution_age_seconds"] = execution["last_execution_age_seconds"]
             item["last_run_ref"] = execution["last_run_ref"]
             item["execution_freshness_seconds"] = execution["freshness_window_seconds"]
+            hold = app.execution_hold(repo)
+            item["owner_paused"] = bool(hold and hold["reason_code"] == "owner-paused")
+            if hold:
+                # An owner hold blocks dispatch, even when a past run succeeded.
+                # Keep observed activity visible; never claim a running child stopped.
+                item["execution_state"] = "blocked"
+                item["execution_reason_code"] = hold["reason_code"]
+                item["execution_reason"] = hold["reason"]
+                if item["owner_paused"]:
+                    item["state"] = "failed" if external_running else "paused"
+                    item["progress_state"] = "running-despite-owner-hold" if external_running else "paused-by-owner"
+                else:
+                    item["state"] = "unknown"
             item["required"] = bool(required)
             result[key] = item
 
@@ -773,7 +786,7 @@ def health_snapshot():
         if not item.get("required") and item.get("state") != "healthy":
             warnings.append(f"{key}-optional-{item.get('state') or 'unknown'}")
         if item.get("required") and item.get("execution_state") != "ready":
-            warnings.append(f"{key}-execution-{item.get('execution_state') or 'unknown'}")
+            warnings.append(f"{key}-owner-paused" if item.get("owner_paused") else f"{key}-execution-{item.get('execution_state') or 'unknown'}")
     if not chat_ready:
         warnings.append(f"models-{models.get('state') or 'unknown'}")
 

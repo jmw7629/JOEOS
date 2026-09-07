@@ -73,12 +73,15 @@
             if not task:return self.sendj({"error":"task not found"},404)
             project=project_by_name(task["project"])
             if not project or not project.get("repo") or project["repo"] not in BRIDGES:return self.sendj({"error":"No OpenCode bridge is connected for this project"},409)
+            hold=execution_hold(project["repo"])
+            if hold:return self.sendj({"error":hold["reason"],"code":hold["reason_code"]},hold["http_status"])
             if task.get("depends_on"):
                 dep=task_by_id(task["depends_on"])
                 if dep and dep["status"]!="Done":return self.sendj({"error":"Task has an unfinished dependency","dependency":dep["title"]},409)
             d=self.body() or {};agent=valid_hint(d.get("agent_key") or task.get("agent_key") or "builder");model=route_model(agent,valid_hint(d.get("model_key") or task.get("model_key")));prompt=txt(d.get("prompt"),12000) or prompt_for_task(task,project,agent,model)
             marker=BRIDGES[project["repo"]];body=f"{marker}\n\nPROJECT_BYTE_TASK_ID: {tid}\nPROJECT_BYTE_AGENT_HINT: {agent}\nPROJECT_BYTE_MODEL_HINT: {model}\n\n{prompt}"
             try:num,url=create_github_issue(project["repo"],task["title"],body)
+            except ExecutionHoldError as e:return self.sendj({"error":str(e),"code":e.reason_code},e.http_status)
             except Exception as e:return self.sendj({"error":str(e)},502)
             rid=str(uuid.uuid4())
             with LOCK,con() as c:

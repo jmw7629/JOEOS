@@ -29,6 +29,35 @@ BRIDGE_STATE = {
     "jmw7629/stickdeath-byte": Path.home() / ".local/state/joeos-opencode-bridge/jmw7629__stickdeath-byte",
     "jmw7629/vitros-web-dashboard": Path.home() / ".local/state/joeos-opencode-bridge/jmw7629__vitros-web-dashboard",
 }
+BYTE_OWNER_STOP = Path.home() / ".config/joeos-opencode-bridge/STICKDEATH_BYTE_STOPPED_BY_OWNER"
+
+
+def execution_hold(repo: str) -> dict | None:
+    """Read only marker existence; never its contents or a caller-supplied path."""
+    if repo != "jmw7629/stickdeath-byte":
+        return None
+    try:
+        BYTE_OWNER_STOP.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError:
+        return {"reason_code": "owner-hold-unavailable", "reason": "BYTE owner-stop evidence is unavailable; execution is disabled", "http_status": 503}
+    return {"reason_code": "owner-paused", "reason": "BYTE is paused by owner; execution is disabled", "http_status": 409}
+
+
+class ExecutionHoldError(RuntimeError):
+    def __init__(self, hold: dict):
+        super().__init__(hold["reason"])
+        self.reason_code = hold["reason_code"]
+        self.http_status = hold["http_status"]
+
+
+def require_no_execution_hold(repo: str) -> None:
+    hold = execution_hold(repo)
+    if hold:
+        raise ExecutionHoldError(hold)
+
+
 SEED = [
     ("Make every Studio tool functional", "StickDeath Infinity", "Active", "Critical", "Complete timeline, drawing, animation, upload, export, and all visible controls."),
     ("Finish Spatter AI production workflow", "StickDeath Infinity", "Active", "Critical", "AI must understand the app, assist creation, and build/export video workflows."),
