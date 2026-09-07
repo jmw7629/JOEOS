@@ -1,0 +1,94 @@
+name: PROJECT_BYTE Home scope polish
+
+on:
+  push:
+    branches: [project-byte-deploy]
+    paths:
+      - '.github/workflows/project-byte-home-scope-polish.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: project-byte-deploy
+          fetch-depth: 0
+
+      - name: Patch Home interactions and scope consistency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          p=Path('deploy/project-byte/v4/home.js')
+          s=p.read_text()
+
+          old='.home-kpi{border-radius:14px;padding:12px;min-width:0}'
+          new='.home-kpi{border-radius:14px;padding:12px;min-width:0;appearance:none;text-align:left;color:var(--txt);cursor:pointer}.home-kpi:hover{border-color:#486c89;transform:translateY(-1px)}'
+          if old in s:s=s.replace(old,new,1)
+          elif 'cursor:pointer}.home-kpi:hover' not in s:raise SystemExit('KPI CSS anchor missing')
+
+          old='el.innerHTML=data.map(([l,v,k,s])=>`<div class="home-kpi" data-kind="${k}"><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join(\'\');'
+          new='el.innerHTML=data.map(([l,v,k,s])=>`<button type="button" class="home-kpi" data-kind="${k}" data-home-kpi="${k}" aria-label="Filter Home to ${l}"><span>${l}</span><b>${v}</b><small>${s}</small></button>`).join(\'\');'
+          if old in s:s=s.replace(old,new,1)
+          elif 'data-home-kpi=' not in s:raise SystemExit('KPI markup anchor missing')
+
+          anchor='''  function safeVisible() {\n    try { return typeof visible === 'function' ? visible() : (tasks || []); } catch { return tasks || []; }\n  }\n'''
+          insert='''  function homeKpiScope(kind) {\n    if (typeof clearFilters === 'function') clearFilters();\n    const map = {\n      open: ['completionFilter','open'],\n      active: ['statusFilter','Active'],\n      blocked: ['statusFilter','Blocked'],\n      critical: ['priorityFilter','Critical'],\n      ai: ['runFilter','active'],\n      due: ['dueFilter','7d']\n    };\n    const pair=map[kind];\n    if(pair&&document.getElementById(pair[0]))document.getElementById(pair[0]).value=pair[1];\n    if(typeof renderAll==='function')renderAll();\n    renderHome();\n  }\n\n  function safeVisible() {\n    try { return typeof visible === 'function' ? visible() : (tasks || []); } catch { return tasks || []; }\n  }\n'''
+          if 'function homeKpiScope' not in s:
+              if anchor not in s:raise SystemExit('safeVisible anchor missing')
+              s=s.replace(anchor,insert,1)
+
+          old='''  function renderActivity() {\n    const el=document.getElementById('homeActivity');if(!el)return;\n    const items=(activity||[]).slice(0,5);\n    el.innerHTML=items.length?items.map(a=>`<button type="button" class="activity-item" ${a.task_id?`data-home-task="${escH(a.task_id)}"`:''}><time>${shortTime(a.ts)}</time><div><b>${escH(a.action)}</b><span>${escH(a.actor||'system')}${a.project?' · '+escH(a.project):''}${a.detail?' · '+escH(a.detail):''}</span></div></button>`).join(''):'<div class="small">No recent activity.</div>';\n  }\n'''
+          new='''  function renderActivity(scoped) {\n    const el=document.getElementById('homeActivity');if(!el)return;\n    const allTasks=tasks||[],filtered=scoped.length!==allTasks.length;\n    const ids=new Set(scoped.map(t=>t.id)),names=new Set(scoped.map(t=>t.project));\n    const source=filtered?(activity||[]).filter(a=>(a.task_id&&ids.has(a.task_id))||(a.project&&names.has(a.project))):(activity||[]);\n    const items=source.slice(0,5);\n    el.innerHTML=items.length?items.map(a=>`<button type="button" class="activity-item" ${a.task_id?`data-home-task="${escH(a.task_id)}"`:'data-home-go="activity"'}><time>${shortTime(a.ts)}</time><div><b>${escH(a.action)}</b><span>${escH(a.actor||'system')}${a.project?' · '+escH(a.project):''}${a.detail?' · '+escH(a.detail):''}</span></div></button>`).join(''):'<div class="small">No recent activity in this scope.</div>';\n  }\n'''
+          if old in s:s=s.replace(old,new,1)
+          elif 'function renderActivity(scoped)' not in s:raise SystemExit('activity anchor missing')
+
+          old='''  function renderApprovals() {\n    const el=document.getElementById('homeApprovals');if(!el)return;\n    const ready=(runs||[]).filter(r=>r.status==='pr-created'||r.pr_url).slice(0,4);\n    el.innerHTML=ready.length?ready.map(r=>`<div class="approval-item"><b>${escH(r.project)} · #${r.issue_number}</b><span>${escH(r.agent_key||'agent')} finished work and produced a reviewable result.</span><div class="approval-actions">${r.pr_url?`<a href="${escH(r.pr_url)}" target="_blank" rel="noopener">Open PR</a>`:''}<button type="button" data-home-run="${escH(r.id)}">Terminal</button></div></div>`).join(''):'<div class="small">No agent work is waiting for review.</div>';\n  }\n'''
+          new='''  function renderApprovals(scoped) {\n    const el=document.getElementById('homeApprovals');if(!el)return;\n    const ids=new Set(scoped.map(t=>t.id));\n    const ready=(runs||[]).filter(r=>ids.has(r.task_id)&&(r.status==='pr-created'||r.pr_url)).slice(0,4);\n    el.innerHTML=ready.length?ready.map(r=>`<div class="approval-item"><b>${escH(r.project)} · #${r.issue_number}</b><span>${escH(r.agent_key||'agent')} finished work and produced a reviewable result.</span><div class="approval-actions">${r.pr_url?`<a href="${escH(r.pr_url)}" target="_blank" rel="noopener">Open PR</a>`:''}<button type="button" data-home-run="${escH(r.id)}">Terminal</button></div></div>`).join(''):'<div class="small">No agent work is waiting for review in this scope.</div>';\n  }\n'''
+          if old in s:s=s.replace(old,new,1)
+          elif 'function renderApprovals(scoped)' not in s:raise SystemExit('approvals anchor missing')
+
+          old='''  function renderPortfolio() {\n    const el=document.getElementById('homePortfolio');if(!el)return;\n    const list=(projects||[]).slice(0,5);\n    el.innerHTML=list.map(p=>{const t=(tasks||[]).filter(x=>x.project===p.name),done=t.filter(x=>x.status==='Done').length,pct=t.length?Math.round(done/t.length*100):0;return `<button type="button" class="work-item" data-home-project="${escH(p.name)}"><div class="work-top"><b>${escH(p.name)}</b><span class="health" data-h="${escH(p.health)}">${escH(p.health)}</span></div><span>${escH(p.stage||'Build')} · Lead ${escH(p.lead||'—')} · ${pct}% complete</span></button>`}).join('')||'<div class="small">No projects yet.</div>';\n  }\n'''
+          new='''  function renderPortfolio(scoped) {\n    const el=document.getElementById('homePortfolio');if(!el)return;\n    const allTasks=tasks||[],filtered=scoped.length!==allTasks.length,names=new Set(scoped.map(t=>t.project));\n    const chosen=document.getElementById('projectFilter')?.value||'';\n    const list=(filtered?(projects||[]).filter(p=>names.has(p.name)||p.name===chosen):(projects||[])).slice(0,5);\n    el.innerHTML=list.map(p=>{const t=(tasks||[]).filter(x=>x.project===p.name),done=t.filter(x=>x.status==='Done').length,pct=t.length?Math.round(done/t.length*100):0;return `<button type="button" class="work-item" data-home-project="${escH(p.name)}"><div class="work-top"><b>${escH(p.name)}</b><span class="health" data-h="${escH(p.health)}">${escH(p.health)}</span></div><span>${escH(p.stage||'Build')} · Lead ${escH(p.lead||'—')} · ${pct}% complete</span></button>`}).join('')||'<div class="small">No projects in this scope.</div>';\n  }\n'''
+          if old in s:s=s.replace(old,new,1)
+          elif 'function renderPortfolio(scoped)' not in s:raise SystemExit('portfolio anchor missing')
+
+          old='renderKpis(scoped); renderScopes(); renderAgentMap(); renderOrg(); renderActivity(); renderWork(scoped); renderApprovals(); renderMemory(); renderPortfolio();'
+          new='renderKpis(scoped); renderScopes(); renderAgentMap(); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(); renderPortfolio(scoped);'
+          if old in s:s=s.replace(old,new,1)
+          elif new not in s:raise SystemExit('renderHome call anchor missing')
+
+          old="const b=e.target.closest('[data-view],[data-home-go],[data-home-action],[data-home-scope],[data-home-agent],[data-home-person],[data-home-task],[data-home-run],[data-home-project]');"
+          new="const b=e.target.closest('[data-view],[data-home-go],[data-home-action],[data-home-scope],[data-home-kpi],[data-home-agent],[data-home-person],[data-home-task],[data-home-run],[data-home-project]');"
+          if old in s:s=s.replace(old,new,1)
+          elif '[data-home-kpi]' not in s:raise SystemExit('click selector anchor missing')
+
+          old="if(b.dataset.homeScope){homeTaskScope(b.dataset.homeScope);e.preventDefault()}"
+          new="if(b.dataset.homeScope){homeTaskScope(b.dataset.homeScope);e.preventDefault()}\n    if(b.dataset.homeKpi){homeKpiScope(b.dataset.homeKpi);e.preventDefault()}"
+          if old in s and 'homeKpiScope(b.dataset.homeKpi)' not in s:s=s.replace(old,new,1)
+          elif 'homeKpiScope(b.dataset.homeKpi)' not in s:raise SystemExit('KPI click anchor missing')
+
+          p.write_text(s)
+          PY
+          node --check deploy/project-byte/v4/home.js
+          grep -q 'data-home-kpi' deploy/project-byte/v4/home.js
+          grep -q 'function renderApprovals(scoped)' deploy/project-byte/v4/home.js
+          grep -q 'No recent activity in this scope' deploy/project-byte/v4/home.js
+          git diff --check
+
+      - name: Commit Home-only polish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add deploy/project-byte/v4/home.js
+          git commit -m 'Polish Home KPI actions and scoped executive panels'
+          git push origin HEAD:project-byte-deploy
