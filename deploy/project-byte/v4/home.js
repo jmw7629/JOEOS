@@ -32,6 +32,9 @@
 
   let homeApprovalState = [];
   let homeApprovalRefreshBusy = false;
+  let homeExternalReviewState = {state:'unavailable',items:[],repositories:{}};
+  let homeExternalReviewRefreshBusy = false;
+  let homeExternalReviewUpdatedAt = 0;
 
   const style = document.createElement('style');
   style.textContent = `
@@ -85,6 +88,7 @@ body[data-pb-view="home"] .wrap{padding:12px 24px 36px;max-width:1360px;margin:a
 .activity-item span,.work-item>span,.memory-item span,.approval-item>span{font-size:11px;line-height:1.55;display:block;color:#a5bad0;margin-top:4px;overflow-wrap:anywhere}.work-item{cursor:pointer;width:100%}.work-item:hover{border-color:#598bb6;background:#18324a}
 .work-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.home-priority{font-size:9px;line-height:1.6;border:1px solid #364e66;border-radius:20px;padding:2px 7px;white-space:nowrap;color:#bdd7ed}.home-priority.Critical{background:#402331;border-color:#73414e;color:#ffb5c0}.home-priority.High{background:#3d2d24;border-color:#6e5130;color:#f2c997}.home-priority.Low{color:#90caff;background:#152d4c}
 .approval-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.approval-actions a,.approval-actions button{border:1px solid #365578;border-radius:9px;min-height:44px;padding:10px;font-size:11px;text-align:center;background:#142b46;color:#e2f1ff}.approval-actions button[data-review-action="approve"]{border-color:#359568;background:#123e34;color:#aeefd1}.approval-actions button[data-review-action="request_changes"]{color:#efd4a3}.approval-note{font-size:10px!important;color:#98aec6!important;margin-top:10px!important}
+.approval-item.external-review{border-color:rgba(112,200,255,.30)}.approval-item.external-review .approval-actions a{min-height:44px;display:inline-flex;align-items:center;max-width:100%;overflow-wrap:anywhere}.external-review-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.external-review-meta em{font-style:normal;font-size:9px;border:1px solid #365578;border-radius:999px;padding:4px 7px;color:#a9bfd5;background:#0f2134}
 .approval-state{font-size:10px;color:#a7d9c4;text-transform:uppercase;letter-spacing:.07em}.home-empty{padding:18px 10px;color:#99b0c9;font-size:12px;line-height:1.6;text-align:center;border:1px dashed rgba(122,164,206,.2);border-radius:12px}.home-empty .pb-icon{display:block;width:26px;height:26px;margin:0 auto 10px;color:#7aa9d1}.home-empty button{display:block;margin:14px auto 0;min-height:44px;padding:8px 15px;background:#172e47;color:#c7e5ff;border:1px solid #33597a;border-radius:10px;font-size:12px}
 .pulse-progress{height:5px;border-radius:4px;background:#203248;margin-top:12px;overflow:hidden}.pulse-progress i{height:100%;display:block;background:linear-gradient(90deg,#2283e8,#67c7f5);border-radius:4px}.home-asset-credit{font-size:10px;color:#69829e;display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;margin:2px 3px}.home-asset-credit a{color:#90aeca}
 .home-nav{display:grid!important;position:fixed;left:50%;right:auto;transform:translateX(-50%);width:min(560px,calc(100% - 24px));bottom:max(12px,env(safe-area-inset-bottom));z-index:40;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;padding:7px;background:rgba(7,15,25,.96);border:1px solid rgba(130,176,215,.32);border-radius:20px;box-shadow:0 -8px 35px rgba(0,0,0,.18),inset 0 1px rgba(239,250,255,.06);backdrop-filter:blur(18px)}
@@ -302,16 +306,61 @@ body[data-pb-view="home"]>header{padding:18px 16px 3px}body[data-pb-view="home"]
     el.innerHTML=items.length?items.map(t=>`<button type="button" class="work-item" data-home-task="${escH(t.id)}"><div class="work-top"><b>${escH(t.title)}</b><span class="home-priority ${escH(t.priority)}">${escH(t.priority)}</span></div><span>${escH(t.project)}${t.due_date?' · due '+escH(t.due_date):''}${t.ai_state?' · AI '+escH(t.ai_state):''}</span></button>`).join(''):`<div class="small">${empty}</div>`;
   }
 
+  function externalReviewAge(seconds) {
+    if(seconds===null||seconds===undefined||Number.isNaN(Number(seconds)))return 'unknown age';
+    const value=Math.max(0,Number(seconds));
+    if(value<60)return `${Math.round(value)}s ago`;
+    if(value<3600)return `${Math.round(value/60)}m ago`;
+    if(value<86400)return `${Math.round(value/3600)}h ago`;
+    return `${Math.round(value/86400)}d ago`;
+  }
+
+  function externalReviewsForScope(scoped) {
+    const all=tasks||[],selected=document.getElementById('projectFilter')?.value||'';
+    const scopedProjects=new Set((scoped||[]).map(t=>t.project));
+    return (homeExternalReviewState.items||[]).filter(item=>{
+      if(selected)return item.project===selected;
+      if((scoped||[]).length===all.length)return true;
+      return scopedProjects.has(item.project);
+    }).slice(0,6);
+  }
+
   function renderApprovals(scoped) {
     const el=document.getElementById('homeApprovals');if(!el)return;
     const ids=new Set(scoped.map(t=>t.id));
     const ready=(runs||[]).filter(r=>ids.has(r.task_id)&&(r.status==='pr-created'||r.pr_url)).slice(0,6);
-    el.innerHTML=ready.length?ready.map(r=>{
+    const ownedHtml=ready.map(r=>{
       const approval=homeApprovalState.find(a=>a.run_id===r.id);
       const controls=approval&&approval.status==='pending'&&session?.level>=2?`<button type="button" data-home-approval="${escH(approval.id)}" data-review-action="approve">Approve review</button><button type="button" data-home-approval="${escH(approval.id)}" data-review-action="request_changes">Request changes</button>`:'';
       const decided=approval&&approval.status!=='pending'?`<span class="approval-state">${escH(approval.status)}${approval.decided_by?' · '+escH(approval.decided_by):''}</span>`:'';
       return `<div class="approval-item"><b>${escH(r.project)} · #${r.issue_number}</b><span>${escH(r.agent_key||'agent')} produced a reviewable result.</span>${decided}<div class="approval-actions">${r.pr_url?`<a href="${escH(r.pr_url)}" target="_blank" rel="noopener">Open PR</a>`:''}<button type="button" data-home-run="${escH(r.id)}">Terminal</button>${controls}</div>${approval?'<span class="approval-note">PROJECT_BYTE approval records your review decision only. It never merges the PR.</span>':''}</div>`;
-    }).join(''):'<div class="small">No agent work is waiting for review in this scope.</div>';
+    }).join('');
+    const external=externalReviewsForScope(scoped);
+    const externalHtml=external.map(item=>{
+      const checks=item.checks||{},failed=Number(checks.failed||0),pending=Number(checks.pending||0),passed=Number(checks.passed||0),unknown=Number(checks.unknown||0);
+      const checksText=failed?`${failed} failed`:pending?`${pending} pending`:unknown?`${unknown} unknown`:passed?`${passed} passed`:'checks unknown';
+      const evidence=item.evidence_state==='stale'?`stale · ${externalReviewAge(item.evidence_age_seconds)}`:item.evidence_state==='fresh'?'fresh':'evidence unavailable';
+      return `<div class="approval-item external-review"><b>${escH(item.project)} · PR #${Number(item.number||0)}</b><span>${escH(item.title||'Reviewable pull request')}</span><div class="external-review-meta"><em>external review</em>${item.draft?'<em>draft</em>':''}<em>${escH(checksText)}</em><em>${escH(item.merge_state||'UNKNOWN')}</em><em>${escH(externalReviewAge(item.updated_age_seconds))}</em><em>${escH(evidence)}</em></div><div class="approval-actions"><a href="${escH(item.url)}" target="_blank" rel="noopener">Open GitHub PR</a></div><span class="approval-note">Read-only observation. PROJECT_BYTE cannot approve, comment, merge, close, rerun or deploy this external PR.</span></div>`;
+    }).join('');
+    const evidenceBanner=homeExternalReviewState.state==='unavailable'?'<div class="small">External review evidence is unavailable; PROJECT_BYTE is not assuming the queue is empty.</div>':homeExternalReviewState.state==='partial'?'<div class="small">External review evidence is partial; unavailable repositories are not assumed clear.</div>':homeExternalReviewState.state==='stale'?'<div class="small">External review evidence is stale; verify GitHub before acting.</div>':'';
+    el.innerHTML=evidenceBanner+ownedHtml+externalHtml || '<div class="home-empty">No observed review work in this scope.</div>';
+  }
+
+  async function refreshExternalReviews(force=false) {
+    if(!(session?.level>=1)){homeExternalReviewState={state:'unavailable',items:[],repositories:{}};renderApprovals(safeVisible());return;}
+    const now=Date.now();
+    if(homeExternalReviewRefreshBusy||(!force&&homeExternalReviewUpdatedAt&&now-homeExternalReviewUpdatedAt<15000))return;
+    homeExternalReviewRefreshBusy=true;
+    try{
+      const x=await api('/api/external-reviews');
+      homeExternalReviewState={state:x.state||'unavailable',items:Array.isArray(x.items)?x.items:[],repositories:x.repositories||{}};
+      homeExternalReviewUpdatedAt=Date.now();
+      renderApprovals(safeVisible());
+    }catch{
+      homeExternalReviewState={state:'unavailable',items:[],repositories:{}};
+      homeExternalReviewUpdatedAt=Date.now();
+      renderApprovals(safeVisible());
+    }finally{homeExternalReviewRefreshBusy=false}
   }
 
   async function refreshHomeApprovals() {
@@ -356,7 +405,7 @@ body[data-pb-view="home"]>header{padding:18px 16px 3px}body[data-pb-view="home"]
   function renderHome() {
     if (!document.getElementById('home')) return;
     const scoped=safeVisible();
-    renderKpis(scoped); renderScopes(); renderAgentMap(scoped); renderExecutionFabric(); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(scoped); renderPortfolio(scoped); void refreshHomeApprovals();
+    renderKpis(scoped); renderScopes(); renderAgentMap(scoped); renderExecutionFabric(); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(scoped); renderPortfolio(scoped); void refreshHomeApprovals(); void refreshExternalReviews();
     syncHomeNav();
     if(typeof window.CustomEvent==='function')window.dispatchEvent(new CustomEvent('project-byte-home-render'));
   }

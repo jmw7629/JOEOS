@@ -1,0 +1,51 @@
+name: PROJECT_BYTE External Review Verify
+
+on:
+  pull_request:
+    branches: [project-byte-deploy]
+    paths:
+      - 'deploy/project-byte/v4/**'
+      - 'deploy/project-byte/install.sh'
+      - '.github/workflows/project-byte-external-review-verify.yml'
+  push:
+    branches: [project-byte-deploy]
+    paths:
+      - 'deploy/project-byte/v4/**'
+      - 'deploy/project-byte/install.sh'
+      - '.github/workflows/project-byte-external-review-verify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-external-review-observability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+      - name: Prove allowlisted read-only external review boundary
+        run: python3 deploy/project-byte/v4/test_external_reviews.py
+      - name: Prove mobile review-card interaction contract
+        run: node deploy/project-byte/v4/test_external_reviews_ui.mjs
+      - name: Prove static boundary and no write-capable controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime=deploy/project-byte/v4/runtime_server.py
+          home=deploy/project-byte/v4/home.js
+          grep -Fq '"jmw7629/stickdeath-byte"' "$runtime"
+          grep -Fq '"jmw7629/vitros-web-dashboard"' "$runtime"
+          grep -Fq 'if path == "/api/external-reviews"' "$runtime"
+          grep -Fq 'if not self.need(1)' "$runtime"
+          grep -Fq 'EXTERNAL_REVIEW_GH, "pr", "list"' "$runtime"
+          grep -Fq 'Read-only observation. PROJECT_BYTE cannot approve, comment, merge, close, rerun or deploy this external PR.' "$home"
+          ! grep -Fq 'data-external-review-action' "$home"
+          node --check "$home"
+          python3 -m py_compile "$runtime"
+          git diff --check HEAD^ HEAD

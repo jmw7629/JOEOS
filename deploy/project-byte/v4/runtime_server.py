@@ -7,6 +7,7 @@ import re
 import subprocess
 import threading
 import time
+from datetime import datetime
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -68,6 +69,166 @@ BRIDGE_SERVICES = {
     "vitros": ("vitros-opencode-bridge.service", "jmw7629/vitros-web-dashboard", True),
     "vitros_verifier": ("vitros-opencode-verifier.service", "jmw7629/vitros-web-dashboard", True),
 }
+
+EXTERNAL_REVIEW_REPOS = (
+    ("stickdeath", "STICKDEATH_BYTE", "jmw7629/stickdeath-byte"),
+    ("vitros", "DASH_BYTE / VITROS", "jmw7629/vitros-web-dashboard"),
+)
+EXTERNAL_REVIEW_CACHE_LOCK = threading.Lock()
+EXTERNAL_REVIEW_CACHE = {"repositories": {}, "at": 0.0}
+EXTERNAL_REVIEW_CACHE_SECONDS = 30.0
+EXTERNAL_REVIEW_STALE_SECONDS = 300.0
+EXTERNAL_REVIEW_LIMIT = 12
+EXTERNAL_REVIEW_TIMEOUT_SECONDS = 4
+EXTERNAL_REVIEW_TITLE_MAX = 180
+EXTERNAL_REVIEW_GH = "/usr/bin/gh"
+EXTERNAL_REVIEW_DECISIONS = frozenset({"", "APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"})
+EXTERNAL_REVIEW_MERGE_STATES = frozenset({"", "BEHIND", "BLOCKED", "CLEAN", "DIRTY", "DRAFT", "HAS_HOOKS", "UNKNOWN", "UNSTABLE"})
+EXTERNAL_REVIEW_CHECK_FAILURES = frozenset({"ACTION_REQUIRED", "CANCELLED", "FAILURE", "STALE", "TIMED_OUT"})
+
+
+def _external_review_check_summary(rollup) -> dict:
+    summary = {"passed": 0, "pending": 0, "failed": 0, "unknown": 0}
+    if not isinstance(rollup, list):
+        summary["unknown"] = 1
+        return summary
+    for raw in rollup[:64]:
+        if not isinstance(raw, dict):
+            summary["unknown"] += 1
+            continue
+        state = str(raw.get("state") or "").upper()
+        status = str(raw.get("status") or "").upper()
+        conclusion = str(raw.get("conclusion") or "").upper()
+        if state:
+            if state == "SUCCESS":
+                summary["passed"] += 1
+            elif state in {"EXPECTED", "PENDING"}:
+                summary["pending"] += 1
+            elif state in EXTERNAL_REVIEW_CHECK_FAILURES:
+                summary["failed"] += 1
+            else:
+                summary["unknown"] += 1
+        elif status and status != "COMPLETED":
+            summary["pending"] += 1
+        elif conclusion == "SUCCESS":
+            summary["passed"] += 1
+        elif conclusion in EXTERNAL_REVIEW_CHECK_FAILURES:
+            summary["failed"] += 1
+        else:
+            summary["unknown"] += 1
+    return summary
+
+
+def _external_review_item(raw, *, key: str, project: str, repo: str, current: float):
+    if not isinstance(raw, dict):
+        return None
+    try:
+        number = int(raw.get("number") or 0)
+    except (TypeError, ValueError):
+        return None
+    if number <= 0 or number > 2_147_483_647:
+        return None
+    title = app.sanitize(str(raw.get("title") or "")).strip()
+    title = " ".join(title.split())[:EXTERNAL_REVIEW_TITLE_MAX]
+    if not title:
+        title = f"Pull request #{number}"
+    review = str(raw.get("reviewDecision") or "").upper()
+    if review not in EXTERNAL_REVIEW_DECISIONS:
+        review = ""
+    merge = str(raw.get("mergeStateStatus") or "").upper()
+    if merge not in EXTERNAL_REVIEW_MERGE_STATES:
+        merge = "UNKNOWN"
+    updated_at = 0
+    try:
+        stamp = str(raw.get("updatedAt") or "")
+        updated_at = int(datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()) if stamp else 0
+    except (TypeError, ValueError, OverflowError):
+        updated_at = 0
+    age = max(0, int(current - updated_at)) if updated_at else None
+    return {
+        "source": "external-review",
+        "key": key,
+        "project": project,
+        "repo": repo,
+        "number": number,
+        "title": title,
+        "updated_at": updated_at or None,
+        "updated_age_seconds": age,
+        "draft": bool(raw.get("isDraft") is True),
+        "review_decision": review,
+        "merge_state": merge,
+        "checks": _external_review_check_summary(raw.get("statusCheckRollup")),
+        "url": f"https://github.com/{repo}/pull/{number}",
+        "read_only": True,
+    }
+
+
+def _read_external_reviews_repo(key: str, project: str, repo: str, current: float):
+    args = [
+        EXTERNAL_REVIEW_GH, "pr", "list", "--repo", repo, "--state", "open", "--limit",
+        str(EXTERNAL_REVIEW_LIMIT), "--json",
+        "number,title,isDraft,updatedAt,reviewDecision,mergeStateStatus,statusCheckRollup",
+    ]
+    try:
+        env = os.environ.copy()
+        env["GH_PROMPT_DISABLED"] = "1"
+        env["NO_COLOR"] = "1"
+        proc = subprocess.run(args, text=True, capture_output=True, timeout=EXTERNAL_REVIEW_TIMEOUT_SECONDS, env=env)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0 or len(proc.stdout or "") > 256 * 1024:
+        return None
+    try:
+        raw = json.loads(proc.stdout or "[]")
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(raw, list):
+        return None
+    items = []
+    for entry in raw[:EXTERNAL_REVIEW_LIMIT]:
+        item = _external_review_item(entry, key=key, project=project, repo=repo, current=current)
+        if item:
+            items.append(item)
+    return {"state": "fresh", "age_seconds": 0, "items": items, "observed_at": int(current)}
+
+
+def external_reviews_snapshot() -> dict:
+    current = time.time()
+    with EXTERNAL_REVIEW_CACHE_LOCK:
+        cached = EXTERNAL_REVIEW_CACHE.get("repositories") or {}
+        cached_at = float(EXTERNAL_REVIEW_CACHE.get("at") or 0.0)
+        if cached and current - cached_at <= EXTERNAL_REVIEW_CACHE_SECONDS:
+            repos = {name: dict(value) for name, value in cached.items()}
+        else:
+            repos = {}
+            for key, project, repo in EXTERNAL_REVIEW_REPOS:
+                fresh = _read_external_reviews_repo(key, project, repo, current)
+                if fresh is not None:
+                    repos[key] = fresh
+                    continue
+                prior = cached.get(key)
+                prior_age = max(0, int(current - float((prior or {}).get("observed_at") or 0))) if prior else None
+                if prior and prior_age is not None and prior_age <= EXTERNAL_REVIEW_STALE_SECONDS:
+                    stale = dict(prior)
+                    stale["state"] = "stale"
+                    stale["age_seconds"] = prior_age
+                    repos[key] = stale
+                else:
+                    repos[key] = {"state": "unavailable", "age_seconds": None, "items": [], "observed_at": None}
+            EXTERNAL_REVIEW_CACHE["repositories"] = {name: dict(value) for name, value in repos.items()}
+            EXTERNAL_REVIEW_CACHE["at"] = current
+    items = []
+    states = {}
+    for key, _project, _repo in EXTERNAL_REVIEW_REPOS:
+        value = repos.get(key) or {"state": "unavailable", "items": []}
+        states[key] = {"state": value.get("state") or "unavailable", "age_seconds": value.get("age_seconds")}
+        for item in value.get("items") or []:
+            safe = dict(item)
+            safe["evidence_state"] = states[key]["state"]
+            safe["evidence_age_seconds"] = states[key]["age_seconds"]
+            items.append(safe)
+    overall = "fresh" if states and all(v["state"] == "fresh" for v in states.values()) else "stale" if any(v["state"] == "stale" for v in states.values()) else "partial" if any(v["state"] == "fresh" for v in states.values()) else "unavailable"
+    return {"state": overall, "items": items, "repositories": states, "read_only": True}
 
 
 def _sync_once():
@@ -902,6 +1063,10 @@ class SafeHandler(app.H):
         path = unquote(urlparse(self.path).path)
         if path == "/healthz":
             return self.sendj(health_snapshot())
+        if path == "/api/external-reviews":
+            if not self.need(1):
+                return
+            return self.sendj(external_reviews_snapshot())
         if path in PUBLIC_FILES:
             return self._public_file(path)
         if path.startswith("/uploads/"):
