@@ -7,7 +7,8 @@ V4="$BASE/v4"
 DEST="/home/joevps/PROJECT_BYTE"
 SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-EXPECTED_SERVER="86c64e3a06e5c76240753063c01b02c7aa8c83eb5b8f3bf64338a03c11d3a765"
+EXPECTED_BACKEND="86c64e3a06e5c76240753063c01b02c7aa8c83eb5b8f3bf64338a03c11d3a765"
+EXPECTED_SERVER="82f8b663bc5e06a2d04974fd7abd29b054aea173b87aeed08969175430c0ddba"
 EXPECTED_INDEX="08a324ae21ab0c19128d0dd0ce6ce9739515a03f740119ce8cd680fe5ef273c7"
 EXPECTED_HOME="3722fe80b6d1d316aecf39d354514ea55a48be17191c9ef5a1a734d764ee6ae2"
 EXPECTED_INSPECTOR="bffa6d45adaafade420b27bf0dcd9717fd8783c3cee1ce73c6550c8752d4cba4"
@@ -18,6 +19,12 @@ if [ "$(id -un)" != "joevps" ]; then
 fi
 
 mkdir -p "$DEST" "$DEST/backups" "$DEST/uploads"
+
+# Public exposure is disabled before code replacement. It is never silently
+# re-enabled; production exposure requires an explicit opt-in after all gates pass.
+if command -v tailscale >/dev/null 2>&1; then
+  sudo tailscale funnel --https=443 off >/dev/null 2>&1 || true
+fi
 
 if [ -f "$DEST/kanban.db" ]; then
   python3 - "$DEST/kanban.db" "$DEST/backups/kanban-${STAMP}.db" <<'PY'
@@ -32,6 +39,7 @@ PY
   echo "Database backup: $DEST/backups/kanban-${STAMP}.db"
 fi
 if [ -f "$DEST/server.py" ]; then cp -p "$DEST/server.py" "$DEST/backups/server-${STAMP}.py"; fi
+if [ -f "$DEST/backend.py" ]; then cp -p "$DEST/backend.py" "$DEST/backups/backend-${STAMP}.py"; fi
 if [ -f "$DEST/index.html" ]; then cp -p "$DEST/index.html" "$DEST/backups/index-${STAMP}.html"; fi
 if [ -f "$DEST/home.js" ]; then cp -p "$DEST/home.js" "$DEST/backups/home-${STAMP}.js"; fi
 if [ -f "$DEST/home-inspector.js" ]; then cp -p "$DEST/home-inspector.js" "$DEST/backups/home-inspector-${STAMP}.js"; fi
@@ -39,28 +47,31 @@ if [ -f "$DEST/admin.secret" ]; then cp -p "$DEST/admin.secret" "$DEST/backups/a
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP/server" "$TMP/index"
+mkdir -p "$TMP/backend" "$TMP/index"
 
 for n in 01 02 03 04 05 06 07 08; do
-  curl --fail --silent --show-error --location "$V4/server/$n.part" -o "$TMP/server/$n.part"
+  curl --fail --silent --show-error --location "$V4/server/$n.part" -o "$TMP/backend/$n.part"
 done
 for n in 01 02 03 04 05 06 07; do
   curl --fail --silent --show-error --location "$V4/index/$n.part" -o "$TMP/index/$n.part"
 done
+curl --fail --silent --show-error --location "$V4/runtime_server.py" -o "$TMP/server.py"
 curl --fail --silent --show-error --location "$V4/home.js" -o "$TMP/home.js"
 curl --fail --silent --show-error --location "$V4/home-inspector.js" -o "$TMP/home-inspector.js"
-cat "$TMP"/server/*.part > "$TMP/server.py"
+cat "$TMP"/backend/*.part > "$TMP/backend.py"
 cat "$TMP"/index/*.part > "$TMP/index.html"
 
+BACKEND_SHA="$(sha256sum "$TMP/backend.py" | awk '{print $1}')"
 SERVER_SHA="$(sha256sum "$TMP/server.py" | awk '{print $1}')"
 INDEX_SHA="$(sha256sum "$TMP/index.html" | awk '{print $1}')"
 HOME_SHA="$(sha256sum "$TMP/home.js" | awk '{print $1}')"
 INSPECTOR_SHA="$(sha256sum "$TMP/home-inspector.js" | awk '{print $1}')"
-[ "$SERVER_SHA" = "$EXPECTED_SERVER" ] || { echo "Server checksum mismatch; refusing deployment." >&2; exit 5; }
+[ "$BACKEND_SHA" = "$EXPECTED_BACKEND" ] || { echo "Backend checksum mismatch; refusing deployment." >&2; exit 5; }
+[ "$SERVER_SHA" = "$EXPECTED_SERVER" ] || { echo "Runtime server checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$INDEX_SHA" = "$EXPECTED_INDEX" ] || { echo "UI checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$HOME_SHA" = "$EXPECTED_HOME" ] || { echo "Home module checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$INSPECTOR_SHA" = "$EXPECTED_INSPECTOR" ] || { echo "Home inspector checksum mismatch; refusing deployment." >&2; exit 5; }
-python3 -m py_compile "$TMP/server.py"
+python3 -m py_compile "$TMP/backend.py" "$TMP/server.py"
 if command -v node >/dev/null 2>&1; then
   node - "$TMP/index.html" "$TMP/home.js" "$TMP/home-inspector.js" <<'NODE'
 const fs=require('fs');
@@ -77,7 +88,7 @@ for(const x of ['homeAgentInspector','homeAgentLens','data-inspect-run','Full te
 NODE
 fi
 
-echo "Verified V4 source: server=$SERVER_SHA ui=$INDEX_SHA home=$HOME_SHA inspector=$INSPECTOR_SHA"
+echo "Verified V4 source: backend=$BACKEND_SHA runtime=$SERVER_SHA ui=$INDEX_SHA home=$HOME_SHA inspector=$INSPECTOR_SHA"
 
 python3 - "$TMP/index.html" <<'PY'
 from pathlib import Path
@@ -93,6 +104,7 @@ for marker in markers:
 p.write_text(text)
 PY
 
+install -m 0644 "$TMP/backend.py" "$DEST/backend.py"
 install -m 0644 "$TMP/server.py" "$DEST/server.py"
 install -m 0644 "$TMP/index.html" "$DEST/index.html"
 install -m 0644 "$TMP/home.js" "$DEST/home.js"
@@ -153,10 +165,12 @@ if ! echo "$HEALTH" | grep -q '"version":4' || [ "$HOME_OK" -ne 1 ]; then
   echo "PROJECT_BYTE V4/Home health check failed: $HEALTH home=$HOME_OK" >&2
   echo "Rolling application code back to the previous known-good version..." >&2
   LAST_SERVER="$(ls -1t "$DEST"/backups/server-*.py 2>/dev/null | head -1 || true)"
+  LAST_BACKEND="$(ls -1t "$DEST"/backups/backend-*.py 2>/dev/null | head -1 || true)"
   LAST_INDEX="$(ls -1t "$DEST"/backups/index-*.html 2>/dev/null | head -1 || true)"
   LAST_HOME="$(ls -1t "$DEST"/backups/home-*.js 2>/dev/null | head -1 || true)"
   LAST_INSPECTOR="$(ls -1t "$DEST"/backups/home-inspector-*.js 2>/dev/null | head -1 || true)"
   [ -n "$LAST_SERVER" ] && cp -p "$LAST_SERVER" "$DEST/server.py"
+  if [ -n "$LAST_BACKEND" ]; then cp -p "$LAST_BACKEND" "$DEST/backend.py"; else rm -f "$DEST/backend.py"; fi
   [ -n "$LAST_INDEX" ] && cp -p "$LAST_INDEX" "$DEST/index.html"
   if [ -n "$LAST_HOME" ]; then cp -p "$LAST_HOME" "$DEST/home.js"; else rm -f "$DEST/home.js"; fi
   if [ -n "$LAST_INSPECTOR" ]; then cp -p "$LAST_INSPECTOR" "$DEST/home-inspector.js"; else rm -f "$DEST/home-inspector.js"; fi
@@ -202,12 +216,16 @@ refresh_bridge "$HOME/.config/joeos-opencode-bridge/stickdeath.env" "stickdeath-
 refresh_bridge "$HOME/.config/joeos-opencode-bridge/vitros.env" "vitros-opencode-bridge.service"
 
 if command -v tailscale >/dev/null 2>&1; then
-  echo "Ensuring public HTTPS through Tailscale Funnel..."
-  sudo tailscale funnel --bg --https=443 --yes 8094
-  echo
-  sudo tailscale funnel status || true
+  if [ "${PROJECT_BYTE_ENABLE_FUNNEL:-0}" = "1" ]; then
+    echo "Enabling public HTTPS through Tailscale Funnel by explicit request..."
+    sudo tailscale funnel --bg --https=443 --yes 8094
+    echo
+    sudo tailscale funnel status || true
+  else
+    echo "Public Tailscale Funnel remains disabled. Re-enable only after production gates are approved."
+  fi
 fi
 
 echo
 echo "PROJECT_BYTE V4 Home Command Center deployment complete."
-echo "Open: https://mcso9tqzb9-1.tailb9395f.ts.net/"
+echo "Local: http://127.0.0.1:8094/"
