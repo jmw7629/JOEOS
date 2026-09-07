@@ -36,7 +36,7 @@ jobs:
           const fs = require('fs');
           const vm = require('vm');
           class FakeElement {
-            constructor(text = '') { this.textContent = text; this.dataset = {}; this.style = {}; }
+            constructor(text = '') { this.textContent = text; this.dataset = {}; this.style = {}; this.innerHTML = ''; }
           }
           const system = new FakeElement('legacy');
           const ai = new FakeElement('legacy');
@@ -51,7 +51,24 @@ jobs:
             },
             fetch: async () => ({
               ok: true,
-              json: async () => ({ok: true, operational: false, components: {models: {state: 'unknown'}}}),
+              json: async () => ({
+                ok: true,
+                operational: true,
+                status: 'operational-with-warnings',
+                warnings: ['models-unknown'],
+                ai_ops: true,
+                ai_chat_ready: false,
+                components: {
+                  sqlite: {state: 'healthy'},
+                  sync: {state: 'healthy'},
+                  bridges: {
+                    stickdeath: {state: 'healthy', required: true},
+                    vitros: {state: 'healthy', required: true},
+                    vitros_verifier: {state: 'failed', required: false},
+                  },
+                  models: {state: 'unknown', tested_ok: 0, failed: 0, unknown: 1},
+                },
+              }),
             }),
             console,
           };
@@ -61,8 +78,8 @@ jobs:
             await Promise.resolve();
             await Promise.resolve();
             await new Promise(resolve => setImmediate(resolve));
-            if (system.textContent !== 'Core healthy · execution health incomplete') throw new Error(`unexpected system evidence: ${system.textContent}`);
-            if (ai.textContent !== 'AI UNKNOWN') throw new Error(`unexpected AI evidence: ${ai.textContent}`);
+            if (system.textContent !== 'Systems operational · 1 warning') throw new Error(`unexpected system evidence: ${system.textContent}`);
+            if (ai.textContent !== 'AI CHAT UNTESTED') throw new Error(`unexpected AI evidence: ${ai.textContent}`);
             if (dot.dataset.health !== 'unknown') throw new Error(`unexpected evidence class: ${dot.dataset.health}`);
             console.log('HOME_STATUS_DIRECT_EVIDENCE_OWNERSHIP=PASS');
           })().catch(error => { console.error(error); process.exit(1); });
@@ -78,18 +95,23 @@ jobs:
           ! grep -q 'AI READY' "$home"
           ! grep -q 'AI CONNECTED' "$home"
           echo 'HOME_LOCAL_HEALTH_WRITERS=REMOVED'
-      - name: Prove model freshness and verifier Funnel gate are explicit
+      - name: Prove chat readiness and optional verifier semantics are explicit
         shell: bash
         run: |
           set -euo pipefail
           python3 -m py_compile deploy/project-byte/v4/runtime_server.py
           grep -q 'MODEL_STATUS_FRESH_SECONDS = 1800' deploy/project-byte/v4/runtime_server.py
           grep -q 'freshness_window_seconds' deploy/project-byte/v4/runtime_server.py
-          grep -q 'AI TESTED OK' deploy/project-byte/v4/health-runtime.js
+          grep -q 'ai_chat_ready' deploy/project-byte/v4/runtime_server.py
+          grep -q 'operational-with-warnings' deploy/project-byte/v4/runtime_server.py
+          grep -Fq '"vitros_verifier": ("vitros-opencode-verifier.service", "jmw7629/vitros-web-dashboard", False)' deploy/project-byte/v4/runtime_server.py
+          grep -q 'AI CHAT TESTED OK' deploy/project-byte/v4/health-runtime.js
+          grep -q 'AI CHAT UNTESTED' deploy/project-byte/v4/health-runtime.js
           ! grep -q "textContent = 'AI VERIFIED'" deploy/project-byte/v4/health-runtime.js
           grep -q 'open Agents or Help for details' deploy/project-byte/v4/health-runtime.js
           grep -q 'check_bridge_service "vitros-opencode-verifier.service"' deploy/project-byte/install.sh
+          grep -q 'Optional VITROS verifier is not active' deploy/project-byte/install.sh
           ! grep -q 'refresh_bridge .*vitros-opencode-verifier.service' deploy/project-byte/install.sh
           grep -q 'EXPECTED_SERVER="[0-9a-f]\{64\}"' deploy/project-byte/install.sh
           grep -q 'SERVER_SHA=.*sha256sum' deploy/project-byte/install.sh
-          echo 'HEALTH_MODEL_FRESHNESS_AND_FUNNEL_GATE=PASS'
+          echo 'HEALTH_REQUIRED_EXECUTION_OPTIONAL_VERIFIER_AND_CHAT_READINESS=PASS'
