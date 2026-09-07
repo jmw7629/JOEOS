@@ -109,6 +109,48 @@ body[data-pb-view="home"]>header{padding:18px 16px 3px}body[data-pb-view="home"]
 @media(max-width:360px){.home-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.home-kpi{padding:11px 9px}.agent-node{width:85px}.agent-node.center{width:62px;height:62px;min-height:62px}.home-card{padding:11px}.home-ai-state{max-width:92px}.home-command input{font-size:16px}.org-row{gap:6px}.org-person b{font-size:10px}.pb-workspace-grid{gap:8px}.pb-workspace-grid button{font-size:11px;padding:9px}}
 @media(prefers-reduced-motion:reduce){.home-shell *,.home-nav *{transition:none!important;animation:none!important;scroll-behavior:auto!important}}body.reduced-motion .home-shell *,body.reduced-motion .home-nav *{transition:none!important;animation:none!important}
 @media(prefers-reduced-transparency:reduce){.home-nav{backdrop-filter:none;background:#081321}.pb-workspaces::backdrop{backdrop-filter:none;background:#000c}}
+/* Focused workspaces: executive metrics belong to Home, never above another tab. */
+body > main.wrap > .metrics{display:none!important}
+body > header .filters,body > header .advancedfilters{display:none!important}
+body > header{position:relative;padding:12px 18px;background:rgba(5,11,20,.94);border-bottom:1px solid rgba(106,151,194,.15)}
+body > header .brand{flex-direction:row;align-items:center;gap:10px}body > header .brand p{display:none}
+body > header .brand h1{font-size:18px;white-space:nowrap}body > header .top{width:auto;display:flex;flex-wrap:nowrap;align-items:center;gap:7px}
+body > header .top #login{flex:none;width:auto;max-width:150px;font-size:11px;min-width:48px;min-height:40px}body > header .top .btn{min-height:40px}
+body[data-pb-view="home"] > header{padding:16px 24px 6px}body[data-pb-view="home"] > header .brand h1{font-size:20px}
+.pb-context-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px}.pb-context-bar h2{font-size:25px;letter-spacing:-.025em;margin:0}.pb-context-bar small{display:block;color:#9ab0c7;font-size:11px;margin-top:4px}.pb-context-bar[hidden]{display:none}
+.pb-context-bar button,.pb-filter-close{min-height:44px;padding:8px 12px;border:1px solid #345676;border-radius:11px;color:#d9ebfa;background:#10263b}.pb-context-bar button[hidden]{display:none}.pb-context-bar button[aria-pressed="true"]{border-color:#62b7fa;color:#8bcbff}
+.pb-filter-dialog{width:min(900px,calc(100vw - 24px));max-height:86dvh;overflow:auto;padding:18px;background:#0b1726;color:#e4effb;border:1px solid #345574;border-radius:20px;overscroll-behavior:contain}.pb-filter-dialog::backdrop{background:#020712cc;backdrop-filter:blur(6px)}
+.pb-filter-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.pb-filter-head h2{margin:0;font-size:22px}.pb-filter-dialog .filters{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0}.pb-filter-dialog .filters #search{grid-column:1/-1;min-width:0;width:100%}.pb-filter-dialog .filters .field{min-width:0;width:100%}.pb-filter-dialog #filterToggle{display:none}
+.pb-filter-dialog .advancedfilters{display:block!important;margin-top:12px}.pb-filter-dialog .filtergrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.pb-filter-dialog select,.pb-filter-dialog input{min-width:0;max-width:100%;font-size:16px}.pb-filter-dialog .field{padding:9px}.pb-filter-dialog .pb-filter-head{position:sticky;top:-18px;z-index:2;background:#0b1726;padding:10px 0}
+.home-scopes [data-open-scope]{margin-left:auto}.home-scopes .pb-icon{width:15px;height:15px;margin-right:5px}
+.pb-crawl{display:flex;align-items:center;gap:9px;margin-top:16px;padding:0 7px 0 12px;border:1px solid rgba(111,173,230,.33);border-radius:11px;background:rgba(4,17,33,.86);min-width:0;overflow:hidden;height:46px}
+.pb-crawl-label{display:flex;align-items:center;gap:6px;font-size:9px;letter-spacing:.09em;font-weight:700;color:#7cc6ff;flex-shrink:0}.pb-crawl-label::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}.pb-crawl[data-state="stale"] .pb-crawl-label{color:#e8bd72}
+.pb-crawl-viewport{flex:1;min-width:0;overflow:hidden;mask-image:linear-gradient(90deg,transparent,#000 10px,#000 calc(100% - 10px),transparent)}.pb-crawl-track{display:flex;width:max-content;animation:pb-news-crawl var(--crawl-duration,70s) linear infinite;will-change:transform}.pb-crawl-group{display:flex;align-items:center;flex-shrink:0;min-width:var(--crawl-min-width,300px);gap:26px;padding-right:26px}
+.pb-crawl-item{display:flex;gap:8px;align-items:center;flex-shrink:0;min-height:44px;padding:3px 0;background:transparent;border:0;font-size:12px;line-height:1.3;white-space:nowrap;color:#c7d9ee;text-align:left}.pb-crawl-item::before{content:'';width:4px;height:4px;border-radius:50%;background:#5a9acb;flex-shrink:0}.pb-crawl-item[data-kind="warning"]::before{background:#efbd6a}.pb-crawl-item[data-kind="error"]::before{background:#ff8791}.pb-crawl-item[data-kind="success"]::before{background:#69dca8}.pb-crawl-item:hover{color:#fff}.pb-crawl-item:focus-visible{outline:2px solid #81caff;outline-offset:-2px}
+.pb-crawl-toggle{display:grid;place-items:center;flex-shrink:0;width:38px;min-height:44px;padding:5px;background:transparent;border:0;color:#9ac1e6}.pb-crawl-toggle .pb-icon{width:16px;height:16px}
+@keyframes pb-news-crawl{from{transform:translate3d(0,0,0)}to{transform:translate3d(calc(-1 * var(--crawl-distance,1800px)),0,0)}}
+.pb-crawl[data-paused="true"] .pb-crawl-track,.pb-crawl-viewport:focus-within .pb-crawl-track,body:not([data-pb-view="home"]) .pb-crawl-track,.pb-crawl[data-hidden="true"] .pb-crawl-track{animation-play-state:paused}
+@media(hover:hover){.pb-crawl-viewport:hover .pb-crawl-track{animation-play-state:paused}}
+/* Brighter Earth limb, tighter overview, and less empty vertical space. */
+.home-hero{padding:22px 24px 20px}.home-hero h2{margin:15px 0 0;font-size:42px}.home-hero::before{background:linear-gradient(90deg,rgba(6,14,25,.93),rgba(6,14,25,.6) 42%,rgba(6,14,25,.07) 95%),linear-gradient(0deg,#07101d 0%,transparent 85%)}
+.home-planet{filter:saturate(.96) brightness(1.18);opacity:.95;top:-25px;right:-40px}.home-command{margin-top:12px}.home-shell{gap:14px}.home-grid{align-items:start}.home-lower{align-items:start}.home-card{box-shadow:inset 0 1px 0 rgba(222,243,255,.09),0 8px 30px #0005}
+.home-kpi{padding:13px;gap:2px 9px}.home-kpi small{display:none}.home-kpi .kpi-orbit{grid-row:1/3}.home-kpi .kpi-label{font-size:12px}.home-kpi b{font-size:24px}.home-card-head{margin-bottom:8px}.home-hero-top{min-height:66px}
+@media(max-width:650px){
+ body > header,body[data-pb-view="home"] > header{padding:10px 12px 7px}.brand{flex-direction:row!important;gap:6px!important}body > header .brand h1,body[data-pb-view="home"] > header .brand h1{font-size:15px;letter-spacing:.04em}body > header .top{gap:5px;width:auto!important}body > header .top #login{max-width:86px;font-size:10px;padding:7px;min-height:40px}body > header .top #refresh,body > header .top #notifyBtn,body > header .top #pbWorkspaceButton{min-width:38px;width:38px;min-height:40px;padding:6px}body > header .top .pb-icon{width:19px;height:19px}body > header .top #notifyBtn{display:none}
+ body:not([data-pb-view="home"]) > main.wrap{padding:12px 14px 30px}.pb-context-bar{margin-bottom:12px}.pb-context-bar h2{font-size:24px}.pb-context-bar small{font-size:10px}.pb-context-bar button{font-size:11px;padding:8px 10px}
+ .pb-filter-dialog{padding:14px}.pb-filter-dialog .filters,.pb-filter-dialog .filtergrid{grid-template-columns:repeat(2,minmax(0,1fr))}.pb-filter-dialog .filters #priorityFilter{grid-column:1/-1}.pb-filter-dialog .pb-filter-head{top:-14px}
+ body[data-pb-view="home"] .wrap{padding:8px 12px 24px}.home-shell{gap:11px}.home-hero{padding:14px 13px;border-radius:16px}.home-hero h2{font-size:30px;margin-top:10px}.home-hero-top{min-height:57px;gap:9px}.home-eyebrow{font-size:9px;max-width:235px;min-height:15px}.home-ai-state{max-width:97px;font-size:8px;padding:5px 7px}.home-planet{width:510px;height:510px;right:-175px;top:18px;opacity:.96}
+ .pb-crawl{margin-top:12px;height:42px;gap:5px;padding-left:8px}.pb-crawl-item{font-size:11px;min-height:42px}.pb-crawl-label{font-size:8px;gap:4px}.pb-crawl-toggle{width:29px;min-height:42px}.home-command{margin-top:9px;padding:4px 6px 4px 11px}.home-command input{min-height:38px}.home-command button{height:40px;width:40px}
+ .home-actions{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}.home-action{flex-direction:column;gap:5px;min-height:61px;padding:7px 3px;font-size:10px;line-height:1.25}.home-action .pb-icon{width:18px;height:18px}
+ .home-kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.home-kpi{grid-template-columns:27px minmax(0,1fr);gap:1px 7px;padding:11px 8px;min-height:65px;border-radius:12px}.home-kpi .kpi-orbit{width:27px;height:27px;margin:0;grid-row:1/3}.home-kpi b{font-size:20px}.home-kpi .kpi-label{font-size:10px;line-height:1.2}.home-kpi small{display:none}.home-scopes{gap:6px;padding-bottom:3px}.home-chip{min-height:40px;font-size:10px;padding:7px 12px}
+ .home-card{padding:12px;border-radius:14px}.home-card-head h3{font-size:13px}.home-card-head{margin-bottom:6px}.agent-map{height:232px}.agent-node{width:94px;min-height:63px;padding:6px 3px}.agent-node .pb-icon{margin-bottom:3px}.agent-node small{font-size:8px}.agent-node.center{height:66px;width:66px;min-height:66px}
+ .org-map{gap:8px}.org-top{padding:9px 12px}.org-top b{font-size:12px}.org-avatar{height:32px;width:32px}.org-row{gap:7px}.org-person{min-height:68px;padding:9px 4px;gap:4px}.home-lower{gap:11px}.execution-fabric{gap:7px}.fabric-node{min-height:65px;padding:10px 8px 10px 23px}.fabric-node b{font-size:10px}.fabric-node span{font-size:10px}
+ .home-nav{bottom:max(8px,env(safe-area-inset-bottom));padding:6px;border-radius:19px}.home-nav button{min-height:49px;font-size:10px;gap:3px}.home-nav .pb-icon{width:22px;height:22px}.chatbox{min-height:0}.chatlog{min-height:220px;max-height:45dvh}.composer textarea{min-height:65px}
+}
+@media(max-width:360px){body > header .brand h1,body[data-pb-view="home"] > header .brand h1{font-size:13px}body > header .top #login{max-width:65px}.home-kpi{grid-template-columns:23px 1fr;gap:2px 5px;padding:9px 6px}.home-kpi .kpi-orbit{width:23px;height:23px}.home-kpi b{font-size:18px}.home-kpi .kpi-label{font-size:9px}.agent-node{width:81px}.agent-node.center{height:60px;width:60px;min-height:60px}.home-action{font-size:9px}}
+@media(prefers-reduced-motion:reduce){.pb-crawl-track{animation:none!important;transform:none!important}.pb-crawl-viewport{overflow-x:auto;mask-image:none}.pb-crawl-group[aria-hidden="true"]{display:none}.pb-crawl-track{will-change:auto}}
+body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!important;will-change:auto}body.reduced-motion .pb-crawl-viewport{overflow-x:auto;mask-image:none}body.reduced-motion .pb-crawl-group[aria-hidden="true"]{display:none}
+.pb-chat-context{margin-top:12px;border:1px solid #2b435c;border-radius:12px;background:#0c1928;padding:0 12px}.pb-chat-context summary{min-height:44px;cursor:pointer;padding:12px 0;color:#c7dced;font-size:12px}.pb-chat-context summary span{font-size:10px;color:#819db8;margin-left:8px}.pb-chat-context .grid3{padding-bottom:12px}.pb-chat-context:not([open]) .grid3{display:none}@media(max-width:650px){#ai .chatbox>.between>div>.small{display:none}#ai .chatbox>.between{margin-bottom:10px;align-items:center}#ai .chatbox #loadChat{font-size:11px;min-height:40px;padding:8px}#ai .chatbox>.chatlog{min-height:200px;max-height:38dvh}#ai .pb-chat-context .grid3{grid-template-columns:1fr 1fr}#ai .composer{margin-top:12px}#ai .composer textarea{font-size:16px}#ai .chatbox>.between h2{font-size:15px}}
   `;
   document.head.appendChild(style);
 
@@ -134,10 +176,14 @@ body[data-pb-view="home"]>header{padding:18px 16px 3px}body[data-pb-view="home"]
           <div>
             <div class="home-eyebrow"><span class="home-status-dot"></span><span id="homeSystemState">Verifying system health…</span></div>
             <h2>Joe AI</h2>
-            <p>Your executive AI command layer across projects, people, agents and infrastructure.</p>
+
           </div>
           <div id="homeAIState" class="home-ai-state">AI UNKNOWN</div>
         </div>
+        <section id="pbLiveCrawl" class="pb-crawl" data-state="connecting" aria-label="Live activity across all projects">
+          <span class="pb-crawl-label">UPDATES</span><div class="pb-crawl-viewport"><div class="pb-crawl-track" aria-live="off"></div></div>
+          <button id="pbCrawlToggle" type="button" class="pb-crawl-toggle" aria-label="Pause activity crawl" aria-pressed="false">${icon('blocked')}</button>
+        </section>
         <div class="home-command">${icon("sparkle")}<input aria-label="Ask Joe AI" id="homeCommandInput" type="text" maxlength="1200" placeholder="Ask, create work, get status, or troubleshoot…"><button id="homeCommandSend" type="button" aria-label="Send to PROJECT_BYTE AI">${icon("send")}</button></div>
         <div class="home-actions">
           <button type="button" class="home-action" data-home-action="ask">${icon("chat")}Ask AI</button>
@@ -236,7 +282,7 @@ body[data-pb-view="home"]>header{padding:18px 16px 3px}body[data-pb-view="home"]
     if(selfName!=='Mike')chips.push(['mike','Mike',c.ownerFilter==='Mike']);
     chips.push(['ai','AI work',c.executorFilter==='ai'],['critical','Critical',c.priorityFilter==='Critical'],['week','This week',c.dueFilter==='7d']);
     const el=document.getElementById('homeScopes');if(!el)return;
-    el.innerHTML=chips.map(([key,label,active])=>`<button type="button" class="home-chip ${active?'active':''}" data-home-scope="${key}" aria-pressed="${active}">${escH(label)}</button>`).join('');
+    el.innerHTML=chips.map(([key,label,active])=>`<button type="button" class="home-chip ${active?'active':''}" data-home-scope="${key}" aria-pressed="${active}">${escH(label)}</button>`).join('')+'<button type="button" class="home-chip" data-open-scope="1">All filters</button>';
   }
 
   function renderAgentMap(scoped) {
@@ -406,7 +452,7 @@ body[data-pb-view="home"]>header{padding:18px 16px 3px}body[data-pb-view="home"]
     if (!document.getElementById('home')) return;
     const scoped=safeVisible();
     renderKpis(scoped); renderScopes(); renderAgentMap(scoped); renderExecutionFabric(); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(scoped); renderPortfolio(scoped); void refreshHomeApprovals(); void refreshExternalReviews();
-    syncHomeNav();
+    renderLiveCrawl();syncHomeNav();
     if(typeof window.CustomEvent==='function')window.dispatchEvent(new CustomEvent('project-byte-home-render'));
   }
 
@@ -454,6 +500,7 @@ body[data-pb-view="home"]>header{padding:18px 16px 3px}body[data-pb-view="home"]
     const saved=document.getElementById('savedView');if(saved)saved.value='';
   }
   function syncHomeNav() {
+    syncWorkspaceChrome();
     const view=document.body.dataset.pbView||'home';
     const groups={board:'portfolio',intelligence:'portfolio',terminalView:'agents',models:'agents',team:'settings',help:'settings',activity:'home'};
     document.querySelectorAll('.home-nav button').forEach(b=>{const active=b.dataset.homeGo===(groups[view]||view);b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
@@ -476,7 +523,123 @@ body[data-pb-view="home"]>header{padding:18px 16px 3px}body[data-pb-view="home"]
   document.addEventListener('click',e=>{if(e.target instanceof Element&&e.target.classList.contains('modalwrap')&&typeof closeModal==='function')closeModal(e.target.id);});
   window.addEventListener('hashchange',()=>{const view=location.hash.slice(1);if(spaces.some(([id])=>id===view)&&document.body.dataset.pbView!==view)go(view);});
 
+  // Put the conversation and composer first; optional routing stays available.
+  const chatBox=document.querySelector('#ai .chatbox'),chatOptions=chatBox?.querySelector('.grid3');
+  if(chatBox&&chatOptions){
+    const context=document.createElement('details');context.id='pbChatContext';context.className='pb-chat-context';
+    context.innerHTML='<summary>Project, agent &amp; model <span>Optional context</span></summary>';
+    context.open=window.innerWidth>=900;context.appendChild(chatOptions);chatBox.appendChild(context);
+  }
+  const originalSyncSelectors=typeof syncSelectors==='function'?syncSelectors:null;
+  if(originalSyncSelectors)syncSelectors=function(){
+    const ids=['aiProject','aiTask','aiAgent','aiModel','terminalRun'],kept=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)?.value||'']));
+    originalSyncSelectors();
+    for(const id of ids){const el=document.getElementById(id);if(el&&[...el.options].some(o=>o.value===kept[id]))el.value=kept[id];if(id==='aiProject'&&typeof syncAITasks==='function')syncAITasks();}
+  };
+
+  // Keep one set of real filter controls, inside an on-demand dialog.
+  const contextBar=document.createElement('div');contextBar.id='pbContextBar';contextBar.className='pb-context-bar';
+  contextBar.innerHTML='<div><h2 id="pbWorkspaceTitle"></h2><small id="pbWorkspaceScope"></small></div><button type="button" id="pbScopedFilters">Filters</button>';
+  main?.insertBefore(contextBar,home);
+  const filterDialog=document.createElement('dialog');filterDialog.id='pbFilterDialog';filterDialog.className='pb-filter-dialog';filterDialog.setAttribute('aria-labelledby','pbFilterTitle');
+  filterDialog.innerHTML='<div class="pb-filter-head"><h2 id="pbFilterTitle">Filter your workspace</h2><button class="pb-filter-close" type="button" aria-label="Close filters">Done</button></div>';
+  const filterControls=document.querySelector('header .filters'),advancedControls=document.getElementById('advancedFilters');
+  if(filterControls)filterDialog.appendChild(filterControls);if(advancedControls)filterDialog.appendChild(advancedControls);document.body.appendChild(filterDialog);
+  const scopeViews=new Set(['home','portfolio','board','intelligence','agents','activity']);let lastChromeView='';
+  function openScopeFilters(){if(!filterDialog.open)filterDialog.showModal();}
+  filterDialog.querySelector('.pb-filter-close').onclick=()=>filterDialog.close();
+  filterDialog.addEventListener('click',e=>{if(e.target===filterDialog){const r=filterDialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)filterDialog.close();}});
+  document.getElementById('pbScopedFilters').onclick=openScopeFilters;
+  if(document.getElementById('openFilters'))document.getElementById('openFilters').onclick=openScopeFilters;
+  document.addEventListener('click',e=>{if(e.target.closest('[data-open-scope],[data-open-filters]')){openScopeFilters();e.preventDefault();}});
+  function syncWorkspaceChrome(){
+    const view=document.body.dataset.pbView||'home',record=spaces.find(([id])=>id===view),count=typeof activeFilterCount==='function'?activeFilterCount():0;
+    if(view!==lastChromeView){if(filterDialog.open)filterDialog.close();lastChromeView=view;if(view==='home')requestAnimationFrame(sizeLiveCrawl);}
+    contextBar.hidden=view==='home';document.getElementById('pbWorkspaceTitle').textContent=record?.[1]||'Workspace';
+    const criteria=typeof filterCriteria==='function'?filterCriteria():{},names=[criteria.projectFilter,criteria.ownerFilter,criteria.priorityFilter,criteria.statusFilter].filter(Boolean);
+    document.getElementById('pbWorkspaceScope').textContent=scopeViews.has(view)&&count?(names.join(' · ')||`${count} active filters`):'';
+    const toggle=document.getElementById('pbScopedFilters');toggle.hidden=!scopeViews.has(view);toggle.textContent=count?`Filters · ${count}`:'Filters';toggle.setAttribute('aria-pressed',String(count>0));
+    const login=document.getElementById('login');if(login&&!session?.ok)login.textContent='Sign in';
+    if(syncCrawlIdentity()||(view==='home'&&Date.now()-crawlLastAttempt>15000))void pollLiveCrawl();
+  }
+  let crawlIdentity='',crawlSnapshot=null,crawlBusy=null,crawlRequest=0,crawlSignature='',crawlPaused=false,crawlState='connecting',crawlLastAttempt=0;
+  const actorIdentity=()=>`${session?.subject||''}|${session?.name||'Public'}|${session?.level||0}`;
+  function syncCrawlIdentity(){
+    const next=actorIdentity();if(next===crawlIdentity)return false;
+    crawlIdentity=next;++crawlRequest;if(crawlBusy)crawlBusy.abort();crawlBusy=null;crawlSnapshot=null;crawlSignature='';crawlState='connecting';return true;
+  }
+  const crawlText=(value,max=130)=>String(value??'').replace(/[\u0000-\u001f\u007f]/g,' ').replace(/\s+/g,' ').trim().slice(0,max);
+  function collectLiveHeadlines(){
+    const data=crawlSnapshot||{tasks:tasks||[],runs:runs||[],activity:activity||[],notifications:notifications||[]},items=[],seen=new Set();
+    const add=(id,text,kind='info',view='activity',task='')=>{if(!text||seen.has(id))return;seen.add(id);items.push({id,text:crawlText(text,200),kind,view,task});};
+    const health=window.__PROJECT_BYTE_HEALTH_LAST__,bridges=health?.components?.bridges||{};
+    if(health?.unavailable)add('health','System health unavailable · inspect connection','warning','help');
+    if(crawlState==='stale')add('stale','Activity connection interrupted · showing last recorded updates','warning','help');
+    for(const [key,label] of [['stickdeath','StickDeath BYTE'],['vitros','VITROS builder'],['vitros_verifier','VITROS verifier']]){
+      const b=bridges[key];if(!b)continue;
+      if(b.owner_paused)add('bridge:'+key,`${label} · paused by owner${b.external_running?' · executor still observed':''}`,'warning','agents');
+      else if(b.external_running||Number(b.active_executor_count)>0)add('bridge:'+key,`${label} · running ${crawlText(b.active_run_ref||b.external_run_ref,55)}${b.active_model?' · '+crawlText(b.active_model,55):''}`,'info','agents');
+      else if(b.state==='failed'||b.execution_state==='blocked')add('bridge:'+key,`${label} · ${crawlText(b.execution_reason||'execution needs attention',110)}`,'error','agents');
+      else if(b.execution_state==='unknown')add('bridge:'+key,`${label} · execution evidence not current`,'warning','agents');
+    }
+    if(session?.level>=1)for(const r of (data.runs||[]).slice(0,8)){
+      const label={running:'running',queued:'queued, not running', 'pr-created':'PR ready for review','opencode-failed':'execution failed','bridge-error':'bridge needs attention','diff-check-failed':'verification failed'}[r.status];
+      if(label)add('run:'+r.id,`${r.project} · ${r.agent_key||'agent'} · ${label} · issue #${r.issue_number}`,/failed|error/.test(r.status)?'error':'info','agents');
+    }
+    const open=(data.tasks||[]).filter(t=>t.status!=='Done');
+    for(const t of open.filter(t=>t.status==='Blocked').slice(0,3))add('blocked:'+t.id,`${t.project} · blocked: ${t.title}`,'warning','board',t.id);
+    for(const t of open.filter(t=>t.due_date&&typeof daysUntil==='function'&&daysUntil(t.due_date)<0).slice(0,2))add('due:'+t.id,`${t.project} · overdue: ${t.title}`,'warning','board',t.id);
+    if(session?.level>=1&&homeExternalReviewState.state==='fresh')for(const r of (homeExternalReviewState.items||[]).slice(0,3))add('review:'+r.repo+':'+r.number,`${r.project} · PR #${r.number} waiting for review · ${r.title}`,'info','agents');
+    for(const a of (data.activity||[]).slice(0,6)){
+      const task=(data.tasks||[]).find(t=>t.id===a.task_id);
+      add('activity:'+a.id,`${shortTime(a.ts)} · ${a.actor||'System'} · ${String(a.action||'update').replaceAll('_',' ')}${a.project?' · '+a.project:''}${a.detail?' · '+crawlText(a.detail,85):''}`,'info','activity',task?.id||'');
+    }
+    for(const t of open.filter(t=>Number(t.progress)>0).slice(0,2))add('progress:'+t.id,`${t.project} · ${t.title} · ${Math.min(100,Math.max(0,Number(t.progress)))}% recorded progress`,'info','board',t.id);
+    const mh=health?.components?.models;
+    if(mh)add('models',mh.state==='tested_ok'?`Model Hub · ${Number(mh.tested_ok||0)} recent connection test${mh.tested_ok===1?'':'s'} passed`:'Model Hub · '+(mh.state==='failed'?'connection test failed':'connection evidence untested or expired'),mh.state==='tested_ok'?'success':'warning','models');
+    if(!(session?.level>=1))add('sign-in','Sign in to see your private agent runs and review updates','info','ai');
+    if(!items.length)add('empty',crawlState==='connecting'?'Connecting to recorded activity…':'No new recorded activity · updates refresh automatically');
+    return items.slice(0,22);
+  }
+  function sizeLiveCrawl(){
+    const root=document.getElementById('pbLiveCrawl'),track=root?.querySelector('.pb-crawl-track'),group=track?.firstElementChild,viewport=root?.querySelector('.pb-crawl-viewport');if(!group||!viewport)return;
+    const animation=track.getAnimations?.()[0],offset=animation?Number(animation.currentTime||0)/1000*34:0;
+    track.style.setProperty('--crawl-min-width',viewport.clientWidth+'px');
+    const distance=group.getBoundingClientRect().width;if(distance<=0)return;
+    track.style.setProperty('--crawl-distance',distance+'px');track.style.setProperty('--crawl-duration',Math.max(1,distance/34)+'s');
+    const next=track.getAnimations?.()[0];if(next)next.currentTime=(offset%distance)/34*1000;
+  }
+  function renderLiveCrawl(){
+    if(syncCrawlIdentity())void pollLiveCrawl();const root=document.getElementById('pbLiveCrawl');if(!root)return;
+    const items=collectLiveHeadlines(),signature=JSON.stringify(items),track=root.querySelector('.pb-crawl-track');
+    root.dataset.state=crawlState;root.dataset.paused=String(crawlPaused);root.dataset.hidden=String(document.hidden);
+    root.querySelector('.pb-crawl-label').textContent=crawlState==='fresh'?'LIVE':crawlState==='stale'?'STALE':'UPDATES';
+    if(signature===crawlSignature)return;crawlSignature=signature;
+    const content=(clone)=>items.map(item=>`<button type="button" class="pb-crawl-item" data-kind="${item.kind}" ${item.task?`data-home-task="${escH(item.task)}"`:`data-home-go="${item.view}"`}${clone?' tabindex="-1"':''}>${escH(item.text)}</button>`).join('');
+    track.innerHTML=`<div class="pb-crawl-group">${content(false)}</div><div class="pb-crawl-group" aria-hidden="true">${content(true)}</div>`;
+    requestAnimationFrame(sizeLiveCrawl);
+  }
+  async function pollLiveCrawl(){
+    if(document.hidden||(document.body.dataset.pbView||'home')!=='home')return;
+    syncCrawlIdentity();if(crawlBusy)return;
+    const identity=crawlIdentity,request=++crawlRequest,controller=new AbortController();crawlBusy=controller;crawlLastAttempt=Date.now();
+    const timeout=setTimeout(()=>controller.abort(),10000),routes=[['activity','/api/activity'],['tasks','/api/tasks']];
+    if(session?.level>=1)routes.push(['runs','/api/runs']);
+    try{
+      const results=await Promise.allSettled(routes.map(async([key,url])=>{const x=await api(url,{signal:controller.signal});if(!Array.isArray(x[key]))throw new Error('Invalid activity evidence');return [key,x[key]];}));
+      if(request!==crawlRequest||identity!==actorIdentity())return;
+      const next={activity:[],tasks:[],runs:[],...(crawlSnapshot||{})};let failures=0;
+      for(const r of results){if(r.status==='fulfilled')next[r.value[0]]=r.value[1];else failures++;}
+      crawlSnapshot=next;crawlState=failures?'stale':'fresh';renderLiveCrawl();
+    }catch{if(request===crawlRequest){crawlState='stale';renderLiveCrawl();}}
+    finally{clearTimeout(timeout);if(request===crawlRequest)crawlBusy=null;}
+  }
+  const crawlToggle=document.getElementById('pbCrawlToggle');
+  crawlToggle.onclick=()=>{crawlPaused=!crawlPaused;crawlToggle.setAttribute('aria-pressed',String(crawlPaused));crawlToggle.setAttribute('aria-label',crawlPaused?'Resume activity crawl':'Pause activity crawl');crawlToggle.innerHTML=icon(crawlPaused?'active':'blocked');renderLiveCrawl();};
+  document.addEventListener('visibilitychange',()=>{renderLiveCrawl();if(!document.hidden)void pollLiveCrawl();});
+  window.addEventListener('resize',sizeLiveCrawl);window.setInterval(pollLiveCrawl,15000);
+
   document.body.dataset.pbView = location.hash.replace('#','') || 'home';
-  window.addEventListener('project-byte-health',e=>renderExecutionFabric(e.detail||null));
-  setTimeout(renderHome,0);
+  window.addEventListener('project-byte-health',e=>{renderExecutionFabric(e.detail||null);renderLiveCrawl();});
+  setTimeout(()=>{renderHome();void pollLiveCrawl();},0);
 })();

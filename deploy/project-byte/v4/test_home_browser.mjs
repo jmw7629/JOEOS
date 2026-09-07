@@ -1,6 +1,7 @@
 // Executable browser acceptance for the actual reconstructed PROJECT_BYTE app.
 // Isolated database and credentials; GitHub execution is deliberately unavailable.
 import assert from 'node:assert/strict';
+import {verifyFocusedWorkspaces} from './test_focused_workspaces.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -81,6 +82,7 @@ try{
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),`${view} has no page-level horizontal overflow`);
   }
   const out=process.env.PB_SCREENSHOTS||path.join(root,'screenshots');await fs.mkdir(out,{recursive:true});
+  await verifyFocusedWorkspaces({page,api,base,out});
   for(const [width,height] of [[320,740],[390,844],[768,1024],[1440,1000]]){
     await page.setViewportSize({width,height});await page.evaluate(()=>renderAll());await sleep(200);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),`Home fits ${width}px`);
