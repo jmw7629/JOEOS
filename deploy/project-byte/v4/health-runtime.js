@@ -30,7 +30,9 @@
     lastHealth = health || null;
     applying = true;
     try {
-      if (health?.operational) {
+      if (health?.unavailable) {
+        setState('System health unavailable', 'degraded');
+      } else if (health?.operational) {
         setState('Systems verified operational', 'healthy');
       } else if (health?.ok) {
         setState('Core healthy · execution health incomplete', 'unknown');
@@ -64,8 +66,7 @@
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       render(await response.json());
     } catch {
-      render({ok: false, operational: false, components: {models: {state: 'unknown'}}});
-      setState('System health unavailable', 'degraded');
+      render({ok: false, operational: false, unavailable: true, components: {models: {state: 'unknown'}}});
     }
   };
 
