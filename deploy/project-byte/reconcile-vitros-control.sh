@@ -71,9 +71,65 @@ if [ -n "$status" ]; then
   git -C "$ROOT" show origin/main:package-lock.json > "$tmp/package-lock.remote.json"
 
   if git -C "$ROOT" status --porcelain=v1 -- package-lock.json | grep -q .; then
-    cmp -s "$ROOT/package-lock.json" "$tmp/package-lock.remote.json" || \
-      fail "local package-lock.json is not byte-identical to origin/main; backup retained at $backup"
-    echo "Verified local package-lock.json already equals origin/main."
+    if ! python3 - "$ROOT/package-lock.json" "$tmp/package-lock.remote.json" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+local_path, remote_path = map(Path, sys.argv[1:3])
+try:
+    local = json.loads(local_path.read_text())
+except Exception as exc:
+    print(f"local package-lock.json is not valid JSON: {type(exc).__name__}", file=sys.stderr)
+    raise SystemExit(2)
+try:
+    remote = json.loads(remote_path.read_text())
+except Exception as exc:
+    print(f"origin/main package-lock.json is not valid JSON: {type(exc).__name__}", file=sys.stderr)
+    raise SystemExit(2)
+
+if local == remote:
+    print("Verified local package-lock.json is semantically identical to origin/main.")
+    raise SystemExit(0)
+
+paths = []
+def add(path):
+    if len(paths) < 12 and path not in paths:
+        paths.append(path)
+
+def walk(a, b, path='$'):
+    if len(paths) >= 12:
+        return
+    if type(a) is not type(b):
+        add(path + ' [type]')
+        return
+    if isinstance(a, dict):
+        ak, bk = set(a), set(b)
+        for key in sorted(ak - bk):
+            add(f"{path}.{key} [local-only]")
+        for key in sorted(bk - ak):
+            add(f"{path}.{key} [remote-only]")
+        for key in sorted(ak & bk):
+            walk(a[key], b[key], f"{path}.{key}")
+            if len(paths) >= 12:
+                return
+    elif isinstance(a, list):
+        if len(a) != len(b):
+            add(path + ' [length]')
+        for idx, (left, right) in enumerate(zip(a, b)):
+            walk(left, right, f"{path}[{idx}]")
+            if len(paths) >= 12:
+                return
+    elif a != b:
+        add(path)
+
+walk(local, remote)
+print("package-lock semantic mismatch paths: " + (", ".join(paths) if paths else "<unknown>"), file=sys.stderr)
+raise SystemExit(1)
+PY
+    then
+      fail "local package-lock.json differs semantically from origin/main; backup retained at $backup"
+    fi
   fi
 
   if git -C "$ROOT" status --porcelain=v1 -- .gitignore | grep -q .; then
