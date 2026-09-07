@@ -42,15 +42,19 @@ jobs:
         run: |
           set -euo pipefail
           f=deploy/project-byte/v4/health-runtime.js
+          base="$RUNNER_TEMP/project-byte-base.js"
+          cat deploy/project-byte/v4/index/*.part > "$RUNNER_TEMP/project-byte-index.html"
+          sed -n '/<script>/,/<\/script>/p' "$RUNNER_TEMP/project-byte-index.html" > "$base"
           home=deploy/project-byte/v4/home.js
           grep -q "health?.operational" "$f"
           grep -q "Core healthy · execution incomplete" "$f"
           grep -q "VITROS verifier" "$f"
           grep -q "modelSummary" "$f"
           grep -q "tested OK" "$f"
-          grep -q "Last test OK" "$f"
-          grep -q "dataset.modelEvidence = 'historical'" "$f"
-          ! grep -q "● Connected" "$f"
+          grep -q "Last test OK" "$base"
+          grep -q "data-model-evidence=\"historical\"" "$base"
+          ! grep -q "● Connected" "$base"
+          ! grep -q 'installHistoricalModelLabels' "$f"
           ! grep -q 'MutationObserver' "$f"
           grep -q 'Verifying system health…' "$home"
           grep -q 'AI UNKNOWN' "$home"
@@ -61,7 +65,7 @@ jobs:
       - name: Verify workspace-wide refresh semantics
         run: |
           set -euo pipefail
-          f=deploy/project-byte/v4/health-runtime.js
+          f="$RUNNER_TEMP/project-byte-base.js"
           for endpoint in session tasks projects intelligence activity models agents runs; do
             grep -q "api('/api/$endpoint')" "$f"
           done
@@ -69,7 +73,8 @@ jobs:
           grep -q 'workspaceRefreshBusy' "$f"
           grep -q 'userIsEditing' "$f"
           grep -q "document.querySelector('.modalwrap.open')" "$f"
-          grep -q 'refreshTimer = setInterval(refreshWorkspace, ms)' "$f"
+          grep -q 'refreshTimer=setInterval(refreshWorkspace,ms)' "$f"
+          ! grep -q 'installWorkspaceRefresh' deploy/project-byte/v4/health-runtime.js
           echo 'WORKSPACE_REFRESH=PASS'
       - name: Verify mobile navigation, filters, and Kanban
         run: |
