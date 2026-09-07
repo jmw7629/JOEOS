@@ -44,6 +44,7 @@ SYNC_STATE = {"last_attempt": 0, "last_ok": 0, "last_error": ""}
 BRIDGE_CACHE_LOCK = threading.Lock()
 BRIDGE_CACHE = {"at": 0.0, "value": {}}
 BRIDGE_CACHE_SECONDS = 10.0
+MODEL_STATUS_FRESH_SECONDS = 1800
 
 BRIDGE_SERVICES = {
     "stickdeath": ("stickdeath-opencode-bridge.service", "jmw7629/StickDeath-Infinity-"),
@@ -153,10 +154,32 @@ def _model_health():
     try:
         models = [m for m in app.model_rows() if m.get("enabled")]
     except Exception:
-        return {"state": "unknown", "enabled": 0, "tested_ok": 0, "failed": 0, "unknown": 0}
-    tested_ok = sum((m.get("last_status") or "").lower() == "ok" for m in models)
-    unknown = sum((m.get("last_status") or "unknown").lower() in {"", "unknown"} for m in models)
-    failed = max(0, len(models) - tested_ok - unknown)
+        return {
+            "state": "unknown",
+            "enabled": 0,
+            "tested_ok": 0,
+            "failed": 0,
+            "unknown": 0,
+            "freshness_window_seconds": MODEL_STATUS_FRESH_SECONDS,
+        }
+    current = int(time.time())
+    tested_ok = 0
+    failed = 0
+    unknown = 0
+    for model in models:
+        status = (model.get("last_status") or "unknown").lower()
+        try:
+            updated_at = int(model.get("updated_at") or 0)
+        except (TypeError, ValueError):
+            updated_at = 0
+        age = max(0, current - updated_at) if updated_at else None
+        fresh = age is not None and age <= MODEL_STATUS_FRESH_SECONDS
+        if not fresh or status in {"", "unknown"}:
+            unknown += 1
+        elif status == "ok":
+            tested_ok += 1
+        else:
+            failed += 1
     if failed:
         state = "failed"
     elif models and tested_ok == len(models):
@@ -169,6 +192,7 @@ def _model_health():
         "tested_ok": tested_ok,
         "failed": failed,
         "unknown": unknown,
+        "freshness_window_seconds": MODEL_STATUS_FRESH_SECONDS,
     }
 
 
