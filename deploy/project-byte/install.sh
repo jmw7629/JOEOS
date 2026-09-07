@@ -205,6 +205,7 @@ refresh_bridge() {
   local unsafe=""
   local remote_head=""
   local local_head=""
+  local checkout_advanced=0
 
   if [ ! -f "$env_file" ]; then
     echo "Bridge refresh skipped for $service_name: configuration file is absent, so liveness cannot be verified." >&2
@@ -248,12 +249,23 @@ refresh_bridge() {
       echo "Bridge refresh skipped for $service_name: fast-forward was not safe." >&2
       return 1
     fi
+    checkout_advanced=1
   fi
   local_head="$(git -C "$root" rev-parse HEAD 2>/dev/null || true)"
   if [ "$local_head" != "$remote_head" ]; then
     echo "Bridge refresh failed for $service_name: checkout is not at origin/main after refresh." >&2
     return 1
   fi
+
+  if systemctl --user is-active --quiet "$service_name"; then
+    if [ "$checkout_advanced" -eq 0 ]; then
+      echo "Bridge already current and active: $service_name @ ${local_head:0:12}; restart not required."
+      return 0
+    fi
+    echo "Bridge checkout advanced for $service_name, but the service is already active; restart deferred to avoid interrupting an executor." >&2
+    return 1
+  fi
+
   if ! systemctl --user restart "$service_name"; then
     echo "Bridge refresh failed for $service_name: service restart failed." >&2
     return 1
