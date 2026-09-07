@@ -4,6 +4,9 @@
 
   let homeApprovalState = [];
   let homeApprovalRefreshBusy = false;
+  let homeExternalReviewState = {state:'unavailable',items:[],repositories:{}};
+  let homeExternalReviewRefreshBusy = false;
+  let homeExternalReviewUpdatedAt = 0;
 
   const style = document.createElement('style');
   style.textContent = `
@@ -30,7 +33,7 @@
   .execution-fabric{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:9px}.fabric-node{min-width:0;border:1px solid rgba(105,132,158,.20);border-radius:10px;background:rgba(6,12,20,.46);padding:8px;text-align:left;color:var(--txt)}.fabric-node b{display:block;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fabric-node span{display:block;color:var(--muted);font-size:8px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fabric-node::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;background:var(--home-amber)}.fabric-node[data-state="healthy"]::before,.fabric-node[data-state="tested_ok"]::before{background:var(--home-green);box-shadow:0 0 7px rgba(116,217,160,.35)}.fabric-node[data-state="failed"]::before{background:var(--home-red)}
   .org-map{display:grid;gap:9px}.org-top{text-align:center;padding:10px;border:1px solid rgba(112,200,255,.25);border-radius:12px;background:rgba(17,35,50,.36)}.org-top b{display:block}.org-row{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.org-person{padding:10px 6px;border:1px solid var(--line);border-radius:11px;background:rgba(7,13,21,.46);text-align:center;font-size:10px;min-width:0}.org-person b{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.org-person small{color:var(--muted)}
   .home-lower{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}.activity-feed,.work-list,.memory-feed,.approval-list{display:grid;gap:7px}.activity-item,.work-item,.memory-item,.approval-item{border:1px solid rgba(91,116,143,.22);background:rgba(6,12,20,.45);border-radius:11px;padding:9px;min-width:0}.activity-item{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start}.activity-item time{font:10px ui-monospace,SFMono-Regular,Menlo,monospace;color:#7990a6}.activity-item b,.work-item b,.memory-item b,.approval-item b{font-size:11px;display:block}.activity-item span,.work-item span,.memory-item span,.approval-item span{font-size:10px;color:var(--muted);display:block;margin-top:2px}.work-item{cursor:pointer}.work-item:hover{border-color:#456a89}.work-top{display:flex;justify-content:space-between;gap:8px}.home-priority{font-size:9px;border-radius:999px;padding:2px 6px;border:1px solid var(--line);height:max-content}.home-priority.Critical{color:#ffb7bd;border-color:#633d42}.home-priority.High{color:#f1d09b;border-color:#5e4b2e}
-  .approval-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.approval-actions a,.approval-actions button{font-size:10px;min-height:34px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:rgba(17,28,40,.75);color:var(--txt)}.approval-actions button[data-review-action="approve"]{border-color:rgba(116,217,160,.42);color:#b9ebcb}.approval-actions button[data-review-action="request_changes"]{border-color:rgba(239,189,106,.42);color:#f1d39c}.approval-state{display:inline-block;margin-top:6px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}.approval-note{margin-top:6px!important;font-size:9px!important}
+  .approval-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.approval-actions a,.approval-actions button{font-size:10px;min-height:34px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:rgba(17,28,40,.75);color:var(--txt)} .approval-item.external-review{border-color:rgba(112,200,255,.28)}.approval-item.external-review .approval-actions a{min-height:44px;display:inline-flex;align-items:center;max-width:100%;overflow-wrap:anywhere}.external-review-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.external-review-meta em{font-style:normal;font-size:9px;border:1px solid var(--line);border-radius:999px;padding:3px 6px;color:var(--muted)}.approval-actions button[data-review-action="approve"]{border-color:rgba(116,217,160,.42);color:#b9ebcb}.approval-actions button[data-review-action="request_changes"]{border-color:rgba(239,189,106,.42);color:#f1d39c}.approval-state{display:inline-block;margin-top:6px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}.approval-note{margin-top:6px!important;font-size:9px!important}
   .home-nav{display:none;position:fixed;left:10px;right:10px;bottom:9px;z-index:40;background:rgba(8,13,20,.94);border:1px solid rgba(102,128,156,.28);border-radius:17px;padding:6px;grid-template-columns:repeat(5,1fr);box-shadow:0 16px 40px rgba(0,0,0,.4);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}.home-nav button{border:0;border-radius:11px;min-height:49px;padding:5px 3px;background:transparent;color:var(--muted);font-size:9px}.home-nav button i{display:block;font-style:normal;font-size:17px;line-height:20px}.home-nav button.active{background:rgba(66,111,150,.19);color:#d9f1ff}
   body[data-pb-view="home"]>.wrap>.metrics{display:none}
   @media(max-width:980px){.home-grid,.home-lower{grid-template-columns:1fr}.home-kpis{grid-template-columns:repeat(3,1fr)}.home-actions{grid-template-columns:repeat(2,1fr)}}
@@ -250,16 +253,44 @@
     el.innerHTML=items.length?items.map(t=>`<button type="button" class="work-item" data-home-task="${escH(t.id)}"><div class="work-top"><b>${escH(t.title)}</b><span class="home-priority ${escH(t.priority)}">${escH(t.priority)}</span></div><span>${escH(t.project)}${t.due_date?' · due '+escH(t.due_date):''}${t.ai_state?' · AI '+escH(t.ai_state):''}</span></button>`).join(''):`<div class="small">${empty}</div>`;
   }
 
+  function externalReviewAge(seconds) {
+    if(seconds===null||seconds===undefined||Number.isNaN(Number(seconds)))return 'unknown age';
+    const value=Math.max(0,Number(seconds));
+    if(value<60)return `${Math.round(value)}s ago`;
+    if(value<3600)return `${Math.round(value/60)}m ago`;
+    if(value<86400)return `${Math.round(value/3600)}h ago`;
+    return `${Math.round(value/86400)}d ago`;
+  }
+
+  function externalReviewsForScope(scoped) {
+    const all=tasks||[],selected=document.getElementById('projectFilter')?.value||'';
+    const scopedProjects=new Set((scoped||[]).map(t=>t.project));
+    return (homeExternalReviewState.items||[]).filter(item=>{
+      if(selected)return item.project===selected;
+      if((scoped||[]).length===all.length)return true;
+      return scopedProjects.has(item.project);
+    }).slice(0,6);
+  }
+
   function renderApprovals(scoped) {
     const el=document.getElementById('homeApprovals');if(!el)return;
     const ids=new Set(scoped.map(t=>t.id));
     const ready=(runs||[]).filter(r=>ids.has(r.task_id)&&(r.status==='pr-created'||r.pr_url)).slice(0,6);
-    el.innerHTML=ready.length?ready.map(r=>{
+    const ownedHtml=ready.map(r=>{
       const approval=homeApprovalState.find(a=>a.run_id===r.id);
       const controls=approval&&approval.status==='pending'&&session?.level>=2?`<button type="button" data-home-approval="${escH(approval.id)}" data-review-action="approve">Approve review</button><button type="button" data-home-approval="${escH(approval.id)}" data-review-action="request_changes">Request changes</button>`:'';
       const decided=approval&&approval.status!=='pending'?`<span class="approval-state">${escH(approval.status)}${approval.decided_by?' · '+escH(approval.decided_by):''}</span>`:'';
-      return `<div class="approval-item"><b>${escH(r.project)} · #${r.issue_number}</b><span>${escH(r.agent_key||'agent')} produced a reviewable result.</span>${decided}<div class="approval-actions">${r.pr_url?`<a href="${escH(r.pr_url)}" target="_blank" rel="noopener">Open PR</a>`:''}<button type="button" data-home-run="${escH(r.id)}">Terminal</button>${controls}</div>${approval?'<span class="approval-note">PROJECT_BYTE approval records your review decision only. It never merges the PR.</span>':''}</div>`;
-    }).join(''):'<div class="small">No agent work is waiting for review in this scope.</div>';
+      return `<div class="approval-item"><b>${escH(r.project)} · #${r.issue_number}</b><span>${escH(r.agent_key||'agent')} produced a PROJECT_BYTE reviewable result.</span>${decided}<div class="approval-actions">${r.pr_url?`<a href="${escH(r.pr_url)}" target="_blank" rel="noopener">Open PR</a>`:''}<button type="button" data-home-run="${escH(r.id)}">Terminal</button>${controls}</div>${approval?'<span class="approval-note">PROJECT_BYTE approval records your review decision only. It never merges the PR.</span>':''}</div>`;
+    }).join('');
+    const external=externalReviewsForScope(scoped);
+    const externalHtml=external.map(item=>{
+      const checks=item.checks||{},failed=Number(checks.failed||0),pending=Number(checks.pending||0),passed=Number(checks.passed||0),unknown=Number(checks.unknown||0);
+      const checksText=failed?`${failed} failed`:pending?`${pending} pending`:unknown?`${unknown} unknown`:passed?`${passed} passed`:'checks unknown';
+      const evidence=item.evidence_state==='stale'?`stale · ${externalReviewAge(item.evidence_age_seconds)}`:item.evidence_state==='fresh'?'fresh':'evidence unavailable';
+      return `<div class="approval-item external-review"><b>${escH(item.project)} · PR #${Number(item.number||0)}</b><span>${escH(item.title||'Reviewable pull request')}</span><div class="external-review-meta"><em>external review</em>${item.draft?'<em>draft</em>':''}<em>${escH(checksText)}</em><em>${escH(item.merge_state||'UNKNOWN')}</em><em>${escH(externalReviewAge(item.updated_age_seconds))}</em><em>${escH(evidence)}</em></div><div class="approval-actions"><a href="${escH(item.url)}" target="_blank" rel="noopener">Open GitHub PR</a></div><span class="approval-note">Read-only observation. PROJECT_BYTE cannot approve, comment, merge, close, rerun or deploy this external PR.</span></div>`;
+    }).join('');
+    const evidenceBanner=homeExternalReviewState.state==='unavailable'?'<div class="small">External review evidence is unavailable; PROJECT_BYTE is not assuming the queue is empty.</div>':homeExternalReviewState.state==='partial'?'<div class="small">External review evidence is partial; unavailable repositories are not assumed clear.</div>':homeExternalReviewState.state==='stale'?'<div class="small">External review evidence is stale; verify GitHub before acting.</div>':'';
+    el.innerHTML=evidenceBanner+ownedHtml+externalHtml || '<div class="small">No observed review work in this scope.</div>';
   }
 
   async function refreshHomeApprovals() {
@@ -267,6 +298,23 @@
     if(!(session?.level>=2)){homeApprovalState=[];renderApprovals(safeVisible());return;}
     homeApprovalRefreshBusy=true;
     try{const x=await api('/api/approvals');homeApprovalState=x.approvals||[];renderApprovals(safeVisible())}catch{homeApprovalState=[]}finally{homeApprovalRefreshBusy=false}
+  }
+
+  async function refreshExternalReviews(force=false) {
+    if(!(session?.level>=1)){homeExternalReviewState={state:'unavailable',items:[],repositories:{}};renderApprovals(safeVisible());return;}
+    const now=Date.now();
+    if(homeExternalReviewRefreshBusy||(!force&&homeExternalReviewUpdatedAt&&now-homeExternalReviewUpdatedAt<15000))return;
+    homeExternalReviewRefreshBusy=true;
+    try{
+      const x=await api('/api/external-reviews');
+      homeExternalReviewState={state:x.state||'unavailable',items:Array.isArray(x.items)?x.items:[],repositories:x.repositories||{}};
+      homeExternalReviewUpdatedAt=Date.now();
+      renderApprovals(safeVisible());
+    }catch{
+      homeExternalReviewState={state:'unavailable',items:[],repositories:{}};
+      homeExternalReviewUpdatedAt=Date.now();
+      renderApprovals(safeVisible());
+    }finally{homeExternalReviewRefreshBusy=false}
   }
 
   async function decideHomeApproval(id,action) {
@@ -301,7 +349,7 @@
   function renderHome() {
     if (!document.getElementById('home')) return;
     const scoped=safeVisible();
-    renderKpis(scoped); renderScopes(); renderAgentMap(scoped); renderExecutionFabric(); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(scoped); renderPortfolio(scoped); void refreshHomeApprovals();
+    renderKpis(scoped); renderScopes(); renderAgentMap(scoped); renderExecutionFabric(); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(scoped); renderPortfolio(scoped); void refreshHomeApprovals(); void refreshExternalReviews();
     document.querySelectorAll('.home-nav button').forEach(b=>b.classList.toggle('active',b.dataset.homeGo===(document.body.dataset.pbView||'home')));
   }
 
