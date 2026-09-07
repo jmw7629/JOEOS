@@ -8,14 +8,10 @@ on:
       - '.github/workflows/project-byte-v4-verify.yml'
   pull_request:
     branches: [project-byte-deploy]
-    paths:
-      - 'deploy/project-byte/v4/**'
-      - 'deploy/project-byte/install.sh'
-      - '.github/workflows/project-byte-v4-verify.yml'
   workflow_dispatch:
 
 jobs:
-  verify:
+  verify-v4:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

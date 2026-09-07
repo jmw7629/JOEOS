@@ -1,0 +1,34 @@
+name: PROJECT_BYTE Governance Verify
+
+on:
+  pull_request:
+    branches: [project-byte-deploy]
+  push:
+    branches: [project-byte-deploy]
+    paths:
+      - '.github/workflows/project-byte-*.yml'
+      - 'deploy/project-byte/verify-governance.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-governance-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+      - name: Prove every required PROJECT_BYTE gate materializes on every deploy PR
+        run: python3 deploy/project-byte/verify-governance.py
+      - name: Check workflow syntax and whitespace
+        run: |
+          python3 - <<'PY'
+          import pathlib, yaml
+          for p in pathlib.Path('.github/workflows').glob('project-byte-*.yml'):
+              yaml.safe_load(p.read_text())
+          PY
+          git diff --check HEAD^ HEAD

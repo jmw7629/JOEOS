@@ -3,9 +3,6 @@ name: PROJECT_BYTE Active Checkout Verify
 on:
   pull_request:
     branches: [project-byte-deploy]
-    paths:
-      - 'deploy/project-byte/install.sh'
-      - '.github/workflows/project-byte-active-checkout-verify.yml'
   push:
     branches: [project-byte-deploy]
     paths:

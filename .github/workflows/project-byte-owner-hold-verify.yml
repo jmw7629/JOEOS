@@ -3,10 +3,6 @@ name: PROJECT_BYTE Owner Hold Verify
 on:
   pull_request:
     branches: [project-byte-deploy]
-    paths:
-      - 'deploy/project-byte/v4/**'
-      - 'deploy/project-byte/install.sh'
-      - '.github/workflows/project-byte-owner-hold-verify.yml'
   push:
     branches: [project-byte-deploy]
     paths:

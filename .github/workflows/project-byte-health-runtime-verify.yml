@@ -3,12 +3,6 @@ name: PROJECT_BYTE Health Runtime Verify
 on:
   pull_request:
     branches: [project-byte-deploy]
-    paths:
-      - 'deploy/project-byte/v4/health-runtime.js'
-      - 'deploy/project-byte/v4/home.js'
-      - 'deploy/project-byte/v4/runtime_server.py'
-      - 'deploy/project-byte/install.sh'
-      - '.github/workflows/project-byte-health-runtime-verify.yml'
   push:
     branches: [project-byte-deploy]
     paths:

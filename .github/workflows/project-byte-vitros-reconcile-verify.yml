@@ -8,13 +8,10 @@ on:
       - '.github/workflows/project-byte-vitros-reconcile-verify.yml'
   pull_request:
     branches: [project-byte-deploy]
-    paths:
-      - 'deploy/project-byte/reconcile-vitros-control.sh'
-      - '.github/workflows/project-byte-vitros-reconcile-verify.yml'
   workflow_dispatch:
 
 jobs:
-  verify:
+  verify-vitros-control-reconcile:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
