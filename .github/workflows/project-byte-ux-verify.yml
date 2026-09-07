@@ -80,12 +80,16 @@ jobs:
         run: |
           set -euo pipefail
           f=deploy/project-byte/v4/health-runtime.js
-          grep -q 'data-home-go="board"' "$f"
-          grep -q 'data-home-go="help"' "$f"
+          ! grep -q "board.innerHTML" "$f"
+          ! grep -q "help.innerHTML" "$f"
           grep -q 'body:not(\[data-pb-view="home"\]) .filters{display:grid!important' "$f"
           grep -q 'scroll-snap-type:x mandatory' "$f"
           grep -q 'calc(100vw - 36px)' "$f"
-          grep -q 'grid-template-columns:repeat(7' "$f"
+          grep -q 'grid-template-columns:repeat(5,minmax(0,1fr))' "$f"
+          grep -q 'data-home-go="portfolio"' deploy/project-byte/v4/home.js
+          grep -q 'data-home-go="agents"' deploy/project-byte/v4/home.js
+          grep -q 'data-home-go="ai"' deploy/project-byte/v4/home.js
+          grep -q 'data-home-go="settings"' deploy/project-byte/v4/home.js
           grep -q '>New work</button>' deploy/project-byte/v4/home.js
           ! grep -q '>Queue work</button>' deploy/project-byte/v4/home.js
           grep -q 'targetOwner===who' deploy/project-byte/v4/home.js
