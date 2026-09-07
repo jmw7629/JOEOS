@@ -55,11 +55,11 @@
       <section class="home-hero">
         <div class="home-hero-top">
           <div>
-            <div class="home-eyebrow"><span class="home-status-dot"></span><span id="homeSystemState">All systems operational</span></div>
+            <div class="home-eyebrow"><span class="home-status-dot"></span><span id="homeSystemState">Verifying system health…</span></div>
             <h2>Joe AI</h2>
             <p>Your executive AI command layer across projects, people, agents and infrastructure.</p>
           </div>
-          <div id="homeAIState" class="home-ai-state">AI READY</div>
+          <div id="homeAIState" class="home-ai-state">AI UNKNOWN</div>
         </div>
         <div class="home-command"><input id="homeCommandInput" type="text" maxlength="1200" placeholder="Ask, create work, get status, or troubleshoot…"><button id="homeCommandSend" type="button" aria-label="Send to PROJECT_BYTE AI">→</button></div>
         <div class="home-actions">
@@ -257,9 +257,6 @@
     if (!document.getElementById('home')) return;
     const scoped=safeVisible();
     renderKpis(scoped); renderScopes(); renderAgentMap(scoped); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(scoped); renderPortfolio(scoped);
-    const active=(runs||[]).filter(r=>['queued','running'].includes(r.status)).length;
-    const state=document.getElementById('homeSystemState'); if(state) state.textContent=active?`${active} AI run${active===1?'':'s'} active`:'All systems operational';
-    const aiState=document.getElementById('homeAIState'); if(aiState) aiState.textContent=(models||[]).some(m=>m.last_status==='ok')?'AI CONNECTED':'AI READY';
     document.querySelectorAll('.home-nav button').forEach(b=>b.classList.toggle('active',b.dataset.homeGo===(document.body.dataset.pbView||'home')));
   }
 
