@@ -1,7 +1,8 @@
 set last_status=?,updated_at=? where model_key=?",(txt(str(e),200),now(),key))
                 return self.sendj({"ok":False,"error":str(e)},502)
-            with con() as c:c.execute("update models set last_status='ok',last_latency_ms=?,updated_at=? where model_key=?",(latency,now(),key))
-            return self.sendj({"ok":ok,"latency_ms":latency,"reply":answer[:120]})
+            protocol_ok=answer.strip()=="PROJECT_BYTE_OK";ok=bool(answer.strip());status="ok" if ok else "empty-response"
+            with con() as c:c.execute("update models set last_status=?,last_latency_ms=?,updated_at=? where model_key=?",(status,latency,now(),key))
+            return self.sendj({"ok":ok,"protocol_ok":protocol_ok,"latency_ms":latency,"reply":answer[:120]})
         if p=="/api/models":
             if not (u:=self.need(3)):return
             d=self.body() or {}
