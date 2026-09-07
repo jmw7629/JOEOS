@@ -23,6 +23,28 @@
             except Exception:return self.sendj({"error":"invalid settings"},400)
             with con() as c:audit(c,"settings_updated","","",", ".join(d.keys()),u["name"])
             return self.sendj({"ok":True,"settings":s})
+        if p.startswith("/api/approvals/") and p.endswith("/decision"):
+            if not (u:=self.need(2)):return
+            parts=p.split("/");aid=txt(unquote(parts[3] if len(parts)>3 else ""),160);d=self.body() or {}
+            action=txt(d.get("action"),40)
+            status_map={"approve":"approved","request_changes":"changes-requested"}
+            if not aid or action not in status_map:return self.sendj({"error":"action must be approve or request_changes"},400)
+            decided=status_map[action]
+            with LOCK,con() as c:
+                rec=c.execute("select * from approvals where id=?",(aid,)).fetchone()
+                if not rec:return self.sendj({"error":"approval not found"},404)
+                rec=dict(rec)
+                if rec["status"]!="pending":
+                    if rec["status"]==decided:return self.sendj({"ok":True,"approval":rec,"idempotent":True})
+                    return self.sendj({"error":"approval already decided","status":rec["status"]},409)
+                c.execute("update approvals set status=?,decided_at=?,decided_by=? where id=?",(decided,now(),u["name"],aid))
+                run=c.execute("select project from runs where id=?",(rec["run_id"],)).fetchone()
+                project=run["project"] if run else ""
+                audit(c,"review_"+decided,rec["task_id"],project,aid,u["name"])
+            if rec.get("run_id"):
+                add_run_event(rec["run_id"],"review",decided,u["name"],"PROJECT_BYTE review decision only; PR was not merged")
+            fresh=next((x for x in approval_rows() if x["id"]==aid),None)
+            return self.sendj({"ok":True,"approval":fresh,"merge_performed":False})
         if p=="/api/notifications/read":
             if not (u:=self.need(1)):return
             d=self.body() or {};subject=settings_subject(u);nid=txt(d.get("id"),120)

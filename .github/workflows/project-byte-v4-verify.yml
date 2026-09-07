@@ -60,7 +60,7 @@ jobs:
           for (const id of ['ownerFilter','leadFilter','statusFilter','healthFilter','stageFilter','executorFilter','agentFilter','modelFilter','aiStateFilter','dueFilter','completionFilter','dependencyFilter','activityFilter','milestoneFilter','repoFilter','runFilter','scopeFilter','savedView']) {
             if (!html.includes(`id="${id}"`)) throw new Error(`missing filter control: ${id}`);
           }
-          for (const required of ['Joe AI','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','Portfolio pulse','homeCommandInput','home-nav']) {
+          for (const required of ['Joe AI','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','New work','Approve review','Request changes','Portfolio pulse','homeCommandInput','home-nav']) {
             if (!home.includes(required)) throw new Error(`missing Home command-center surface: ${required}`);
           }
           for (const forbidden of ['All systems operational','AI READY','AI CONNECTED']) {
@@ -186,6 +186,7 @@ jobs:
           done
 
           OWNER="$(cat admin.secret)"
+          test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18094/api/approvals)" = '403'
           curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/session | tee session.json
           grep -q '"role":"owner"' session.json
 
@@ -222,7 +223,21 @@ jobs:
             -d '{"agent_key":"builder","model_key":"ollama-local"}' \
             http://127.0.0.1:18094/api/tasks/legacy/queue | tee queue.json
           grep -q '"issue":999' queue.json
-          curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/runs | grep '"issue_number":999' >/dev/null
+          python3 - <<'PY'
+          import sqlite3,time
+          db=sqlite3.connect('/tmp/project-byte-v4/runtime/kanban.db')
+          db.execute("update runs set status='pr-created',pr_url='https://github.com/jmw7629/StickDeath-Infinity-/pull/999',finished_at=?,updated_at=? where issue_number=999",(int(time.time()),int(time.time())))
+          db.commit();db.close()
+          PY
+          curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/approvals | tee approvals.json
+          APPROVAL_ID="$(python3 -c 'import json,sys; a=json.load(sys.stdin)["approvals"]; print(a[0]["id"]) if a else (_ for _ in ()).throw(SystemExit(2))' < approvals.json)"
+          test "${APPROVAL_ID#review:}" != "$APPROVAL_ID"
+          curl -fsS -X POST -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" \
+            -d '{"action":"approve"}' "http://127.0.0.1:18094/api/approvals/${APPROVAL_ID}/decision" | tee approval-decision.json
+          grep -q '"status":"approved"' approval-decision.json
+          grep -q '"merge_performed":false' approval-decision.json
+          test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" -d '{"action":"request_changes"}' "http://127.0.0.1:18094/api/approvals/${APPROVAL_ID}/decision")" = '409'
+          echo 'REMOTE_REVIEW_LEDGER_NO_AUTOMERGE=PASS'
 
           echo 'TRUTHFUL_HEALTH_COMPONENTS=PASS'
           echo 'HOME_STATUS_EVIDENCE_GATED=PASS'

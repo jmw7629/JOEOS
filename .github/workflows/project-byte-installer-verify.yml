@@ -70,6 +70,10 @@ jobs:
           grep -q 'if ! check_bridge_service "vitros-opencode-verifier.service"; then BRIDGE_REFRESH_FAILURES=1; fi' deploy/project-byte/install.sh
           ! grep -q 'Optional VITROS verifier' deploy/project-byte/install.sh
           ! grep -q 'refresh_bridge .*vitros-opencode-verifier.service' deploy/project-byte/install.sh
+          grep -q '"/api/approvals"' "$TMP/server.py"
+          grep -q 'data-home-approval' "$TMP/home.js"
+          grep -q '>New work</button>' "$TMP/home.js"
+          ! grep -q '>Queue work</button>' "$TMP/home.js"
           grep -q 'data-home-kpi' "$TMP/home.js"
           grep -q 'function homeKpiScope' "$TMP/home.js"
           grep -q 'function renderActivity(scoped)' "$TMP/home.js"
