@@ -3,7 +3,6 @@
   window.__PROJECT_BYTE_HEALTH_RUNTIME__ = true;
 
   let lastHealth = null;
-  let workspaceRefreshBusy = false;
 
   const safeText = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const componentState = value => String(value?.state || 'unknown').toLowerCase();
@@ -96,86 +95,12 @@
     };
   };
 
-  const installHistoricalModelLabels = () => {
-    if (typeof renderModels !== 'function') return;
-    const originalRenderModels = renderModels;
-    renderModels = function() {
-      originalRenderModels();
-      const cards = [...document.querySelectorAll('#modelGrid .modelcard')];
-      cards.forEach((card, index) => {
-        const model = (models || [])[index];
-        const pill = card.querySelector('.cardhead .pill');
-        if (!model || !pill) return;
-        const status = String(model.last_status || 'unknown').toLowerCase();
-        pill.textContent = status === 'ok' ? '● Last test OK' : status === 'unknown' || !status ? '● Not tested / stale' : `● Last test ${status}`;
-        pill.dataset.modelEvidence = 'historical';
-      });
-    };
-  };
-
-  const userIsEditing = () => {
-    if (document.querySelector('.modalwrap.open')) return true;
-    const active = document.activeElement;
-    if (!active) return false;
-    return ['INPUT','TEXTAREA','SELECT'].includes(active.tagName) || active.isContentEditable;
-  };
-
-  const refreshWorkspace = async () => {
-    if (workspaceRefreshBusy || userIsEditing()) return;
-    workspaceRefreshBusy = true;
-    try {
-      const calls = [
-        api('/api/session'), api('/api/tasks'), api('/api/projects'), api('/api/intelligence'),
-        api('/api/activity'), api('/api/models'), api('/api/agents'), api('/api/runs')
-      ];
-      const [ss,a,b,c,d,e,f,g] = await Promise.all(calls);
-      session = ss;
-      tasks = a.tasks || [];
-      projects = b.projects || [];
-      intel = c || {top:[],signals:{}};
-      activity = d.activity || [];
-      models = e.models || [];
-      agents = f.agents || [];
-      runs = g.runs || [];
-      if (session.level >= 3) {
-        try { team = (await api('/api/team')).team || []; } catch { team = []; }
-      } else team = [];
-      if (session.level >= 2) {
-        try { memory = (await api('/api/memory')).memory || []; } catch { memory = []; }
-      } else memory = [];
-      if (session.level >= 1) {
-        try { notifications = (await api('/api/notifications')).notifications || []; } catch { notifications = []; }
-      } else notifications = [];
-      syncSelectors();
-      renderAll();
-      renderNotifications();
-      deliverBrowserNotifications();
-      if (document.querySelector('#terminalView.active')) await terminalLoad();
-      const status = document.getElementById('status');
-      if (status) status.textContent = `Live · ${session.ok ? session.name : 'public read-only'} · ${new Date().toLocaleTimeString()}`;
-    } catch (error) {
-      const status = document.getElementById('status');
-      if (status) status.textContent = `Refresh error: ${error?.message || 'unknown error'}`;
-    } finally {
-      workspaceRefreshBusy = false;
-    }
-  };
-
   const installHealthOwnership = () => {
     if (typeof renderAll !== 'function') return;
     const originalRenderAll = renderAll;
     renderAll = function() {
       originalRenderAll();
       if (lastHealth) render(lastHealth);
-    };
-  };
-
-  const installWorkspaceRefresh = () => {
-    if (typeof setRefreshTimer !== 'function') return;
-    setRefreshTimer = function() {
-      if (refreshTimer) clearInterval(refreshTimer);
-      const ms = Math.max(5, Number(settings.general?.refresh_seconds || 10)) * 1000;
-      refreshTimer = setInterval(refreshWorkspace, ms);
     };
   };
 
@@ -219,9 +144,7 @@
     setState('Verifying system health…', 'unknown');
     setAIState({state: 'unknown'});
     installTruthfulSettingsHealth();
-    installHistoricalModelLabels();
     installHealthOwnership();
-    installWorkspaceRefresh();
     installMobileUX();
     if (typeof renderModels === 'function') renderModels();
     if (typeof setRefreshTimer === 'function') setRefreshTimer();
