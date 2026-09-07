@@ -1,0 +1,80 @@
+name: PROJECT_BYTE fix curl health checks
+
+on:
+  push:
+    branches: [project-byte-deploy]
+    paths:
+      - '.github/workflows/project-byte-fix-curl-health.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: project-byte-deploy
+          fetch-depth: 0
+
+      - name: Replace pipe-closing health probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          p=Path('deploy/project-byte/install.sh')
+          s=p.read_text()
+          old='''for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  if HEALTH="$(curl -fsS http://127.0.0.1:8094/healthz 2>/dev/null)"; then
+    if curl -fsS http://127.0.0.1:8094/ | grep -q '<script src="/home.js"></script>' \\
+      && curl -fsS http://127.0.0.1:8094/ | grep -q '<script src="/home-inspector.js"></script>' \\
+      && curl -fsS http://127.0.0.1:8094/home.js | grep -q 'Joe AI' \\
+      && curl -fsS http://127.0.0.1:8094/home.js | grep -q 'Live agents' \\
+      && curl -fsS http://127.0.0.1:8094/home-inspector.js | grep -q 'homeAgentInspector' \\
+      && curl -fsS http://127.0.0.1:8094/home-inspector.js | grep -q 'data-inspect-run'; then
+      HOME_OK=1
+      break
+    fi
+  fi
+  sleep 1
+done
+'''
+          new='''for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  if HEALTH="$(curl -fsS http://127.0.0.1:8094/healthz 2>/dev/null)"; then
+    if curl -fsS http://127.0.0.1:8094/ -o "$TMP/live-index.html" \\
+      && curl -fsS http://127.0.0.1:8094/home.js -o "$TMP/live-home.js" \\
+      && curl -fsS http://127.0.0.1:8094/home-inspector.js -o "$TMP/live-home-inspector.js" \\
+      && grep -Fq '<script src="/home.js"></script>' "$TMP/live-index.html" \\
+      && grep -Fq '<script src="/home-inspector.js"></script>' "$TMP/live-index.html" \\
+      && grep -Fq 'Joe AI' "$TMP/live-home.js" \\
+      && grep -Fq 'Live agents' "$TMP/live-home.js" \\
+      && grep -Fq 'homeAgentInspector' "$TMP/live-home-inspector.js" \\
+      && grep -Fq 'data-inspect-run' "$TMP/live-home-inspector.js"; then
+      HOME_OK=1
+      break
+    fi
+  fi
+  sleep 1
+done
+'''
+          if old not in s:
+              raise SystemExit('expected health-check block not found')
+          p.write_text(s.replace(old,new,1))
+          PY
+          bash -n deploy/project-byte/install.sh
+          ! grep -nE 'curl .*\| *grep -q' deploy/project-byte/install.sh
+          git diff --check
+
+      - name: Commit installer-only fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add deploy/project-byte/install.sh
+          git commit -m 'Avoid broken-pipe noise in PROJECT_BYTE health checks'
+          git push origin HEAD:project-byte-deploy
