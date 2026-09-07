@@ -153,6 +153,5 @@
   };
 
   window.__PROJECT_BYTE_HEALTH_REAPPLY__ = () => { if (lastHealth) render(lastHealth); };
-  window.__PROJECT_BYTE_WORKSPACE_REFRESH__ = refreshWorkspace;
   start();
 })();
