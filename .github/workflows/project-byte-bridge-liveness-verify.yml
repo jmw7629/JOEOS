@@ -110,6 +110,35 @@ jobs:
               assert activity >= 7000
               assert complete is True
 
+          with tempfile.TemporaryDirectory() as td:
+              root = Path(td)
+              proc = root / 'proc'
+              cache = root / 'cache'
+              proc.mkdir()
+              worktree = cache / 'jmw7629__StickDeath-Infinity-' / 'worktrees' / 'issue-105'
+              worktree.mkdir(parents=True)
+              outside = root / 'outside'
+              outside.mkdir()
+
+              def fake_process(pid, args):
+                  process = proc / str(pid)
+                  process.mkdir()
+                  uid = os.getuid()
+                  (process / 'status').write_text(f'Name:\topencode\nUid:\t{uid}\t{uid}\t{uid}\t{uid}\n')
+                  (process / 'cmdline').write_bytes(b'\0'.join(x.encode() for x in args) + b'\0')
+
+              fake_process(11, ['/x/opencode', 'run', '--dir', str(worktree), '--model', 'opencode/nemotron-3.5-lightning-free', 'PROMPT token=SUPERSECRET'])
+              fake_process(12, ['/x/opencode', 'run', '--dir', str(outside), '--model', 'bad/provider', 'PROMPT other-secret'])
+              fake_process(13, ['/x/opencode', 'tui', '--dir', str(worktree), 'PROMPT third-secret'])
+              observed = mod._active_executor('jmw7629/StickDeath-Infinity-', proc_root=proc, cache_root=cache)
+              assert observed['running'] is True and observed['count'] == 1, observed
+              assert observed['active_run_ref'] == 'issue-105', observed
+              assert observed['active_issue_number'] == 105, observed
+              assert observed['active_model'] == 'opencode/nemotron-3.5-lightning-free', observed
+              assert 'SECRET' not in repr(observed) and 'PROMPT' not in repr(observed), observed
+              unavailable = mod._active_executor('jmw7629/StickDeath-Infinity-', proc_root=root / 'missing-proc', cache_root=cache)
+              assert unavailable['running'] is False and unavailable['evidence_complete'] is False, unavailable
+
           def execution_case(content, *, age=5, verifier=False):
               with tempfile.TemporaryDirectory() as td:
                   root = Path(td)
@@ -158,6 +187,10 @@ jobs:
               now - mod.BRIDGE_STALL_SECONDS - 10 if 'StickDeath' in repo else None,
               True,
           )
+          mod._active_executor = lambda repo, verifier=False: {
+              'running': False, 'count': 0, 'active_run_ref': '', 'active_issue_number': 0,
+              'active_model': '', 'evidence_complete': True,
+          }
           bridges = mod._bridge_health()
           assert bridges['stickdeath']['state'] == 'failed', bridges
           assert bridges['stickdeath']['progress_state'] == 'stalled', bridges
@@ -167,6 +200,35 @@ jobs:
           assert bridges['vitros_verifier']['state'] == 'healthy', bridges
           assert bridges['vitros_verifier']['pending_observable'] is False, bridges
           assert bridges['vitros_verifier']['required'] is True, bridges
+
+          mod.BRIDGE_CACHE['at'] = 0.0
+          mod.BRIDGE_CACHE['value'] = {}
+          mod._pending_runs = lambda repo, current: {'count': 0, 'oldest_age_seconds': None, 'active_updated_at': None, 'active_issue_number': 0}
+          mod._latest_bridge_activity = lambda repo, **kwargs: (now - 2, True)
+          mod._active_executor = lambda repo, verifier=False: {
+              'running': 'StickDeath' in repo,
+              'count': 1 if 'StickDeath' in repo else 0,
+              'active_run_ref': 'issue-105' if 'StickDeath' in repo else '',
+              'active_issue_number': 105 if 'StickDeath' in repo else 0,
+              'active_model': 'opencode/nemotron-3.5-lightning-free' if 'StickDeath' in repo else '',
+              'evidence_complete': True,
+          }
+          externally_running = mod._bridge_health()
+          assert externally_running['stickdeath']['state'] == 'healthy', externally_running
+          assert externally_running['stickdeath']['progress_state'] == 'running', externally_running
+          assert externally_running['stickdeath']['active_run_ref'] == 'issue-105', externally_running
+          assert externally_running['stickdeath']['active_model'] == 'opencode/nemotron-3.5-lightning-free', externally_running
+          assert externally_running['stickdeath']['pending_count'] == 1, externally_running
+
+          mod.BRIDGE_CACHE['at'] = 0.0
+          mod.BRIDGE_CACHE['value'] = {}
+          mod._active_executor = lambda repo, verifier=False: {
+              'running': False, 'count': 0, 'active_run_ref': '', 'active_issue_number': 0,
+              'active_model': '', 'evidence_complete': False,
+          }
+          incomplete = mod._bridge_health()
+          assert incomplete['stickdeath']['state'] == 'unknown', incomplete
+          assert incomplete['stickdeath']['progress_state'] == 'evidence-incomplete', incomplete
 
           print('BRIDGE_IDLE_HEALTHY=PASS')
           print('BRIDGE_RUNNING_FRESH=PASS')
@@ -181,6 +243,11 @@ jobs:
           print('EXECUTION_RATE_LIMIT_CLASSIFICATION=PASS')
           print('EXECUTION_LATER_SUCCESS_RECOVERS=PASS')
           print('EXECUTION_STALE_EVIDENCE_UNKNOWN=PASS')
+          print('EXTERNAL_EXECUTOR_APPROVED_ROOT=PASS')
+          print('EXTERNAL_EXECUTOR_UNRELATED_IGNORED=PASS')
+          print('EXTERNAL_EXECUTOR_PROMPT_NOT_EXPOSED=PASS')
+          print('EXTERNAL_EXECUTOR_RUNNING_OVERRIDES_IDLE=PASS')
+          print('EXTERNAL_EXECUTOR_UNAVAILABLE_FAILS_UNKNOWN=PASS')
           PY
       - name: Prove health path is local, bounded and non-mutating
         shell: bash
@@ -195,6 +262,12 @@ jobs:
           grep -q '_execution_readiness' "$runtime"
           grep -q 'execution_state' "$runtime"
           grep -q 'execution_reason_code' "$runtime"
+          grep -q 'EXECUTOR_PROCESS_SCAN_MAX_ENTRIES = 8192' "$runtime"
+          grep -q 'EXECUTOR_CMDLINE_READ_BYTES = 16384' "$runtime"
+          grep -q '_active_executor' "$runtime"
+          grep -q 'active_run_ref' "$runtime"
+          grep -q 'active_model' "$runtime"
+          grep -q 'executor_evidence_complete' "$runtime"
           grep -q "status in ('queued','running')" "$runtime"
           grep -q '_processed_issue_activity' "$runtime"
           grep -q 'progress_evidence_complete' "$runtime"
