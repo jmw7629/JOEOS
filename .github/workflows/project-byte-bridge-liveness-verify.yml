@@ -130,14 +130,36 @@ jobs:
               fake_process(11, ['/x/opencode', 'run', '--dir', str(worktree), '--model', 'opencode/nemotron-3.5-lightning-free', 'PROMPT token=SUPERSECRET'])
               fake_process(12, ['/x/opencode', 'run', '--dir', str(outside), '--model', 'bad/provider', 'PROMPT other-secret'])
               fake_process(13, ['/x/opencode', 'tui', '--dir', str(worktree), 'PROMPT third-secret'])
-              observed = mod._active_executor('jmw7629/StickDeath-Infinity-', proc_root=proc, cache_root=cache)
+              observed = mod._active_executor('jmw7629/StickDeath-Infinity-', boundary='stickdeath', proc_root=proc, cache_root=cache)
               assert observed['running'] is True and observed['count'] == 1, observed
               assert observed['active_run_ref'] == 'issue-105', observed
               assert observed['active_issue_number'] == 105, observed
               assert observed['active_model'] == 'opencode/nemotron-3.5-lightning-free', observed
               assert 'SECRET' not in repr(observed) and 'PROMPT' not in repr(observed), observed
-              unavailable = mod._active_executor('jmw7629/StickDeath-Infinity-', proc_root=root / 'missing-proc', cache_root=cache)
+
+              vitros_live = cache / 'jmw7629__vitros-web-dashboard' / 'project-byte-live-builder' / 'issue-324'
+              vitros_live.mkdir(parents=True)
+              vitros_wrong = cache / 'jmw7629__vitros-web-dashboard' / 'worktrees' / 'issue-325'
+              vitros_wrong.mkdir(parents=True)
+              verifier = cache / 'jmw7629__vitros-web-dashboard' / 'verifier-sandboxes' / 'verify-316-dcecb6a10d'
+              verifier.mkdir(parents=True)
+              fake_process(14, ['/x/opencode', 'run', '--dir', str(vitros_live), '--model', 'opencode/nemotron-3.5-lightning-free', 'PROMPT live-v-secret'])
+              fake_process(15, ['/x/opencode', 'run', '--dir', str(vitros_wrong), '--model', 'opencode/nemotron-3.5-lightning-free', 'PROMPT wrong-root-secret'])
+              fake_process(16, ['/x/opencode', 'run', '--dir', str(verifier), '--model', 'opencode/nemotron-3.5-lightning-free', 'PROMPT verifier-secret'])
+              vitros_observed = mod._active_executor('jmw7629/vitros-web-dashboard', boundary='vitros', proc_root=proc, cache_root=cache)
+              assert vitros_observed['running'] is True and vitros_observed['count'] == 1, vitros_observed
+              assert vitros_observed['active_run_ref'] == 'issue-324', vitros_observed
+              assert vitros_observed['active_model'] == 'opencode/nemotron-3.5-lightning-free', vitros_observed
+              verifier_observed = mod._active_executor('jmw7629/vitros-web-dashboard', boundary='vitros_verifier', proc_root=proc, cache_root=cache)
+              assert verifier_observed['running'] is True and verifier_observed['count'] == 1, verifier_observed
+              assert verifier_observed['active_run_ref'] == 'verify-316-dcecb6a10d', verifier_observed
+              assert 'secret' not in repr(vitros_observed).lower(), vitros_observed
+              assert 'secret' not in repr(verifier_observed).lower(), verifier_observed
+
+              unavailable = mod._active_executor('jmw7629/StickDeath-Infinity-', boundary='stickdeath', proc_root=root / 'missing-proc', cache_root=cache)
               assert unavailable['running'] is False and unavailable['evidence_complete'] is False, unavailable
+              invalid_boundary = mod._active_executor('jmw7629/vitros-web-dashboard', boundary='unknown', proc_root=proc, cache_root=cache)
+              assert invalid_boundary['running'] is False and invalid_boundary['evidence_complete'] is False, invalid_boundary
 
           def execution_case(content, *, age=5, verifier=False):
               with tempfile.TemporaryDirectory() as td:
@@ -187,7 +209,7 @@ jobs:
               now - mod.BRIDGE_STALL_SECONDS - 10 if 'StickDeath' in repo else None,
               True,
           )
-          mod._active_executor = lambda repo, verifier=False: {
+          mod._active_executor = lambda repo, boundary: {
               'running': False, 'count': 0, 'active_run_ref': '', 'active_issue_number': 0,
               'active_model': '', 'evidence_complete': True,
           }
@@ -205,12 +227,12 @@ jobs:
           mod.BRIDGE_CACHE['value'] = {}
           mod._pending_runs = lambda repo, current: {'count': 0, 'oldest_age_seconds': None, 'active_updated_at': None, 'active_issue_number': 0}
           mod._latest_bridge_activity = lambda repo, **kwargs: (now - 2, True)
-          mod._active_executor = lambda repo, verifier=False: {
-              'running': 'StickDeath' in repo,
-              'count': 1 if 'StickDeath' in repo else 0,
-              'active_run_ref': 'issue-105' if 'StickDeath' in repo else '',
-              'active_issue_number': 105 if 'StickDeath' in repo else 0,
-              'active_model': 'opencode/nemotron-3.5-lightning-free' if 'StickDeath' in repo else '',
+          mod._active_executor = lambda repo, boundary: {
+              'running': boundary == 'stickdeath',
+              'count': 1 if boundary == 'stickdeath' else 0,
+              'active_run_ref': 'issue-105' if boundary == 'stickdeath' else '',
+              'active_issue_number': 105 if boundary == 'stickdeath' else 0,
+              'active_model': 'opencode/nemotron-3.5-lightning-free' if boundary == 'stickdeath' else '',
               'evidence_complete': True,
           }
           externally_running = mod._bridge_health()
@@ -222,7 +244,7 @@ jobs:
 
           mod.BRIDGE_CACHE['at'] = 0.0
           mod.BRIDGE_CACHE['value'] = {}
-          mod._active_executor = lambda repo, verifier=False: {
+          mod._active_executor = lambda repo, boundary: {
               'running': False, 'count': 0, 'active_run_ref': '', 'active_issue_number': 0,
               'active_model': '', 'evidence_complete': False,
           }
@@ -244,6 +266,9 @@ jobs:
           print('EXECUTION_LATER_SUCCESS_RECOVERS=PASS')
           print('EXECUTION_STALE_EVIDENCE_UNKNOWN=PASS')
           print('EXTERNAL_EXECUTOR_APPROVED_ROOT=PASS')
+          print('VITROS_BUILDER_EXACT_ROOT=PASS')
+          print('VITROS_GENERIC_WORKTREES_ROOT_IGNORED=PASS')
+          print('VITROS_VERIFIER_EXACT_ROOT=PASS')
           print('EXTERNAL_EXECUTOR_UNRELATED_IGNORED=PASS')
           print('EXTERNAL_EXECUTOR_PROMPT_NOT_EXPOSED=PASS')
           print('EXTERNAL_EXECUTOR_RUNNING_OVERRIDES_IDLE=PASS')
@@ -264,6 +289,9 @@ jobs:
           grep -q 'execution_reason_code' "$runtime"
           grep -q 'EXECUTOR_PROCESS_SCAN_MAX_ENTRIES = 8192' "$runtime"
           grep -q 'EXECUTOR_CMDLINE_READ_BYTES = 16384' "$runtime"
+          grep -q '"stickdeath": "worktrees"' "$runtime"
+          grep -q '"vitros": "project-byte-live-builder"' "$runtime"
+          grep -q '"vitros_verifier": "verifier-sandboxes"' "$runtime"
           grep -q '_active_executor' "$runtime"
           grep -q 'active_run_ref' "$runtime"
           grep -q 'active_model' "$runtime"

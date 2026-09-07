@@ -110,6 +110,7 @@ jobs:
           grep -q '_active_executor' "$TMP/server.py"
           grep -q 'active_run_ref' "$TMP/server.py"
           grep -q 'active_model' "$TMP/server.py"
+          grep -q '"vitros": "project-byte-live-builder"' "$TMP/server.py"
           grep -q 'executor_evidence_complete' "$TMP/server.py"
           grep -q 'freshness_window_seconds' "$TMP/server.py"
           grep -Fq '"vitros_verifier": ("vitros-opencode-verifier.service", "jmw7629/vitros-web-dashboard", True)' "$TMP/server.py"
