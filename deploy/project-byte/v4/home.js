@@ -19,7 +19,7 @@
   .home-command{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:15px}.home-command input{width:100%;min-width:0;background:rgba(4,9,16,.62);border:1px solid rgba(112,200,255,.26);border-radius:13px;min-height:48px;padding:0 14px;color:var(--txt);font-size:16px;outline:none}.home-command input:focus{border-color:rgba(112,200,255,.72);box-shadow:0 0 0 3px rgba(112,200,255,.10)}
   .home-command button,.home-action,.home-nav button,.home-chip{border:1px solid var(--line);color:var(--txt);background:linear-gradient(180deg,rgba(26,38,53,.86),rgba(13,21,31,.84));box-shadow:inset 0 1px rgba(255,255,255,.04)}
   .home-command button{width:48px;border-radius:13px;font-size:20px}.home-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}.home-action{border-radius:11px;min-height:43px;padding:8px;font-size:12px;font-weight:650}.home-action:hover,.home-command button:hover,.home-chip:hover{border-color:#486c89}
-  .home-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}.home-kpi{border-radius:14px;padding:12px;min-width:0}.home-kpi span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.1em;font-weight:700}.home-kpi b{display:block;font-size:23px;margin-top:4px;letter-spacing:-.03em}.home-kpi small{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+  .home-kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}.home-kpi{border-radius:14px;padding:12px;min-width:0;appearance:none;text-align:left;color:var(--txt);cursor:pointer}.home-kpi:hover{border-color:#486c89;transform:translateY(-1px)}.home-kpi span{display:block;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.1em;font-weight:700}.home-kpi b{display:block;font-size:23px;margin-top:4px;letter-spacing:-.03em}.home-kpi small{display:block;color:var(--muted);font-size:10px;margin-top:2px}
   .home-kpi[data-kind="blocked"] b,.home-kpi[data-kind="critical"] b{color:#ffb1b7}.home-kpi[data-kind="ai"] b{color:#abd8ff}.home-kpi[data-kind="due"] b{color:#f1d39c}
   .home-scopes{display:flex;gap:7px;overflow:auto;padding:1px 1px 4px;scrollbar-width:none}.home-scopes::-webkit-scrollbar{display:none}.home-chip{border-radius:999px;padding:8px 11px;white-space:nowrap;font-size:11px}.home-chip.active{background:#173a54;border-color:#3678a2;color:#d5efff}
   .home-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:12px}.home-card{border-radius:17px;padding:14px;min-width:0}.home-card-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:11px}.home-card-head h3{font-size:14px;margin:0}.home-card-head button{background:transparent;border:0;color:var(--muted);min-width:32px;min-height:32px;border-radius:8px}.home-card-head button:hover{background:rgba(255,255,255,.04);color:var(--txt)}
@@ -123,6 +123,22 @@
     renderHome();
   }
 
+  function homeKpiScope(kind) {
+    if (typeof clearFilters === 'function') clearFilters();
+    const map = {
+      open: ['completionFilter','open'],
+      active: ['statusFilter','Active'],
+      blocked: ['statusFilter','Blocked'],
+      critical: ['priorityFilter','Critical'],
+      ai: ['runFilter','active'],
+      due: ['dueFilter','7d']
+    };
+    const pair=map[kind];
+    if(pair&&document.getElementById(pair[0]))document.getElementById(pair[0]).value=pair[1];
+    if(typeof renderAll==='function')renderAll();
+    renderHome();
+  }
+
   function safeVisible() {
     try { return typeof visible === 'function' ? visible() : (tasks || []); } catch { return tasks || []; }
   }
@@ -149,7 +165,7 @@
       ['Due soon',dueSoon,'due','next 7 days']
     ];
     const el=document.getElementById('homeKpis'); if(!el) return;
-    el.innerHTML=data.map(([l,v,k,s])=>`<div class="home-kpi" data-kind="${k}"><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join('');
+    el.innerHTML=data.map(([l,v,k,s])=>`<button type="button" class="home-kpi" data-kind="${k}" data-home-kpi="${k}" aria-label="Filter Home to ${l}"><span>${l}</span><b>${v}</b><small>${s}</small></button>`).join('');
   }
 
   function renderScopes() {
@@ -179,10 +195,13 @@
     el.innerHTML=`<div class="org-top"><b>${escH(who)}</b><small>Executive operator</small></div><div class="org-row">${row.map(p=>`<button type="button" class="org-person" data-home-person="${escH(p.name)}"><b>${escH(p.name)}</b><small>${escH(p.sub)}</small></button>`).join('')}</div><div class="org-row">${['Research','Development','Operations'].map((x,i)=>`<div class="org-person"><b>${x}</b><small>${i===0?'Evidence':i===1?'Build':'Release'}</small></div>`).join('')}</div>`;
   }
 
-  function renderActivity() {
+  function renderActivity(scoped) {
     const el=document.getElementById('homeActivity');if(!el)return;
-    const items=(activity||[]).slice(0,5);
-    el.innerHTML=items.length?items.map(a=>`<button type="button" class="activity-item" ${a.task_id?`data-home-task="${escH(a.task_id)}"`:''}><time>${shortTime(a.ts)}</time><div><b>${escH(a.action)}</b><span>${escH(a.actor||'system')}${a.project?' · '+escH(a.project):''}${a.detail?' · '+escH(a.detail):''}</span></div></button>`).join(''):'<div class="small">No recent activity.</div>';
+    const allTasks=tasks||[],filtered=scoped.length!==allTasks.length;
+    const ids=new Set(scoped.map(t=>t.id)),names=new Set(scoped.map(t=>t.project));
+    const source=filtered?(activity||[]).filter(a=>(a.task_id&&ids.has(a.task_id))||(a.project&&names.has(a.project))):(activity||[]);
+    const items=source.slice(0,5);
+    el.innerHTML=items.length?items.map(a=>`<button type="button" class="activity-item" ${a.task_id?`data-home-task="${escH(a.task_id)}"`:'data-home-go="activity"'}><time>${shortTime(a.ts)}</time><div><b>${escH(a.action)}</b><span>${escH(a.actor||'system')}${a.project?' · '+escH(a.project):''}${a.detail?' · '+escH(a.detail):''}</span></div></button>`).join(''):'<div class="small">No recent activity in this scope.</div>';
   }
 
   function renderWork(scoped) {
@@ -194,10 +213,11 @@
     el.innerHTML=items.length?items.map(t=>`<button type="button" class="work-item" data-home-task="${escH(t.id)}"><div class="work-top"><b>${escH(t.title)}</b><span class="home-priority ${escH(t.priority)}">${escH(t.priority)}</span></div><span>${escH(t.project)}${t.due_date?' · due '+escH(t.due_date):''}${t.ai_state?' · AI '+escH(t.ai_state):''}</span></button>`).join(''):'<div class="small">No open work in this scope.</div>';
   }
 
-  function renderApprovals() {
+  function renderApprovals(scoped) {
     const el=document.getElementById('homeApprovals');if(!el)return;
-    const ready=(runs||[]).filter(r=>r.status==='pr-created'||r.pr_url).slice(0,4);
-    el.innerHTML=ready.length?ready.map(r=>`<div class="approval-item"><b>${escH(r.project)} · #${r.issue_number}</b><span>${escH(r.agent_key||'agent')} finished work and produced a reviewable result.</span><div class="approval-actions">${r.pr_url?`<a href="${escH(r.pr_url)}" target="_blank" rel="noopener">Open PR</a>`:''}<button type="button" data-home-run="${escH(r.id)}">Terminal</button></div></div>`).join(''):'<div class="small">No agent work is waiting for review.</div>';
+    const ids=new Set(scoped.map(t=>t.id));
+    const ready=(runs||[]).filter(r=>ids.has(r.task_id)&&(r.status==='pr-created'||r.pr_url)).slice(0,4);
+    el.innerHTML=ready.length?ready.map(r=>`<div class="approval-item"><b>${escH(r.project)} · #${r.issue_number}</b><span>${escH(r.agent_key||'agent')} finished work and produced a reviewable result.</span><div class="approval-actions">${r.pr_url?`<a href="${escH(r.pr_url)}" target="_blank" rel="noopener">Open PR</a>`:''}<button type="button" data-home-run="${escH(r.id)}">Terminal</button></div></div>`).join(''):'<div class="small">No agent work is waiting for review in this scope.</div>';
   }
 
   function renderMemory() {
@@ -206,16 +226,18 @@
     el.innerHTML=items.length?items.map(m=>`<div class="memory-item"><b>${escH(m.kind)} · ${escH(m.agent_key||'shared')}</b><span>${escH(m.content)}</span></div>`).join(''):'<div class="small">No agent memory available for this access level.</div>';
   }
 
-  function renderPortfolio() {
+  function renderPortfolio(scoped) {
     const el=document.getElementById('homePortfolio');if(!el)return;
-    const list=(projects||[]).slice(0,5);
-    el.innerHTML=list.map(p=>{const t=(tasks||[]).filter(x=>x.project===p.name),done=t.filter(x=>x.status==='Done').length,pct=t.length?Math.round(done/t.length*100):0;return `<button type="button" class="work-item" data-home-project="${escH(p.name)}"><div class="work-top"><b>${escH(p.name)}</b><span class="health" data-h="${escH(p.health)}">${escH(p.health)}</span></div><span>${escH(p.stage||'Build')} · Lead ${escH(p.lead||'—')} · ${pct}% complete</span></button>`}).join('')||'<div class="small">No projects yet.</div>';
+    const allTasks=tasks||[],filtered=scoped.length!==allTasks.length,names=new Set(scoped.map(t=>t.project));
+    const chosen=document.getElementById('projectFilter')?.value||'';
+    const list=(filtered?(projects||[]).filter(p=>names.has(p.name)||p.name===chosen):(projects||[])).slice(0,5);
+    el.innerHTML=list.map(p=>{const t=(tasks||[]).filter(x=>x.project===p.name),done=t.filter(x=>x.status==='Done').length,pct=t.length?Math.round(done/t.length*100):0;return `<button type="button" class="work-item" data-home-project="${escH(p.name)}"><div class="work-top"><b>${escH(p.name)}</b><span class="health" data-h="${escH(p.health)}">${escH(p.health)}</span></div><span>${escH(p.stage||'Build')} · Lead ${escH(p.lead||'—')} · ${pct}% complete</span></button>`}).join('')||'<div class="small">No projects in this scope.</div>';
   }
 
   function renderHome() {
     if (!document.getElementById('home')) return;
     const scoped=safeVisible();
-    renderKpis(scoped); renderScopes(); renderAgentMap(); renderOrg(); renderActivity(); renderWork(scoped); renderApprovals(); renderMemory(); renderPortfolio();
+    renderKpis(scoped); renderScopes(); renderAgentMap(); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(); renderPortfolio(scoped);
     const active=(runs||[]).filter(r=>['queued','running'].includes(r.status)).length;
     const state=document.getElementById('homeSystemState'); if(state) state.textContent=active?`${active} AI run${active===1?'':'s'} active`:'All systems operational';
     const aiState=document.getElementById('homeAIState'); if(aiState) aiState.textContent=(models||[]).some(m=>m.last_status==='ok')?'AI CONNECTED':'AI READY';
@@ -237,11 +259,12 @@
   };
 
   document.addEventListener('click',e=>{
-    const b=e.target.closest('[data-view],[data-home-go],[data-home-action],[data-home-scope],[data-home-agent],[data-home-person],[data-home-task],[data-home-run],[data-home-project]');
+    const b=e.target.closest('[data-view],[data-home-go],[data-home-action],[data-home-scope],[data-home-kpi],[data-home-agent],[data-home-person],[data-home-task],[data-home-run],[data-home-project]');
     if(!b)return;
     if(b.dataset.view){document.body.dataset.pbView=b.dataset.view;setTimeout(renderHome,0)}
     if(b.dataset.homeGo){go(b.dataset.homeGo);e.preventDefault()}
     if(b.dataset.homeScope){homeTaskScope(b.dataset.homeScope);e.preventDefault()}
+    if(b.dataset.homeKpi){homeKpiScope(b.dataset.homeKpi);e.preventDefault()}
     if(b.dataset.homeAgent){if(document.getElementById('agentFilter'))document.getElementById('agentFilter').value=b.dataset.homeAgent;if(typeof renderAll==='function')renderAll();go('agents');e.preventDefault()}
     if(b.dataset.homePerson){if(b.dataset.homePerson==='AI Agents')go('agents');else if(b.dataset.homePerson==='Systems')go('settings');else {if(document.getElementById('ownerFilter'))document.getElementById('ownerFilter').value=b.dataset.homePerson;if(typeof renderAll==='function')renderAll();go('board')}e.preventDefault()}
     if(b.dataset.homeTask){if(typeof openTask==='function')openTask(b.dataset.homeTask);e.preventDefault()}
