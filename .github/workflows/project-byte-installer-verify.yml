@@ -72,6 +72,9 @@ jobs:
           ! grep -q 'refresh_bridge .*vitros-opencode-verifier.service' deploy/project-byte/install.sh
           grep -q '"/api/approvals"' "$TMP/server.py"
           grep -q 'data-home-approval' "$TMP/home.js"
+          grep -q 'homeExecutionFabric' "$TMP/home.js"
+          grep -q 'project-byte-health' "$TMP/home.js"
+          grep -q "CustomEvent('project-byte-health'" "$TMP/health-runtime.js"
           grep -q '>New work</button>' "$TMP/home.js"
           ! grep -q '>Queue work</button>' "$TMP/home.js"
           grep -q 'data-home-kpi' "$TMP/home.js"
