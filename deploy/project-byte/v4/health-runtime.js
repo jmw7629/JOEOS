@@ -5,7 +5,7 @@
   let lastHealth = null;
   let workspaceRefreshBusy = false;
 
-  const safeText = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+  const safeText = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const componentState = value => String(value?.state || 'unknown').toLowerCase();
   const stateLabel = value => componentState(value) === 'healthy' ? 'healthy' : componentState(value) === 'failed' ? 'failed' : 'unknown';
 
@@ -155,6 +155,15 @@
     }
   };
 
+  const installHealthOwnership = () => {
+    if (typeof renderAll !== 'function') return;
+    const originalRenderAll = renderAll;
+    renderAll = function() {
+      originalRenderAll();
+      if (lastHealth) render(lastHealth);
+    };
+  };
+
   const installWorkspaceRefresh = () => {
     if (typeof setRefreshTimer !== 'function') return;
     setRefreshTimer = function() {
@@ -182,6 +191,21 @@
       }
     `;
     document.head.appendChild(style);
+    const nav = document.querySelector('.home-nav');
+    if (nav && !nav.querySelector('[data-home-go="board"]')) {
+      const board = document.createElement('button');
+      board.type = 'button';
+      board.dataset.homeGo = 'board';
+      board.innerHTML = '<i>▤</i>Board';
+      nav.insertBefore(board, nav.querySelector('[data-home-go="agents"]'));
+    }
+    if (nav && !nav.querySelector('[data-home-go="help"]')) {
+      const help = document.createElement('button');
+      help.type = 'button';
+      help.dataset.homeGo = 'help';
+      help.innerHTML = '<i>?</i>Help';
+      nav.appendChild(help);
+    }
   };
 
   const start = () => {
@@ -189,6 +213,7 @@
     setAIState({state: 'unknown'});
     installTruthfulSettingsHealth();
     installHistoricalModelLabels();
+    installHealthOwnership();
     installWorkspaceRefresh();
     installMobileUX();
     if (typeof renderModels === 'function') renderModels();
@@ -199,6 +224,5 @@
 
   window.__PROJECT_BYTE_HEALTH_REAPPLY__ = () => { if (lastHealth) render(lastHealth); };
   window.__PROJECT_BYTE_WORKSPACE_REFRESH__ = refreshWorkspace;
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once: true});
-  else start();
+  start();
 })();
