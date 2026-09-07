@@ -62,6 +62,9 @@ jobs:
           for (const forbidden of ['All systems operational','AI READY','AI CONNECTED']) {
             if (home.includes(forbidden)) throw new Error(`legacy false-green Home writer remains: ${forbidden}`);
           }
+          if (!html.includes('STICKDEATH_BYTE (jmw7629/stickdeath-byte)')) throw new Error('Help missing STICKDEATH_BYTE execution target');
+          if (!html.includes('StickDeath Infinity / R3 is read-only product evidence')) throw new Error('Help missing authoritative R3 read-only boundary');
+          if (html.includes('Current verified bridges are StickDeath Infinity and VITROS.')) throw new Error('legacy misleading StickDeath bridge label remains');
           for (const required of ['homeAgentInspector','homeAgentLens','Execution log details require Editor or Owner access','data-inspect-run','data-inspect-external','running (external)','external-bridge','External runs cannot be killed, restarted, merged or deployed','Full terminal','Agent workspace']) {
             if (!inspector.includes(required)) throw new Error(`missing agent-inspector surface: ${required}`);
           }
