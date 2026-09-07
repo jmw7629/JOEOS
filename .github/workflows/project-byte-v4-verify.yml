@@ -146,19 +146,19 @@ jobs:
           grep -q 'LEGACY_V2_TASK' tasks.json
           curl -fsS http://127.0.0.1:18094/api/projects | tee projects.json
           grep -q 'LEGACY_GOAL' projects.json
-          curl -fsS http://127.0.0.1:18094/api/help | grep -q 'Queue to AI'
-          curl -fsS http://127.0.0.1:18094/ | grep -q 'Help / How-To'
-          curl -fsS http://127.0.0.1:18094/ | grep -q 'Notification center'
-          curl -fsS http://127.0.0.1:18094/ | grep -q 'ownerFilter'
-          curl -fsS http://127.0.0.1:18094/ | grep -q 'savedView'
-          curl -fsS http://127.0.0.1:18094/ | grep -q '<script src="/home.js"></script>'
-          curl -fsS http://127.0.0.1:18094/ | grep -q '<script src="/home-inspector.js"></script>'
-          curl -fsS http://127.0.0.1:18094/ | grep -q '<script src="/health-runtime.js"></script>'
-          curl -fsS http://127.0.0.1:18094/home.js | grep -q 'Joe AI'
-          curl -fsS http://127.0.0.1:18094/home-inspector.js | grep -q 'homeAgentInspector'
-          curl -fsS http://127.0.0.1:18094/home-inspector.js | grep -q 'data-inspect-run'
-          curl -fsS http://127.0.0.1:18094/health-runtime.js | grep -q 'Verifying system health'
-          curl -fsS http://127.0.0.1:18094/health-runtime.js | grep -q 'Core healthy · execution health incomplete'
+          curl -fsS http://127.0.0.1:18094/api/help | grep 'Queue to AI' >/dev/null
+          curl -fsS http://127.0.0.1:18094/ | grep 'Help / How-To' >/dev/null
+          curl -fsS http://127.0.0.1:18094/ | grep 'Notification center' >/dev/null
+          curl -fsS http://127.0.0.1:18094/ | grep 'ownerFilter' >/dev/null
+          curl -fsS http://127.0.0.1:18094/ | grep 'savedView' >/dev/null
+          curl -fsS http://127.0.0.1:18094/ | grep '<script src="/home.js"></script>' >/dev/null
+          curl -fsS http://127.0.0.1:18094/ | grep '<script src="/home-inspector.js"></script>' >/dev/null
+          curl -fsS http://127.0.0.1:18094/ | grep '<script src="/health-runtime.js"></script>' >/dev/null
+          curl -fsS http://127.0.0.1:18094/home.js | grep 'Joe AI' >/dev/null
+          curl -fsS http://127.0.0.1:18094/home-inspector.js | grep 'homeAgentInspector' >/dev/null
+          curl -fsS http://127.0.0.1:18094/home-inspector.js | grep 'data-inspect-run' >/dev/null
+          curl -fsS http://127.0.0.1:18094/health-runtime.js | grep 'Verifying system health' >/dev/null
+          curl -fsS http://127.0.0.1:18094/health-runtime.js | grep 'Core healthy · execution health incomplete' >/dev/null
 
           deny_runtime_path() {
             local path="$1"
@@ -213,7 +213,7 @@ jobs:
           grep -q 'Critical work is blocked' notifications.json
           curl -fsS -X POST -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" \
             -d '{"all":true}' http://127.0.0.1:18094/api/notifications/read >/dev/null
-          curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/notifications | grep -q '"unread":0'
+          curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/notifications | grep '"unread":0' >/dev/null
 
           curl -fsS -X PATCH -H 'Content-Type: application/json' -H "X-Access-Key: $OWNER" \
             -d '{"status":"Backlog","executor":"ai","agent_key":"builder","model_key":"ollama-local"}' \
@@ -222,7 +222,7 @@ jobs:
             -d '{"agent_key":"builder","model_key":"ollama-local"}' \
             http://127.0.0.1:18094/api/tasks/legacy/queue | tee queue.json
           grep -q '"issue":999' queue.json
-          curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/runs | grep -q '"issue_number":999'
+          curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/runs | grep '"issue_number":999' >/dev/null
 
           echo 'TRUTHFUL_HEALTH_COMPONENTS=PASS'
           echo 'HOME_STATUS_EVIDENCE_GATED=PASS'
