@@ -44,6 +44,7 @@ SYNC_STATE = {"last_attempt": 0, "last_ok": 0, "last_error": ""}
 BRIDGE_CACHE_LOCK = threading.Lock()
 BRIDGE_CACHE = {"at": 0.0, "value": {}}
 BRIDGE_CACHE_SECONDS = 10.0
+BRIDGE_STALL_SECONDS = 2700
 MODEL_STATUS_FRESH_SECONDS = 1800
 
 BRIDGE_SERVICES = {
@@ -105,6 +106,32 @@ def _latest_bridge_activity(repo: str):
     return max(mtimes) if mtimes else None
 
 
+def _pending_runs(repo: str, current: float):
+    try:
+        with app.con() as conn:
+            records = conn.execute(
+                "select status,updated_at from runs where repo=? and status in ('queued','running') order by updated_at",
+                (repo,),
+            ).fetchall()
+    except Exception:
+        return None
+    if not records:
+        return {"count": 0, "oldest_age_seconds": None, "latest_updated_at": None}
+    updated = []
+    for record in records:
+        try:
+            updated.append(max(0, int(record["updated_at"] or 0)))
+        except (KeyError, TypeError, ValueError):
+            return None
+    oldest = min(updated)
+    latest = max(updated)
+    return {
+        "count": len(records),
+        "oldest_age_seconds": max(0, int(current - oldest)) if oldest else None,
+        "latest_updated_at": latest or None,
+    }
+
+
 def _service_state(service: str):
     env = os.environ.copy()
     env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
@@ -120,10 +147,67 @@ def _service_state(service: str):
         return "unknown"
     text = (proc.stdout or "").strip().lower()
     if proc.returncode == 0 and text == "active":
-        return "healthy"
+        return "active"
     if text in {"inactive", "failed", "deactivating"}:
         return "failed"
     return "unknown"
+
+
+def _evaluate_bridge_health(
+    service_state: str,
+    pending: dict | None,
+    last_activity: float | None,
+    current: float,
+    *,
+    pending_observable: bool = True,
+):
+    activity_age = max(0, int(current - last_activity)) if last_activity else None
+    result = {
+        "state": "unknown",
+        "service_state": service_state,
+        "progress_state": "unknown",
+        "pending_count": None if pending is None else int(pending.get("count") or 0),
+        "last_activity_age_seconds": activity_age,
+        "stall_after_seconds": BRIDGE_STALL_SECONDS,
+        "pending_observable": bool(pending_observable),
+    }
+    if service_state == "failed":
+        result["state"] = "failed"
+        result["progress_state"] = "inactive"
+        return result
+    if service_state != "active":
+        return result
+    if not pending_observable:
+        result["state"] = "healthy"
+        result["progress_state"] = "idle-or-external"
+        return result
+    if pending is None:
+        result["progress_state"] = "evidence-unavailable"
+        return result
+    count = int(pending.get("count") or 0)
+    if count == 0:
+        result["state"] = "healthy"
+        result["progress_state"] = "idle"
+        return result
+
+    oldest_age = pending.get("oldest_age_seconds")
+    latest_updated_at = pending.get("latest_updated_at")
+    result["oldest_pending_age_seconds"] = oldest_age
+    if last_activity is None or not latest_updated_at or last_activity < float(latest_updated_at):
+        if oldest_age is not None and oldest_age > BRIDGE_STALL_SECONDS:
+            result["state"] = "failed"
+            result["progress_state"] = "stalled"
+        else:
+            result["progress_state"] = "awaiting-evidence"
+        return result
+
+    if activity_age is not None and activity_age > BRIDGE_STALL_SECONDS:
+        result["state"] = "failed"
+        result["progress_state"] = "stalled"
+    else:
+        result["state"] = "healthy"
+        result["progress_state"] = "running"
+    return result
 
 
 def _copy_bridge_health(value: dict) -> dict:
@@ -139,13 +223,24 @@ def _bridge_health():
             return _copy_bridge_health(cached)
 
         result = {}
+        pending_by_repo = {}
         for key, (service, repo, required) in BRIDGE_SERVICES.items():
-            last_activity = _latest_bridge_activity(repo)
-            result[key] = {
-                "state": _service_state(service),
-                "required": bool(required),
-                "last_activity_age_seconds": max(0, int(current - last_activity)) if last_activity else None,
-            }
+            # PROJECT_BYTE records builder runs locally. The independent VITROS
+            # verifier queue is external, so health remains process-observable
+            # without inventing pending-work evidence or calling the network.
+            pending_observable = key != "vitros_verifier"
+            if pending_observable and repo not in pending_by_repo:
+                pending_by_repo[repo] = _pending_runs(repo, current)
+            pending = pending_by_repo.get(repo) if pending_observable else {"count": 0}
+            component = _evaluate_bridge_health(
+                _service_state(service),
+                pending,
+                _latest_bridge_activity(repo),
+                current,
+                pending_observable=pending_observable,
+            )
+            component["required"] = bool(required)
+            result[key] = component
         BRIDGE_CACHE["at"] = current
         BRIDGE_CACHE["value"] = result
         return _copy_bridge_health(result)
