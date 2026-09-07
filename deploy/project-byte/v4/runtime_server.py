@@ -57,6 +57,11 @@ EXECUTION_LOG_READ_BYTES = 32768
 EXECUTOR_PROCESS_SCAN_MAX_ENTRIES = 8192
 EXECUTOR_CMDLINE_READ_BYTES = 16384
 EXECUTOR_MODEL_RE = re.compile(r"^[A-Za-z0-9._:/+\-]{1,120}$")
+EXECUTOR_ROOT_NAMES = {
+    "stickdeath": "worktrees",
+    "vitros": "project-byte-live-builder",
+    "vitros_verifier": "verifier-sandboxes",
+}
 
 BRIDGE_SERVICES = {
     "stickdeath": ("stickdeath-opencode-bridge.service", "jmw7629/StickDeath-Infinity-", True),
@@ -298,10 +303,13 @@ def _execution_readiness(repo: str, current: float, *, verifier: bool = False):
     return result
 
 
-def _executor_process_root(repo: str, *, verifier: bool = False, cache_root: Path | None = None):
+def _executor_process_root(repo: str, *, boundary: str, cache_root: Path | None = None):
+    root_name = EXECUTOR_ROOT_NAMES.get(boundary)
+    if not root_name:
+        return None
     base = cache_root or (Path.home() / ".cache" / "joeos-opencode-bridge")
     repo_root = base / repo.replace("/", "__")
-    return repo_root / ("verifier-sandboxes" if verifier else "worktrees")
+    return repo_root / root_name
 
 
 def _read_proc_uid(status_path: Path):
@@ -351,7 +359,7 @@ def _read_proc_tokens(cmdline_path: Path):
 def _active_executor(
     repo: str,
     *,
-    verifier: bool = False,
+    boundary: str,
     proc_root: Path | None = None,
     cache_root: Path | None = None,
 ):
@@ -364,7 +372,11 @@ def _active_executor(
         "evidence_complete": True,
     }
     proc = proc_root or Path("/proc")
-    expected = _executor_process_root(repo, verifier=verifier, cache_root=cache_root)
+    expected = _executor_process_root(repo, boundary=boundary, cache_root=cache_root)
+    if expected is None:
+        result["evidence_complete"] = False
+        return result
+    verifier = boundary == "vitros_verifier"
     try:
         expected = expected.resolve(strict=True)
     except FileNotFoundError:
@@ -596,7 +608,7 @@ def _bridge_health():
             if pending_observable and repo not in pending_by_repo:
                 pending_by_repo[repo] = _pending_runs(repo, current)
             pending = pending_by_repo.get(repo) if pending_observable else {"count": 0}
-            executor = _active_executor(repo, verifier=(key == "vitros_verifier"))
+            executor = _active_executor(repo, boundary=key)
             active_issue = int((pending or {}).get("active_issue_number") or executor.get("active_issue_number") or 0)
             last_activity, activity_evidence_complete = _latest_bridge_activity(
                 repo,
