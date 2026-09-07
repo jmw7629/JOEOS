@@ -44,9 +44,10 @@ jobs:
           grep -q "health?.operational" "$f"
           grep -q "Core healthy · execution incomplete" "$f"
           grep -q "VITROS verifier" "$f"
-          grep -q "Models .*tested OK" "$f"
+          grep -q "modelSummary" "$f"
+          grep -q "tested OK" "$f"
           grep -q "Last test OK" "$f"
-          grep -q "data.modelEvidence = 'historical'\|dataset.modelEvidence = 'historical'" "$f"
+          grep -q "dataset.modelEvidence = 'historical'" "$f"
           ! grep -q "● Connected" "$f"
           echo 'TRUTHFUL_HEALTH_AND_MODEL_WORDING=PASS'
       - name: Verify workspace-wide refresh semantics
