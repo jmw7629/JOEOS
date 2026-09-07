@@ -54,6 +54,9 @@ BRIDGE_ACTIVITY_SKIP_DIRS = frozenset(
 MODEL_STATUS_FRESH_SECONDS = 1800
 EXECUTION_EVIDENCE_FRESH_SECONDS = 1800
 EXECUTION_LOG_READ_BYTES = 32768
+EXECUTOR_PROCESS_SCAN_MAX_ENTRIES = 8192
+EXECUTOR_CMDLINE_READ_BYTES = 16384
+EXECUTOR_MODEL_RE = re.compile(r"^[A-Za-z0-9._:/+\-]{1,120}$")
 
 BRIDGE_SERVICES = {
     "stickdeath": ("stickdeath-opencode-bridge.service", "jmw7629/StickDeath-Infinity-", True),
@@ -295,6 +298,152 @@ def _execution_readiness(repo: str, current: float, *, verifier: bool = False):
     return result
 
 
+def _executor_process_root(repo: str, *, verifier: bool = False, cache_root: Path | None = None):
+    base = cache_root or (Path.home() / ".cache" / "joeos-opencode-bridge")
+    repo_root = base / repo.replace("/", "__")
+    return repo_root / ("verifier-sandboxes" if verifier else "worktrees")
+
+
+def _read_proc_uid(status_path: Path):
+    try:
+        with status_path.open("rb") as stream:
+            raw = stream.read(4096)
+    except FileNotFoundError:
+        return None, True
+    except OSError:
+        return None, False
+    for line in raw.splitlines():
+        if line.startswith(b"Uid:"):
+            fields = line.split()
+            if len(fields) >= 2:
+                try:
+                    return int(fields[1]), True
+                except ValueError:
+                    return None, False
+    return None, False
+
+
+def _read_proc_tokens(cmdline_path: Path):
+    try:
+        with cmdline_path.open("rb") as stream:
+            raw = stream.read(EXECUTOR_CMDLINE_READ_BYTES)
+    except FileNotFoundError:
+        return None, True
+    except OSError:
+        return None, False
+    if not raw:
+        return [], True
+    pieces = raw.split(b"\0")
+    # A truncated final token can contain an arbitrarily long prompt. Discard it.
+    if raw[-1:] != b"\0":
+        pieces = pieces[:-1]
+    tokens = []
+    for piece in pieces[:64]:
+        if not piece or len(piece) > 512:
+            continue
+        try:
+            tokens.append(piece.decode("utf-8", errors="strict"))
+        except UnicodeDecodeError:
+            continue
+    return tokens, True
+
+
+def _active_executor(
+    repo: str,
+    *,
+    verifier: bool = False,
+    proc_root: Path | None = None,
+    cache_root: Path | None = None,
+):
+    result = {
+        "running": False,
+        "count": 0,
+        "active_run_ref": "",
+        "active_issue_number": 0,
+        "active_model": "",
+        "evidence_complete": True,
+    }
+    proc = proc_root or Path("/proc")
+    expected = _executor_process_root(repo, verifier=verifier, cache_root=cache_root)
+    try:
+        expected = expected.resolve(strict=True)
+    except FileNotFoundError:
+        return result
+    except OSError:
+        result["evidence_complete"] = False
+        return result
+    try:
+        with os.scandir(proc) as scan:
+            entries = [entry for entry in scan if entry.name.isdigit()]
+    except OSError:
+        result["evidence_complete"] = False
+        return result
+    if len(entries) > EXECUTOR_PROCESS_SCAN_MAX_ENTRIES:
+        result["evidence_complete"] = False
+        entries = entries[:EXECUTOR_PROCESS_SCAN_MAX_ENTRIES]
+    matches = []
+    uid = os.getuid()
+    for entry in sorted(entries, key=lambda item: int(item.name)):
+        pid_root = Path(entry.path)
+        process_uid, uid_complete = _read_proc_uid(pid_root / "status")
+        if not uid_complete:
+            result["evidence_complete"] = False
+            continue
+        if process_uid is None or process_uid != uid:
+            continue
+        tokens, cmd_complete = _read_proc_tokens(pid_root / "cmdline")
+        if not cmd_complete:
+            result["evidence_complete"] = False
+            continue
+        if not tokens or Path(tokens[0]).name != "opencode" or "run" not in tokens[:6]:
+            continue
+        run_dir = ""
+        model = ""
+        for index, token in enumerate(tokens):
+            if token == "--dir" and index + 1 < len(tokens):
+                run_dir = tokens[index + 1]
+            elif token.startswith("--dir="):
+                run_dir = token.split("=", 1)[1]
+            elif token == "--model" and index + 1 < len(tokens):
+                model = tokens[index + 1]
+            elif token.startswith("--model="):
+                model = token.split("=", 1)[1]
+        if not run_dir:
+            continue
+        try:
+            candidate = Path(run_dir).resolve(strict=True)
+        except OSError:
+            continue
+        if candidate.parent != expected:
+            continue
+        if verifier:
+            match = re.fullmatch(r"verify-(\d+)-([0-9A-Fa-f]{7,64})", candidate.name)
+        else:
+            match = re.fullmatch(r"issue-(\d+)", candidate.name)
+        if not match:
+            continue
+        if model and not EXECUTOR_MODEL_RE.fullmatch(model):
+            model = ""
+        matches.append(
+            {
+                "pid": int(entry.name),
+                "active_run_ref": candidate.name,
+                "active_issue_number": int(match.group(1)),
+                "active_model": model,
+            }
+        )
+    if matches:
+        first = min(matches, key=lambda item: item["pid"])
+        result.update(
+            running=True,
+            count=len(matches),
+            active_run_ref=first["active_run_ref"],
+            active_issue_number=first["active_issue_number"],
+            active_model=first["active_model"],
+        )
+    return result
+
+
 def _pending_runs(repo: str, current: float):
     try:
         with app.con() as conn:
@@ -447,20 +596,37 @@ def _bridge_health():
             if pending_observable and repo not in pending_by_repo:
                 pending_by_repo[repo] = _pending_runs(repo, current)
             pending = pending_by_repo.get(repo) if pending_observable else {"count": 0}
-            active_issue = int((pending or {}).get("active_issue_number") or 0)
-            last_activity, evidence_complete = _latest_bridge_activity(
+            executor = _active_executor(repo, verifier=(key == "vitros_verifier"))
+            active_issue = int((pending or {}).get("active_issue_number") or executor.get("active_issue_number") or 0)
+            last_activity, activity_evidence_complete = _latest_bridge_activity(
                 repo,
                 issue_number=active_issue,
                 verifier=(key == "vitros_verifier"),
             )
+            service_state = _service_state(service)
             item = _evaluate_bridge_health(
-                _service_state(service),
+                service_state,
                 pending,
                 last_activity,
                 current,
                 pending_observable=pending_observable,
-                activity_evidence_complete=evidence_complete,
+                activity_evidence_complete=activity_evidence_complete,
             )
+            if service_state == "active" and executor.get("running"):
+                item["state"] = "healthy"
+                item["progress_state"] = "running"
+                item["pending_count"] = max(int(item.get("pending_count") or 0), int(executor.get("count") or 1))
+            elif (
+                service_state == "active"
+                and not executor.get("evidence_complete")
+                and item.get("progress_state") in {"idle", "idle-or-external"}
+            ):
+                item["state"] = "unknown"
+                item["progress_state"] = "evidence-incomplete"
+            item["executor_evidence_complete"] = bool(executor.get("evidence_complete"))
+            item["active_executor_count"] = int(executor.get("count") or 0)
+            item["active_run_ref"] = executor.get("active_run_ref") or ""
+            item["active_model"] = executor.get("active_model") or ""
             execution = _execution_readiness(
                 repo, current, verifier=(key == "vitros_verifier")
             )

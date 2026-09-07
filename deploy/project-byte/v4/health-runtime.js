@@ -13,7 +13,10 @@
     const execution = String(value?.execution_state || 'unknown').toLowerCase();
     const reason = String(value?.execution_reason || '').trim();
     const process = progress && progress !== 'unknown' ? `${state}/${progress}` : state;
-    return `Process: ${process} · Execution: ${execution}${reason ? ' · ' + reason : ''}`;
+    const activeRef = String(value?.active_run_ref || '').trim();
+    const activeModel = String(value?.active_model || '').trim();
+    const active = activeRef ? ` · Active: ${activeRef}${activeModel ? ' · ' + activeModel : ''}` : '';
+    return `Process: ${process}${active} · Execution: ${execution}${reason ? ' · ' + reason : ''}`;
   };
 
   const setState = (text, kind = 'unknown') => {
