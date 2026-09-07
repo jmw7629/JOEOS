@@ -7,12 +7,12 @@ V4="$BASE/v4"
 DEST="/home/joevps/PROJECT_BYTE"
 SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-EXPECTED_BACKEND="bdf918b920d31d482ec488f57d69435840b0fce4832b9d8471add43e6df74aa6"
-EXPECTED_SERVER="7d1b4a81c50cdb2fe512d010ec1c5a0369000448c33ade25e05ce503b83deb86"
+EXPECTED_BACKEND="7e221bba0a3a6774d8526575ac4cf442f73b6576db65c3e54eb2bc3ed2cfc629"
+EXPECTED_SERVER="fed880ef28c6e33548ab6ca8edd2f01a8a90dde204e566bf8ee283ec9b63514c"
 EXPECTED_INDEX="e1d84e8c05d4f4207708f69c5fcc5d4e8e45c6976b048541c23094e89d9fc785"
-EXPECTED_HOME="eb45a224b57a7fd8728cf8608a556562dbcdff178f0ca9aef71d1f2d7f4460f3"
-EXPECTED_INSPECTOR="bffa6d45adaafade420b27bf0dcd9717fd8783c3cee1ce73c6550c8752d4cba4"
-EXPECTED_HEALTH="90b649972a8283707acbdf0856e7952a36488c939c35a5db2d682bde2e4bc218"
+EXPECTED_HOME="71cb5ea64fa5a03ed1acb80ccba76f5723b2a2e1efc109a50c117114af357ff7"
+EXPECTED_INSPECTOR="ecb0848082bb026b0ec7dfe8d61d980d1a9329b330571f2e9e91cd2464e43ba0"
+EXPECTED_HEALTH="3408f4c12277ab69ca6fdb311a57bb753d3832ce42b5360ce84551b42b19f621"
 
 if [ "$(id -un)" != "joevps" ]; then
   echo "Run this as joevps, not root." >&2
@@ -289,7 +289,7 @@ check_bridge_service() {
   echo "Bridge service active: $service_name"
 }
 
-if ! refresh_bridge "$HOME/.config/joeos-opencode-bridge/stickdeath.env" "stickdeath-opencode-bridge.service"; then BRIDGE_REFRESH_FAILURES=1; fi
+if ! refresh_bridge "$HOME/.config/joeos-opencode-bridge/stickdeath-byte.env" "stickdeath-byte-opencode-bridge.service"; then BRIDGE_REFRESH_FAILURES=1; fi
 if ! refresh_bridge "$HOME/.config/joeos-opencode-bridge/vitros.env" "vitros-opencode-bridge.service"; then BRIDGE_REFRESH_FAILURES=1; fi
 # The independent VITROS verifier is a required production execution boundary.
 # Gate Funnel on its liveness without mutating its shared VITROS control checkout.

@@ -64,7 +64,7 @@ EXECUTOR_ROOT_NAMES = {
 }
 
 BRIDGE_SERVICES = {
-    "stickdeath": ("stickdeath-opencode-bridge.service", "jmw7629/StickDeath-Infinity-", True),
+    "stickdeath": ("stickdeath-byte-opencode-bridge.service", "jmw7629/stickdeath-byte", True),
     "vitros": ("vitros-opencode-bridge.service", "jmw7629/vitros-web-dashboard", True),
     "vitros_verifier": ("vitros-opencode-verifier.service", "jmw7629/vitros-web-dashboard", True),
 }
@@ -356,6 +356,18 @@ def _read_proc_tokens(cmdline_path: Path):
     return tokens, True
 
 
+def _process_elapsed_seconds(pid_root: Path, proc_root: Path):
+    try:
+        stat = (pid_root / "stat").read_text(errors="strict")
+        fields = stat[stat.rfind(")") + 2 :].split()
+        started_ticks = int(fields[19])
+        uptime = float((proc_root / "uptime").read_text().split()[0])
+        hz = os.sysconf("SC_CLK_TCK")
+        return max(0, int(uptime - (started_ticks / hz)))
+    except (OSError, ValueError, IndexError):
+        return None
+
+
 def _active_executor(
     repo: str,
     *,
@@ -369,6 +381,7 @@ def _active_executor(
         "active_run_ref": "",
         "active_issue_number": 0,
         "active_model": "",
+        "elapsed_seconds": None,
         "evidence_complete": True,
     }
     proc = proc_root or Path("/proc")
@@ -442,6 +455,7 @@ def _active_executor(
                 "active_run_ref": candidate.name,
                 "active_issue_number": int(match.group(1)),
                 "active_model": model,
+                "elapsed_seconds": _process_elapsed_seconds(pid_root, proc),
             }
         )
     if matches:
@@ -452,6 +466,7 @@ def _active_executor(
             active_run_ref=first["active_run_ref"],
             active_issue_number=first["active_issue_number"],
             active_model=first["active_model"],
+            elapsed_seconds=first["elapsed_seconds"],
         )
     return result
 
@@ -627,7 +642,6 @@ def _bridge_health():
             if service_state == "active" and executor.get("running"):
                 item["state"] = "healthy"
                 item["progress_state"] = "running"
-                item["pending_count"] = max(int(item.get("pending_count") or 0), int(executor.get("count") or 1))
             elif (
                 service_state == "active"
                 and not executor.get("evidence_complete")
@@ -635,10 +649,24 @@ def _bridge_health():
             ):
                 item["state"] = "unknown"
                 item["progress_state"] = "evidence-incomplete"
+            external_running = bool(executor.get("running"))
             item["executor_evidence_complete"] = bool(executor.get("evidence_complete"))
             item["active_executor_count"] = int(executor.get("count") or 0)
             item["active_run_ref"] = executor.get("active_run_ref") or ""
-            item["active_model"] = executor.get("active_model") or ""
+            # Provider/model strings from external process command lines are intentionally not exposed.
+            item["active_model"] = ""
+            item["execution_source"] = (
+                "external-bridge" if external_running
+                else "project-byte" if int(item.get("pending_count") or 0) > 0
+                else ""
+            )
+            item["external_running"] = external_running
+            item["external_executor_count"] = int(executor.get("count") or 0)
+            item["external_run_ref"] = executor.get("active_run_ref") or ""
+            item["external_issue_number"] = int(executor.get("active_issue_number") or 0)
+            item["external_elapsed_seconds"] = executor.get("elapsed_seconds")
+            item["external_activity_age_seconds"] = item.get("last_activity_age_seconds")
+            item["external_evidence_complete"] = bool(executor.get("evidence_complete"))
             execution = _execution_readiness(
                 repo, current, verifier=(key == "vitros_verifier")
             )

@@ -22,11 +22,11 @@ REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 HINT_RE = re.compile(r"^[A-Za-z0-9_.:/@+\-]{1,140}$")
 SECRET_RE = re.compile(r"(?i)(authorization:\s*(?:bearer|basic)\s+\S+|(?:token|secret|password|api[_-]?key)\s*[=:]\s*\S+|sk-[A-Za-z0-9_-]{10,}|ghp_[A-Za-z0-9]{10,}|github_pat_[A-Za-z0-9_]{10,})")
 BRIDGES = {
-    "jmw7629/StickDeath-Infinity-": "<!-- joeos-opencode-bridge:v1 -->",
+    "jmw7629/stickdeath-byte": "<!-- stickdeath-byte-opencode-bridge:v1 -->",
     "jmw7629/vitros-web-dashboard": "<!-- vitros-opencode-bridge:v1 -->",
 }
 BRIDGE_STATE = {
-    "jmw7629/StickDeath-Infinity-": Path.home() / ".local/state/joeos-opencode-bridge/jmw7629__StickDeath-Infinity-",
+    "jmw7629/stickdeath-byte": Path.home() / ".local/state/joeos-opencode-bridge/jmw7629__stickdeath-byte",
     "jmw7629/vitros-web-dashboard": Path.home() / ".local/state/joeos-opencode-bridge/jmw7629__vitros-web-dashboard",
 }
 SEED = [

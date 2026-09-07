@@ -14,8 +14,10 @@
     const reason = String(value?.execution_reason || '').trim();
     const process = progress && progress !== 'unknown' ? `${state}/${progress}` : state;
     const activeRef = String(value?.active_run_ref || '').trim();
-    const activeModel = String(value?.active_model || '').trim();
-    const active = activeRef ? ` · Active: ${activeRef}${activeModel ? ' · ' + activeModel : ''}` : '';
+    const source = String(value?.execution_source || '').trim();
+    const elapsed = value?.external_elapsed_seconds;
+    const elapsedText = elapsed === null || elapsed === undefined ? '' : ` · ${Math.max(0,Math.round(Number(elapsed)/60))}m`;
+    const active = activeRef ? ` · Active: ${activeRef}${source ? ' · ' + source : ''}${source === 'external-bridge' ? elapsedText : ''}` : '';
     return `Process: ${process}${active} · Execution: ${execution}${reason ? ' · ' + reason : ''}`;
   };
 
