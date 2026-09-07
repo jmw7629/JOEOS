@@ -24,7 +24,7 @@
     const el = document.getElementById('homeAIState');
     if (!el) return;
     const state = modelsHealth?.state || 'unknown';
-    const text = state === 'tested_ok' ? 'AI TESTED OK' : state === 'failed' ? 'AI DEGRADED' : 'AI UNKNOWN';
+    const text = state === 'tested_ok' ? 'AI CHAT TESTED OK' : state === 'failed' ? 'AI CHAT DEGRADED' : 'AI CHAT UNTESTED';
     if (el.textContent !== text) el.textContent = text;
     el.dataset.health = state;
   };
@@ -39,7 +39,7 @@
     const components = health.components || {};
     const bridges = components.bridges || {};
     const modelsHealth = components.models || {};
-    const headline = health.operational ? 'Operational' : health.ok ? 'Core healthy · execution incomplete' : 'Degraded';
+    const headline = health.operational ? ((health.warnings || []).length ? 'Operational · warnings' : 'Operational') : health.ok ? 'Core healthy · execution incomplete' : 'Degraded';
     const modelSummary = `${Number(modelsHealth.tested_ok || 0)} tested OK · ${Number(modelsHealth.failed || 0)} failed · ${Number(modelsHealth.unknown || 0)} unknown`;
     const pieces = [
       `PROJECT_BYTE v${safeText(health.version || 4)} · ${safeText(headline)}`,
@@ -47,7 +47,7 @@
       `Sync ${safeText(stateLabel(components.sync))}`,
       `StickDeath ${safeText(stateLabel(bridges.stickdeath))}`,
       `VITROS builder ${safeText(stateLabel(bridges.vitros))}`,
-      `VITROS verifier ${safeText(stateLabel(bridges.vitros_verifier))}`,
+      `VITROS verifier ${safeText(stateLabel(bridges.vitros_verifier))} (optional)`,
       `Models ${safeText(modelsHealth.state || 'unknown')} (${safeText(modelSummary)})`,
     ];
     el.innerHTML = pieces.join(' · ');
@@ -59,7 +59,8 @@
     if (health?.unavailable) {
       setState('System health unavailable', 'degraded');
     } else if (health?.operational) {
-      setState('Systems verified operational', 'healthy');
+      const count = (health.warnings || []).length;
+      setState(count ? `Systems operational · ${count} warning${count === 1 ? '' : 's'}` : 'Systems verified operational', count ? 'unknown' : 'healthy');
     } else if (health?.ok) {
       setState('Core healthy · execution health incomplete', 'unknown');
     } else {
