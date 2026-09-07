@@ -45,6 +45,7 @@ def project_rows() -> list[dict]: return rows("select * from projects order by n
 def model_rows() -> list[dict]: return rows("select * from models order by display_name")
 def agent_rows() -> list[dict]: return rows("select * from agents order by name")
 def run_rows() -> list[dict]: return rows("select id,task_id,project,repo,agent_key,model_key,status,issue_number,issue_url,pr_url,updated_at,finished_at,last_event,last_comment_count,learned from runs order by updated_at desc limit 160")
+def approval_rows() -> list[dict]: return rows("select * from approvals order by case when status='pending' then 0 else 1 end,created_at desc limit 160")
 def activity_rows() -> list[dict]: return rows("select * from activity order by id desc limit 200")
 def team_rows() -> list[dict]: return [{k:v for k,v in r.items() if k != "token_hash"} for r in rows("select * from collaborators order by name")]
 

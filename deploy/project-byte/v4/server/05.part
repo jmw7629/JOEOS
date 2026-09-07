@@ -21,6 +21,22 @@ def bridge_status(repo: str, issue: int) -> tuple[str,str,str]:
     return status,pr,detail
 
 
+def ensure_review_approval(c, run: dict, pr_url: str="") -> None:
+    if not run.get("id") or not (pr_url or run.get("pr_url")):
+        return
+    aid="review:"+run["id"]
+    summary=f"{run.get('project') or 'Project'} · issue #{run.get('issue_number') or 0} produced a reviewable PR. Review approval never merges automatically."
+    c.execute("insert or ignore into approvals(id,run_id,task_id,kind,summary,status,created_at) values(?,?,?,?,?,'pending',?)",
+              (aid,run["id"],run.get("task_id") or "","pr-review",summary,now()))
+
+
+def ensure_review_approvals() -> None:
+    with con() as c:
+        pending=[dict(r) for r in c.execute("select id,task_id,project,repo,agent_key,model_key,status,issue_number,issue_url,pr_url,updated_at,finished_at,last_event,last_comment_count,learned from runs where status='pr-created' or pr_url<>'' order by updated_at desc limit 160")]
+        for run in pending:
+            ensure_review_approval(c,run,run.get("pr_url") or "")
+
+
 def sync_runs_once():
     for run in run_rows():
         if run["status"] in ("pr-created","opencode-failed","bridge-error","diff-check-failed","no-changes","skipped-existing-branch"):continue
@@ -30,7 +46,9 @@ def sync_runs_once():
                 c.execute("update runs set status=?,pr_url=?,last_event=?,updated_at=?,finished_at=? where id=?",(status,pr,txt(detail or status,800),now(),now() if status in ("pr-created","opencode-failed","bridge-error","diff-check-failed","no-changes","skipped-existing-branch") else 0,run["id"]))
                 c.execute("update tasks set ai_state=?,github_pr_url=?,updated_at=? where id=?",(status,pr,now(),run["task_id"]))
                 audit(c,"ai_run_status",run["task_id"],run["project"],status,"system")
-                if status=="pr-created":notify(c,"ai_success","success","AI work ready for review",f"{run['project']} · issue #{run['issue_number']} produced a PR","#agents",run["project"],run["task_id"],f"run-success:{run['id']}")
+                if status=="pr-created":
+                    ensure_review_approval(c,{**run,"pr_url":pr},pr)
+                    notify(c,"ai_success","success","AI work ready for review",f"{run['project']} · issue #{run['issue_number']} produced a PR","#agents",run["project"],run["task_id"],f"run-success:{run['id']}")
                 elif status in ("opencode-failed","bridge-error","diff-check-failed","no-changes","skipped-existing-branch"):notify(c,"ai_failure","critical","AI execution needs attention",f"{run['project']} · issue #{run['issue_number']} · {status}","#agents",run["project"],run["task_id"],f"run-failure:{run['id']}:{status}")
             add_run_event(run["id"],"status",status,run["agent_key"],detail)
             fresh=dict(run);fresh["status"]=status;fresh["pr_url"]=pr;learn_from_run(fresh,status,detail)
@@ -106,6 +124,9 @@ class H(SimpleHTTPRequestHandler):
         if p=="/api/models":return self.sendj({"models":model_rows() if u["level"]>=1 else []})
         if p=="/api/agents":return self.sendj({"agents":agent_rows() if u["level"]>=1 else []})
         if p=="/api/runs":return self.sendj({"runs":run_rows() if u["level"]>=1 else []})
+        if p=="/api/approvals":
+            if not self.need(2):return
+            ensure_review_approvals();return self.sendj({"approvals":approval_rows()})
         if p=="/api/settings":
             if not (u:=self.need(1)):return
             return self.sendj({"settings":get_settings(settings_subject(u))})

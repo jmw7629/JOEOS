@@ -86,4 +86,10 @@ jobs:
           grep -q 'scroll-snap-type:x mandatory' "$f"
           grep -q 'calc(100vw - 36px)' "$f"
           grep -q 'grid-template-columns:repeat(7' "$f"
+          grep -q '>New work</button>' deploy/project-byte/v4/home.js
+          ! grep -q '>Queue work</button>' deploy/project-byte/v4/home.js
+          grep -q 'targetOwner===who' deploy/project-byte/v4/home.js
+          grep -q 'data-home-approval' deploy/project-byte/v4/home.js
+          grep -q 'PROJECT_BYTE approval records your review decision only' deploy/project-byte/v4/home.js
+          echo 'HOME_REVIEW_AND_SCOPE_UX=PASS'
           echo 'MOBILE_COMMAND_CENTER=PASS'

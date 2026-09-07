@@ -2,6 +2,9 @@
   if (window.__PROJECT_BYTE_HOME__) return;
   window.__PROJECT_BYTE_HOME__ = true;
 
+  let homeApprovalState = [];
+  let homeApprovalRefreshBusy = false;
+
   const style = document.createElement('style');
   style.textContent = `
   :root{--home-blue:#70c8ff;--home-blue2:#3f78ff;--home-violet:#8f7cff;--home-green:#74d9a0;--home-red:#ff7e87;--home-amber:#efbd6a}
@@ -26,7 +29,7 @@
   .agent-map{position:relative;height:238px;overflow:hidden;border-radius:13px;background:radial-gradient(circle at center,rgba(52,91,133,.13),transparent 44%),linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:auto,28px 28px,28px 28px}.agent-map svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.agent-map line{stroke:rgba(112,200,255,.22);stroke-width:1.2;stroke-dasharray:4 5}.agent-node{position:absolute;transform:translate(-50%,-50%);width:76px;min-height:58px;padding:8px 5px;border:1px solid rgba(123,151,181,.28);border-radius:13px;background:rgba(15,24,35,.94);color:var(--txt);text-align:center;font-size:10px;box-shadow:inset 0 1px rgba(255,255,255,.035)}.agent-node b{display:block;font-size:11px;margin-bottom:2px}.agent-node small{font-size:9px;color:var(--muted)}.agent-node.center{width:88px;min-height:68px;border-color:rgba(112,200,255,.50);box-shadow:0 0 24px rgba(56,139,198,.16),inset 0 1px rgba(255,255,255,.05)}.agent-node.running::before{content:"";position:absolute;top:7px;right:7px;width:6px;height:6px;background:var(--home-green);border-radius:50%}
   .org-map{display:grid;gap:9px}.org-top{text-align:center;padding:10px;border:1px solid rgba(112,200,255,.25);border-radius:12px;background:rgba(17,35,50,.36)}.org-top b{display:block}.org-row{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.org-person{padding:10px 6px;border:1px solid var(--line);border-radius:11px;background:rgba(7,13,21,.46);text-align:center;font-size:10px;min-width:0}.org-person b{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.org-person small{color:var(--muted)}
   .home-lower{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}.activity-feed,.work-list,.memory-feed,.approval-list{display:grid;gap:7px}.activity-item,.work-item,.memory-item,.approval-item{border:1px solid rgba(91,116,143,.22);background:rgba(6,12,20,.45);border-radius:11px;padding:9px;min-width:0}.activity-item{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start}.activity-item time{font:10px ui-monospace,SFMono-Regular,Menlo,monospace;color:#7990a6}.activity-item b,.work-item b,.memory-item b,.approval-item b{font-size:11px;display:block}.activity-item span,.work-item span,.memory-item span,.approval-item span{font-size:10px;color:var(--muted);display:block;margin-top:2px}.work-item{cursor:pointer}.work-item:hover{border-color:#456a89}.work-top{display:flex;justify-content:space-between;gap:8px}.home-priority{font-size:9px;border-radius:999px;padding:2px 6px;border:1px solid var(--line);height:max-content}.home-priority.Critical{color:#ffb7bd;border-color:#633d42}.home-priority.High{color:#f1d09b;border-color:#5e4b2e}
-  .approval-actions{display:flex;gap:6px;margin-top:7px}.approval-actions a,.approval-actions button{font-size:10px;min-height:31px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:rgba(17,28,40,.75);color:var(--txt)}
+  .approval-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.approval-actions a,.approval-actions button{font-size:10px;min-height:34px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:rgba(17,28,40,.75);color:var(--txt)}.approval-actions button[data-review-action="approve"]{border-color:rgba(116,217,160,.42);color:#b9ebcb}.approval-actions button[data-review-action="request_changes"]{border-color:rgba(239,189,106,.42);color:#f1d39c}.approval-state{display:inline-block;margin-top:6px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}.approval-note{margin-top:6px!important;font-size:9px!important}
   .home-nav{display:none;position:fixed;left:10px;right:10px;bottom:9px;z-index:40;background:rgba(8,13,20,.94);border:1px solid rgba(102,128,156,.28);border-radius:17px;padding:6px;grid-template-columns:repeat(5,1fr);box-shadow:0 16px 40px rgba(0,0,0,.4);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}.home-nav button{border:0;border-radius:11px;min-height:49px;padding:5px 3px;background:transparent;color:var(--muted);font-size:9px}.home-nav button i{display:block;font-style:normal;font-size:17px;line-height:20px}.home-nav button.active{background:rgba(66,111,150,.19);color:#d9f1ff}
   body[data-pb-view="home"]>.wrap>.metrics{display:none}
   @media(max-width:980px){.home-grid,.home-lower{grid-template-columns:1fr}.home-kpis{grid-template-columns:repeat(3,1fr)}.home-actions{grid-template-columns:repeat(2,1fr)}}
@@ -64,7 +67,7 @@
         <div class="home-command"><input id="homeCommandInput" type="text" maxlength="1200" placeholder="Ask, create work, get status, or troubleshoot…"><button id="homeCommandSend" type="button" aria-label="Send to PROJECT_BYTE AI">→</button></div>
         <div class="home-actions">
           <button type="button" class="home-action" data-home-action="ask">Ask AI</button>
-          <button type="button" class="home-action authonly" data-home-action="create">Queue work</button>
+          <button type="button" class="home-action authonly" data-home-action="create">New work</button>
           <button type="button" class="home-action" data-home-action="agents">Review agents</button>
           <button type="button" class="home-action" data-home-action="troubleshoot">Troubleshoot</button>
         </div>
@@ -220,19 +223,44 @@
     const el=document.getElementById('homeWork');if(!el)return;
     const title=document.getElementById('homeWorkTitle');
     const authenticated=session?.name&&session.name!=='Public',who=authenticated?session.name:'';
-    if(title)title.textContent=authenticated?'My work':'Open work';
-    let items=authenticated?scoped.filter(t=>t.status!=='Done'&&t.owner===who):scoped.filter(t=>t.status!=='Done');
+    const selectedOwner=document.getElementById('ownerFilter')?.value||'';
+    const targetOwner=selectedOwner||(authenticated?who:'');
+    if(title)title.textContent=targetOwner?(targetOwner===who?'My work':`${targetOwner}’s work`):'Open work';
+    let items=targetOwner?scoped.filter(t=>t.status!=='Done'&&t.owner===targetOwner):scoped.filter(t=>t.status!=='Done');
     const rank={Critical:0,High:1,Medium:2,Low:3};
     items=items.sort((a,b)=>(rank[a.priority]??9)-(rank[b.priority]??9)).slice(0,4);
-    const empty=authenticated?`No open work assigned to ${escH(who)} in this scope.`:'No open work in this scope.';
+    const empty=targetOwner?`No open work assigned to ${escH(targetOwner)} in this scope.`:'No open work in this scope.';
     el.innerHTML=items.length?items.map(t=>`<button type="button" class="work-item" data-home-task="${escH(t.id)}"><div class="work-top"><b>${escH(t.title)}</b><span class="home-priority ${escH(t.priority)}">${escH(t.priority)}</span></div><span>${escH(t.project)}${t.due_date?' · due '+escH(t.due_date):''}${t.ai_state?' · AI '+escH(t.ai_state):''}</span></button>`).join(''):`<div class="small">${empty}</div>`;
   }
 
   function renderApprovals(scoped) {
     const el=document.getElementById('homeApprovals');if(!el)return;
     const ids=new Set(scoped.map(t=>t.id));
-    const ready=(runs||[]).filter(r=>ids.has(r.task_id)&&(r.status==='pr-created'||r.pr_url)).slice(0,4);
-    el.innerHTML=ready.length?ready.map(r=>`<div class="approval-item"><b>${escH(r.project)} · #${r.issue_number}</b><span>${escH(r.agent_key||'agent')} finished work and produced a reviewable result.</span><div class="approval-actions">${r.pr_url?`<a href="${escH(r.pr_url)}" target="_blank" rel="noopener">Open PR</a>`:''}<button type="button" data-home-run="${escH(r.id)}">Terminal</button></div></div>`).join(''):'<div class="small">No agent work is waiting for review in this scope.</div>';
+    const ready=(runs||[]).filter(r=>ids.has(r.task_id)&&(r.status==='pr-created'||r.pr_url)).slice(0,6);
+    el.innerHTML=ready.length?ready.map(r=>{
+      const approval=homeApprovalState.find(a=>a.run_id===r.id);
+      const controls=approval&&approval.status==='pending'&&session?.level>=2?`<button type="button" data-home-approval="${escH(approval.id)}" data-review-action="approve">Approve review</button><button type="button" data-home-approval="${escH(approval.id)}" data-review-action="request_changes">Request changes</button>`:'';
+      const decided=approval&&approval.status!=='pending'?`<span class="approval-state">${escH(approval.status)}${approval.decided_by?' · '+escH(approval.decided_by):''}</span>`:'';
+      return `<div class="approval-item"><b>${escH(r.project)} · #${r.issue_number}</b><span>${escH(r.agent_key||'agent')} produced a reviewable result.</span>${decided}<div class="approval-actions">${r.pr_url?`<a href="${escH(r.pr_url)}" target="_blank" rel="noopener">Open PR</a>`:''}<button type="button" data-home-run="${escH(r.id)}">Terminal</button>${controls}</div>${approval?'<span class="approval-note">PROJECT_BYTE approval records your review decision only. It never merges the PR.</span>':''}</div>`;
+    }).join(''):'<div class="small">No agent work is waiting for review in this scope.</div>';
+  }
+
+  async function refreshHomeApprovals() {
+    if(homeApprovalRefreshBusy)return;
+    if(!(session?.level>=2)){homeApprovalState=[];renderApprovals(safeVisible());return;}
+    homeApprovalRefreshBusy=true;
+    try{const x=await api('/api/approvals');homeApprovalState=x.approvals||[];renderApprovals(safeVisible())}catch{homeApprovalState=[]}finally{homeApprovalRefreshBusy=false}
+  }
+
+  async function decideHomeApproval(id,action) {
+    if(!id||!['approve','request_changes'].includes(action))return;
+    const label=action==='approve'?'Approve this review? This will not merge the PR.':'Request changes on this review? This will not modify the PR automatically.';
+    if(!confirm(label))return;
+    try{
+      await api('/api/approvals/'+encodeURIComponent(id)+'/decision',{method:'POST',body:JSON.stringify({action})});
+      const status=document.getElementById('status');if(status)status.textContent=action==='approve'?'Review approved · PR remains unmerged':'Changes requested · PR remains unmodified';
+      await refreshHomeApprovals();
+    }catch(error){const status=document.getElementById('status');if(status)status.textContent='Review decision failed: '+(error?.message||'unknown error')}
   }
 
   function renderMemory(scoped) {
@@ -256,7 +284,7 @@
   function renderHome() {
     if (!document.getElementById('home')) return;
     const scoped=safeVisible();
-    renderKpis(scoped); renderScopes(); renderAgentMap(scoped); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(scoped); renderPortfolio(scoped);
+    renderKpis(scoped); renderScopes(); renderAgentMap(scoped); renderOrg(); renderActivity(scoped); renderWork(scoped); renderApprovals(scoped); renderMemory(scoped); renderPortfolio(scoped); void refreshHomeApprovals();
     document.querySelectorAll('.home-nav button').forEach(b=>b.classList.toggle('active',b.dataset.homeGo===(document.body.dataset.pbView||'home')));
   }
 
@@ -275,7 +303,7 @@
   };
 
   document.addEventListener('click',e=>{
-    const b=e.target.closest('[data-view],[data-home-go],[data-home-action],[data-home-scope],[data-home-kpi],[data-home-agent],[data-home-person],[data-home-task],[data-home-run],[data-home-project]');
+    const b=e.target.closest('[data-view],[data-home-go],[data-home-action],[data-home-scope],[data-home-kpi],[data-home-agent],[data-home-person],[data-home-task],[data-home-run],[data-home-project],[data-home-approval]');
     if(!b)return;
     if(b.dataset.view){document.body.dataset.pbView=b.dataset.view;setTimeout(renderHome,0)}
     if(b.dataset.homeGo){go(b.dataset.homeGo);e.preventDefault()}
@@ -286,6 +314,7 @@
     if(b.dataset.homeTask){if(typeof openTask==='function')openTask(b.dataset.homeTask);e.preventDefault()}
     if(b.dataset.homeRun){if(document.getElementById('terminalRun'))document.getElementById('terminalRun').value=b.dataset.homeRun;go('terminalView');if(typeof terminalLoad==='function')terminalLoad();e.preventDefault()}
     if(b.dataset.homeProject){if(document.getElementById('projectFilter'))document.getElementById('projectFilter').value=b.dataset.homeProject;if(typeof renderAll==='function')renderAll();go('portfolio');e.preventDefault()}
+    if(b.dataset.homeApproval){void decideHomeApproval(b.dataset.homeApproval,b.dataset.reviewAction);e.preventDefault()}
     if(b.dataset.homeAction){
       if(b.dataset.homeAction==='ask'){go('ai');setTimeout(()=>document.getElementById('chatInput')?.focus(),30)}
       if(b.dataset.homeAction==='create'&&typeof openTask==='function')openTask('');

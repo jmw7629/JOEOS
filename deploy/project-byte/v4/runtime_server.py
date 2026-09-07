@@ -31,6 +31,7 @@ GET_API_PATHS = frozenset(
         "/api/models",
         "/api/agents",
         "/api/runs",
+        "/api/approvals",
         "/api/settings",
         "/api/notifications",
         "/api/team",
