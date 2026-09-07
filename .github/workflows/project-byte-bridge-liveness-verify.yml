@@ -23,6 +23,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Compile runtime
         run: python3 -m py_compile deploy/project-byte/v4/runtime_server.py
       - name: Prove bounded local liveness semantics
@@ -46,9 +48,14 @@ jobs:
 
           now = 1_800_000_000.0
 
-          def check(name, service, pending, activity, expected_state, expected_progress, observable=True):
+          def check(name, service, pending, activity, expected_state, expected_progress, observable=True, complete=True):
               got = mod._evaluate_bridge_health(
-                  service, pending, activity, now, pending_observable=observable
+                  service,
+                  pending,
+                  activity,
+                  now,
+                  pending_observable=observable,
+                  activity_evidence_complete=complete,
               )
               assert got['state'] == expected_state, (name, got)
               assert got['progress_state'] == expected_progress, (name, got)
@@ -76,6 +83,11 @@ jobs:
               {'count': 1, 'oldest_age_seconds': mod.BRIDGE_STALL_SECONDS + 1, 'active_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 1)},
               None, 'failed', 'stalled'
           )
+          check(
+              'bounded-scan-incomplete', 'active',
+              {'count': 1, 'oldest_age_seconds': mod.BRIDGE_STALL_SECONDS + 1, 'active_updated_at': int(now - mod.BRIDGE_STALL_SECONDS - 1)},
+              now - mod.BRIDGE_STALL_SECONDS - 1, 'unknown', 'evidence-incomplete', complete=False
+          )
           check('inactive', 'failed', {'count': 0}, None, 'failed', 'inactive')
           check('verifier-active', 'active', {'count': 0}, None, 'healthy', 'idle-or-external', observable=False)
           check('verifier-inactive', 'failed', {'count': 0}, None, 'failed', 'inactive', observable=False)
@@ -95,7 +107,10 @@ jobs:
               'active_updated_at': None,
               'active_issue_number': 0,
           }
-          mod._latest_bridge_activity = lambda repo, **kwargs: now - mod.BRIDGE_STALL_SECONDS - 10 if 'StickDeath' in repo else None
+          mod._latest_bridge_activity = lambda repo, **kwargs: (
+              now - mod.BRIDGE_STALL_SECONDS - 10 if 'StickDeath' in repo else None,
+              True,
+          )
           bridges = mod._bridge_health()
           assert bridges['stickdeath']['state'] == 'failed', bridges
           assert bridges['stickdeath']['progress_state'] == 'stalled', bridges
@@ -109,6 +124,7 @@ jobs:
           print('BRIDGE_RUNNING_FRESH=PASS')
           print('BRIDGE_STALLED_FAILS_CLOSED=PASS')
           print('BRIDGE_MISSING_EVIDENCE_UNKNOWN=PASS')
+          print('BRIDGE_BOUNDED_SCAN_INCOMPLETE_UNKNOWN=PASS')
           print('VITROS_VERIFIER_REQUIRED_SERVICE_GATE=PASS')
           PY
       - name: Prove health path is local, bounded and non-mutating
@@ -119,7 +135,10 @@ jobs:
           installer=deploy/project-byte/install.sh
           health=deploy/project-byte/v4/health-runtime.js
           grep -q 'BRIDGE_STALL_SECONDS = 2700' "$runtime"
+          grep -q 'BRIDGE_ACTIVITY_SCAN_MAX_ENTRIES = 6000' "$runtime"
           grep -q "status in ('queued','running')" "$runtime"
+          grep -q '_processed_issue_activity' "$runtime"
+          grep -q 'progress_evidence_complete' "$runtime"
           grep -q 'last_activity_age_seconds' "$runtime"
           grep -q 'oldest_pending_age_seconds' "$runtime"
           grep -q 'pending_observable' "$runtime"
@@ -134,5 +153,9 @@ jobs:
           ! grep -q 'Optional VITROS verifier' "$installer"
           grep -q 'bridgeSummary' "$health"
           ! grep -q '(optional)' "$health"
-          git diff --check origin/project-byte-deploy...HEAD
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            git diff --check HEAD^1...HEAD^2
+          else
+            git diff --check HEAD^
+          fi
           echo 'BRIDGE_LIVENESS_LOCAL_ONLY=PASS'
