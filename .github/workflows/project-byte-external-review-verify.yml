@@ -43,7 +43,7 @@ jobs:
           grep -Fq '"jmw7629/vitros-web-dashboard"' "$runtime"
           grep -Fq 'if path == "/api/external-reviews"' "$runtime"
           grep -Fq 'if not self.need(1)' "$runtime"
-          grep -Fq '"gh", "pr", "list"' "$runtime"
+          grep -Fq 'EXTERNAL_REVIEW_GH, "pr", "list"' "$runtime"
           grep -Fq 'Read-only observation. PROJECT_BYTE cannot approve, comment, merge, close, rerun or deploy this external PR.' "$home"
           ! grep -Fq 'data-external-review-action' "$home"
           node --check "$home"
