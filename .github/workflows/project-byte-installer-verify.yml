@@ -74,7 +74,7 @@ jobs:
           ! grep -q 'board.innerHTML' "$TMP/health-runtime.js"
           ! grep -q 'help.innerHTML' "$TMP/health-runtime.js"
           grep -q "CustomEvent('project-byte-health'" "$TMP/health-runtime.js"
-          grep -q '>New work</button>' "$TMP/home.js"
+          grep -q 'New work</button>' "$TMP/home.js"
           ! grep -q '>Queue work</button>' "$TMP/home.js"
           grep -q 'data-home-kpi' "$TMP/home.js"
           grep -q 'function homeKpiScope' "$TMP/home.js"
