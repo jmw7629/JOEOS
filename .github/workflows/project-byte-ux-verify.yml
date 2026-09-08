@@ -106,6 +106,8 @@ jobs:
           node "$RUNNER_TEMP/pb-browser/node_modules/playwright/cli.js" install --with-deps chromium
       - name: Verify bounded execution observation adapter
         run: PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_observatory.py
+      - name: Verify presentation configuration boundaries
+        run: PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_workspace_profile.py
       - name: Exercise actual Home on mobile and desktop
         env:
           PB_SCREENSHOTS: ${{ runner.temp }}/pb-orbital-screenshots

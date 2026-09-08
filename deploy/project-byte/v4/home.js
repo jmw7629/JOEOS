@@ -1,6 +1,8 @@
 (() => {
   if (window.__PROJECT_BYTE_HOME__) return;
   window.__PROJECT_BYTE_HOME__ = true;
+  let workspaceProfile = {schema_version:1,display_name:'PROJECT_BYTE',assistant_name:'Joe AI',owner_shortcuts:['Joe','Mike']};
+  window.PROJECT_BYTE_WORKSPACE = workspaceProfile;
   // Original inline icons: no icon font, tracking request, or runtime dependency.
   const ICONS = {
     home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/>',
@@ -150,7 +152,7 @@ body[data-pb-view="home"] > header{padding:16px 24px 6px}body[data-pb-view="home
 @media(max-width:360px){body > header .brand h1,body[data-pb-view="home"] > header .brand h1{font-size:13px}body > header .top #login{max-width:65px}.home-kpi{grid-template-columns:23px 1fr;gap:2px 5px;padding:9px 6px}.home-kpi .kpi-orbit{width:23px;height:23px}.home-kpi b{font-size:18px}.home-kpi .kpi-label{font-size:9px}.agent-node{width:81px}.agent-node.center{height:60px;width:60px;min-height:60px}.home-action{font-size:9px}}
 @media(prefers-reduced-motion:reduce){.pb-crawl-track{animation:none!important;transform:none!important}.pb-crawl-viewport{overflow-x:auto;mask-image:none}.pb-crawl-group[aria-hidden="true"]{display:none}.pb-crawl-track{will-change:auto}}
 body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!important;will-change:auto}body.reduced-motion .pb-crawl-viewport{overflow-x:auto;mask-image:none}body.reduced-motion .pb-crawl-group[aria-hidden="true"]{display:none}
-.pb-chat-context{margin-top:12px;border:1px solid #2b435c;border-radius:12px;background:#0c1928;padding:0 12px}.pb-chat-context summary{min-height:44px;cursor:pointer;padding:12px 0;color:#c7dced;font-size:12px}.pb-chat-context summary span{font-size:10px;color:#819db8;margin-left:8px}.pb-chat-context .grid3{padding-bottom:12px}.pb-chat-context:not([open]) .grid3{display:none}@media(max-width:650px){#ai .chatbox>.between>div>.small{display:none}#ai .chatbox>.between{margin-bottom:10px;align-items:center}#ai .chatbox #loadChat{font-size:11px;min-height:40px;padding:8px}#ai .chatbox>.chatlog{min-height:200px;max-height:38dvh}#ai .pb-chat-context .grid3{grid-template-columns:1fr 1fr}#ai .composer{margin-top:12px}#ai .composer textarea{font-size:16px}#ai .chatbox>.between h2{font-size:15px}}
+.pb-chat-context{margin-top:12px;border:1px solid #2b435c;border-radius:12px;background:#0c1928;padding:0 12px}.pb-chat-context summary{min-height:44px;cursor:pointer;padding:12px 0;color:#c7dced;font-size:12px}.pb-chat-context summary span{font-size:10px;color:#819db8;margin-left:8px}.pb-chat-context .grid3{padding-bottom:12px}.pb-chat-context:not([open]) .grid3{display:none}@media(max-width:650px){#ai .chatbox>.between>div>.small{display:none}#ai .chatbox>.between{margin-bottom:10px;align-items:center}#ai .chatbox #loadChat{font-size:11px;min-height:40px;padding:8px}#ai .chatbox>.chatlog{min-height:200px;max-height:38dvh}#ai .pb-chat-context .grid3{grid-template-columns:repeat(2,minmax(0,1fr))}#ai .ai-layout>*,#ai .pb-chat-context .label{min-width:0}#ai .pb-chat-context select{min-width:0;width:100%}#ai .composer{margin-top:12px}#ai .composer textarea{font-size:16px}#ai .chatbox>.between h2{font-size:15px}}
   `;
   document.head.appendChild(style);
 
@@ -175,7 +177,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
         <div class="home-hero-top">
           <div>
             <div class="home-eyebrow"><span class="home-status-dot"></span><span id="homeSystemState">Verifying system health…</span></div>
-            <h2>Joe AI</h2>
+            <h2>${escH(workspaceProfile.assistant_name)}</h2>
 
           </div>
           <div id="homeAIState" class="home-ai-state">AI UNKNOWN</div>
@@ -235,7 +237,8 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   function homeTaskScope(mode) {
     if(mode==='all'){if(typeof clearFilters==='function')clearFilters();renderHome();return;}
     const selfName=session?.name&&session.name!=='Public'?session.name:'';
-    const map={self:['ownerFilter',selfName],joe:['ownerFilter','Joe'],mike:['ownerFilter','Mike'],ai:['executorFilter','ai'],critical:['priorityFilter','Critical'],week:['dueFilter','7d']};
+    const map={self:['ownerFilter',selfName],ai:['executorFilter','ai'],critical:['priorityFilter','Critical'],week:['dueFilter','7d']};
+    workspaceProfile.owner_shortcuts.forEach((name,i)=>map[ownerShortcutKey(name,i)]=['ownerFilter',name]);
     const pair=map[mode];if(!pair||!pair[1])return;
     const control=document.getElementById(pair[0]);
     setHomeFilter(pair[0],control?.value===pair[1]?'':pair[1]);
@@ -278,8 +281,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     const isAll=!Object.values(c).some(Boolean);
     const chips=[['all','All projects',isAll]];
     if(selfName)chips.push(['self','My work',c.ownerFilter===selfName]);
-    if(selfName!=='Joe')chips.push(['joe','Joe',c.ownerFilter==='Joe']);
-    if(selfName!=='Mike')chips.push(['mike','Mike',c.ownerFilter==='Mike']);
+    workspaceProfile.owner_shortcuts.forEach((name,i)=>{if(name!==selfName)chips.push([ownerShortcutKey(name,i),name,c.ownerFilter===name]);});
     chips.push(['ai','AI work',c.executorFilter==='ai'],['critical','Critical',c.priorityFilter==='Critical'],['week','This week',c.dueFilter==='7d']);
     const el=document.getElementById('homeScopes');if(!el)return;
     el.innerHTML=chips.map(([key,label,active])=>`<button type="button" class="home-chip ${active?'active':''}" data-home-scope="${key}" aria-pressed="${active}">${escH(label)}</button>`).join('')+'<button type="button" class="home-chip" data-open-scope="1">All filters</button>';
@@ -299,7 +301,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     let lines='<svg class="agent-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">';
     enabled.forEach((a,i)=>{const [x,y]=positions[i];lines+=`<path class="${activeKeys.has(a.agent_key)?'live-link':''}" d="M50 50 C${x<50?32:68} 50,${x<50?38:62} ${y},${x} ${y}"/>`;});
     lines+='</svg>';
-    const center=`<button type="button" class="agent-node center" style="left:50%;top:50%" data-home-go="ai" aria-label="Open Joe AI">${icon('user')}<b>Joe AI</b><small>Executive</small></button>`;
+    const center=`<button type="button" class="agent-node center" style="left:50%;top:50%" data-home-go="ai" aria-label="Open ${escH(workspaceProfile.assistant_name)}">${icon('user')}<b>${escH(workspaceProfile.assistant_name)}</b><small>Executive</small></button>`;
     const nodes=enabled.map((a,i)=>{const [x,y]=positions[i];return `<button type="button" class="agent-node ${activeKeys.has(a.agent_key)?'running':''}" style="left:${x}%;top:${y}%" data-home-agent="${escH(a.agent_key)}" aria-label="Inspect ${escH(a.name)}">${icon(icons[a.agent_key]||'agents')}<b>${escH(a.name)}</b><small>${activeKeys.has(a.agent_key)?'Running':'Configured role'}</small></button>`;}).join('');
     el.innerHTML=lines+center+nodes+(enabled.length?'':'<span style="position:absolute;bottom:12px;left:0;right:0;text-align:center" class="small">Sign in to inspect your configured agents.</span>');
   }
@@ -484,7 +486,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   const send=async()=>{
     const input=document.getElementById('homeCommandInput'),text=input?.value.trim();
     if(!text||homeSendBusy)return;
-    if(!(session?.level>=2)){homeToast('Sign in with your owner or team key to use Joe AI.');document.getElementById('login')?.click();return;}
+    if(!(session?.level>=2)){homeToast(`Sign in with your owner or team key to use ${workspaceProfile.assistant_name}.`);document.getElementById('login')?.click();return;}
     homeSendBusy=true;const button=document.getElementById('homeCommandSend');button.disabled=true;
     go('ai');const composer=document.getElementById('chatInput');if(composer)composer.value=text;
     try{if(typeof sendChat==='function')await sendChat(text);if(composer&&!composer.value)input.value='';else homeToast(document.getElementById('status')?.textContent||'Message kept as a draft.');}
@@ -555,7 +557,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   function syncWorkspaceChrome(){
     const view=document.body.dataset.pbView||'home',record=spaces.find(([id])=>id===view),count=typeof activeFilterCount==='function'?activeFilterCount():0;
     if(view!==lastChromeView){if(filterDialog.open)filterDialog.close();lastChromeView=view;if(view==='home')requestAnimationFrame(sizeLiveCrawl);}
-    contextBar.hidden=view==='home';document.getElementById('pbWorkspaceTitle').textContent=record?.[1]||'Workspace';
+    contextBar.hidden=view==='home';document.getElementById('pbWorkspaceTitle').textContent=view==='ai'?workspaceProfile.assistant_name+' chat':record?.[1]||'Workspace';
     const criteria=typeof filterCriteria==='function'?filterCriteria():{},names=[criteria.projectFilter,criteria.ownerFilter,criteria.priorityFilter,criteria.statusFilter].filter(Boolean);
     document.getElementById('pbWorkspaceScope').textContent=scopeViews.has(view)&&count?(names.join(' · ')||`${count} active filters`):'';
     const toggle=document.getElementById('pbScopedFilters');toggle.hidden=!scopeViews.has(view);toggle.textContent=count?`Filters · ${count}`:'Filters';toggle.setAttribute('aria-pressed',String(count>0));
@@ -642,6 +644,37 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   document.body.dataset.pbView = location.hash.replace('#','') || 'home';
   window.addEventListener('project-byte-health',e=>{renderExecutionFabric(e.detail||null);renderLiveCrawl();});
   setTimeout(()=>{renderHome();void pollLiveCrawl();},0);
+  function ownerShortcutKey(name,index){return name==='Joe'?'joe':name==='Mike'?'mike':'person-'+index;}
+  async function loadWorkspaceProfile(){
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
+    try{
+      const response=await fetch('/api/workspace-profile',{cache:'no-store',signal:controller.signal});
+      const payload=await response.json();
+      if(!response.ok)throw new Error('unavailable');
+      const p=payload.profile;
+      if(p?.schema_version!==1||typeof p.display_name!=='string'||typeof p.assistant_name!=='string'||!Array.isArray(p.owner_shortcuts)||p.owner_shortcuts.some(n=>typeof n!=='string'))throw new Error('invalid');
+      workspaceProfile=p;window.PROJECT_BYTE_WORKSPACE=p;
+      document.title=p.display_name;
+      const title=document.querySelector('.brand h1');
+      if(title){if(p.display_name==='PROJECT_BYTE')title.innerHTML='PROJECT<span class="pb-wordmark">_BYTE</span>';else title.textContent=p.display_name;}
+      document.querySelector('.home-hero-top h2').textContent=p.assistant_name;
+      if(p.assistant_name!=='Joe AI'){const heading=document.querySelector('#ai .chatbox h2');if(heading)heading.textContent=p.assistant_name;}
+      document.getElementById('homeCommandInput').setAttribute('aria-label','Ask '+p.assistant_name);
+      document.getElementById('homeCommandSend').setAttribute('aria-label','Send to '+p.assistant_name);
+      document.querySelector('.home-asset-credit span').textContent=p.display_name+' · Your executive workspace';
+      const chat=document.querySelector('#pbWorkspaces [data-home-go="ai"]');
+      if(chat)for(const node of chat.childNodes)if(node.nodeType===Node.TEXT_NODE)node.textContent=p.assistant_name+' chat';
+      document.body.classList.toggle('custom-workspace-profile',p.display_name!=='PROJECT_BYTE'||p.assistant_name!=='Joe AI'||JSON.stringify(p.owner_shortcuts)!==JSON.stringify(['Joe','Mike']));
+      renderHome();
+    }catch{
+      const note=document.createElement('p');note.className='small';note.id='workspaceProfileWarning';note.setAttribute('role','status');note.textContent='Workspace branding is unavailable. Default appearance is shown.';
+      document.querySelector('#settings .settingsgrid')?.prepend(note);
+    }finally{clearTimeout(timeout);window.PROJECT_BYTE_WORKSPACE_READY=true;if(typeof deliverBrowserNotifications==='function')deliverBrowserNotifications();}
+  }
+  const profileStyle=document.createElement('style');
+  profileStyle.textContent='body.custom-workspace-profile .home-shell{grid-template-columns:minmax(0,1fr)}body.custom-workspace-profile .home-asset-credit{overflow-wrap:anywhere}body.custom-workspace-profile #ai .chatbox .between>div{min-width:0}body.custom-workspace-profile .brand>div:first-child{min-width:0}body.custom-workspace-profile .brand .top{flex-shrink:0}body.custom-workspace-profile .brand h1{max-width:45vw;overflow:hidden;text-overflow:ellipsis}body.custom-workspace-profile .home-hero-top>div:first-child,body.custom-workspace-profile .pb-context-bar>div{min-width:0}body.custom-workspace-profile #homeWorkTitle,body.custom-workspace-profile #homeWork .small,body.custom-workspace-profile #pbWorkspaceScope,body.custom-workspace-profile .pb-home-toast,body.custom-workspace-profile .home-hero-top h2,body.custom-workspace-profile #pbWorkspaceTitle,body.custom-workspace-profile #ai .chatbox h2{overflow-wrap:anywhere}body.custom-workspace-profile .agent-node.center b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}body.custom-workspace-profile .pb-workspaces button{overflow-wrap:anywhere;min-width:0}body.custom-workspace-profile .home-chip{flex-shrink:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}';
+  document.head.appendChild(profileStyle);
+  void loadWorkspaceProfile();
 })();
 
 (() => {
