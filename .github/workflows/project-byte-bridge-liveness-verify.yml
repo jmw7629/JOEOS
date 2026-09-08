@@ -252,6 +252,24 @@ jobs:
           mod.BRIDGE_CACHE['at'] = 0.0
           mod.BRIDGE_CACHE['value'] = {}
           mod._active_executor = lambda repo, boundary: {
+              'running': boundary == 'stickdeath',
+              'count': 1 if boundary == 'stickdeath' else 0,
+              'active_run_ref': 'issue-106' if boundary == 'stickdeath' else '',
+              'active_issue_number': 106 if boundary == 'stickdeath' else 0,
+              'active_model': '', 'evidence_complete': False,
+          }
+          partial_positive = mod._bridge_health()
+          assert partial_positive['stickdeath']['state'] == 'healthy', partial_positive
+          assert partial_positive['stickdeath']['progress_state'] == 'running', partial_positive
+          assert partial_positive['stickdeath']['external_running'] is True, partial_positive
+          assert partial_positive['stickdeath']['external_evidence_complete'] is False, partial_positive
+          assert partial_positive['stickdeath']['execution_state'] == 'running', partial_positive
+          assert partial_positive['stickdeath']['execution_reason_code'] == 'active-executor', partial_positive
+          assert partial_positive['stickdeath']['execution_reason'] == 'active external executor observed; completion pending', partial_positive
+
+          mod.BRIDGE_CACHE['at'] = 0.0
+          mod.BRIDGE_CACHE['value'] = {}
+          mod._active_executor = lambda repo, boundary: {
               'running': False, 'count': 0, 'active_run_ref': '', 'active_issue_number': 0,
               'active_model': '', 'evidence_complete': False,
           }
@@ -264,6 +282,7 @@ jobs:
           print('BRIDGE_STALLED_FAILS_CLOSED=PASS')
           print('BRIDGE_MISSING_EVIDENCE_UNKNOWN=PASS')
           print('BRIDGE_BOUNDED_SCAN_INCOMPLETE_UNKNOWN=PASS')
+          print('BRIDGE_PARTIAL_SCAN_POSITIVE_EXECUTOR=PASS')
           print('BRIDGE_ISSUE_SPECIFIC_ACTIVITY=PASS')
           print('BRIDGE_NESTED_WORKTREE_ACTIVITY=PASS')
           print('VITROS_VERIFIER_REQUIRED_SERVICE_GATE=PASS')

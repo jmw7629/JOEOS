@@ -838,8 +838,9 @@ def _bridge_health():
             item["last_run_ref"] = execution["last_run_ref"]
             item["execution_freshness_seconds"] = execution["freshness_window_seconds"]
             # Current executor presence and historical completion evidence are separate facts.
-            # A live allowlisted executor proves activity, not successful completion.
-            if external_running and item["external_evidence_complete"]:
+            # A positive allowlisted executor match proves activity even when the broader
+            # process scan is partial; scan completeness only limits absence conclusions.
+            if external_running:
                 item["execution_state"] = "running"
                 item["execution_reason_code"] = "active-executor"
                 item["execution_reason"] = "active external executor observed; completion pending"
