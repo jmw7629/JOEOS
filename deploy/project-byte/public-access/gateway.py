@@ -22,7 +22,7 @@ import time
 from urllib.parse import quote, unquote, urlsplit
 
 COOKIE = '__Host-project_byte_session'
-ASSETS = {'/', '/index.html', '/home.js', '/home-inspector.js', '/health-runtime.js', '/ai-connections.js'}
+ASSETS = {'/', '/index.html', '/home.js', '/home-inspector.js', '/health-runtime.js', '/ai-connections.js', '/codex-workspace.js'}
 GET_APIS = {'/healthz','/api/session','/api/tasks','/api/projects','/api/intelligence','/api/activity',
             '/api/models','/api/agents','/api/runs','/api/approvals','/api/settings','/api/notifications',
             '/api/team','/api/memory','/api/chat','/api/help','/api/observatory','/api/external-reviews',
@@ -32,7 +32,11 @@ POST_APIS = {'/api/auth','/api/settings','/api/notifications/read','/api/tasks',
              '/api/ai-connections/discover','/api/ai-connections/connect','/api/ai-connections/default',
              '/api/ai-connections/login','/api/ai-connections/disconnect'}
 MAX_BODY = 10 * 1024 * 1024
+CODEX_MAX_BODY = 64 * 1024
 MAX_RESPONSE = 20 * 1024 * 1024
+CODEX_PREFIX = '/api/codex-workspace'
+CODEX_ID = r'[0-9a-f]{32}'
+CODEX_EVENTS = re.compile(CODEX_PREFIX+'/runs/'+CODEX_ID+'/events')
 CSP = "default-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 
 
@@ -40,7 +44,19 @@ def digest(value):
     return hashlib.sha256(value.encode()).hexdigest()
 
 
-def api_allowed(method,path):
+def codex_api(path):
+    return path == CODEX_PREFIX or path.startswith(CODEX_PREFIX+'/')
+
+
+def api_allowed(method,path,query=''):
+    if codex_api(path):
+        if method == 'GET':
+            if CODEX_EVENTS.fullmatch(path):
+                return not query or bool(re.fullmatch(r'after=(?:0|[1-9][0-9]{0,18})',query))
+            return not query and (path == CODEX_PREFIX or bool(re.fullmatch(
+                CODEX_PREFIX+'/(conversations|artifacts)/'+CODEX_ID,path)))
+        return method == 'POST' and not query and (path == CODEX_PREFIX+'/message' or bool(re.fullmatch(
+            CODEX_PREFIX+'/(runs/'+CODEX_ID+'/stop|permissions/'+CODEX_ID+'/decision)',path)))
     ident=r'[A-Za-z0-9:_-]{1,160}'
     if method=='GET':return path in GET_APIS or bool(re.fullmatch('/api/runs/'+ident+'/terminal',path))
     if method=='POST':return path in POST_APIS or bool(re.fullmatch('/api/(approvals/'+ident+'/decision|tasks/'+ident+'/queue)',path))
@@ -302,6 +318,11 @@ def handler_for(access, origin, upstream=('127.0.0.1',8094), trusted_serve=False
             path=unquote(target.path)
             if any(part in ('.','..') for part in path.split('/')) or '\\' in path:
                 return self.respond(400, {'error':'Invalid path'})
+            native_api=codex_api(path)
+            if (native_api or path == '/codex-workspace.js') and (target.path != path or '?' in self.path and not target.query):
+                return self.respond(400, {'error':'Canonical workspace path required'})
+            if path == '/codex-workspace.js' and target.query:
+                return self.respond(404, {'error':'Not found'})
             if self.headers.get('Transfer-Encoding') or len(self.headers.get_all('Content-Length',[]))>1:
                 return self.respond(400, {'error':'Invalid framing'})
             mutation=self.command not in ('GET','HEAD')
@@ -351,8 +372,10 @@ def handler_for(access, origin, upstream=('127.0.0.1',8094), trusted_serve=False
                 return self.deny(changed=True)
             if path=='/_gateway/check' and self.command=='GET':
                 return self.respond(200,{'ok':True})
-            if api and not api_allowed(self.command,path):
+            if api and not api_allowed(self.command,path,target.query):
                 return self.respond(404,{'error':'Not found'})
+            if native_api and (identity.get('role') != 'owner' or identity.get('level') != 4 or identity.get('subject') != 'owner'):
+                return self.respond(403,{'error':'Owner sign-in required for the Codex workspace'})
             if path in ('/api/auth','/api/session'):
                 if path=='/api/auth' and self.command!='POST' or path=='/api/session' and self.command!='GET':
                     return self.respond(405,{'error':'Method unavailable'})
@@ -365,7 +388,7 @@ def handler_for(access, origin, upstream=('127.0.0.1',8094), trusted_serve=False
                 return self.respond(405,{'error':'Method unavailable'})
             if self.headers.get('Upgrade'):
                 return self.respond(400,{'error':'Upgrade unavailable'})
-            payload=self.body(MAX_BODY) if mutation else None
+            payload=self.body(CODEX_MAX_BODY if native_api else MAX_BODY) if mutation else None
             self.deadline.cancel()  # Request is complete; long model replies may proceed.
             headers={'Host':'127.0.0.1:8094','Accept-Encoding':'identity'}
             if api:headers['X-Access-Key']=record['key']

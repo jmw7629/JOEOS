@@ -125,7 +125,7 @@ def install(app, BaseHandler, public_files, codex=None):
                 return self.sendj({'error': 'Codex is unavailable; refresh its connection status'}, 503)
             return self.sendj({'error': 'AI connections are unavailable'}, 503)
 
-        def _ai_body(self):
+        def _ai_body(self, limit=MAX_BODY):
             lengths = self.headers.get_all('Content-Length', [])
             types = self.headers.get_all('Content-Type', [])
             origins = self.headers.get_all('Origin', [])
@@ -140,7 +140,7 @@ def install(app, BaseHandler, public_files, codex=None):
                     valid_origin = False
             if (self.headers.get_all('Transfer-Encoding', []) or len(lengths) != 1
                     or not re.fullmatch(r'[0-9]{1,6}', lengths[0])
-                    or not 0 < int(lengths[0]) <= MAX_BODY or len(types) != 1
+                    or not 0 < int(lengths[0]) <= limit or len(types) != 1
                     or types[0].split(';', 1)[0].strip().lower() != 'application/json'
                     or len(hosts) != 1 or not hosts[0] or not valid_origin):
                 self.close_connection = True

@@ -1388,6 +1388,10 @@ from ai_runtime import install as install_ai_connections
 
 SafeHandler = install_ai_connections(app, SafeHandler, PUBLIC_FILES)
 
+from codex_tasks_runtime import install as install_codex_workspace
+
+SafeHandler = install_codex_workspace(app, SafeHandler, PUBLIC_FILES)
+
 
 if __name__ == "__main__":
     app.init_db()

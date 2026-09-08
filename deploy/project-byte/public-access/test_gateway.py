@@ -201,7 +201,7 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(self.calls,[])
 
     def test_anonymous_never_reaches_private_content_or_head(self):
-        for route in ['/','/home.js','/api/tasks','/api/projects','/api/activity','/api/intelligence','/uploads/private.html','/admin.secret','/kanban.db']:
+        for route in ['/','/home.js','/codex-workspace.js','/api/codex-workspace','/api/codex-workspace/artifacts/'+'a'*32,'/api/tasks','/api/projects','/api/activity','/api/intelligence','/uploads/private.html','/admin.secret','/kanban.db']:
             for method in ('GET','HEAD'):
                 status,_,raw=self.request(route,method);self.assertIn(status,(303,401));self.assertNotIn(b'PRIVATE',raw)
         self.assertEqual(self.calls,[])
@@ -262,6 +262,72 @@ class GatewayTests(unittest.TestCase):
         for method,path in [('POST','/api/approvals/review:run-id/decision'),('GET','/api/runs/run-id/terminal'),('PATCH','/api/projects/Revenue / 100% Growth'),('PATCH','/api/tasks/task-id'),('DELETE','/api/tasks/task-id')]:
             self.assertTrue(api_allowed(method,path))
         self.assertFalse(api_allowed('DELETE','/api/projects/X'))
+
+    def test_codex_exact_owner_routes_and_authenticated_asset(self):
+        token=self.login();ident='a'*32;prefix='/api/codex-workspace'
+        routes=[('GET',prefix),('GET',prefix+'/conversations/'+ident),
+                ('GET',prefix+'/runs/'+ident+'/events'),('GET',prefix+'/runs/'+ident+'/events?after=0'),
+                ('GET',prefix+'/runs/'+ident+'/events?after=197'),('GET',prefix+'/artifacts/'+ident),
+                ('POST',prefix+'/message'),('POST',prefix+'/runs/'+ident+'/stop'),
+                ('POST',prefix+'/permissions/'+ident+'/decision')]
+        for method,route in routes:
+            with self.subTest(method=method,route=route):
+                self.assertEqual(self.request(route,method,{} if method=='POST' else None,token,self.key)[0],200)
+                self.assertEqual(self.calls[-1]['path'],route)
+                self.assertEqual(self.calls[-1]['key'],self.key)
+                self.assertEqual(self.calls[-1]['origin'],'http://127.0.0.1:8094' if method=='POST' else None)
+        status,headers,_=self.request(prefix+'/artifacts/'+ident,token=token,key=self.key)
+        self.assertEqual(status,200);self.assertEqual(headers['Content-Type'],'application/json')
+        self.assertNotIn('Content-Disposition',headers,'text artifact content remains authenticated JSON for the UI download')
+        for method in ('GET','HEAD'):
+            self.assertEqual(self.request('/codex-workspace.js',method,token=token)[0],200)
+            self.assertIsNone(self.calls[-1]['key'],'script asset does not forward a private API key')
+
+    def test_codex_cookie_nonce_owner_role_and_origin_are_all_required(self):
+        owner=self.login();viewer=self.login(self.viewer);ident='a'*32;prefix='/api/codex-workspace'
+        routes=[('GET',prefix),('GET',prefix+'/conversations/'+ident),('GET',prefix+'/artifacts/'+ident),
+                ('GET',prefix+'/runs/'+ident+'/events?after=0'),('POST',prefix+'/message'),
+                ('POST',prefix+'/runs/'+ident+'/stop'),('POST',prefix+'/permissions/'+ident+'/decision')]
+        for method,route in routes:
+            body={} if method=='POST' else None
+            for token,key,status in [('',self.key,401),(owner,'',401),(owner,'stale-nonce',401),(viewer,self.viewer,403)]:
+                with self.subTest(route=route,token_type='owner' if token==owner else 'other',key_present=bool(key)):
+                    self.assertEqual(self.request(route,method,body,token,key)[0],status)
+            if method=='POST':
+                self.assertEqual(self.request(route,method,body,owner,self.key,{'Origin':'https://elsewhere.example'})[0],403)
+        for role in ('editor','admin'):
+            with sqlite3.connect(self.root/'kanban.db') as db:db.execute('UPDATE collaborators SET role=?',(role,))
+            self.assertEqual(self.request(prefix,token=viewer,key=self.viewer)[0],403)
+            self.assertEqual(self.request(prefix+'/message','POST',{},viewer,self.viewer)[0],403)
+        self.assertEqual(self.calls,[])
+
+    def test_codex_dynamic_paths_and_queries_are_canonical_and_bounded(self):
+        token=self.login();ident='a'*32;prefix='/api/codex-workspace';events=prefix+'/runs/'+ident+'/events'
+        invalid=[prefix+'/',prefix+'?url=http://elsewhere.example',prefix+'?',
+                 prefix+'/conversations/'+ident+'?after=0',prefix+'/artifacts/'+ident+'?download=1',
+                 prefix+'/artifacts/../admin.secret',prefix+'/runs/'+ident+'/events/extra',
+                 events+'?after=-1',events+'?after=01',events+'?after=1.2',events+'?after=1&after=2',
+                 events+'?after=0&url=http://elsewhere.example',events+'?after='+('9'*20),
+                 events+'?after=%31',events+'?after=',events+'?',
+                 prefix+'/conversations/'+('a'*31),prefix+'/conversations/'+('a'*33),
+                 prefix+'/conversations/'+('A'*32),prefix+'/conversations/00000000-0000-0000-0000-000000000000',
+                 prefix+'/conversations/%61'+('a'*31),'/api/%63odex-workspace',
+                 '/api/codex-workspace%2fconversations/'+ident,'/codex-workspace.js?version=1','/codex-workspace.js?',
+                 '/%63odex-workspace.js','/codex-workspace.js/extra']
+        for route in invalid:
+            with self.subTest(route=route):self.assertIn(self.request(route,token=token,key=self.key)[0],(400,404))
+        for method,route in [('POST',events),('GET',prefix+'/message'),('HEAD',prefix),
+                             ('DELETE',prefix+'/conversations/'+ident),('PATCH',prefix+'/message'),
+                             ('POST',prefix+'/message?after=0'),('POST',prefix+'/runs/'+ident+'/stop?after=0')]:
+            with self.subTest(method=method,route=route):self.assertEqual(self.request(route,method,{},token,self.key)[0],404)
+        self.assertEqual(self.calls,[])
+
+    def test_codex_request_body_limit_is_64_kib(self):
+        token=self.login();path='/api/codex-workspace/message'
+        self.assertEqual(self.request(path,'POST',{'message':'x'*64000},token,self.key)[0],200)
+        before=len(self.calls)
+        self.assertEqual(self.request(path,'POST',{'message':'x'*65536},token,self.key)[0],400)
+        self.assertEqual(len(self.calls),before)
     def test_parallel_chat_does_not_block_reads(self):
         token=self.login();result=[]
         t=threading.Thread(target=lambda:result.append(self.request('/api/chat','POST',{},token,self.key)[0]));t.start()

@@ -6,7 +6,7 @@ on:
 jobs:
   verify-ai-connections:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,20 +21,74 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_connection.py
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_ai_runtime.py
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_stage_ai_overlay.py
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/public-access/test_gateway.py
+      - name: Verify native task routing, HTTP, publisher and fail-closed sandbox boundaries
+        run: |
+          bash -n deploy/project-byte/install.sh
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_task_rpc.py
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_sandbox.py
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_tasks.py
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_tasks_runtime.py
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_publisher.py
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_stage_codex_overlay.py
       - name: Install pinned isolated verification tools
         run: |
           npm install --prefix "$RUNNER_TEMP/pb-ai-tools" --ignore-scripts --no-audit --no-fund @openai/codex@0.153.4 playwright@1.57.0
           node "$RUNNER_TEMP/pb-ai-tools/node_modules/playwright/cli.js" install --with-deps chromium
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap
       - name: Prove native Codex has no execution tools using an unauthenticated fixture
         run: |
           PROJECT_BYTE_TEST_CODEX_BIN="$RUNNER_TEMP/pb-ai-tools/node_modules/.bin/codex" \
           PROJECT_BYTE_CODEX_EVIDENCE_DIR="$RUNNER_TEMP/pb-ai-evidence/native-tools" \
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_runtime_tools.py
+      - name: Prove native task RPC tool correlation, cancellation and inventory boundaries
+        run: |
+          PROJECT_BYTE_TEST_CODEX_BIN="$RUNNER_TEMP/pb-ai-tools/node_modules/.bin/codex" \
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_task_rpc.py
+      - name: Probe actual runner isolation without weakening host policy
+        id: sandbox
+        env:
+          PYTHONPATH: deploy/project-byte/v4
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          from test_codex_sandbox import RepositoryFixture
+          fixture = RepositoryFixture()
+          try:
+              fixture.setUp()
+              proof = fixture.factory.capabilities()
+          finally:
+              fixture.doCleanups()
+          available = proof.get('available') is True
+          evidence = Path(os.environ['RUNNER_TEMP'])/'pb-ai-evidence'
+          evidence.mkdir(parents=True, exist_ok=True)
+          (evidence/'sandbox-probe.json').write_text(json.dumps(proof, indent=2))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('available='+str(available).lower()+'\n')
+          if not available:
+              print('::notice::Full native controller acceptance will not run because this CI host denies hard sandbox isolation. Mandatory fail-closed tests still run; dedicated broker acceptance remains required before deployment.')
+          PY
+      - name: Prove native controller, sandbox, delegation, approval and stop with synthetic services
+        if: steps.sandbox.outputs.available == 'true'
+        run: |
+          PROJECT_BYTE_TEST_CODEX_BIN="$RUNNER_TEMP/pb-ai-tools/node_modules/.bin/codex" \
+          PROJECT_BYTE_CODEX_EVIDENCE_DIR="$RUNNER_TEMP/pb-ai-evidence/native-workspace" \
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_workspace_native.py
+      - name: Record missing full-chain isolation evidence explicitly
+        if: steps.sandbox.outputs.available == 'false'
+        run: |
+          printf '%s\n' '{"status":"not_run","reason":"CI host did not provide verified hard sandbox isolation","deployment_requires":"separate native broker acceptance"}' > "$RUNNER_TEMP/pb-ai-evidence/native-workspace-not-run.json"
       - name: Verify connection panel and session boundaries on four screen widths
         run: |
           PB_PLAYWRIGHT_MODULE="$RUNNER_TEMP/pb-ai-tools/node_modules/playwright/index.mjs" \
           PB_SCREENSHOTS="$RUNNER_TEMP/pb-ai-evidence/browser" \
           node deploy/project-byte/v4/test_ai_connections_browser.mjs
+          PB_PLAYWRIGHT_MODULE="$RUNNER_TEMP/pb-ai-tools/node_modules/playwright/index.mjs" \
+          PB_SCREENSHOTS="$RUNNER_TEMP/pb-ai-evidence/workspace-browser" \
+          node deploy/project-byte/v4/test_codex_workspace_browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
