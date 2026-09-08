@@ -1,0 +1,32 @@
+name: PROJECT_BYTE Public Access Verify
+on:
+  pull_request:
+    branches: [project-byte-deploy]
+  workflow_dispatch:
+jobs:
+  verify-public-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify gateway boundaries
+        run: PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/public-access/test_gateway.py
+      - name: Install isolated browser tooling
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pb-public-browser" --ignore-scripts --no-audit --no-fund playwright@1.57.0
+          node "$RUNNER_TEMP/pb-public-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Verify authenticated live workspace flows
+        run: |
+          PB_PLAYWRIGHT_MODULE="$RUNNER_TEMP/pb-public-browser/node_modules/playwright/index.mjs" \
+          PB_SCREENSHOTS="$RUNNER_TEMP/pb-public-evidence" \
+          node deploy/project-byte/public-access/test_browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: project-byte-public-access-evidence
+          path: ${{ runner.temp }}/pb-public-evidence
+          retention-days: 7
+          if-no-files-found: ignore
