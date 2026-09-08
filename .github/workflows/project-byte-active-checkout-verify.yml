@@ -30,6 +30,8 @@ jobs:
           FAKEBIN="$TMP/bin"
           STATE="$TMP/systemctl.state"
           CALLS="$TMP/systemctl.calls"
+          GIT_CALLS="$TMP/git.calls"
+          REAL_GIT="$(command -v git)"
           mkdir -p "$FAKEBIN"
 
           git init --bare "$REMOTE" >/dev/null
@@ -54,10 +56,17 @@ jobs:
           set -euo pipefail
           echo "$*" >> "$FAKE_SYSTEMCTL_CALLS"
           if [[ " $* " == *" is-active "* ]]; then
-            if [ "${FAKE_SYSTEMCTL_MODE:-active}" = "active" ] || [ -f "$FAKE_SYSTEMCTL_STATE" ]; then
+            if [ -f "$FAKE_SYSTEMCTL_STATE" ]; then
+              echo active
               exit 0
             fi
-            exit 3
+            case "${FAKE_SYSTEMCTL_MODE:-active}" in
+              active) echo active; exit 0 ;;
+              inactive) echo inactive; exit 3 ;;
+              failed) echo failed; exit 3 ;;
+              unavailable) echo 'Failed to connect to bus' >&2; exit 1 ;;
+              *) echo unknown; exit 4 ;;
+            esac
           fi
           if [[ " $* " == *" restart "* ]]; then
             touch "$FAKE_SYSTEMCTL_STATE"
@@ -66,11 +75,19 @@ jobs:
           exit 0
           SH
           chmod +x "$FAKEBIN/systemctl"
+          cat > "$FAKEBIN/git" <<SH
+          #!/usr/bin/env bash
+          set -euo pipefail
+          echo "\$*" >> "\$FAKE_GIT_CALLS"
+          exec "$REAL_GIT" "\$@"
+          SH
+          chmod +x "$FAKEBIN/git"
           export PATH="$FAKEBIN:$PATH"
           export FAKE_SYSTEMCTL_STATE="$STATE"
           export FAKE_SYSTEMCTL_CALLS="$CALLS"
+          export FAKE_GIT_CALLS="$GIT_CALLS"
 
-          awk '/^refresh_bridge\(\) \{/{capture=1} capture{print} capture && /^}$/{exit}' deploy/project-byte/install.sh > "$TMP/function.sh"
+          awk '/^bridge_service_state\(\) \{/{capture=1} capture{print} /^refresh_bridge\(\) \{/{refresh=1} capture && refresh && /^}$/{exit}' deploy/project-byte/install.sh > "$TMP/function.sh"
           # shellcheck disable=SC1090
           source "$TMP/function.sh"
 
@@ -102,6 +119,34 @@ jobs:
           test "$(git -C "$ROOT" rev-parse HEAD)" = "$B"
           grep -q ' restart ' "$CALLS"
           echo 'INACTIVE_BEHIND_FAST_FORWARD_AND_RESTART=PASS'
+
+          git -C "$ROOT" reset --hard "$A" >/dev/null
+          rm -f "$STATE"
+          : > "$CALLS"
+          : > "$GIT_CALLS"
+          export FAKE_SYSTEMCTL_MODE=unavailable
+          set +e
+          refresh_bridge "$ENV_FILE" bridge.service
+          RC=$?
+          set -e
+          test "$RC" -eq 1
+          test "$(git -C "$ROOT" rev-parse HEAD)" = "$A"
+          ! grep -qE '(^| )fetch( |$)' "$GIT_CALLS"
+          ! grep -qE '(^| )merge( |$)' "$GIT_CALLS"
+          ! grep -q ' restart ' "$CALLS"
+          echo 'USER_BUS_UNAVAILABLE_ZERO_FETCH_MERGE_RESTART=PASS'
+
+          git -C "$ROOT" reset --hard "$A" >/dev/null
+          rm -f "$STATE"
+          : > "$CALLS"
+          : > "$GIT_CALLS"
+          export FAKE_SYSTEMCTL_MODE=failed
+          refresh_bridge "$ENV_FILE" bridge.service
+          test "$(git -C "$ROOT" rev-parse HEAD)" = "$B"
+          grep -qE '(^| )fetch( |$)' "$GIT_CALLS"
+          grep -qE '(^| )merge( |$)' "$GIT_CALLS"
+          grep -q ' restart ' "$CALLS"
+          echo 'KNOWN_FAILED_SERVICE_REFRESH_AND_RESTART=PASS'
       - name: Prove dirty and non-main guards remain before mutation
         shell: bash
         run: |
@@ -118,15 +163,18 @@ jobs:
               'control checkout is on',
               'status --porcelain',
               'control checkout has real changes',
+              'bridge_service_state "$service_name"',
+              'user service state is unavailable; no fetch, merge, or restart was performed',
               'fetch --prune origin main',
               'service is active; control checkout and HEAD were left unchanged',
               'merge --ff-only origin/main',
           ]
           for item in required:
               assert item in f, item
-          assert f.index('status --porcelain') < f.index('fetch --prune origin main')
+          assert f.index('status --porcelain') < f.index('bridge_service_state "$service_name"') < f.index('fetch --prune origin main')
           assert f.index('service is active; control checkout and HEAD were left unchanged') < f.index('merge --ff-only origin/main')
           print('DIRTY_GUARD_PRECEDES_FETCH=PASS')
+          print('SERVICE_EVIDENCE_PRECEDES_FETCH=PASS')
           print('ACTIVE_GUARD_PRECEDES_MERGE=PASS')
           PY
           git diff --check
