@@ -88,7 +88,7 @@ jobs:
           ! grep -q '>Queue work</button>' deploy/project-byte/v4/home.js
           grep -q 'targetOwner===who' deploy/project-byte/v4/home.js
           grep -q 'data-home-approval' deploy/project-byte/v4/home.js
-          grep -q 'PROJECT_BYTE approval records your review decision only' deploy/project-byte/v4/home.js
+          grep -q 'PRFKT_PROJECT approval records your review decision only' deploy/project-byte/v4/home.js
           grep -q 'homeExecutionFabric' deploy/project-byte/v4/home.js
           grep -q 'VITROS verifier' deploy/project-byte/v4/home.js
           grep -q 'Model Hub' deploy/project-byte/v4/home.js

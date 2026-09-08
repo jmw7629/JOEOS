@@ -59,7 +59,7 @@ class _RPC:
         self.events = []
         self.timeout = timeout
         try:
-            self.request('initialize', {'clientInfo': {'name': 'project_byte', 'title': 'PROJECT_BYTE', 'version': '1.0'}})
+            self.request('initialize', {'clientInfo': {'name': 'project_byte', 'title': 'PRFKT_PROJECT', 'version': '1.0'}})
             self.send({'method': 'initialized', 'params': {}})
         except Exception:
             self.close()
@@ -304,7 +304,7 @@ class Connection:
             if account.get('type') != 'chatgpt':
                 raise CodexError('Sign in with ChatGPT to use this subscription connection')
             params = {'cwd': str(self.workspace), 'modelProvider': 'openai', 'sandbox': 'read-only', 'approvalPolicy': 'never', 'ephemeral': True,
-                      'serviceName': 'project_byte_chat', 'developerInstructions': 'You are the PROJECT_BYTE workspace assistant. Answer using the supplied conversation context. This connection supports conversation only; do not run tools, access files, start agents, or claim to execute work.'}
+                      'serviceName': 'project_byte_chat', 'developerInstructions': 'You are AI_BYTE, the PRFKT_PROJECT workspace assistant. Answer using the supplied conversation context. This connection supports conversation only; do not run tools, access files, start agents, or claim to execute work.'}
             if model:
                 params['model'] = model
             created = rpc.request('thread/start', params, deadline=deadline)

@@ -89,8 +89,8 @@ EXTERNAL_REVIEW_CHECK_FAILURES = frozenset({"ACTION_REQUIRED", "CANCELLED", "FAI
 
 WORKSPACE_PROFILE_DEFAULTS = {
     "schema_version": 1,
-    "display_name": "PROJECT_BYTE",
-    "assistant_name": "Joe AI",
+    "display_name": "PRFKT_PROJECT",
+    "assistant_name": "AI_BYTE",
     "owner_shortcuts": ["Joe", "Mike"],
 }
 

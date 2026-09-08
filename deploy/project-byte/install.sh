@@ -9,14 +9,14 @@ SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 EXPECTED_PERMISSIONS="0faf72af5e015c58ba7737fe9c6aaca227529fa0835fcc55f4e7d22d84e2c149"
 EXPECTED_BACKEND="7df2ed5c0e32ebca1bc2efce46ecdc3a393318e833bc4c6ee8754404fc642526"
-EXPECTED_SERVER="b3ac02476469be22e812b5b673cf8dfb9b1fcf0b92189bdef7fafb330c65e4cb"
-EXPECTED_INDEX="0aca79517bfab8f13f13476377d21c5f6dc4aa0ed7541a7e713b70c12da6c187"
-EXPECTED_HOME="0454ee3ea662789cd4c05ffa1d07eeca83da36b2516765df708782bdb06dbc90"
-EXPECTED_INSPECTOR="9924325cd0434a5b44dc7f49ff0db87642ddfaef1308b68256b5838dc7ec8d1d"
-EXPECTED_HEALTH="f189f4673a0610671839f9f43f59a404e9001e9a923f83ffe70ee363f61cc12d"
+EXPECTED_SERVER="760b4dbec4cb70cdb5d5a4b5b21903c2525f135390747349b614d7e9c0fd9fdf"
+EXPECTED_INDEX="02d5a918466fe62b9b0c323efe2aa60f5168ea5693a40cc97d74ecd88d6cb8eb"
+EXPECTED_HOME="0295383067e2b1b608f91d22d5d18032abdc02438f7d6ca02e59e5d1f2775e4b"
+EXPECTED_INSPECTOR="1f53a44f5950a0ff250494997dab8dae6fa50a7c80fabbc43043095fbaee6f08"
+EXPECTED_HEALTH="c5b7bdb56d6c51dd56475d677f7b41dca95d7dbddbf6b9d5f739cc5606aee058"
 EXPECTED_AI_RUNTIME="682326d44e1e9949346a2f49942253e799b5308d2c25fd8192bd6f7f540657b5"
 EXPECTED_AI_CONNECTIONS="73a0d20ae618c7704333845537e0bd436da0e7ac8db6784a49b1e85cc431bde8"
-EXPECTED_CODEX_CONNECTION="1bc510d2d5f138684d3817d4b6011d3bd26dabc8b582a5795913be57aa53ff02"
+EXPECTED_CODEX_CONNECTION="5d760634826aea4c16fbc65bbb95cafcbf395d682d756cc78de681cc909e7cb5"
 EXPECTED_AI_UI="bc13a5d862ab55fc397f57a15ba48676dea3c6277c76c94f1540371b31872c1e"
 
 if [ "$(id -un)" != "joevps" ]; then
@@ -124,7 +124,7 @@ const inspector=fs.readFileSync(process.argv[4],'utf8');
 const health=fs.readFileSync(process.argv[5],'utf8');
 new Function(home); new Function(inspector); new Function(health);
 for(const x of ['Portfolio','Kanban','Work next','AI','Agents','Terminal','Models','Team','Activity','Settings','Help / How-To'])if(!h.includes(x))throw new Error('missing '+x);
-for(const x of ['Joe AI','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','Portfolio pulse'])if(!home.includes(x))throw new Error('missing Home '+x);
+for(const x of ['AI_BYTE','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','Portfolio pulse'])if(!home.includes(x))throw new Error('missing Home '+x);
 for(const x of ['homeAgentInspector','homeAgentLens','data-inspect-run','Full terminal','Agent workspace'])if(!inspector.includes(x))throw new Error('missing inspector '+x);
 for(const x of ['Verifying system health','Systems verified operational','AI CHAT TESTED OK','AI CHAT UNTESTED'])if(!health.includes(x))throw new Error('missing health behavior '+x);
 NODE
@@ -203,7 +203,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
       && grep -Fq '<script src="/home.js"></script>' "$TMP/live-index.html" \
       && grep -Fq '<script src="/home-inspector.js"></script>' "$TMP/live-index.html" \
       && grep -Fq '<script src="/health-runtime.js"></script>' "$TMP/live-index.html" \
-      && grep -Fq 'Joe AI' "$TMP/live-home.js" \
+      && grep -Fq 'AI_BYTE' "$TMP/live-home.js" \
       && grep -Fq 'Live agents' "$TMP/live-home.js" \
       && grep -Fq 'homeAgentInspector' "$TMP/live-home-inspector.js" \
       && grep -Fq 'data-inspect-run' "$TMP/live-home-inspector.js" \

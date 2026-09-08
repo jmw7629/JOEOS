@@ -67,7 +67,7 @@ export async function verifyWorkspaceProfile({page,api,root}){
     await page.reload({waitUntil:'networkidle'});
     await page.waitForSelector('#workspaceProfileWarning',{state:'attached'});
     assert.ok(!(await page.locator('body').textContent()).includes('DO_NOT_EXPOSE'));
-    assert.equal(await page.locator('.home-hero-top h2').textContent(),'Joe AI');
+    assert.equal(await page.locator('.home-hero-top h2').textContent(),'AI_BYTE');
     assert.deepEqual(await api('/api/session'),before.session);
     assert.deepEqual(await api('/api/settings'),before.settings);
     assert.deepEqual(await api('/api/tasks'),before.tasks);
@@ -75,7 +75,7 @@ export async function verifyWorkspaceProfile({page,api,root}){
     await fs.rm(file,{force:true});
     await page.reload({waitUntil:'networkidle'});
   }
-  assert.equal(await page.title(),'PROJECT_BYTE');
+  assert.equal(await page.title(),'PRFKT_PROJECT');
   console.log('WORKSPACE_PROFILE_DEFAULTS_CUSTOM_LABELS_AUTH_DATA_PRESERVED=PASS');
 }
 

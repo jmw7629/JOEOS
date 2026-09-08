@@ -35,7 +35,7 @@ class WorkspaceProfileTests(unittest.TestCase):
         return handler.do_GET()
 
     def test_absent_profile_preserves_defaults_without_creating_files(self):
-        self.assertEqual(self.response(), (200, {'profile': {'schema_version':1,'display_name':'PROJECT_BYTE','assistant_name':'Joe AI','owner_shortcuts':['Joe','Mike']}}))
+        self.assertEqual(self.response(), (200, {'profile': {'schema_version':1,'display_name':'PRFKT_PROJECT','assistant_name':'AI_BYTE','owner_shortcuts':['Joe','Mike']}}))
         self.assertEqual(list(self.root.iterdir()), [])
         self.runtime.workspace_profile()['owner_shortcuts'].append('mutation')
         self.assertEqual(self.runtime.workspace_profile()['owner_shortcuts'], ['Joe','Mike'])
@@ -78,7 +78,7 @@ class WorkspaceProfileTests(unittest.TestCase):
     def test_empty_shortcuts_and_safe_partial_profile_are_supported(self):
         self.profile.write_text('{"schema_version":1,"owner_shortcuts":[]}')
         self.assertEqual(self.runtime.workspace_profile()['owner_shortcuts'],[])
-        self.assertEqual(self.runtime.workspace_profile()['display_name'],'PROJECT_BYTE')
+        self.assertEqual(self.runtime.workspace_profile()['display_name'],'PRFKT_PROJECT')
 
 
 if __name__ == '__main__':

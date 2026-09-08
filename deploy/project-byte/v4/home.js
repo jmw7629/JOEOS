@@ -1,7 +1,7 @@
 (() => {
   if (window.__PROJECT_BYTE_HOME__) return;
   window.__PROJECT_BYTE_HOME__ = true;
-  let workspaceProfile = {schema_version:1,display_name:'PROJECT_BYTE',assistant_name:'Joe AI',owner_shortcuts:['Joe','Mike']};
+  let workspaceProfile = {schema_version:1,display_name:'PRFKT_PROJECT',assistant_name:'AI_BYTE',owner_shortcuts:['Joe','Mike']};
   window.PROJECT_BYTE_WORKSPACE = workspaceProfile;
   // Original inline icons: no icon font, tracking request, or runtime dependency.
   const ICONS = {
@@ -43,7 +43,7 @@
 
   const style = document.createElement('style');
   style.textContent = `
-/* PROJECT_BYTE / Orbital Home. All data stays in the existing application. */
+/* PRFKT_PROJECT / Orbital Home. All data stays in the existing application. */
 :root{--home-blue:#76c9ff;--home-blue2:#2388f5;--home-violet:#b39aff;--home-green:#69dca8;--home-red:#ff8791;--home-amber:#f1c471;--home-border:rgba(138,177,213,.22)}
 body{padding-bottom:96px}body[data-pb-view="home"]{background:radial-gradient(ellipse at 80% 0,rgba(28,73,131,.18),transparent 55%),#050a12}
 body[data-pb-view="home"]>header{position:relative;background:rgba(5,10,18,.85);border-bottom:0;max-width:1360px;margin:auto;padding:22px 24px 6px}
@@ -189,7 +189,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
           <span class="pb-crawl-label">UPDATES</span><div class="pb-crawl-viewport"><div class="pb-crawl-track" aria-live="off"></div></div>
           <button id="pbCrawlToggle" type="button" class="pb-crawl-toggle" aria-label="Pause activity crawl" aria-pressed="false">${icon('blocked')}</button>
         </section>
-        <div class="home-command">${icon("sparkle")}<input aria-label="Ask Joe AI" id="homeCommandInput" type="text" maxlength="1200" placeholder="Ask, create work, get status, or troubleshoot…"><button id="homeCommandSend" type="button" aria-label="Send to PROJECT_BYTE AI">${icon("send")}</button></div>
+        <div class="home-command">${icon("sparkle")}<input aria-label="Ask AI_BYTE" id="homeCommandInput" type="text" maxlength="1200" placeholder="Ask, create work, get status, or troubleshoot…"><button id="homeCommandSend" type="button" aria-label="Send to AI_BYTE">${icon("send")}</button></div>
         <div class="home-actions">
           <button type="button" class="home-action" data-home-action="ask">${icon("chat")}Ask AI</button>
           <button type="button" class="home-action authonly" data-home-action="create">${icon("plus")}New work</button>
@@ -212,7 +212,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
         <article class="home-card"><div class="home-card-head"><h3>${icon("memory")}Recent memories</h3><button type="button" data-home-go="agents" aria-label="Open memory">›</button></div><div id="homeMemory" class="memory-feed"></div></article>
         <article class="home-card"><div class="home-card-head"><h3>${icon("projects")}Portfolio pulse</h3><button type="button" data-home-go="portfolio" aria-label="Open Portfolio">›</button></div><div id="homePortfolio"></div></article>
       </section>
-      <div class="home-asset-credit"><span>PROJECT_BYTE · Your executive workspace</span><a href="https://science.nasa.gov/resource/blue-marble-2002/" target="_blank" rel="noopener noreferrer">Earth imagery: NASA Earth Observatory</a></div>
+      <div class="home-asset-credit"><span>PRFKT_PROJECT · Your executive workspace</span><a href="https://science.nasa.gov/resource/blue-marble-2002/" target="_blank" rel="noopener noreferrer">Earth imagery: NASA Earth Observatory</a></div>
     </div>`;
   if (main) main.insertBefore(home, portfolio || main.firstChild);
 
@@ -398,16 +398,16 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
       const approval=homeApprovalState.find(a=>a.run_id===r.id);
       const controls=approval&&approval.status==='pending'&&session?.level>=2?`<button type="button" data-home-approval="${escH(approval.id)}" data-review-action="approve">Approve review</button><button type="button" data-home-approval="${escH(approval.id)}" data-review-action="request_changes">Request changes</button>`:'';
       const decided=approval&&approval.status!=='pending'?`<span class="approval-state">${escH(approval.status)}${approval.decided_by?' · '+escH(approval.decided_by):''}</span>`:'';
-      return `<div class="approval-item"><b>${escH(r.project)} · #${r.issue_number}</b><span>${escH(r.agent_key||'agent')} produced a reviewable result.</span>${decided}<div class="approval-actions">${r.pr_url?`<a href="${escH(r.pr_url)}" target="_blank" rel="noopener">Open PR</a>`:''}<button type="button" data-home-run="${escH(r.id)}">Terminal</button>${controls}</div>${approval?'<span class="approval-note">PROJECT_BYTE approval records your review decision only. It never merges the PR.</span>':''}</div>`;
+      return `<div class="approval-item"><b>${escH(r.project)} · #${r.issue_number}</b><span>${escH(r.agent_key||'agent')} produced a reviewable result.</span>${decided}<div class="approval-actions">${r.pr_url?`<a href="${escH(r.pr_url)}" target="_blank" rel="noopener">Open PR</a>`:''}<button type="button" data-home-run="${escH(r.id)}">Terminal</button>${controls}</div>${approval?'<span class="approval-note">PRFKT_PROJECT approval records your review decision only. It never merges the PR.</span>':''}</div>`;
     }).join('');
     const external=externalReviewsForScope(scoped);
     const externalHtml=external.map(item=>{
       const checks=item.checks||{},failed=Number(checks.failed||0),pending=Number(checks.pending||0),passed=Number(checks.passed||0),unknown=Number(checks.unknown||0);
       const checksText=failed?`${failed} failed`:pending?`${pending} pending`:unknown?`${unknown} unknown`:passed?`${passed} passed`:'checks unknown';
       const evidence=item.evidence_state==='stale'?`stale · ${externalReviewAge(item.evidence_age_seconds)}`:item.evidence_state==='fresh'?'fresh':'evidence unavailable';
-      return `<div class="approval-item external-review"><b>${escH(item.project)} · PR #${Number(item.number||0)}</b><span>${escH(item.title||'Reviewable pull request')}</span><div class="external-review-meta"><em>external review</em>${item.draft?'<em>draft</em>':''}<em>${escH(checksText)}</em><em>${escH(item.merge_state||'UNKNOWN')}</em><em>${escH(externalReviewAge(item.updated_age_seconds))}</em><em>${escH(evidence)}</em></div><div class="approval-actions"><a href="${escH(item.url)}" target="_blank" rel="noopener">Open GitHub PR</a></div><span class="approval-note">Read-only observation. PROJECT_BYTE cannot approve, comment, merge, close, rerun or deploy this external PR.</span></div>`;
+      return `<div class="approval-item external-review"><b>${escH(item.project)} · PR #${Number(item.number||0)}</b><span>${escH(item.title||'Reviewable pull request')}</span><div class="external-review-meta"><em>external review</em>${item.draft?'<em>draft</em>':''}<em>${escH(checksText)}</em><em>${escH(item.merge_state||'UNKNOWN')}</em><em>${escH(externalReviewAge(item.updated_age_seconds))}</em><em>${escH(evidence)}</em></div><div class="approval-actions"><a href="${escH(item.url)}" target="_blank" rel="noopener">Open GitHub PR</a></div><span class="approval-note">Read-only observation. PRFKT_PROJECT cannot approve, comment, merge, close, rerun or deploy this external PR.</span></div>`;
     }).join('');
-    const evidenceBanner=homeExternalReviewState.state==='unavailable'?'<div class="small">External review evidence is unavailable; PROJECT_BYTE is not assuming the queue is empty.</div>':homeExternalReviewState.state==='partial'?'<div class="small">External review evidence is partial; unavailable repositories are not assumed clear.</div>':homeExternalReviewState.state==='stale'?'<div class="small">External review evidence is stale; verify GitHub before acting.</div>':'';
+    const evidenceBanner=homeExternalReviewState.state==='unavailable'?'<div class="small">External review evidence is unavailable; PRFKT_PROJECT is not assuming the queue is empty.</div>':homeExternalReviewState.state==='partial'?'<div class="small">External review evidence is partial; unavailable repositories are not assumed clear.</div>':homeExternalReviewState.state==='stale'?'<div class="small">External review evidence is stale; verify GitHub before acting.</div>':'';
     el.innerHTML=evidenceBanner+ownedHtml+externalHtml || '<div class="home-empty">No observed review work in this scope.</div>';
   }
 
@@ -499,7 +499,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
       if(b.dataset.homeAction==='ask'){go('ai');setTimeout(()=>document.getElementById('chatInput')?.focus(),30)}
       if(b.dataset.homeAction==='create'&&typeof openTask==='function')openTask('');
       if(b.dataset.homeAction==='agents')go('agents');
-      if(b.dataset.homeAction==='troubleshoot'){go('ai');setTimeout(()=>{const a=document.getElementById('aiAgent');if(a)a.value='help';const i=document.getElementById('chatInput');if(i){i.value='Help me troubleshoot the current PROJECT_BYTE state and tell me exactly where to go.';i.focus()}},30)}
+      if(b.dataset.homeAction==='troubleshoot'){go('ai');setTimeout(()=>{const a=document.getElementById('aiAgent');if(a)a.value='help';const i=document.getElementById('chatInput');if(i){i.value='Help me troubleshoot the current PRFKT_PROJECT state and tell me exactly where to go.';i.focus()}},30)}
       e.preventDefault();
     }
   });
@@ -530,10 +530,10 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     document.querySelectorAll('.home-nav button').forEach(b=>{const active=b.dataset.homeGo===(groups[view]||view);b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   }
   const brand=document.querySelector('.brand h1');
-  if(brand&&brand.textContent.trim()==='PROJECT_BYTE')brand.innerHTML='PROJECT<span class="pb-wordmark">_BYTE</span>';
+  if(brand&&brand.textContent.trim()==='PRFKT_PROJECT')brand.innerHTML='PRFKT<span class="pb-wordmark">_PROJECT</span>';
   const subtitle=document.querySelector('.brand p');if(subtitle)subtitle.textContent='People × Agents × Progress';
   const drawer=document.createElement('dialog');drawer.id='pbWorkspaces';drawer.className='pb-workspaces';drawer.setAttribute('aria-labelledby','pbWorkspacesTitle');
-  const spaces=[['home','Home','home'],['portfolio','Projects','projects'],['board','Kanban board','open'],['intelligence','Work next','critical'],['agents','Agents','agents'],['ai','Joe AI chat','chat'],['terminalView','Execution logs','code'],['models','Model Hub','ai'],['team','Team access','team'],['activity','Activity','activity'],['settings','Settings','settings'],['help','Help / How-To','help']];
+  const spaces=[['home','Home','home'],['portfolio','Projects','projects'],['board','Kanban board','open'],['intelligence','Work next','critical'],['agents','Agents','agents'],['ai','AI_BYTE chat','chat'],['terminalView','Execution logs','code'],['models','Model Hub','ai'],['team','Team access','team'],['activity','Activity','activity'],['settings','Settings','settings'],['help','Help / How-To','help']];
   drawer.innerHTML=`<div class="pb-drawer-head"><h2 id="pbWorkspacesTitle">Your workspace</h2><button type="button" class="pb-drawer-close" aria-label="Close workspace menu">${icon('close')}</button></div><div class="pb-workspace-grid">${spaces.map(([view,label,ico])=>`<button type="button" data-home-go="${view}">${icon(ico)}${label}</button>`).join('')}</div>`;
   document.body.appendChild(drawer);
   drawer.querySelector('.pb-drawer-close').onclick=()=>drawer.close();
@@ -678,15 +678,15 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
       workspaceProfile=p;window.PROJECT_BYTE_WORKSPACE=p;
       document.title=p.display_name;
       const title=document.querySelector('.brand h1');
-      if(title){if(p.display_name==='PROJECT_BYTE')title.innerHTML='PROJECT<span class="pb-wordmark">_BYTE</span>';else title.textContent=p.display_name;}
+      if(title){if(p.display_name==='PRFKT_PROJECT')title.innerHTML='PRFKT<span class="pb-wordmark">_PROJECT</span>';else title.textContent=p.display_name;}
       document.querySelector('.home-hero-top h2').textContent=p.assistant_name;
-      if(p.assistant_name!=='Joe AI'){const heading=document.querySelector('#ai .chatbox h2');if(heading)heading.textContent=p.assistant_name;}
+      if(p.assistant_name!=='AI_BYTE'){const heading=document.querySelector('#ai .chatbox h2');if(heading)heading.textContent=p.assistant_name;}
       document.getElementById('homeCommandInput').setAttribute('aria-label','Ask '+p.assistant_name);
       document.getElementById('homeCommandSend').setAttribute('aria-label','Send to '+p.assistant_name);
       document.querySelector('.home-asset-credit span').textContent=p.display_name+' · Your executive workspace';
       const chat=document.querySelector('#pbWorkspaces [data-home-go="ai"]');
       if(chat)for(const node of chat.childNodes)if(node.nodeType===Node.TEXT_NODE)node.textContent=p.assistant_name+' chat';
-      document.body.classList.toggle('custom-workspace-profile',p.display_name!=='PROJECT_BYTE'||p.assistant_name!=='Joe AI'||JSON.stringify(p.owner_shortcuts)!==JSON.stringify(['Joe','Mike']));
+      document.body.classList.toggle('custom-workspace-profile',p.display_name!=='PRFKT_PROJECT'||p.assistant_name!=='AI_BYTE'||JSON.stringify(p.owner_shortcuts)!==JSON.stringify(['Joe','Mike']));
       renderHome();
     }catch{
       const note=document.createElement('p');note.className='small';note.id='workspaceProfileWarning';note.setAttribute('role','status');note.textContent='Workspace branding is unavailable. Default appearance is shown.';
