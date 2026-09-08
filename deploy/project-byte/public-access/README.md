@@ -13,8 +13,11 @@ pending application PRs, start a permission runner, resume BYTE or change R3/VIT
 Use the separate public owner sign-in key or an existing strong collaborator access
 key. Live preflight found the private owner key is too short for public authentication.
 The public owner key is generated from 32 random bytes and kept in a private 0600
-file outside the repository and release. The service requires this file; it rejects
-the raw private owner key, preserving that key for the existing private app. Public
+file outside the repository and release. At the owner's explicit request, that file
+can instead contain a four-digit numeric PIN. This shorter credential is easier to
+guess; per-client login limits still apply. The service requires this file and
+rejects the raw private owner key unless it was explicitly selected as the public
+credential too, preserving the private app's key. Public
 owner sign-in resolves to the current owner credential entirely inside the gateway.
 Rotating either credential invalidates the corresponding owner sessions. The gateway
 validates credentials and settings with read-only queries; invalid keys are never

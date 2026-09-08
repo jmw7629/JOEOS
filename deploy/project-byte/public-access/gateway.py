@@ -58,7 +58,7 @@ class Access:
         self.attempts = {}
         self.login_clients = collections.Counter()
         # Omission is supported only by disposable compatibility fixtures. The
-        # production CLI always requires a separate strong public owner key.
+        # Production requires an explicitly configured public owner credential.
         self.public_owner_key_file = Path(public_owner_key_file) if public_owner_key_file else None
         self.public_owner_key()
         self.state_dir = Path(state_dir) if state_dir else None
@@ -98,7 +98,9 @@ class Access:
             if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600 or info.st_uid != os.getuid():
                 raise ValueError('Public owner credential is unavailable')
             raw = stream.read(45)
-        if not re.fullmatch(rb'[A-Za-z0-9_-]{43}\n?', raw):
+        # A four-digit owner PIN is an explicit administrator configuration;
+        # collaborator keys and automatically generated owner keys stay long.
+        if not re.fullmatch(rb'(?:[A-Za-z0-9_-]{43}|[0-9]{4})\n?', raw):
             raise ValueError('Public owner credential is unavailable')
         return raw.decode().rstrip('\n')
 
@@ -134,7 +136,7 @@ class Access:
             return identity, minutes * 60
 
     def login(self, key, old_token, client='local-fixture'):
-        if not isinstance(key, str) or not 16 <= len(key) <= 256 or any(ord(c) < 33 or ord(c) > 126 for c in key):
+        if not isinstance(key, str) or not 4 <= len(key) <= 256 or any(ord(c) < 33 or ord(c) > 126 for c in key):
             return None
         with self.lock:
             now = self.clock()
@@ -150,15 +152,17 @@ class Access:
         public_owner_fingerprint = None
         if public_owner_key is not None:
             owner_key = self.owner_key()
-            # The private owner key is never a public credential, regardless of
-            # its length or whether a collaborator record happens to match it.
-            if hmac.compare_digest(fingerprint, digest(owner_key)):
-                return None
             alias_fingerprint = digest(public_owner_key)
             if hmac.compare_digest(fingerprint, alias_fingerprint):
                 key = owner_key
                 fingerprint = digest(owner_key)
                 public_owner_fingerprint = alias_fingerprint
+            elif len(key) < 16 or hmac.compare_digest(fingerprint, digest(owner_key)):
+                # Private credentials stay private unless the owner explicitly
+                # selected that same value as their public credential.
+                return None
+        elif len(key) < 16:
+            return None
         found = self.identity(fingerprint)
         if not found:
             return None

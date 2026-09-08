@@ -58,8 +58,8 @@ class GatewayTests(unittest.TestCase):
         cookie=headers['Set-Cookie'];self.assertIn('Secure; HttpOnly; SameSite=Strict',cookie)
         return cookie.split(';')[0].split('=',1)[1]
 
-    def enable_public_owner(self):
-        self.public_key=secrets.token_urlsafe(32)
+    def enable_public_owner(self,key=None):
+        self.public_key=key or secrets.token_urlsafe(32)
         self.public_file=self.root/'public-owner.secret'
         self.public_file.write_text(self.public_key+'\n');self.public_file.chmod(0o600)
         self.access=Access(self.root,clock=lambda:self.now,public_owner_key_file=self.public_file)
@@ -88,9 +88,69 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(self.request('/api/tasks',token=token,key=self.viewer)[0],200)
         self.assertEqual(self.calls[-1]['key'],self.viewer)
         self.assertIsNone(self.access.sessions[digest(token)]['public_owner_fingerprint'])
-        # An accidental alias/private-key equality must never enable raw-key login.
+        # Only an exact, explicitly configured public alias can also equal the private key.
         (self.root/'admin.secret').write_text(self.public_key)
-        self.assertEqual(self.request('/_gateway/login','POST',{'key':self.public_key})[0],401)
+        token=self.login(self.public_key)
+        self.assertEqual(json.loads(self.request('/api/session',token=token,key=self.public_key)[2])['role'],'owner')
+        self.assertEqual(self.access.sessions[digest(token)]['public_owner_fingerprint'],digest(self.public_key))
+
+    def test_explicit_numeric_public_pin_forwards_owner_key_and_rejects_other_short_keys(self):
+        self.enable_public_owner('9876')
+        token=self.login(self.public_key)
+        self.assertEqual(json.loads(self.request('/api/session',token=token,key=self.key)[2])['role'],'owner')
+        self.assertEqual(self.request('/api/tasks',token=token,key=self.key)[0],200)
+        self.assertEqual(self.calls[-1]['key'],self.key)
+        record=self.access.sessions[digest(token)]
+        self.assertEqual(record['public_owner_fingerprint'],digest(self.public_key))
+        self.assertNotIn(self.public_key,record.values())
+        viewer_token=self.login(self.viewer)
+        self.assertEqual(json.loads(self.request('/api/session',token=viewer_token,key=self.viewer)[2])['role'],'viewer')
+        self.assertEqual(self.request('/api/tasks',token=viewer_token,key=self.viewer)[0],200)
+        self.assertEqual(self.calls[-1]['key'],self.viewer)
+        self.assertIsNone(self.access.sessions[digest(viewer_token)]['public_owner_fingerprint'])
+        before=len(self.calls)
+        for invalid in ('9875','abcd','987','98765'):
+            self.assertEqual(self.request('/_gateway/login','POST',{'key':invalid})[0],401)
+        self.assertEqual(len(self.calls),before)
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':self.key})[0],401)
+        (self.root/'admin.secret').write_text(self.public_key)
+        token=self.login(self.public_key)
+        self.assertEqual(json.loads(self.request('/api/session',token=token,key=self.public_key)[2])['role'],'owner')
+
+    def test_short_credentials_require_explicit_owner_alias_not_collaborator_or_private_key(self):
+        short_key='9876'
+        with sqlite3.connect(self.root/'kanban.db') as db:
+            db.execute('INSERT INTO collaborators VALUES (?,?,?,?,?)',('short','Short fixture','editor',digest(short_key),1))
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':short_key})[0],401)
+        (self.root/'admin.secret').write_text(short_key)
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':short_key})[0],401)
+        self.enable_public_owner()
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':short_key})[0],401)
+        self.assertEqual(self.calls,[])
+
+    def test_numeric_public_pin_failures_are_rate_limited(self):
+        self.enable_public_owner('9876')
+        for _ in range(10):
+            self.assertEqual(self.request('/_gateway/login','POST',{'key':'9875'})[0],401)
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':self.public_key})[0],429)
+        self.assertEqual(self.calls,[])
+        self.now+=61
+        self.login(self.public_key)
+
+    def test_public_alias_rotation_to_pin_and_back_revokes_credentials_and_sessions(self):
+        self.enable_public_owner()
+        original_alias=self.public_key;original_token=self.login(original_alias)
+        pin='9876';self.public_file.write_text(pin+'\n')
+        self.assertEqual(self.request('/',token=original_token)[0],303)
+        self.assertNotIn(digest(original_token),self.access.sessions)
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':original_alias})[0],401)
+        pin_token=self.login(pin)
+        replacement=secrets.token_urlsafe(32);self.public_file.write_text(replacement)
+        self.assertEqual(self.request('/',token=pin_token)[0],303)
+        self.assertNotIn(digest(pin_token),self.access.sessions)
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':pin})[0],401)
+        replacement_token=self.login(replacement)
+        self.assertEqual(self.request('/api/tasks',token=replacement_token,key=self.key)[0],200)
 
     def test_public_alias_and_private_owner_rotation_revoke_old_sessions(self):
         self.enable_public_owner();token=self.login(self.public_key)
@@ -117,7 +177,7 @@ class GatewayTests(unittest.TestCase):
 
     def test_public_alias_file_requires_private_regular_valid_credential(self):
         self.enable_public_owner()
-        for malformed in ['', '1234', 'x'*42, 'x'*44, 'x'*42+'!', 'x'*43+'\n\n']:
+        for malformed in ['', 'abcd', '98a6', '987', '98765', '\u0669\u0668\u0667\u0666', '9876\n\n', 'x'*42, 'x'*44, 'x'*42+'!', 'x'*43+'\n\n']:
             self.public_file.write_text(malformed)
             with self.subTest(value_length=len(malformed)),self.assertRaises(ValueError):
                 Access(self.root,public_owner_key_file=self.public_file)
