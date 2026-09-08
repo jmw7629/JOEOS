@@ -7,10 +7,11 @@ V4="$BASE/v4"
 DEST="/home/joevps/PROJECT_BYTE"
 SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
+EXPECTED_PERMISSIONS="0faf72af5e015c58ba7737fe9c6aaca227529fa0835fcc55f4e7d22d84e2c149"
 EXPECTED_BACKEND="7df2ed5c0e32ebca1bc2efce46ecdc3a393318e833bc4c6ee8754404fc642526"
-EXPECTED_SERVER="16e7488c8aea3774fc08c03b1375535dfc94986f6aa83b514c7621ec3d89568e"
-EXPECTED_INDEX="abd991edb36f8191b9f67659b8f6eb6c39938270055551a163d9c53271117e95"
-EXPECTED_HOME="7ace191200373446f6d606811c9f512ba7b1e6afc1c7814f9c505d79572a4e5d"
+EXPECTED_SERVER="84e3bb65d24f01d2e81bf8a1dee59fefd96ed48a7ae9dfd7364d41e37ee40045"
+EXPECTED_INDEX="8bb259c9fb0e6fdf516ae83149f701a4a0bfa75b7fb0650279962f60f869f501"
+EXPECTED_HOME="0454ee3ea662789cd4c05ffa1d07eeca83da36b2516765df708782bdb06dbc90"
 EXPECTED_INSPECTOR="9924325cd0434a5b44dc7f49ff0db87642ddfaef1308b68256b5838dc7ec8d1d"
 EXPECTED_HEALTH="f189f4673a0610671839f9f43f59a404e9001e9a923f83ffe70ee363f61cc12d"
 
@@ -45,6 +46,7 @@ PY
   echo "Database backup: $DEST/backups/kanban-${STAMP}.db"
 fi
 if [ -f "$DEST/server.py" ]; then cp -p "$DEST/server.py" "$DEST/backups/server-${STAMP}.py"; fi
+if [ -f "$DEST/execution_permissions.py" ]; then cp -p "$DEST/execution_permissions.py" "$DEST/backups/execution-permissions-${STAMP}.py"; fi
 if [ -f "$DEST/backend.py" ]; then cp -p "$DEST/backend.py" "$DEST/backups/backend-${STAMP}.py"; fi
 if [ -f "$DEST/index.html" ]; then cp -p "$DEST/index.html" "$DEST/backups/index-${STAMP}.html"; fi
 if [ -f "$DEST/home.js" ]; then cp -p "$DEST/home.js" "$DEST/backups/home-${STAMP}.js"; fi
@@ -62,6 +64,7 @@ done
 for n in 01 02 03 04 05 06 07; do
   curl --fail --silent --show-error --location "$V4/index/$n.part" -o "$TMP/index/$n.part"
 done
+curl --fail --silent --show-error --location "$V4/execution_permissions.py" -o "$TMP/execution_permissions.py"
 curl --fail --silent --show-error --location "$V4/runtime_server.py" -o "$TMP/server.py"
 curl --fail --silent --show-error --location "$V4/home.js" -o "$TMP/home.js"
 curl --fail --silent --show-error --location "$V4/home-inspector.js" -o "$TMP/home-inspector.js"
@@ -69,19 +72,21 @@ curl --fail --silent --show-error --location "$V4/health-runtime.js" -o "$TMP/he
 cat "$TMP"/backend/*.part > "$TMP/backend.py"
 cat "$TMP"/index/*.part > "$TMP/index.html"
 
+PERMISSIONS_SHA="$(sha256sum "$TMP/execution_permissions.py" | awk '{print $1}')"
 BACKEND_SHA="$(sha256sum "$TMP/backend.py" | awk '{print $1}')"
 SERVER_SHA="$(sha256sum "$TMP/server.py" | awk '{print $1}')"
 INDEX_SHA="$(sha256sum "$TMP/index.html" | awk '{print $1}')"
 HOME_SHA="$(sha256sum "$TMP/home.js" | awk '{print $1}')"
 INSPECTOR_SHA="$(sha256sum "$TMP/home-inspector.js" | awk '{print $1}')"
 HEALTH_SHA="$(sha256sum "$TMP/health-runtime.js" | awk '{print $1}')"
+[ "$PERMISSIONS_SHA" = "$EXPECTED_PERMISSIONS" ] || { echo "Permission module checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$BACKEND_SHA" = "$EXPECTED_BACKEND" ] || { echo "Backend checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$SERVER_SHA" = "$EXPECTED_SERVER" ] || { echo "Runtime server SHA-256 mismatch; refusing deployment." >&2; exit 5; }
 [ "$INDEX_SHA" = "$EXPECTED_INDEX" ] || { echo "UI checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$HOME_SHA" = "$EXPECTED_HOME" ] || { echo "Home module checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$INSPECTOR_SHA" = "$EXPECTED_INSPECTOR" ] || { echo "Home inspector checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$HEALTH_SHA" = "$EXPECTED_HEALTH" ] || { echo "Health UI checksum mismatch; refusing deployment." >&2; exit 5; }
-python3 -m py_compile "$TMP/backend.py" "$TMP/server.py"
+python3 -m py_compile "$TMP/backend.py" "$TMP/server.py" "$TMP/execution_permissions.py"
 if command -v node >/dev/null 2>&1; then
   node - "$TMP/index.html" "$TMP/home.js" "$TMP/home-inspector.js" "$TMP/health-runtime.js" <<'NODE'
 const fs=require('fs');
@@ -116,6 +121,7 @@ for marker in markers:
 p.write_text(text)
 PY
 
+install -m 0644 "$TMP/execution_permissions.py" "$DEST/execution_permissions.py"
 install -m 0644 "$TMP/backend.py" "$DEST/backend.py"
 install -m 0644 "$TMP/server.py" "$DEST/server.py"
 install -m 0644 "$TMP/index.html" "$DEST/index.html"

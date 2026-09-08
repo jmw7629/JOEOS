@@ -3,6 +3,9 @@
 import assert from 'node:assert/strict';
 import {verifyFocusedWorkspaces} from './test_focused_workspaces.mjs';
 import {prepareObservationFixtures,verifyObservatory} from './test_observatory_browser.mjs';
+import {verifyWorkspaceProfile} from './test_workspace_profile_browser.mjs';
+import {verifyExecutionPermissions} from './test_execution_permissions_browser.mjs';
+import {verifyExternalReviewLogout} from './test_external_reviews_browser.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,6 +19,7 @@ const key='TEST_ONLY_ORBITAL_UI_ACCESS_2026';
 async function concatenate(folder){const files=(await fs.readdir(path.join(source,folder))).filter(f=>f.endsWith('.part')).sort();return (await Promise.all(files.map(f=>fs.readFile(path.join(source,folder,f),'utf8')))).join('');}
 await fs.writeFile(path.join(root,'backend.py'),await concatenate('server'));
 await fs.copyFile(path.join(source,'runtime_server.py'),path.join(root,'server.py'));
+await fs.copyFile(path.join(source,'execution_permissions.py'),path.join(root,'execution_permissions.py'));
 let html=await concatenate('index');
 for(const name of ['home.js','home-inspector.js','health-runtime.js']){await fs.copyFile(path.join(source,name),path.join(root,name));const tag=`<script src="/${name}"></script>`;if(!html.includes(tag))html=html.replace('</body>',tag+'</body>');}
 await fs.writeFile(path.join(root,'index.html'),html);
@@ -86,18 +90,21 @@ try{
     await page.locator(`#pbWorkspaces [data-home-go="${view}"]`).click();
     await page.waitForSelector(`#${view}.active`);
     assert.equal(await page.locator('#pbWorkspaces').evaluate(e=>e.open),false,'workspace drawer closes');
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),`${view} has no page-level horizontal overflow`);
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),`${view} has no page-level horizontal overflow`);
   }
   const out=process.env.PB_SCREENSHOTS||path.join(root,'screenshots');await fs.mkdir(out,{recursive:true});
   await verifyFocusedWorkspaces({page,api,base,out});
   await verifyObservatory({page,api,base,out});
   for(const [width,height] of [[320,740],[390,844],[768,1024],[1440,1000]]){
     await page.setViewportSize({width,height});await page.evaluate(()=>renderAll());await sleep(200);
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),`Home fits ${width}px`);
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),`Home fits ${width}px`);
     assert.equal(await page.locator('.home-nav button').count(),5);
     const b=await page.locator('.home-nav').boundingBox();assert.ok(b.x>=0&&b.x+b.width<=width+1,'dock fits viewport');
     await page.screenshot({path:path.join(out,`orbital-${width}.png`),fullPage:true});
   }
+  await verifyWorkspaceProfile({page,api,root});
+  await verifyExecutionPermissions({page,api,base,out});
+  await verifyExternalReviewLogout({page});
   await api('/api/settings','POST',{general:{default_view:'board'}});
   await page.goto(base,{waitUntil:'networkidle'});await page.waitForSelector('#board.active');
   assert.equal(errors.length,0,'no browser exceptions: '+errors.join('; '));

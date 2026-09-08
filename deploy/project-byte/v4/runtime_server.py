@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
 import subprocess
 import threading
 import time
@@ -86,13 +87,54 @@ EXTERNAL_REVIEW_DECISIONS = frozenset({"", "APPROVED", "CHANGES_REQUESTED", "REV
 EXTERNAL_REVIEW_MERGE_STATES = frozenset({"", "BEHIND", "BLOCKED", "CLEAN", "DIRTY", "DRAFT", "HAS_HOOKS", "UNKNOWN", "UNSTABLE"})
 EXTERNAL_REVIEW_CHECK_FAILURES = frozenset({"ACTION_REQUIRED", "CANCELLED", "FAILURE", "STALE", "TIMED_OUT"})
 
+WORKSPACE_PROFILE_DEFAULTS = {
+    "schema_version": 1,
+    "display_name": "PROJECT_BYTE",
+    "assistant_name": "Joe AI",
+    "owner_shortcuts": ["Joe", "Mike"],
+}
+
+
+def workspace_profile() -> dict:
+    """Read presentation-only configuration; never identity or permissions."""
+    defaults = json.loads(json.dumps(WORKSPACE_PROFILE_DEFAULTS))
+    try:
+        fd = os.open(app.ROOT / "workspace.json", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return defaults
+    with os.fdopen(fd, "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise ValueError("workspace profile must be a regular file")
+        raw = stream.read(16385)
+    if len(raw) > 16384:
+        raise ValueError("workspace profile is too large")
+    data = json.loads(raw)
+    if not isinstance(data, dict) or set(data) - set(defaults):
+        raise ValueError("unsupported workspace profile fields")
+    if type(data.get("schema_version")) is not int or data["schema_version"] != 1:
+        raise ValueError("unsupported workspace profile version")
+    for name in ("display_name", "assistant_name"):
+        value = data.get(name, defaults[name])
+        if not isinstance(value, str) or not value.strip() or len(value) > 48 or any(ord(c) < 32 for c in value):
+            raise ValueError("invalid workspace label")
+        defaults[name] = value.strip()
+    shortcuts = data.get("owner_shortcuts", defaults["owner_shortcuts"])
+    if not isinstance(shortcuts, list) or len(shortcuts) > 6:
+        raise ValueError("invalid owner shortcuts")
+    if any(not isinstance(v, str) or not v.strip() or len(v) > 48 or any(ord(c) < 32 for c in v) for v in shortcuts):
+        raise ValueError("invalid owner shortcut label")
+    defaults["owner_shortcuts"] = list(dict.fromkeys(v.strip() for v in shortcuts))
+    return defaults
+
 
 def _external_review_check_summary(rollup) -> dict:
     summary = {"passed": 0, "pending": 0, "failed": 0, "unknown": 0}
     if not isinstance(rollup, list):
         summary["unknown"] = 1
         return summary
-    for raw in rollup[:64]:
+    # The repository response is already byte-bounded. Summarize every check so
+    # a failure beyond an arbitrary display limit cannot become a green result.
+    for raw in rollup:
         if not isinstance(raw, dict):
             summary["unknown"] += 1
             continue
@@ -122,11 +164,10 @@ def _external_review_check_summary(rollup) -> dict:
 def _external_review_item(raw, *, key: str, project: str, repo: str, current: float):
     if not isinstance(raw, dict):
         return None
-    try:
-        number = int(raw.get("number") or 0)
-    except (TypeError, ValueError):
-        return None
-    if number <= 0 or number > 2_147_483_647:
+    number = raw.get("number")
+    # GitHub emits integer IDs. Do not coerce booleans, strings or floats into
+    # trusted pull-request URLs (including non-finite JSON numeric values).
+    if type(number) is not int or number <= 0 or number > 2_147_483_647:
         return None
     title = app.sanitize(str(raw.get("title") or "")).strip()
     title = " ".join(title.split())[:EXTERNAL_REVIEW_TITLE_MAX]
@@ -179,16 +220,20 @@ def _read_external_reviews_repo(key: str, project: str, repo: str, current: floa
     if proc.returncode != 0 or len(proc.stdout or "") > 256 * 1024:
         return None
     try:
-        raw = json.loads(proc.stdout or "[]")
-    except (json.JSONDecodeError, TypeError):
+        raw = json.loads(proc.stdout)
+    except (ValueError, TypeError, RecursionError):
         return None
-    if not isinstance(raw, list):
+    if not isinstance(raw, list) or len(raw) > EXTERNAL_REVIEW_LIMIT:
         return None
-    items = []
-    for entry in raw[:EXTERNAL_REVIEW_LIMIT]:
+    items, numbers = [], set()
+    for entry in raw:
         item = _external_review_item(entry, key=key, project=project, repo=repo, current=current)
-        if item:
-            items.append(item)
+        if item is None or item["number"] in numbers:
+            # Preserve stale evidence through the caller instead of presenting
+            # malformed or incomplete output as a fresh empty review queue.
+            return None
+        numbers.add(item["number"])
+        items.append(item)
     return {"state": "fresh", "age_seconds": 0, "items": items, "observed_at": int(current)}
 
 
@@ -1172,6 +1217,15 @@ def observatory_snapshot():
         return OBS_CACHE["value"]
 
 
+def permission_gateway():
+    # Lazy loading keeps the optional runner boundary out of ordinary page/health reads.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("project_byte_permissions", Path(__file__).with_name("execution_permissions.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.Gateway(app.ROOT, hold=app.execution_hold), module
+
+
 class SafeHandler(app.H):
     """Production HTTP boundary with evidence-backed health."""
 
@@ -1253,6 +1307,15 @@ class SafeHandler(app.H):
 
     def do_GET(self):
         path = unquote(urlparse(self.path).path)
+        if path == "/api/execution-permissions":
+            if not self.need(4):
+                return
+            return self._execution_permissions()
+        if path == "/api/workspace-profile":
+            try:
+                return self.sendj({"profile": workspace_profile()})
+            except (OSError, ValueError, TypeError, RecursionError):
+                return self.sendj({"error": "Workspace presentation configuration is unavailable"}, 503)
         if path == "/healthz":
             return self.sendj(health_snapshot())
         if path == "/api/observatory":
@@ -1270,6 +1333,47 @@ class SafeHandler(app.H):
         if path in GET_API_PATHS or RUN_TERMINAL_RE.fullmatch(path):
             return app.H.do_GET(self)
         return self._not_found()
+
+    def _execution_permissions(self, decision=None, actor=None):
+        try:
+            gateway, module = permission_gateway()
+            try:
+                result = gateway.snapshot() if decision is None else gateway.decide(decision, actor)
+                return self.sendj(result)
+            except module.PermissionError as error:
+                return self.sendj({"error": str(error), "state": "unavailable", "requests": [],
+                                   "history": getattr(error, "history", [])}, error.status)
+        except Exception:
+            # No configuration, credentials, tool output, or SQLite paths in errors.
+            return self.sendj({"error": "Execution permissions are unavailable", "state": "unavailable", "requests": []}, 503)
+
+    def do_POST(self):
+        if unquote(urlparse(self.path).path) != "/api/execution-permissions/decision":
+            return app.H.do_POST(self)
+        actor = self.need(4)
+        if not actor:
+            return
+        # The existing explicit access-key header is required; no cookie credentials.
+        lengths = self.headers.get_all("Content-Length", [])
+        origin = self.headers.get("Origin")
+        if (self.path != "/api/execution-permissions/decision" or self.headers.get("Transfer-Encoding")
+                or len(lengths) != 1 or not lengths[0].isdigit() or not 0 < int(lengths[0]) <= 4096
+                or self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower() != "application/json"
+                or (origin and (urlparse(origin).scheme not in ("http", "https")
+                                or urlparse(origin).netloc != self.headers.get("Host")))):
+            return self.sendj({"error": "Invalid execution permission request"}, 400)
+        try:
+            # Reject duplicate keys and nonfinite values before runner or audit I/O.
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("project_byte_permissions", Path(__file__).with_name("execution_permissions.py"))
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            decision = module.decode(self.rfile.read(int(lengths[0])))
+        except Exception:
+            return self.sendj({"error": "Invalid execution permission request"}, 400)
+        if not isinstance(decision, dict):
+            return self.sendj({"error": "Invalid execution permission request"}, 400)
+        return self._execution_permissions(decision, actor)
 
     def do_HEAD(self):
         path = unquote(urlparse(self.path).path)

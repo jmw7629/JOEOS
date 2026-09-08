@@ -1,6 +1,8 @@
 (() => {
   if (window.__PROJECT_BYTE_HOME__) return;
   window.__PROJECT_BYTE_HOME__ = true;
+  let workspaceProfile = {schema_version:1,display_name:'PROJECT_BYTE',assistant_name:'Joe AI',owner_shortcuts:['Joe','Mike']};
+  window.PROJECT_BYTE_WORKSPACE = workspaceProfile;
   // Original inline icons: no icon font, tracking request, or runtime dependency.
   const ICONS = {
     home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/>',
@@ -35,6 +37,9 @@
   let homeExternalReviewState = {state:'unavailable',items:[],repositories:{}};
   let homeExternalReviewRefreshBusy = false;
   let homeExternalReviewUpdatedAt = 0;
+  let homeExternalReviewIdentity = '';
+  let homeExternalReviewRequest = 0;
+  let homeExternalReviewController = null;
 
   const style = document.createElement('style');
   style.textContent = `
@@ -150,7 +155,7 @@ body[data-pb-view="home"] > header{padding:16px 24px 6px}body[data-pb-view="home
 @media(max-width:360px){body > header .brand h1,body[data-pb-view="home"] > header .brand h1{font-size:13px}body > header .top #login{max-width:65px}.home-kpi{grid-template-columns:23px 1fr;gap:2px 5px;padding:9px 6px}.home-kpi .kpi-orbit{width:23px;height:23px}.home-kpi b{font-size:18px}.home-kpi .kpi-label{font-size:9px}.agent-node{width:81px}.agent-node.center{height:60px;width:60px;min-height:60px}.home-action{font-size:9px}}
 @media(prefers-reduced-motion:reduce){.pb-crawl-track{animation:none!important;transform:none!important}.pb-crawl-viewport{overflow-x:auto;mask-image:none}.pb-crawl-group[aria-hidden="true"]{display:none}.pb-crawl-track{will-change:auto}}
 body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!important;will-change:auto}body.reduced-motion .pb-crawl-viewport{overflow-x:auto;mask-image:none}body.reduced-motion .pb-crawl-group[aria-hidden="true"]{display:none}
-.pb-chat-context{margin-top:12px;border:1px solid #2b435c;border-radius:12px;background:#0c1928;padding:0 12px}.pb-chat-context summary{min-height:44px;cursor:pointer;padding:12px 0;color:#c7dced;font-size:12px}.pb-chat-context summary span{font-size:10px;color:#819db8;margin-left:8px}.pb-chat-context .grid3{padding-bottom:12px}.pb-chat-context:not([open]) .grid3{display:none}@media(max-width:650px){#ai .chatbox>.between>div>.small{display:none}#ai .chatbox>.between{margin-bottom:10px;align-items:center}#ai .chatbox #loadChat{font-size:11px;min-height:40px;padding:8px}#ai .chatbox>.chatlog{min-height:200px;max-height:38dvh}#ai .pb-chat-context .grid3{grid-template-columns:1fr 1fr}#ai .composer{margin-top:12px}#ai .composer textarea{font-size:16px}#ai .chatbox>.between h2{font-size:15px}}
+.pb-chat-context{margin-top:12px;border:1px solid #2b435c;border-radius:12px;background:#0c1928;padding:0 12px}.pb-chat-context summary{min-height:44px;cursor:pointer;padding:12px 0;color:#c7dced;font-size:12px}.pb-chat-context summary span{font-size:10px;color:#819db8;margin-left:8px}.pb-chat-context .grid3{padding-bottom:12px}.pb-chat-context:not([open]) .grid3{display:none}@media(max-width:650px){#ai .chatbox>.between>div>.small{display:none}#ai .chatbox>.between{margin-bottom:10px;align-items:center}#ai .chatbox #loadChat{font-size:11px;min-height:40px;padding:8px}#ai .chatbox>.chatlog{min-height:200px;max-height:38dvh}#ai .pb-chat-context .grid3{grid-template-columns:repeat(2,minmax(0,1fr))}#ai .ai-layout>*,#ai .pb-chat-context .label{min-width:0}#ai .pb-chat-context select{min-width:0;width:100%}#ai .composer{margin-top:12px}#ai .composer textarea{font-size:16px}#ai .chatbox>.between h2{font-size:15px}}
   `;
   document.head.appendChild(style);
 
@@ -175,7 +180,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
         <div class="home-hero-top">
           <div>
             <div class="home-eyebrow"><span class="home-status-dot"></span><span id="homeSystemState">Verifying system health…</span></div>
-            <h2>Joe AI</h2>
+            <h2>${escH(workspaceProfile.assistant_name)}</h2>
 
           </div>
           <div id="homeAIState" class="home-ai-state">AI UNKNOWN</div>
@@ -235,7 +240,8 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   function homeTaskScope(mode) {
     if(mode==='all'){if(typeof clearFilters==='function')clearFilters();renderHome();return;}
     const selfName=session?.name&&session.name!=='Public'?session.name:'';
-    const map={self:['ownerFilter',selfName],joe:['ownerFilter','Joe'],mike:['ownerFilter','Mike'],ai:['executorFilter','ai'],critical:['priorityFilter','Critical'],week:['dueFilter','7d']};
+    const map={self:['ownerFilter',selfName],ai:['executorFilter','ai'],critical:['priorityFilter','Critical'],week:['dueFilter','7d']};
+    workspaceProfile.owner_shortcuts.forEach((name,i)=>map[ownerShortcutKey(name,i)]=['ownerFilter',name]);
     const pair=map[mode];if(!pair||!pair[1])return;
     const control=document.getElementById(pair[0]);
     setHomeFilter(pair[0],control?.value===pair[1]?'':pair[1]);
@@ -278,8 +284,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     const isAll=!Object.values(c).some(Boolean);
     const chips=[['all','All projects',isAll]];
     if(selfName)chips.push(['self','My work',c.ownerFilter===selfName]);
-    if(selfName!=='Joe')chips.push(['joe','Joe',c.ownerFilter==='Joe']);
-    if(selfName!=='Mike')chips.push(['mike','Mike',c.ownerFilter==='Mike']);
+    workspaceProfile.owner_shortcuts.forEach((name,i)=>{if(name!==selfName)chips.push([ownerShortcutKey(name,i),name,c.ownerFilter===name]);});
     chips.push(['ai','AI work',c.executorFilter==='ai'],['critical','Critical',c.priorityFilter==='Critical'],['week','This week',c.dueFilter==='7d']);
     const el=document.getElementById('homeScopes');if(!el)return;
     el.innerHTML=chips.map(([key,label,active])=>`<button type="button" class="home-chip ${active?'active':''}" data-home-scope="${key}" aria-pressed="${active}">${escH(label)}</button>`).join('')+'<button type="button" class="home-chip" data-open-scope="1">All filters</button>';
@@ -299,7 +304,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     let lines='<svg class="agent-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">';
     enabled.forEach((a,i)=>{const [x,y]=positions[i];lines+=`<path class="${activeKeys.has(a.agent_key)?'live-link':''}" d="M50 50 C${x<50?32:68} 50,${x<50?38:62} ${y},${x} ${y}"/>`;});
     lines+='</svg>';
-    const center=`<button type="button" class="agent-node center" style="left:50%;top:50%" data-home-go="ai" aria-label="Open Joe AI">${icon('user')}<b>Joe AI</b><small>Executive</small></button>`;
+    const center=`<button type="button" class="agent-node center" style="left:50%;top:50%" data-home-go="ai" aria-label="Open ${escH(workspaceProfile.assistant_name)}">${icon('user')}<b>${escH(workspaceProfile.assistant_name)}</b><small>Executive</small></button>`;
     const nodes=enabled.map((a,i)=>{const [x,y]=positions[i];return `<button type="button" class="agent-node ${activeKeys.has(a.agent_key)?'running':''}" style="left:${x}%;top:${y}%" data-home-agent="${escH(a.agent_key)}" aria-label="Inspect ${escH(a.name)}">${icon(icons[a.agent_key]||'agents')}<b>${escH(a.name)}</b><small>${activeKeys.has(a.agent_key)?'Running':'Configured role'}</small></button>`;}).join('');
     el.innerHTML=lines+center+nodes+(enabled.length?'':'<span style="position:absolute;bottom:12px;left:0;right:0;text-align:center" class="small">Sign in to inspect your configured agents.</span>');
   }
@@ -352,6 +357,18 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     el.innerHTML=items.length?items.map(t=>`<button type="button" class="work-item" data-home-task="${escH(t.id)}"><div class="work-top"><b>${escH(t.title)}</b><span class="home-priority ${escH(t.priority)}">${escH(t.priority)}</span></div><span>${escH(t.project)}${t.due_date?' · due '+escH(t.due_date):''}${t.ai_state?' · AI '+escH(t.ai_state):''}</span></button>`).join(''):`<div class="small">${empty}</div>`;
   }
 
+  function syncExternalReviewIdentity() {
+    // Compare credentials only in memory; never include them in rendered evidence.
+    const identity=JSON.stringify([accessKey,session?.subject||'',session?.name||'',session?.level||0]);
+    if(identity!==homeExternalReviewIdentity){
+      homeExternalReviewIdentity=identity;++homeExternalReviewRequest;
+      homeExternalReviewController?.abort();homeExternalReviewController=null;
+      homeExternalReviewRefreshBusy=false;homeExternalReviewUpdatedAt=0;
+      homeExternalReviewState={state:'unavailable',items:[],repositories:{}};
+    }
+    return !!accessKey&&session?.level>=1;
+  }
+
   function externalReviewAge(seconds) {
     if(seconds===null||seconds===undefined||Number.isNaN(Number(seconds)))return 'unknown age';
     const value=Math.max(0,Number(seconds));
@@ -362,6 +379,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   }
 
   function externalReviewsForScope(scoped) {
+    if(!syncExternalReviewIdentity())return [];
     const all=tasks||[],selected=document.getElementById('projectFilter')?.value||'';
     const scopedProjects=new Set((scoped||[]).map(t=>t.project));
     return (homeExternalReviewState.items||[]).filter(item=>{
@@ -372,6 +390,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   }
 
   function renderApprovals(scoped) {
+    syncExternalReviewIdentity();
     const el=document.getElementById('homeApprovals');if(!el)return;
     const ids=new Set(scoped.map(t=>t.id));
     const ready=(runs||[]).filter(r=>ids.has(r.task_id)&&(r.status==='pr-created'||r.pr_url)).slice(0,6);
@@ -393,20 +412,25 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   }
 
   async function refreshExternalReviews(force=false) {
-    if(!(session?.level>=1)){homeExternalReviewState={state:'unavailable',items:[],repositories:{}};renderApprovals(safeVisible());return;}
+    if(!syncExternalReviewIdentity()){renderApprovals(safeVisible());return;}
     const now=Date.now();
     if(homeExternalReviewRefreshBusy||(!force&&homeExternalReviewUpdatedAt&&now-homeExternalReviewUpdatedAt<15000))return;
     homeExternalReviewRefreshBusy=true;
+    const request=++homeExternalReviewRequest,controller=new AbortController();
+    homeExternalReviewController=controller;
+    const current=()=>{syncExternalReviewIdentity();return request===homeExternalReviewRequest;};
     try{
-      const x=await api('/api/external-reviews');
+      const x=await api('/api/external-reviews',{signal:controller.signal});
+      if(!current())return;
       homeExternalReviewState={state:x.state||'unavailable',items:Array.isArray(x.items)?x.items:[],repositories:x.repositories||{}};
       homeExternalReviewUpdatedAt=Date.now();
       renderApprovals(safeVisible());
     }catch{
+      if(!current())return;
       homeExternalReviewState={state:'unavailable',items:[],repositories:{}};
       homeExternalReviewUpdatedAt=Date.now();
       renderApprovals(safeVisible());
-    }finally{homeExternalReviewRefreshBusy=false}
+    }finally{if(request===homeExternalReviewRequest){homeExternalReviewRefreshBusy=false;homeExternalReviewController=null;}}
   }
 
   async function refreshHomeApprovals() {
@@ -484,7 +508,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   const send=async()=>{
     const input=document.getElementById('homeCommandInput'),text=input?.value.trim();
     if(!text||homeSendBusy)return;
-    if(!(session?.level>=2)){homeToast('Sign in with your owner or team key to use Joe AI.');document.getElementById('login')?.click();return;}
+    if(!(session?.level>=2)){homeToast(`Sign in with your owner or team key to use ${workspaceProfile.assistant_name}.`);document.getElementById('login')?.click();return;}
     homeSendBusy=true;const button=document.getElementById('homeCommandSend');button.disabled=true;
     go('ai');const composer=document.getElementById('chatInput');if(composer)composer.value=text;
     try{if(typeof sendChat==='function')await sendChat(text);if(composer&&!composer.value)input.value='';else homeToast(document.getElementById('status')?.textContent||'Message kept as a draft.');}
@@ -555,7 +579,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   function syncWorkspaceChrome(){
     const view=document.body.dataset.pbView||'home',record=spaces.find(([id])=>id===view),count=typeof activeFilterCount==='function'?activeFilterCount():0;
     if(view!==lastChromeView){if(filterDialog.open)filterDialog.close();lastChromeView=view;if(view==='home')requestAnimationFrame(sizeLiveCrawl);}
-    contextBar.hidden=view==='home';document.getElementById('pbWorkspaceTitle').textContent=record?.[1]||'Workspace';
+    contextBar.hidden=view==='home';document.getElementById('pbWorkspaceTitle').textContent=view==='ai'?workspaceProfile.assistant_name+' chat':record?.[1]||'Workspace';
     const criteria=typeof filterCriteria==='function'?filterCriteria():{},names=[criteria.projectFilter,criteria.ownerFilter,criteria.priorityFilter,criteria.statusFilter].filter(Boolean);
     document.getElementById('pbWorkspaceScope').textContent=scopeViews.has(view)&&count?(names.join(' · ')||`${count} active filters`):'';
     const toggle=document.getElementById('pbScopedFilters');toggle.hidden=!scopeViews.has(view);toggle.textContent=count?`Filters · ${count}`:'Filters';toggle.setAttribute('aria-pressed',String(count>0));
@@ -589,7 +613,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     const open=(data.tasks||[]).filter(t=>t.status!=='Done');
     for(const t of open.filter(t=>t.status==='Blocked').slice(0,3))add('blocked:'+t.id,`${t.project} · blocked: ${t.title}`,'warning','board',t.id);
     for(const t of open.filter(t=>t.due_date&&typeof daysUntil==='function'&&daysUntil(t.due_date)<0).slice(0,2))add('due:'+t.id,`${t.project} · overdue: ${t.title}`,'warning','board',t.id);
-    if(session?.level>=1&&homeExternalReviewState.state==='fresh')for(const r of (homeExternalReviewState.items||[]).slice(0,3))add('review:'+r.repo+':'+r.number,`${r.project} · PR #${r.number} waiting for review · ${r.title}`,'info','agents');
+    if(syncExternalReviewIdentity()&&homeExternalReviewState.state==='fresh')for(const r of (homeExternalReviewState.items||[]).slice(0,3))add('review:'+r.repo+':'+r.number,`${r.project} · PR #${r.number} waiting for review · ${r.title}`,'info','agents');
     for(const a of (data.activity||[]).slice(0,6)){
       const task=(data.tasks||[]).find(t=>t.id===a.task_id);
       add('activity:'+a.id,`${shortTime(a.ts)} · ${a.actor||'System'} · ${String(a.action||'update').replaceAll('_',' ')}${a.project?' · '+a.project:''}${a.detail?' · '+crawlText(a.detail,85):''}`,'info','activity',task?.id||'');
@@ -642,6 +666,37 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   document.body.dataset.pbView = location.hash.replace('#','') || 'home';
   window.addEventListener('project-byte-health',e=>{renderExecutionFabric(e.detail||null);renderLiveCrawl();});
   setTimeout(()=>{renderHome();void pollLiveCrawl();},0);
+  function ownerShortcutKey(name,index){return name==='Joe'?'joe':name==='Mike'?'mike':'person-'+index;}
+  async function loadWorkspaceProfile(){
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
+    try{
+      const response=await fetch('/api/workspace-profile',{cache:'no-store',signal:controller.signal});
+      const payload=await response.json();
+      if(!response.ok)throw new Error('unavailable');
+      const p=payload.profile;
+      if(p?.schema_version!==1||typeof p.display_name!=='string'||typeof p.assistant_name!=='string'||!Array.isArray(p.owner_shortcuts)||p.owner_shortcuts.some(n=>typeof n!=='string'))throw new Error('invalid');
+      workspaceProfile=p;window.PROJECT_BYTE_WORKSPACE=p;
+      document.title=p.display_name;
+      const title=document.querySelector('.brand h1');
+      if(title){if(p.display_name==='PROJECT_BYTE')title.innerHTML='PROJECT<span class="pb-wordmark">_BYTE</span>';else title.textContent=p.display_name;}
+      document.querySelector('.home-hero-top h2').textContent=p.assistant_name;
+      if(p.assistant_name!=='Joe AI'){const heading=document.querySelector('#ai .chatbox h2');if(heading)heading.textContent=p.assistant_name;}
+      document.getElementById('homeCommandInput').setAttribute('aria-label','Ask '+p.assistant_name);
+      document.getElementById('homeCommandSend').setAttribute('aria-label','Send to '+p.assistant_name);
+      document.querySelector('.home-asset-credit span').textContent=p.display_name+' · Your executive workspace';
+      const chat=document.querySelector('#pbWorkspaces [data-home-go="ai"]');
+      if(chat)for(const node of chat.childNodes)if(node.nodeType===Node.TEXT_NODE)node.textContent=p.assistant_name+' chat';
+      document.body.classList.toggle('custom-workspace-profile',p.display_name!=='PROJECT_BYTE'||p.assistant_name!=='Joe AI'||JSON.stringify(p.owner_shortcuts)!==JSON.stringify(['Joe','Mike']));
+      renderHome();
+    }catch{
+      const note=document.createElement('p');note.className='small';note.id='workspaceProfileWarning';note.setAttribute('role','status');note.textContent='Workspace branding is unavailable. Default appearance is shown.';
+      document.querySelector('#settings .settingsgrid')?.prepend(note);
+    }finally{clearTimeout(timeout);window.PROJECT_BYTE_WORKSPACE_READY=true;if(typeof deliverBrowserNotifications==='function')deliverBrowserNotifications();}
+  }
+  const profileStyle=document.createElement('style');
+  profileStyle.textContent='body.custom-workspace-profile .home-shell{grid-template-columns:minmax(0,1fr)}body.custom-workspace-profile .home-asset-credit{overflow-wrap:anywhere}body.custom-workspace-profile #ai .chatbox .between>div{min-width:0}body.custom-workspace-profile .brand>div:first-child{min-width:0}body.custom-workspace-profile .brand .top{flex-shrink:0}body.custom-workspace-profile .brand h1{max-width:45vw;overflow:hidden;text-overflow:ellipsis}body.custom-workspace-profile .home-hero-top>div:first-child,body.custom-workspace-profile .pb-context-bar>div{min-width:0}body.custom-workspace-profile #homeWorkTitle,body.custom-workspace-profile #homeWork .small,body.custom-workspace-profile #pbWorkspaceScope,body.custom-workspace-profile .pb-home-toast,body.custom-workspace-profile .home-hero-top h2,body.custom-workspace-profile #pbWorkspaceTitle,body.custom-workspace-profile #ai .chatbox h2{overflow-wrap:anywhere}body.custom-workspace-profile .agent-node.center b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}body.custom-workspace-profile .pb-workspaces button{overflow-wrap:anywhere;min-width:0}body.custom-workspace-profile .home-chip{flex-shrink:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}';
+  document.head.appendChild(profileStyle);
+  void loadWorkspaceProfile();
 })();
 
 (() => {
@@ -829,4 +884,84 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   window.addEventListener('project-byte-health',()=>{if(host.classList.contains('active'))void refresh();});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});window.setInterval(refresh,15000);
   renderEvidence();renderVisuals();setTimeout(()=>refresh(true),0);
+})();
+
+// Live permissions are separate from the historical Observatory graph and code review.
+(() => {
+  const panel=document.querySelector('#pbObservatory .obs-approval-note');
+  if(!panel)return;
+  const style=document.createElement('style');
+  style.textContent=`.permission-head,.permission-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.permission-head b{flex:1}.permission-card{padding:12px;margin-top:12px;background:#091827;border:1px solid #31465c;border-radius:10px;min-width:0}.permission-card pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;max-height:240px;overflow:auto}.permission-card textarea{display:block;width:100%;box-sizing:border-box;min-height:65px;margin:8px 0;padding:9px;border:1px solid #31465c;border-radius:8px;background:#0b1d2f;color:#dce9f7}.permission-card button,.permission-head button{min-height:44px}.permission-context{overflow-wrap:anywhere}.permission-feedback{margin:9px 0;color:#efcf9b}.permission-history{overflow-wrap:anywhere;margin-top:12px}.permission-card[aria-busy=true]{opacity:.7}`;
+  document.head.appendChild(style);
+  let identity='',epoch=0,controller=null,busy=false,last=0,rows=[],snapshot=null,feedback='',decisionFeedback='';
+  const notes=new Map();
+  const who=()=>JSON.stringify([accessKey,session?.subject,session?.level]);
+  const owner=()=>!!accessKey&&session?.ok&&session?.level===4;
+  const active=()=>!document.hidden&&document.querySelector('#agents')?.classList.contains('active');
+  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function clear(){epoch++;controller?.abort();controller=null;busy=false;rows=[];snapshot=null;notes.clear();feedback='';decisionFeedback='';last=0;}
+  function render(){
+    if(!owner()){
+      panel.innerHTML='<b>Execution permissions</b><p>Owner sign-in is required to view or decide live tool requests. Historical traces and code-review decisions remain separate.</p>';
+      return;
+    }
+    const connected=snapshot?.state==='connected';
+    const title=connected?'Connected to registered runner':snapshot?.state==='not_connected'?'Not connected':'Connection unverified';
+    panel.innerHTML=`<div class="permission-head"><b>Execution permissions · ${title}</b><button data-permission-refresh ${busy?'disabled':''}>Refresh</button></div><p>Approve once releases one requested tool. Deny rejects all pending tools in this session, including requests arriving before the runner processes the decision. Neither action merges code or verifies tool completion.</p><div class="permission-feedback" role="status">${escape(decisionFeedback)}${decisionFeedback&&feedback?'<br>':''}${escape(feedback)}</div>${connected?`<p class="permission-context">${escape(snapshot.repository)} · ${escape(snapshot.session_id)}</p>`:'<p>A permission-capable runner must be registered on the server. Historical traces never create approval requests.</p>'}<div class="permission-queue">${connected?rows.map(row=>{
+      const r=row.request,remaining=Math.max(0,Math.ceil(row.expires_at-snapshot.server_time));
+      const enabled=row.state==='pending'&&remaining>0&&!busy;
+      return `<article class="permission-card" data-permission-handle="${escape(row.handle)}"><b>${escape(r.permission)} · ${escape(row.state)}</b><div class="permission-context">Tool ${escape(r.tool.callID)} · Message ${escape(r.tool.messageID)}</div><pre>${escape(JSON.stringify({patterns:r.patterns,metadata:r.metadata},null,2))}</pre><p>${row.state==='pending'?`Review window: ${remaining} seconds at last refresh. ${row.affected_count} pending in this session.`:'This request cannot be submitted again.'}</p>${enabled?`<label>Decision note (optional)<textarea maxlength="1000" data-permission-note="${escape(row.handle)}" placeholder="Stored in the audit. Denial notes are also sent to the runner.">${escape(notes.get(row.handle)||'')}</textarea></label><div class="permission-actions"><button data-permission-decision="approve_once" data-handle="${escape(row.handle)}">Approve once</button><button data-permission-decision="deny_session" data-handle="${escape(row.handle)}">Deny session’s pending tools</button></div>`:''}</article>`;
+    }).join('')||'<p>No pending tool permission requests.</p>':''}</div>${snapshot?.history?.length?`<details class="permission-history"><summary>Recent permission audit</summary>${snapshot.history.map(item=>`<p>${escape(new Date(item.ts*1000).toLocaleString())} · ${escape(item.decision)} · ${escape(item.result)}${item.note?` · ${escape(item.note)}`:''}</p>`).join('')}</details>`:''}`;
+  }
+  async function request(path,options,current,turn){
+    const response=await fetch(path,{...options,signal:controller.signal,headers:{'Content-Type':'application/json','X-Access-Key':accessKey}});
+    const data=await response.json();
+    if(turn!==epoch||who()!==current||!owner())return null;
+    if(!response.ok){const error=new Error(data.error||'Permission runner is unavailable');error.response=data;throw error;}
+    return data;
+  }
+  async function refresh(force=false){
+    const current=who();
+    if(identity!==current){clear();identity=current;render();}
+    if(!owner()||busy||(!force&&(!active()||Date.now()-last<5000)))return;
+    // Keep a note being edited stable while polling; decisions always recheck server state.
+    if(!force&&panel.contains(document.activeElement)&&document.activeElement.matches('textarea'))return;
+    busy=true;controller=new AbortController();const turn=epoch;
+    try{
+      const data=await request('/api/execution-permissions',{},current,turn);
+      if(!data)return;
+      snapshot=data;rows=data.requests||[];feedback='';
+      const keep=new Set(rows.filter(r=>r.state==='pending').map(r=>r.handle));
+      for(const handle of notes.keys())if(!keep.has(handle))notes.delete(handle);
+    }catch(error){if(turn===epoch&&who()===current){snapshot=error.response||null;rows=[];feedback=error.message;}}
+    finally{if(turn===epoch&&who()===current){busy=false;last=Date.now();render();}}
+  }
+  panel.addEventListener('input',event=>{const handle=event.target.dataset.permissionNote;if(handle)notes.set(handle,event.target.value);});
+  panel.addEventListener('click',async event=>{
+    if(event.target.closest('[data-permission-refresh]')){feedback='';void refresh(true);return;}
+    const button=event.target.closest('[data-permission-decision]');
+    if(!button||busy||!owner()||who()!==identity)return;
+    const row=rows.find(r=>r.handle===button.dataset.handle);
+    if(!row||row.state!=='pending')return;
+    const elapsed=(Date.now()-last)/1000;
+    if(row.expires_at<=snapshot.server_time+elapsed){feedback='The review window expired. Refresh the queue.';void refresh(true);return;}
+    const current=who(),turn=epoch;
+    const body={handle:row.handle,review_token:row.review_token,decision:button.dataset.permissionDecision,message:notes.get(row.handle)||''};
+    busy=true;controller=new AbortController();render();
+    try{
+      const data=await request('/api/execution-permissions/decision',{method:'POST',body:JSON.stringify(body)},current,turn);
+      if(!data)return;
+      decisionFeedback=data.message;notes.delete(row.handle);
+    }catch(error){if(turn===epoch&&who()===current)decisionFeedback='Decision could not be confirmed. Refresh to inspect its state; do not retry blindly. '+error.message;}
+    finally{if(turn===epoch&&who()===current){busy=false;rows=[];snapshot=null;render();void refresh(true);}}
+  });
+  document.addEventListener('click',event=>{
+    if(event.target.closest('#login,#logoutAllLocal')){clear();render();}
+    setTimeout(()=>void refresh(),0);
+  },true);
+  window.addEventListener('project-byte-home-render',()=>void refresh());
+  window.addEventListener('hashchange',()=>void refresh());
+  document.addEventListener('visibilitychange',()=>void refresh());
+  setInterval(()=>void refresh(),1000);
+  render();
 })();

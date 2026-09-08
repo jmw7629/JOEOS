@@ -35,8 +35,8 @@ from pathlib import Path
 Path({str(self.calls)!r}).open('a').write(' '.join(sys.argv[1:])+'\\n')
 repo=sys.argv[sys.argv.index('--repo')+1] if '--repo' in sys.argv else ''
 if repo in {fail.split(',')!r}: sys.exit(3)
-if repo=={BYTE!r}: print({byte!r})
-elif repo=={VITROS!r}: print({vitros!r})
+if repo=={BYTE!r}: sys.stdout.write({byte!r})
+elif repo=={VITROS!r}: sys.stdout.write({vitros!r})
 else: sys.exit(9)
 '''
         p=self.bin/'gh';p.write_text(script);p.chmod(0o700)
@@ -64,6 +64,15 @@ else: sys.exit(9)
         self.fake_gh('{}','not-json')
         snap=self.mod.external_reviews_snapshot();self.assertEqual(snap['state'],'unavailable');self.assertEqual(snap['items'],[])
 
+    def test_empty_or_excessively_nested_json_is_unavailable(self):
+        for payload in ['', '   ', '['*1200+'0'+']'*1200, '[{"number":'+'9'*5000+'}]']:
+            with self.subTest(payload=payload[:40]):
+                self.fake_gh(payload,payload)
+                self.mod.EXTERNAL_REVIEW_CACHE={'repositories':{},'at':0.0}
+                snap=self.mod.external_reviews_snapshot()
+                self.assertEqual(snap['state'],'unavailable')
+                self.assertEqual(snap['items'],[])
+
     def test_partial_failure_is_explicit_not_empty_assumption(self):
         vitros=json.dumps([{'number':235,'title':'Provider boundary','updatedAt':'2026-09-07T20:00:00Z','statusCheckRollup':[]}])
         self.fake_gh('[]',vitros,fail=BYTE)
@@ -87,9 +96,47 @@ else: sys.exit(9)
         self.assertEqual(expired['state'],'unavailable');self.assertEqual(expired['items'],[])
 
     def test_invalid_fields_are_bounded(self):
-        data=json.dumps([{'number':'bad','title':'x'},{'number':3,'title':'   ','updatedAt':'nonsense','reviewDecision':'INJECT','mergeStateStatus':'EVIL','statusCheckRollup':'bad'}])
+        data=json.dumps([{'number':3,'title':'   ','updatedAt':'nonsense','reviewDecision':'INJECT','mergeStateStatus':'EVIL','statusCheckRollup':'bad'}])
         self.fake_gh(data,'[]')
         snap=self.mod.external_reviews_snapshot();item=[x for x in snap['items'] if x['repo']==BYTE][0]
         self.assertEqual(item['number'],3);self.assertEqual(item['review_decision'],'');self.assertEqual(item['merge_state'],'UNKNOWN');self.assertEqual(item['checks']['unknown'],1);self.assertIsNone(item['updated_age_seconds'])
+
+    def test_malformed_entries_never_become_fresh_empty_or_wrong_urls(self):
+        for number in [None,True,False,'1','bad',1.0,1.7,float('inf'),float('nan'),0,-1,2_147_483_648]:
+            with self.subTest(number=number):
+                self.fake_gh(json.dumps([{'number':number}]),'[]')
+                self.mod.EXTERNAL_REVIEW_CACHE={'repositories':{},'at':0.0}
+                snap=self.mod.external_reviews_snapshot()
+                self.assertEqual(snap['repositories']['stickdeath']['state'],'unavailable')
+                self.assertEqual(snap['items'],[])
+        for payload in ['[{}]','[null]','[1]','[{"number":1e309}]',
+                        '[{"number":7},{}]','[{"number":7},{"number":7}]',
+                        json.dumps([{'number':n+1} for n in range(13)])]:
+            with self.subTest(payload=payload):
+                self.fake_gh(payload,'[]')
+                self.mod.EXTERNAL_REVIEW_CACHE={'repositories':{},'at':0.0}
+                snap=self.mod.external_reviews_snapshot()
+                self.assertEqual(snap['repositories']['stickdeath']['state'],'unavailable')
+                self.assertEqual(snap['items'],[])
+
+    def test_malformed_refresh_preserves_labeled_prior_evidence(self):
+        self.fake_gh('[{"number":7,"title":"Prior evidence"}]','[]')
+        with mock.patch.object(self.mod.time,'time',return_value=1000.0): fresh=self.mod.external_reviews_snapshot()
+        self.assertEqual(fresh['items'][0]['number'],7)
+        self.fake_gh('[{}]','[]')
+        with mock.patch.object(self.mod.time,'time',return_value=1060.0): stale=self.mod.external_reviews_snapshot()
+        self.assertEqual(stale['items'][0]['number'],7)
+        self.assertEqual(stale['items'][0]['evidence_state'],'stale')
+        with mock.patch.object(self.mod.time,'time',return_value=1400.0): expired=self.mod.external_reviews_snapshot()
+        self.assertEqual(expired['repositories']['stickdeath']['state'],'unavailable')
+        self.assertEqual(expired['items'],[])
+
+    def test_check_summary_does_not_hide_failures_after_64_checks(self):
+        checks=[{'status':'COMPLETED','conclusion':'SUCCESS'} for _ in range(64)]
+        checks += [{'status':'COMPLETED','conclusion':'FAILURE'},
+                   {'status':'IN_PROGRESS'},None,{'state':'SUCCESS'}]
+        self.fake_gh(json.dumps([{'number':7,'statusCheckRollup':checks}]),'[]')
+        snap=self.mod.external_reviews_snapshot()
+        self.assertEqual(snap['items'][0]['checks'],{'passed':65,'failed':1,'pending':1,'unknown':1})
 
 if __name__=='__main__':unittest.main(verbosity=2)
