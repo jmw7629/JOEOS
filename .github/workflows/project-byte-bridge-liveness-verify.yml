@@ -41,6 +41,7 @@ jobs:
           stub.execution_hold = lambda repo: None
           sys.modules['backend'] = stub
           path = Path('deploy/project-byte/v4/runtime_server.py')
+          sys.path.insert(0, str(path.parent.resolve()))
           spec = importlib.util.spec_from_file_location('project_byte_runtime', path)
           mod = importlib.util.module_from_spec(spec)
           spec.loader.exec_module(mod)

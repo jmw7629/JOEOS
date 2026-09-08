@@ -9,10 +9,12 @@ import {randomBytes} from 'node:crypto';
 const {chromium}=await import(process.env.PB_PLAYWRIGHT_MODULE||'playwright');
 const here=path.dirname(fileURLToPath(import.meta.url)),source=path.resolve(here,'../v4');
 const root=await fs.mkdtemp(path.join(os.tmpdir(),'pb-public-browser-'));
+// Keep provider credential storage separate from files served by the fixture app.
+const privateState=await fs.mkdtemp(path.join(os.tmpdir(),'pb-public-private-state-'));
 const owner='1234',publicOwner=randomBytes(32).toString('base64url'),children=[];let browser,logs='';
 async function port(){return new Promise(resolve=>{const server=net.createServer();server.listen(0,'127.0.0.1',()=>{const p=server.address().port;server.close(()=>resolve(p));});});}
 async function concat(dir){return (await Promise.all((await fs.readdir(path.join(source,dir))).filter(x=>x.endsWith('.part')).sort().map(x=>fs.readFile(path.join(source,dir,x),'utf8')))).join('');}
-function start(args){const child=spawn('python3',args,{cwd:root,env:{...process.env,HOME:root,XDG_CONFIG_HOME:path.join(root,'config'),XDG_DATA_HOME:path.join(root,'data'),XDG_CACHE_HOME:path.join(root,'cache'),PATH:path.join(root,'bin')+path.delimiter+process.env.PATH,KANBAN_HOST:'127.0.0.1',KANBAN_PORT:String(backendPort),PYTHONDONTWRITEBYTECODE:'1'},stdio:['ignore','pipe','pipe']});children.push(child);for(const stream of [child.stdout,child.stderr])stream.on('data',b=>logs=(logs+b.toString()).slice(-3000));return child;}
+function start(args){const child=spawn('python3',args,{cwd:root,env:{...process.env,HOME:root,XDG_STATE_HOME:privateState,XDG_CONFIG_HOME:path.join(root,'config'),XDG_DATA_HOME:path.join(root,'data'),XDG_CACHE_HOME:path.join(root,'cache'),PATH:path.join(root,'bin')+path.delimiter+process.env.PATH,KANBAN_HOST:'127.0.0.1',KANBAN_PORT:String(backendPort),PYTHONDONTWRITEBYTECODE:'1'},stdio:['ignore','pipe','pipe']});children.push(child);for(const stream of [child.stdout,child.stderr])stream.on('data',b=>logs=(logs+b.toString()).slice(-3000));return child;}
 const backendPort=await port(),gatewayPort=await port(),upstream=`http://127.0.0.1:${backendPort}`,base=`http://127.0.0.1:${gatewayPort}`;
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function ready(url){for(let i=0;i<100;i++){try{const r=await fetch(url);if(r.ok)return;}catch{}await sleep(100);}throw new Error('Fixture did not start: '+logs);}
@@ -75,4 +77,4 @@ for(const name of ['ai_runtime.py','ai_connections.py','codex_connection.py','ai
  console.log('PUBLIC_PRIVATE_DATA_AND_ATTACHMENTS_REQUIRE_AUTH=PASS');
  console.log('PUBLIC_STRONG_OWNER_ALIAS_PRESERVES_PRIVATE_SHORT_KEY=PASS');
 }catch(error){console.error('PUBLIC_BROWSER_FAILED',error,logs);process.exitCode=1;}
-finally{if(browser)await browser.close();for(const child of children)child.kill('SIGTERM');await Promise.all(children.map(child=>new Promise(resolve=>child.exitCode!==null||child.signalCode?resolve():child.once('exit',resolve))));}
+finally{if(browser)await browser.close();for(const child of children)child.kill('SIGTERM');await Promise.all(children.map(child=>new Promise(resolve=>child.exitCode!==null||child.signalCode?resolve():child.once('exit',resolve))));await fs.rm(privateState,{recursive:true,force:true});}

@@ -38,10 +38,17 @@ export async function verifyExecutionPermissions({page,api,base,out}){
     assert.equal(await panel.locator('img').count(),0);
     for(const [width,height] of [[320,740],[390,844],[768,1024],[1440,1000]]){
       await page.setViewportSize({width,height});
-      const buttons=panel.locator('[data-permission-decision]');
-      for(const button of await buttons.all()){
-        const bounds=await button.boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width+1,'permission action fits '+width);
-      }
+      // Live polling can replace the controls during a viewport change. Wait for
+      // both visible actions and capture one layout snapshot without stale locators.
+      const layout=await page.waitForFunction(()=>{
+        const buttons=[...document.querySelectorAll('#pbObservatory .obs-approval-note [data-permission-decision]')];
+        if(buttons.length!==2)return false;
+        const bounds=buttons.map(button=>button.getBoundingClientRect());
+        if(bounds.some(box=>box.width<=0||box.height<=0))return false;
+        return bounds.map(box=>({x:box.x,width:box.width}));
+      });
+      const bounds=await layout.jsonValue();await layout.dispose();
+      for(const box of bounds)assert.ok(box.x>=0&&box.x+box.width<=width+1,'permission action fits '+width);
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1));
       await panel.screenshot({path:path.join(out,`permissions-fixture-${width}.png`)});
     }

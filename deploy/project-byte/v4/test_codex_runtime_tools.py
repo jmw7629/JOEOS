@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -110,7 +111,13 @@ supports_websockets = false
 request_max_retries = 0
 stream_max_retries = 0
 '''.replace('PORT', str(self.server.server_port)).replace('MODEL', json.dumps(model)))
-        env = {'PATH': os.defpath, 'HOME': str(login_home), 'LANG': 'en_US.UTF-8',
+        # The npm launcher uses /usr/bin/env node. setup-node can install Node
+        # outside os.defpath; retain only that resolved executable directory,
+        # rather than inheriting the caller's entire PATH or authentication env.
+        node = shutil.which('node')
+        isolated_path = os.pathsep.join(dict.fromkeys(
+            ([str(Path(node).resolve(strict=True).parent)] if node else []) + os.defpath.split(os.pathsep)))
+        env = {'PATH': isolated_path, 'HOME': str(login_home), 'LANG': 'en_US.UTF-8',
                'XDG_CONFIG_HOME': str(login_home / 'config'), 'XDG_DATA_HOME': str(login_home / 'data'),
                'XDG_CACHE_HOME': str(login_home / 'cache'), 'CODEX_HOME': str(home)}
         result = {'label': label, 'model': model, 'disabled': list(disabled), 'source_sha256': hashlib.sha256(
@@ -124,8 +131,11 @@ stream_max_retries = 0
         rpc = None
         try:
             with patch.dict(os.environ, env, clear=True), patch.object(codex, 'DISABLED', disabled):
-                version = subprocess.run([str(self.binary), '--version'], env=env, cwd=workspace,
-                                         text=True, capture_output=True, timeout=10, check=True).stdout.strip()
+                version_process = subprocess.run([str(self.binary), '--version'], env=env, cwd=workspace,
+                                                 text=True, capture_output=True, timeout=10)
+                self.assertEqual(version_process.returncode, 0,
+                                 f'Codex --version failed: stderr={version_process.stderr[:2048]!r}')
+                version = version_process.stdout.strip()
                 result['runtime_version'] = version
                 self.assertEqual('codex-cli ' + PINNED_VERSION, version)
                 rpc = codex._RPC(self.binary, home, workspace, timeout=30)
