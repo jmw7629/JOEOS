@@ -310,7 +310,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     const bridgeNode=(key,label,go='agents')=>{
       const x=bridges[key]||{},state=x.state||'unknown',progress=x.progress_state||'unknown',pending=Number(x.pending_count||0),execution=x.execution_state||'unknown',reason=x.execution_reason||'',activeRef=x.active_run_ref||'',source=x.execution_source||'',externalElapsed=x.external_elapsed_seconds;
       const process=progress&&progress!=='unknown'?`${state}/${progress}`:state;
-      const visual=x.owner_paused&&!x.external_running?'paused':state==='failed'||execution==='blocked'?'failed':state==='healthy'&&execution==='ready'?'healthy':'unknown';
+      const visual=x.owner_paused&&!x.external_running?'paused':state==='failed'||execution==='blocked'?'failed':state==='healthy'&&(execution==='ready'||execution==='running')?'healthy':'unknown';
       const elapsed=externalElapsed===null||externalElapsed===undefined?'':` · ${Math.max(0,Math.round(Number(externalElapsed)/60))}m`;
       const active=activeRef ? ' · Active: '+activeRef+(source?' · '+source:'')+(source==='external-bridge'?elapsed:'') : '';
       const detail=x.owner_paused&&!x.external_running?'Paused by owner · execution disabled':`Process: ${process}${active} · Execution: ${execution}${reason?' · '+reason:''}`;

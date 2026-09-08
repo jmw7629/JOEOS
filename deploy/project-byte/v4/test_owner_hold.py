@@ -107,7 +107,7 @@ class OwnerHoldTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.backend.create_github_issue("jmw7629/StickDeath-Infinity-", "fixture", "fixture")
 
-    def health_fixture(self, active_child=False):
+    def health_fixture(self, active_child=False, executor_evidence_complete=True):
         rt = self.runtime
         current = rt.time.time()
         rt.SYNC_STATE.update(last_attempt=int(current), last_ok=int(current), last_error="")
@@ -116,7 +116,7 @@ class OwnerHoldTests(unittest.TestCase):
         rt._service_state = lambda service: "active"
         rt._pending_runs = lambda repo, now: {"count": 0}
         rt._latest_bridge_activity = lambda repo, **kw: (current, True)
-        rt._active_executor = lambda repo, **kw: {"running": active_child and repo == BYTE, "count": int(active_child and repo == BYTE), "evidence_complete": True}
+        rt._active_executor = lambda repo, **kw: {"running": active_child and repo == BYTE, "count": int(active_child and repo == BYTE), "evidence_complete": executor_evidence_complete}
         rt._execution_readiness = lambda repo, now, **kw: {"state": "ready", "reason_code": "success", "reason": "last execution completed successfully", "last_execution_age_seconds": 5, "last_run_ref": "issue-1", "freshness_window_seconds": 1800}
         return rt.health_snapshot()
 
@@ -143,7 +143,19 @@ class OwnerHoldTests(unittest.TestCase):
         self.assertEqual(byte["state"], "failed")
         self.assertEqual(byte["progress_state"], "running-despite-owner-hold")
         self.assertTrue(byte["external_running"])
+        self.assertEqual(byte["execution_state"], "blocked")
+        self.assertEqual(byte["execution_reason_code"], "owner-paused")
         self.assertEqual(byte["pending_count"], 0)
+
+    def test_running_child_partial_scan_during_hold_is_still_observed(self):
+        self.make_hold()
+        byte = self.health_fixture(active_child=True, executor_evidence_complete=False)["components"]["bridges"]["stickdeath"]
+        self.assertEqual(byte["state"], "failed")
+        self.assertEqual(byte["progress_state"], "running-despite-owner-hold")
+        self.assertTrue(byte["external_running"])
+        self.assertFalse(byte["external_evidence_complete"])
+        self.assertEqual(byte["execution_state"], "blocked")
+        self.assertEqual(byte["execution_reason_code"], "owner-paused")
 
     def test_health_missing_hold_evidence_never_goes_green(self):
         with mock.patch.object(Path, "lstat", side_effect=PermissionError("private path")):
