@@ -92,7 +92,9 @@ def _external_review_check_summary(rollup) -> dict:
     if not isinstance(rollup, list):
         summary["unknown"] = 1
         return summary
-    for raw in rollup[:64]:
+    # The repository response is already byte-bounded. Summarize every check so
+    # a failure beyond an arbitrary display limit cannot become a green result.
+    for raw in rollup:
         if not isinstance(raw, dict):
             summary["unknown"] += 1
             continue
@@ -122,11 +124,10 @@ def _external_review_check_summary(rollup) -> dict:
 def _external_review_item(raw, *, key: str, project: str, repo: str, current: float):
     if not isinstance(raw, dict):
         return None
-    try:
-        number = int(raw.get("number") or 0)
-    except (TypeError, ValueError):
-        return None
-    if number <= 0 or number > 2_147_483_647:
+    number = raw.get("number")
+    # GitHub emits integer IDs. Do not coerce booleans, strings or floats into
+    # trusted pull-request URLs (including non-finite JSON numeric values).
+    if type(number) is not int or number <= 0 or number > 2_147_483_647:
         return None
     title = app.sanitize(str(raw.get("title") or "")).strip()
     title = " ".join(title.split())[:EXTERNAL_REVIEW_TITLE_MAX]
@@ -179,16 +180,20 @@ def _read_external_reviews_repo(key: str, project: str, repo: str, current: floa
     if proc.returncode != 0 or len(proc.stdout or "") > 256 * 1024:
         return None
     try:
-        raw = json.loads(proc.stdout or "[]")
-    except (json.JSONDecodeError, TypeError):
+        raw = json.loads(proc.stdout)
+    except (ValueError, TypeError, RecursionError):
         return None
-    if not isinstance(raw, list):
+    if not isinstance(raw, list) or len(raw) > EXTERNAL_REVIEW_LIMIT:
         return None
-    items = []
-    for entry in raw[:EXTERNAL_REVIEW_LIMIT]:
+    items, numbers = [], set()
+    for entry in raw:
         item = _external_review_item(entry, key=key, project=project, repo=repo, current=current)
-        if item:
-            items.append(item)
+        if item is None or item["number"] in numbers:
+            # Preserve stale evidence through the caller instead of presenting
+            # malformed or incomplete output as a fresh empty review queue.
+            return None
+        numbers.add(item["number"])
+        items.append(item)
     return {"state": "fresh", "age_seconds": 0, "items": items, "observed_at": int(current)}
 
 
