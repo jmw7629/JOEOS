@@ -48,13 +48,17 @@ def api_allowed(method,path):
 
 
 class Access:
-    def __init__(self, app_root, clock=time.time, state_dir=None):
+    def __init__(self, app_root, clock=time.time, state_dir=None, public_owner_key_file=None):
         self.root = Path(app_root).resolve(strict=True)
         self.clock = clock
         self.lock = threading.RLock()
         self.sessions = {}
         self.attempts = {}
         self.login_clients = collections.Counter()
+        # Omission is supported only by disposable compatibility fixtures. The
+        # production CLI always requires a separate strong public owner key.
+        self.public_owner_key_file = Path(public_owner_key_file) if public_owner_key_file else None
+        self.public_owner_key()
         self.state_dir = Path(state_dir) if state_dir else None
         if self.state_dir:
             self.state_dir.mkdir(mode=0o700, exist_ok=True)
@@ -83,8 +87,20 @@ class Access:
         # from turning one revoked collaborator's requests into an owner lockout.
         return ('127.77.'+str(ident//256)+'.'+str(ident%256),0)
 
-    def identity(self, fingerprint):
-        # Never import the app: import/init routines can mutate its database.
+    def public_owner_key(self):
+        if self.public_owner_key_file is None:
+            return None
+        fd = os.open(self.public_owner_key_file, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, 'rb') as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600 or info.st_uid != os.getuid():
+                raise ValueError('Public owner credential is unavailable')
+            raw = stream.read(45)
+        if not re.fullmatch(rb'[A-Za-z0-9_-]{43}\n?', raw):
+            raise ValueError('Public owner credential is unavailable')
+        return raw.decode().rstrip('\n')
+
+    def owner_key(self):
         fd = os.open(self.root / 'admin.secret', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         with os.fdopen(fd, 'rb') as stream:
             info = os.fstat(stream.fileno())
@@ -93,7 +109,11 @@ class Access:
             raw = stream.read(1025)
         if len(raw) > 1024:
             raise ValueError('Owner credential is unavailable')
-        owner_hash = digest(raw.decode().strip())
+        return raw.decode().strip()
+
+    def identity(self, fingerprint):
+        # Never import the app: import/init routines can mutate its database.
+        owner_hash = digest(self.owner_key())
         with sqlite3.connect('file:' + quote(str(self.root / 'kanban.db')) + '?mode=ro', uri=True, timeout=3) as db:
             db.execute('PRAGMA query_only=ON')
             if hmac.compare_digest(fingerprint, owner_hash):
@@ -124,8 +144,23 @@ class Access:
                 return 'limited'
             attempts.append(now)
         fingerprint = digest(key)
+        public_owner_key = self.public_owner_key()
+        public_owner_fingerprint = None
+        if public_owner_key is not None:
+            owner_key = self.owner_key()
+            # The private owner key is never a public credential, regardless of
+            # its length or whether a collaborator record happens to match it.
+            if hmac.compare_digest(fingerprint, digest(owner_key)):
+                return None
+            alias_fingerprint = digest(public_owner_key)
+            if hmac.compare_digest(fingerprint, alias_fingerprint):
+                key = owner_key
+                fingerprint = digest(owner_key)
+                public_owner_fingerprint = alias_fingerprint
         found = self.identity(fingerprint)
         if not found:
+            return None
+        if public_owner_key is not None and (found[0]['role'] == 'owner') != (public_owner_fingerprint is not None):
             return None
         with self.lock:
             self.sessions = {k:v for k,v in self.sessions.items() if now < v['expires'] and now >= v['created']}
@@ -134,7 +169,8 @@ class Access:
             self.sessions.pop(digest(old_token), None)
             token = secrets.token_urlsafe(32)
             self.sessions[digest(token)] = {'fingerprint':fingerprint, 'key':key, 'csrf':secrets.token_urlsafe(32),
-                                           'created':now, 'expires':now+found[1]}
+                                           'created':now, 'expires':now+found[1],
+                                           'public_owner_fingerprint':public_owner_fingerprint}
             return token, found[1]
 
     def check(self, token):
@@ -147,6 +183,16 @@ class Access:
                 return None
             record = dict(record)
         found = self.identity(record['fingerprint'])
+        public_owner_key = self.public_owner_key()
+        alias_fingerprint = record.get('public_owner_fingerprint')
+        if public_owner_key is not None and found and (found[0]['role'] == 'owner') != (alias_fingerprint is not None):
+            self.logout(token)
+            return None
+        if alias_fingerprint is not None and (public_owner_key is None or
+                not hmac.compare_digest(alias_fingerprint, digest(public_owner_key)) or
+                not found or found[0]['role'] != 'owner'):
+            self.logout(token)
+            return None
         now = self.clock()
         if not found or now < record['created'] or now >= min(record['expires'], record['created']+found[1]):
             self.logout(token)
@@ -383,8 +429,9 @@ if __name__=='__main__':
     parser.add_argument('--origin',required=True)
     parser.add_argument('--port',type=int,default=8097)
     parser.add_argument('--state-dir',type=Path,required=True)
+    parser.add_argument('--public-owner-key-file',type=Path,required=True)
     args=parser.parse_args()
     if not re.fullmatch(r'https://[a-z0-9-]+\.[a-z0-9]+\.ts\.net',args.origin):parser.error('A canonical HTTPS Tailscale origin is required')
-    server=BoundedServer(('127.0.0.1',args.port),handler_for(Access(args.app_root,state_dir=args.state_dir),args.origin,trusted_serve=True))
+    server=BoundedServer(('127.0.0.1',args.port),handler_for(Access(args.app_root,state_dir=args.state_dir,public_owner_key_file=args.public_owner_key_file),args.origin,trusted_serve=True))
     print('PROJECT_BYTE authenticated public gateway ready',flush=True)
     server.serve_forever()

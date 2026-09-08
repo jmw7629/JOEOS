@@ -10,9 +10,15 @@ pending application PRs, start a permission runner, resume BYTE or change R3/VIT
 
 ## Authentication and browser behavior
 
-Use the existing owner or collaborator access key. The gateway validates it with
-read-only queries against the live app's credentials and settings; invalid keys are
-never forwarded to the app. A random Secure/HttpOnly/SameSite=Strict host cookie
+Use the separate public owner sign-in key or an existing strong collaborator access
+key. Live preflight found the private owner key is too short for public authentication.
+The public owner key is generated from 32 random bytes and kept in a private 0600
+file outside the repository and release. The service requires this file; it rejects
+the raw private owner key, preserving that key for the existing private app. Public
+owner sign-in resolves to the current owner credential entirely inside the gateway.
+Rotating either credential invalidates the corresponding owner sessions. The gateway
+validates credentials and settings with read-only queries; invalid keys are never
+forwarded to the app. A random Secure/HttpOnly/SameSite=Strict host cookie
 identifies a volatile gateway session. The real key exists only in that session's
 server memory and is never written to gateway disk, cookies, logs or browser storage.
 A separate per-session nonce is supplied in authenticated HTML and used in the
@@ -73,8 +79,15 @@ create a 0700 state directory, verify SHA256 values, and point `current` at the 
 Install the included systemd unit, run `systemd-analyze verify`, and start only
 `project-byte-public-gateway.service`.
 
+Before starting the service, provision a `secrets.token_urlsafe(32)` value in
+`credentials/public-owner.secret` under the gateway root. Set the credentials directory
+0700 and the file 0600, owned by the service user. Keep this key out of Git, logs and
+public artifacts. Give the owner the key through a private local credential file.
+Do not replace the application's `admin.secret`. Preserve the public key across
+release updates; intentional rotation signs out public owner sessions.
+
 Before public access, verify login and authenticated read-only live API calls using
-the existing key entirely on the VPS; print only statuses/counts, never credentials,
+the public owner key entirely on the VPS; print only statuses/counts, never credentials,
 cookies, nonces or business records. Verify anonymous GET/HEAD/API/uploads fail closed,
 logout revokes the session, source map permissions and service restrictions work.
 Then enable exactly:

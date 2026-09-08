@@ -58,6 +58,88 @@ class GatewayTests(unittest.TestCase):
         cookie=headers['Set-Cookie'];self.assertIn('Secure; HttpOnly; SameSite=Strict',cookie)
         return cookie.split(';')[0].split('=',1)[1]
 
+    def enable_public_owner(self):
+        self.public_key=secrets.token_urlsafe(32)
+        self.public_file=self.root/'public-owner.secret'
+        self.public_file.write_text(self.public_key+'\n');self.public_file.chmod(0o600)
+        self.access=Access(self.root,clock=lambda:self.now,public_owner_key_file=self.public_file)
+        self.server.RequestHandlerClass=handler_for(self.access,self.origin,('127.0.0.1',self.upstream.server_port))
+
+    def test_public_alias_accepts_strong_key_and_forwards_existing_short_owner_key(self):
+        self.key='1234';(self.root/'admin.secret').write_text(self.key)
+        self.enable_public_owner()
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':self.key})[0],401)
+        token=self.login(self.public_key)
+        status,_,raw=self.request('/api/session',token=token,key=self.key)
+        self.assertEqual(status,200);self.assertEqual(json.loads(raw)['role'],'owner')
+        self.assertEqual(self.request('/api/tasks',token=token,key=self.key)[0],200)
+        self.assertEqual(self.calls[-1]['key'],self.key)
+        record=self.access.sessions[digest(token)]
+        self.assertEqual(record['fingerprint'],digest(self.key))
+        self.assertEqual(record['public_owner_fingerprint'],digest(self.public_key))
+        self.assertNotIn(self.public_key,repr(record))
+        self.assertNotIn(self.public_key,self.request('/',token=token)[2].decode())
+
+    def test_public_alias_rejects_strong_private_owner_key_and_preserves_collaborator(self):
+        self.enable_public_owner()
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':self.key})[0],401)
+        token=self.login(self.viewer)
+        self.assertEqual(json.loads(self.request('/api/session',token=token,key=self.viewer)[2])['role'],'viewer')
+        self.assertEqual(self.request('/api/tasks',token=token,key=self.viewer)[0],200)
+        self.assertEqual(self.calls[-1]['key'],self.viewer)
+        self.assertIsNone(self.access.sessions[digest(token)]['public_owner_fingerprint'])
+        # An accidental alias/private-key equality must never enable raw-key login.
+        (self.root/'admin.secret').write_text(self.public_key)
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':self.public_key})[0],401)
+
+    def test_public_alias_and_private_owner_rotation_revoke_old_sessions(self):
+        self.enable_public_owner();token=self.login(self.public_key)
+        replacement=secrets.token_urlsafe(32);self.public_file.write_text(replacement)
+        self.assertEqual(self.request('/',token=token)[0],303)
+        self.assertNotIn(digest(token),self.access.sessions)
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':self.public_key})[0],401)
+        token=self.login(replacement)
+        self.key=secrets.token_hex(20);(self.root/'admin.secret').write_text(self.key)
+        self.assertEqual(self.request('/',token=token)[0],303)
+        token=self.login(replacement)
+        self.assertEqual(self.request('/api/tasks',token=token,key=self.key)[0],200)
+        self.assertEqual(self.calls[-1]['key'],self.key)
+
+    def test_public_alias_never_crosses_owner_collaborator_identity_boundary(self):
+        self.enable_public_owner();owner_token=self.login(self.public_key);viewer_token=self.login(self.viewer)
+        with sqlite3.connect(self.root/'kanban.db') as db:
+            db.execute('INSERT INTO collaborators VALUES (?,?,?,?,?)',('old-owner','Old owner','admin',digest(self.key),1))
+        (self.root/'admin.secret').write_text(self.viewer)
+        self.assertEqual(self.request('/',token=owner_token)[0],303,'old owner must not become a collaborator')
+        self.assertEqual(self.request('/',token=viewer_token)[0],303,'collaborator must not become owner')
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':self.viewer})[0],401)
+        self.assertEqual(self.calls,[])
+
+    def test_public_alias_file_requires_private_regular_valid_credential(self):
+        self.enable_public_owner()
+        for malformed in ['', '1234', 'x'*42, 'x'*44, 'x'*42+'!', 'x'*43+'\n\n']:
+            self.public_file.write_text(malformed)
+            with self.subTest(value_length=len(malformed)),self.assertRaises(ValueError):
+                Access(self.root,public_owner_key_file=self.public_file)
+        self.public_file.write_text(self.public_key)
+        for mode in (0o640,0o644,0o400):
+            self.public_file.chmod(mode)
+            with self.subTest(mode=mode),self.assertRaises(ValueError):
+                Access(self.root,public_owner_key_file=self.public_file)
+        self.public_file.chmod(0o600);self.public_file.unlink()
+        with self.assertRaises(OSError):Access(self.root,public_owner_key_file=self.public_file)
+        self.public_file.symlink_to(self.root/'admin.secret')
+        with self.assertRaises(OSError):Access(self.root,public_owner_key_file=self.public_file)
+
+    def test_unavailable_public_alias_fails_closed_during_session(self):
+        self.enable_public_owner();token=self.login(self.public_key)
+        self.public_file.unlink()
+        self.assertEqual(self.request('/api/tasks',token=token,key=self.key)[0],503)
+        self.public_file.write_text('invalid');self.public_file.chmod(0o600)
+        self.assertEqual(self.request('/api/tasks',token=token,key=self.key)[0],400)
+        self.assertEqual(self.request('/_gateway/login','POST',{'key':self.viewer})[0],400)
+        self.assertEqual(self.calls,[])
+
     def test_anonymous_never_reaches_private_content_or_head(self):
         for route in ['/','/home.js','/api/tasks','/api/projects','/api/activity','/api/intelligence','/uploads/private.html','/admin.secret','/kanban.db']:
             for method in ('GET','HEAD'):
