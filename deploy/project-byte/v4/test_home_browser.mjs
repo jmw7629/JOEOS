@@ -49,6 +49,11 @@ try{
   await page.waitForFunction(()=>document.querySelector('#login').textContent.includes('owner'));
   await page.waitForSelector('#homeAgentMap [data-home-agent="builder"]');
   assert.equal(await page.locator('[data-home-action="create"] .pb-icon').count(),1,'inspector must not erase the New work icon');
+  await page.evaluate(()=>window.dispatchEvent(new CustomEvent('project-byte-health',{detail:{components:{bridges:{vitros:{state:'healthy',progress_state:'running',execution_state:'running',execution_reason:'active external executor observed; completion pending',active_run_ref:'issue-337',execution_source:'external-bridge',external_elapsed_seconds:60,external_running:true}},models:{state:'tested_ok',enabled:1,tested_ok:1}}}})));
+  const activeFabric=page.locator('#homeExecutionFabric .fabric-node').filter({hasText:'VITROS builder'});
+  assert.equal(await activeFabric.getAttribute('data-state'),'healthy','active execution must not render as unknown');
+  assert.match(await activeFabric.textContent(),/Execution: running/);
+  assert.match(await activeFabric.textContent(),/completion pending/);
   await page.locator('[data-home-scope="mike"]').click();
   await page.locator('[data-home-scope="critical"]').click();
   assert.equal(await page.locator('#ownerFilter').inputValue(),'Mike','priority must preserve owner');

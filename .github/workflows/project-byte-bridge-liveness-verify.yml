@@ -245,6 +245,9 @@ jobs:
           assert externally_running['stickdeath']['external_running'] is True, externally_running
           assert externally_running['stickdeath']['external_executor_count'] == 1, externally_running
           assert externally_running['stickdeath']['external_issue_number'] == 105, externally_running
+          assert externally_running['stickdeath']['execution_state'] == 'running', externally_running
+          assert externally_running['stickdeath']['execution_reason_code'] == 'active-executor', externally_running
+          assert externally_running['stickdeath']['execution_reason'] == 'active external executor observed; completion pending', externally_running
 
           mod.BRIDGE_CACHE['at'] = 0.0
           mod.BRIDGE_CACHE['value'] = {}

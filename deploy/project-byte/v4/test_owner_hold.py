@@ -143,6 +143,8 @@ class OwnerHoldTests(unittest.TestCase):
         self.assertEqual(byte["state"], "failed")
         self.assertEqual(byte["progress_state"], "running-despite-owner-hold")
         self.assertTrue(byte["external_running"])
+        self.assertEqual(byte["execution_state"], "blocked")
+        self.assertEqual(byte["execution_reason_code"], "owner-paused")
         self.assertEqual(byte["pending_count"], 0)
 
     def test_health_missing_hold_evidence_never_goes_green(self):
