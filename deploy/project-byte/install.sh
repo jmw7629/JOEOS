@@ -19,6 +19,12 @@ if [ "$(id -un)" != "joevps" ]; then
   exit 1
 fi
 
+# Remote/non-login shells do not always inherit the joevps user service bus.
+# Establish the conventional per-user bus explicitly; service-state failures
+# below still fail closed rather than being interpreted as an inactive worker.
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+
 mkdir -p "$DEST" "$DEST/backups" "$DEST/uploads"
 
 # Never leave a prior public listener exposed while application code changes.
@@ -196,6 +202,25 @@ echo "Home command center, agent inspector, and evidence-backed health UI are lo
 echo "Existing tasks, projects, attachments, database, and owner key were preserved."
 
 BRIDGE_REFRESH_FAILURES=0
+bridge_service_state() {
+  local service_name="$1"
+  local state=""
+  local rc=0
+  state="$(systemctl --user is-active "$service_name" 2>/dev/null)" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    case "$state" in
+      active|reloading|activating|deactivating) printf '%s\n' active; return 0 ;;
+    esac
+  fi
+  if [ "$rc" -eq 3 ]; then
+    case "$state" in
+      inactive|failed) printf '%s\n' inactive; return 0 ;;
+      deactivating) printf '%s\n' active; return 0 ;;
+    esac
+  fi
+  printf '%s\n' unavailable
+}
+
 byte_owner_hold_clear() {
   python3 - "$HOME/.config/joeos-opencode-bridge/STICKDEATH_BYTE_STOPPED_BY_OWNER" <<'OWNER_HOLD_PY'
 from pathlib import Path
@@ -222,6 +247,7 @@ refresh_bridge() {
   local remote_head=""
   local local_head=""
   local service_active=0
+  local service_state="unavailable"
 
   if [ "$service_name" = "stickdeath-byte-opencode-bridge.service" ] && ! byte_owner_hold_clear; then
     return 1
@@ -257,6 +283,13 @@ refresh_bridge() {
     return 1
   fi
 
+  service_state="$(bridge_service_state "$service_name")"
+  if [ "$service_state" = "unavailable" ]; then
+    echo "Bridge refresh skipped for $service_name: user service state is unavailable; no fetch, merge, or restart was performed." >&2
+    return 1
+  fi
+  [ "$service_state" = "active" ] && service_active=1
+
   echo "Refreshing bridge checkout for $service_name..."
   if ! git -C "$root" fetch --prune origin main; then
     echo "Bridge refresh failed for $service_name: git fetch failed." >&2
@@ -269,9 +302,13 @@ refresh_bridge() {
     return 1
   fi
 
-  if systemctl --user is-active --quiet "$service_name"; then
-    service_active=1
+  service_state="$(bridge_service_state "$service_name")"
+  if [ "$service_state" = "unavailable" ]; then
+    echo "Bridge refresh stopped for $service_name: user service state became unavailable; checkout and restart were left untouched." >&2
+    return 1
   fi
+  service_active=0
+  [ "$service_state" = "active" ] && service_active=1
 
   if [ "$local_head" = "$remote_head" ]; then
     if [ "$service_active" -eq 1 ]; then
@@ -283,6 +320,15 @@ refresh_bridge() {
     return 1
   else
     if [ "$service_name" = "stickdeath-byte-opencode-bridge.service" ] && ! byte_owner_hold_clear; then
+      return 1
+    fi
+    service_state="$(bridge_service_state "$service_name")"
+    if [ "$service_state" != "inactive" ]; then
+      if [ "$service_state" = "active" ]; then
+        echo "Bridge refresh deferred for $service_name: service became active before checkout mutation; HEAD was left unchanged." >&2
+      else
+        echo "Bridge refresh skipped for $service_name: user service state is unavailable before checkout mutation." >&2
+      fi
       return 1
     fi
     if ! git -C "$root" merge --ff-only origin/main; then
@@ -300,12 +346,26 @@ refresh_bridge() {
     return 1
   fi
 
+  service_state="$(bridge_service_state "$service_name")"
+  if [ "$service_state" = "active" ]; then
+    echo "Bridge is active at current checkout: $service_name @ ${local_head:0:12}; restart not required."
+    return 0
+  fi
+  if [ "$service_state" = "unavailable" ]; then
+    echo "Bridge refresh stopped for $service_name: user service state is unavailable before restart." >&2
+    return 1
+  fi
   if ! systemctl --user restart "$service_name"; then
     echo "Bridge refresh failed for $service_name: service restart failed." >&2
     return 1
   fi
-  if ! systemctl --user is-active --quiet "$service_name"; then
-    echo "Bridge refresh failed for $service_name: service is not active after restart." >&2
+  service_state="$(bridge_service_state "$service_name")"
+  if [ "$service_state" != "active" ]; then
+    if [ "$service_state" = "unavailable" ]; then
+      echo "Bridge refresh failed for $service_name: user service state is unavailable after restart." >&2
+    else
+      echo "Bridge refresh failed for $service_name: service is not active after restart." >&2
+    fi
     return 1
   fi
   echo "Bridge refreshed and active: $service_name @ ${local_head:0:12}"
@@ -313,7 +373,13 @@ refresh_bridge() {
 
 check_bridge_service() {
   local service_name="$1"
-  if ! systemctl --user is-active --quiet "$service_name"; then
+  local service_state=""
+  service_state="$(bridge_service_state "$service_name")"
+  if [ "$service_state" = "unavailable" ]; then
+    echo "Bridge liveness check failed for $service_name: user service state is unavailable; no control checkout was changed." >&2
+    return 1
+  fi
+  if [ "$service_state" != "active" ]; then
     echo "Bridge liveness check failed for $service_name: service is not active; no control checkout was changed." >&2
     return 1
   fi

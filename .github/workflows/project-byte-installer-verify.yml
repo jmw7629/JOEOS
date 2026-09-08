@@ -57,8 +57,12 @@ jobs:
           grep -q 'symbolic-ref --quiet --short HEAD' deploy/project-byte/install.sh
           grep -q '\[ "$branch" != "main" \]' deploy/project-byte/install.sh
           grep -q 'merge --ff-only origin/main' deploy/project-byte/install.sh
+          grep -q 'export XDG_RUNTIME_DIR=' deploy/project-byte/install.sh
+          grep -q 'export DBUS_SESSION_BUS_ADDRESS=' deploy/project-byte/install.sh
+          grep -q 'bridge_service_state()' deploy/project-byte/install.sh
+          grep -q 'user service state is unavailable; no fetch, merge, or restart was performed' deploy/project-byte/install.sh
           grep -q 'systemctl --user restart "$service_name"' deploy/project-byte/install.sh
-          grep -q 'systemctl --user is-active --quiet "$service_name"' deploy/project-byte/install.sh
+          grep -q 'systemctl --user is-active "$service_name"' deploy/project-byte/install.sh
           ! grep -q 'systemctl --user restart "$service_name" || true' deploy/project-byte/install.sh
           grep -q 'Bridge refreshed and active:' deploy/project-byte/install.sh
           grep -q 'configuration file is absent, so liveness cannot be verified' deploy/project-byte/install.sh
