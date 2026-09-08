@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import {verifyFocusedWorkspaces} from './test_focused_workspaces.mjs';
 import {prepareObservationFixtures,verifyObservatory} from './test_observatory_browser.mjs';
+import {verifyWorkspaceProfile} from './test_workspace_profile_browser.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -86,18 +87,19 @@ try{
     await page.locator(`#pbWorkspaces [data-home-go="${view}"]`).click();
     await page.waitForSelector(`#${view}.active`);
     assert.equal(await page.locator('#pbWorkspaces').evaluate(e=>e.open),false,'workspace drawer closes');
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),`${view} has no page-level horizontal overflow`);
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),`${view} has no page-level horizontal overflow`);
   }
   const out=process.env.PB_SCREENSHOTS||path.join(root,'screenshots');await fs.mkdir(out,{recursive:true});
   await verifyFocusedWorkspaces({page,api,base,out});
   await verifyObservatory({page,api,base,out});
   for(const [width,height] of [[320,740],[390,844],[768,1024],[1440,1000]]){
     await page.setViewportSize({width,height});await page.evaluate(()=>renderAll());await sleep(200);
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),`Home fits ${width}px`);
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),`Home fits ${width}px`);
     assert.equal(await page.locator('.home-nav button').count(),5);
     const b=await page.locator('.home-nav').boundingBox();assert.ok(b.x>=0&&b.x+b.width<=width+1,'dock fits viewport');
     await page.screenshot({path:path.join(out,`orbital-${width}.png`),fullPage:true});
   }
+  await verifyWorkspaceProfile({page,api,root});
   await api('/api/settings','POST',{general:{default_view:'board'}});
   await page.goto(base,{waitUntil:'networkidle'});await page.waitForSelector('#board.active');
   assert.equal(errors.length,0,'no browser exceptions: '+errors.join('; '));

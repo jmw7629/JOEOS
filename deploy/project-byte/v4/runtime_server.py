@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
 import subprocess
 import threading
 import time
@@ -85,6 +86,45 @@ EXTERNAL_REVIEW_GH = "/usr/bin/gh"
 EXTERNAL_REVIEW_DECISIONS = frozenset({"", "APPROVED", "CHANGES_REQUESTED", "REVIEW_REQUIRED"})
 EXTERNAL_REVIEW_MERGE_STATES = frozenset({"", "BEHIND", "BLOCKED", "CLEAN", "DIRTY", "DRAFT", "HAS_HOOKS", "UNKNOWN", "UNSTABLE"})
 EXTERNAL_REVIEW_CHECK_FAILURES = frozenset({"ACTION_REQUIRED", "CANCELLED", "FAILURE", "STALE", "TIMED_OUT"})
+
+WORKSPACE_PROFILE_DEFAULTS = {
+    "schema_version": 1,
+    "display_name": "PROJECT_BYTE",
+    "assistant_name": "Joe AI",
+    "owner_shortcuts": ["Joe", "Mike"],
+}
+
+
+def workspace_profile() -> dict:
+    """Read presentation-only configuration; never identity or permissions."""
+    defaults = json.loads(json.dumps(WORKSPACE_PROFILE_DEFAULTS))
+    try:
+        fd = os.open(app.ROOT / "workspace.json", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return defaults
+    with os.fdopen(fd, "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise ValueError("workspace profile must be a regular file")
+        raw = stream.read(16385)
+    if len(raw) > 16384:
+        raise ValueError("workspace profile is too large")
+    data = json.loads(raw)
+    if not isinstance(data, dict) or set(data) - set(defaults):
+        raise ValueError("unsupported workspace profile fields")
+    if type(data.get("schema_version")) is not int or data["schema_version"] != 1:
+        raise ValueError("unsupported workspace profile version")
+    for name in ("display_name", "assistant_name"):
+        value = data.get(name, defaults[name])
+        if not isinstance(value, str) or not value.strip() or len(value) > 48 or any(ord(c) < 32 for c in value):
+            raise ValueError("invalid workspace label")
+        defaults[name] = value.strip()
+    shortcuts = data.get("owner_shortcuts", defaults["owner_shortcuts"])
+    if not isinstance(shortcuts, list) or len(shortcuts) > 6:
+        raise ValueError("invalid owner shortcuts")
+    if any(not isinstance(v, str) or not v.strip() or len(v) > 48 or any(ord(c) < 32 for c in v) for v in shortcuts):
+        raise ValueError("invalid owner shortcut label")
+    defaults["owner_shortcuts"] = list(dict.fromkeys(v.strip() for v in shortcuts))
+    return defaults
 
 
 def _external_review_check_summary(rollup) -> dict:
@@ -1253,6 +1293,11 @@ class SafeHandler(app.H):
 
     def do_GET(self):
         path = unquote(urlparse(self.path).path)
+        if path == "/api/workspace-profile":
+            try:
+                return self.sendj({"profile": workspace_profile()})
+            except (OSError, ValueError, TypeError, RecursionError):
+                return self.sendj({"error": "Workspace presentation configuration is unavailable"}, 503)
         if path == "/healthz":
             return self.sendj(health_snapshot())
         if path == "/api/observatory":
