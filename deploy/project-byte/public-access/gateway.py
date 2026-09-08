@@ -22,13 +22,15 @@ import time
 from urllib.parse import quote, unquote, urlsplit
 
 COOKIE = '__Host-project_byte_session'
-ASSETS = {'/', '/index.html', '/home.js', '/home-inspector.js', '/health-runtime.js'}
+ASSETS = {'/', '/index.html', '/home.js', '/home-inspector.js', '/health-runtime.js', '/ai-connections.js'}
 GET_APIS = {'/healthz','/api/session','/api/tasks','/api/projects','/api/intelligence','/api/activity',
             '/api/models','/api/agents','/api/runs','/api/approvals','/api/settings','/api/notifications',
             '/api/team','/api/memory','/api/chat','/api/help','/api/observatory','/api/external-reviews',
-            '/api/workspace-profile','/api/execution-permissions'}
+            '/api/workspace-profile','/api/execution-permissions','/api/ai-connections'}
 POST_APIS = {'/api/auth','/api/settings','/api/notifications/read','/api/tasks','/api/chat','/api/models/test',
-             '/api/models','/api/agents','/api/memory','/api/team','/api/upload','/api/execution-permissions/decision'}
+             '/api/models','/api/agents','/api/memory','/api/team','/api/upload','/api/execution-permissions/decision',
+             '/api/ai-connections/discover','/api/ai-connections/connect','/api/ai-connections/default',
+             '/api/ai-connections/login','/api/ai-connections/disconnect'}
 MAX_BODY = 10 * 1024 * 1024
 MAX_RESPONSE = 20 * 1024 * 1024
 CSP = "default-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"

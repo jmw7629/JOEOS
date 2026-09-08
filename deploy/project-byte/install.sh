@@ -9,11 +9,15 @@ SERVICE="/etc/systemd/system/project-byte.service"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 EXPECTED_PERMISSIONS="0faf72af5e015c58ba7737fe9c6aaca227529fa0835fcc55f4e7d22d84e2c149"
 EXPECTED_BACKEND="7df2ed5c0e32ebca1bc2efce46ecdc3a393318e833bc4c6ee8754404fc642526"
-EXPECTED_SERVER="84e3bb65d24f01d2e81bf8a1dee59fefd96ed48a7ae9dfd7364d41e37ee40045"
-EXPECTED_INDEX="8bb259c9fb0e6fdf516ae83149f701a4a0bfa75b7fb0650279962f60f869f501"
+EXPECTED_SERVER="b3ac02476469be22e812b5b673cf8dfb9b1fcf0b92189bdef7fafb330c65e4cb"
+EXPECTED_INDEX="0aca79517bfab8f13f13476377d21c5f6dc4aa0ed7541a7e713b70c12da6c187"
 EXPECTED_HOME="0454ee3ea662789cd4c05ffa1d07eeca83da36b2516765df708782bdb06dbc90"
 EXPECTED_INSPECTOR="9924325cd0434a5b44dc7f49ff0db87642ddfaef1308b68256b5838dc7ec8d1d"
 EXPECTED_HEALTH="f189f4673a0610671839f9f43f59a404e9001e9a923f83ffe70ee363f61cc12d"
+EXPECTED_AI_RUNTIME="682326d44e1e9949346a2f49942253e799b5308d2c25fd8192bd6f7f540657b5"
+EXPECTED_AI_CONNECTIONS="73a0d20ae618c7704333845537e0bd436da0e7ac8db6784a49b1e85cc431bde8"
+EXPECTED_CODEX_CONNECTION="1bc510d2d5f138684d3817d4b6011d3bd26dabc8b582a5795913be57aa53ff02"
+EXPECTED_AI_UI="bc13a5d862ab55fc397f57a15ba48676dea3c6277c76c94f1540371b31872c1e"
 
 if [ "$(id -un)" != "joevps" ]; then
   echo "Run this as joevps, not root." >&2
@@ -54,6 +58,14 @@ if [ -f "$DEST/home-inspector.js" ]; then cp -p "$DEST/home-inspector.js" "$DEST
 if [ -f "$DEST/health-runtime.js" ]; then cp -p "$DEST/health-runtime.js" "$DEST/backups/health-runtime-${STAMP}.js"; fi
 if [ -f "$DEST/admin.secret" ]; then cp -p "$DEST/admin.secret" "$DEST/backups/admin-${STAMP}.secret"; fi
 
+if [ -f "$DEST/ai_runtime.py" ]; then cp -p "$DEST/ai_runtime.py" "$DEST/backups/ai_runtime.py-${STAMP}"; fi
+
+if [ -f "$DEST/ai_connections.py" ]; then cp -p "$DEST/ai_connections.py" "$DEST/backups/ai_connections.py-${STAMP}"; fi
+
+if [ -f "$DEST/codex_connection.py" ]; then cp -p "$DEST/codex_connection.py" "$DEST/backups/codex_connection.py-${STAMP}"; fi
+
+if [ -f "$DEST/ai-connections.js" ]; then cp -p "$DEST/ai-connections.js" "$DEST/backups/ai-connections.js-${STAMP}"; fi
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/backend" "$TMP/index"
@@ -69,6 +81,10 @@ curl --fail --silent --show-error --location "$V4/runtime_server.py" -o "$TMP/se
 curl --fail --silent --show-error --location "$V4/home.js" -o "$TMP/home.js"
 curl --fail --silent --show-error --location "$V4/home-inspector.js" -o "$TMP/home-inspector.js"
 curl --fail --silent --show-error --location "$V4/health-runtime.js" -o "$TMP/health-runtime.js"
+curl --fail --silent --show-error --location "$V4/ai_runtime.py" -o "$TMP/ai_runtime.py"
+curl --fail --silent --show-error --location "$V4/ai_connections.py" -o "$TMP/ai_connections.py"
+curl --fail --silent --show-error --location "$V4/codex_connection.py" -o "$TMP/codex_connection.py"
+curl --fail --silent --show-error --location "$V4/ai-connections.js" -o "$TMP/ai-connections.js"
 cat "$TMP"/backend/*.part > "$TMP/backend.py"
 cat "$TMP"/index/*.part > "$TMP/index.html"
 
@@ -79,6 +95,14 @@ INDEX_SHA="$(sha256sum "$TMP/index.html" | awk '{print $1}')"
 HOME_SHA="$(sha256sum "$TMP/home.js" | awk '{print $1}')"
 INSPECTOR_SHA="$(sha256sum "$TMP/home-inspector.js" | awk '{print $1}')"
 HEALTH_SHA="$(sha256sum "$TMP/health-runtime.js" | awk '{print $1}')"
+AI_RUNTIME_SHA="$(sha256sum "$TMP/ai_runtime.py" | awk '{print $1}')"
+[ "$AI_RUNTIME_SHA" = "$EXPECTED_AI_RUNTIME" ] || { echo "ai_runtime.py checksum mismatch; refusing deployment." >&2; exit 5; }
+AI_CONNECTIONS_SHA="$(sha256sum "$TMP/ai_connections.py" | awk '{print $1}')"
+[ "$AI_CONNECTIONS_SHA" = "$EXPECTED_AI_CONNECTIONS" ] || { echo "ai_connections.py checksum mismatch; refusing deployment." >&2; exit 5; }
+CODEX_CONNECTION_SHA="$(sha256sum "$TMP/codex_connection.py" | awk '{print $1}')"
+[ "$CODEX_CONNECTION_SHA" = "$EXPECTED_CODEX_CONNECTION" ] || { echo "codex_connection.py checksum mismatch; refusing deployment." >&2; exit 5; }
+AI_UI_SHA="$(sha256sum "$TMP/ai-connections.js" | awk '{print $1}')"
+[ "$AI_UI_SHA" = "$EXPECTED_AI_UI" ] || { echo "ai-connections.js checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$PERMISSIONS_SHA" = "$EXPECTED_PERMISSIONS" ] || { echo "Permission module checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$BACKEND_SHA" = "$EXPECTED_BACKEND" ] || { echo "Backend checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$SERVER_SHA" = "$EXPECTED_SERVER" ] || { echo "Runtime server SHA-256 mismatch; refusing deployment." >&2; exit 5; }
@@ -86,12 +110,13 @@ HEALTH_SHA="$(sha256sum "$TMP/health-runtime.js" | awk '{print $1}')"
 [ "$HOME_SHA" = "$EXPECTED_HOME" ] || { echo "Home module checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$INSPECTOR_SHA" = "$EXPECTED_INSPECTOR" ] || { echo "Home inspector checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$HEALTH_SHA" = "$EXPECTED_HEALTH" ] || { echo "Health UI checksum mismatch; refusing deployment." >&2; exit 5; }
-python3 -m py_compile "$TMP/backend.py" "$TMP/server.py" "$TMP/execution_permissions.py"
+python3 -m py_compile "$TMP/backend.py" "$TMP/server.py" "$TMP/execution_permissions.py" "$TMP/ai_runtime.py" "$TMP/ai_connections.py" "$TMP/codex_connection.py"
 if command -v node >/dev/null 2>&1; then
+  node --check "$TMP/ai-connections.js"
   node - "$TMP/index.html" "$TMP/home.js" "$TMP/home-inspector.js" "$TMP/health-runtime.js" <<'NODE'
 const fs=require('fs');
 const h=fs.readFileSync(process.argv[2],'utf8');
-const m=h.match(/<script>([\s\S]*)<\/script>/);
+const m=h.match(/<script>([\s\S]*?)<\/script>/);
 if(!m)throw new Error('inline script missing');
 new Function(m[1]);
 const home=fs.readFileSync(process.argv[3],'utf8');
@@ -128,6 +153,12 @@ install -m 0644 "$TMP/index.html" "$DEST/index.html"
 install -m 0644 "$TMP/home.js" "$DEST/home.js"
 install -m 0644 "$TMP/home-inspector.js" "$DEST/home-inspector.js"
 install -m 0644 "$TMP/health-runtime.js" "$DEST/health-runtime.js"
+install -m 0644 "$TMP/ai_runtime.py" "$DEST/ai_runtime.py"
+install -m 0644 "$TMP/ai_connections.py" "$DEST/ai_connections.py"
+install -m 0644 "$TMP/codex_connection.py" "$DEST/codex_connection.py"
+install -m 0644 "$TMP/ai-connections.js" "$DEST/ai-connections.js"
+mkdir -p /home/joevps/.local/state/project-byte
+chmod 700 /home/joevps/.local/state/project-byte
 touch "$DEST/project-byte.env"
 chmod 600 "$DEST/project-byte.env"
 
@@ -150,7 +181,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=/home/joevps/PROJECT_BYTE
+ReadWritePaths=/home/joevps/PROJECT_BYTE /home/joevps/.local/state/project-byte
+ReadWritePaths=-/home/joevps/.local/share/project-byte-codex/auth
 
 [Install]
 WantedBy=multi-user.target
@@ -199,6 +231,10 @@ if ! echo "$HEALTH" | grep -q '"version":4' || ! echo "$HEALTH" | grep -q '"ok":
   if [ -n "$LAST_HOME" ]; then cp -p "$LAST_HOME" "$DEST/home.js"; else rm -f "$DEST/home.js"; fi
   if [ -n "$LAST_INSPECTOR" ]; then cp -p "$LAST_INSPECTOR" "$DEST/home-inspector.js"; else rm -f "$DEST/home-inspector.js"; fi
   if [ -n "$LAST_HEALTH" ]; then cp -p "$LAST_HEALTH" "$DEST/health-runtime.js"; else rm -f "$DEST/health-runtime.js"; fi
+  if [ -f "$DEST/backups/ai_runtime.py-${STAMP}" ]; then cp -p "$DEST/backups/ai_runtime.py-${STAMP}" "$DEST/ai_runtime.py"; else rm -f "$DEST/ai_runtime.py"; fi
+  if [ -f "$DEST/backups/ai_connections.py-${STAMP}" ]; then cp -p "$DEST/backups/ai_connections.py-${STAMP}" "$DEST/ai_connections.py"; else rm -f "$DEST/ai_connections.py"; fi
+  if [ -f "$DEST/backups/codex_connection.py-${STAMP}" ]; then cp -p "$DEST/backups/codex_connection.py-${STAMP}" "$DEST/codex_connection.py"; else rm -f "$DEST/codex_connection.py"; fi
+  if [ -f "$DEST/backups/ai-connections.js-${STAMP}" ]; then cp -p "$DEST/backups/ai-connections.js-${STAMP}" "$DEST/ai-connections.js"; else rm -f "$DEST/ai-connections.js"; fi
   sudo systemctl restart project-byte.service
   exit 6
 fi

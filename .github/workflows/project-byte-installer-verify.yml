@@ -30,6 +30,7 @@ jobs:
           cp deploy/project-byte/v4/home-inspector.js "$TMP/home-inspector.js"
           cp deploy/project-byte/v4/health-runtime.js "$TMP/health-runtime.js"
           cp deploy/project-byte/v4/execution_permissions.py "$TMP/execution_permissions.py"
+          python3 deploy/project-byte/v4/verify_ai_packaging.py
           PERMISSIONS_SHA="$(sha256sum "$TMP/execution_permissions.py" | awk '{print $1}')"
           BACKEND_SHA="$(sha256sum "$TMP/backend.py" | awk '{print $1}')"
           SERVER_SHA="$(sha256sum "$TMP/server.py" | awk '{print $1}')"

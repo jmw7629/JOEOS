@@ -28,7 +28,7 @@ jobs:
           node - /tmp/project-byte-index.html <<'NODE'
           const fs=require('fs');
           const html=fs.readFileSync(process.argv[2],'utf8');
-          const match=html.match(/<script>([\s\S]*)<\/script>/);
+          const match=html.match(/<script>([\s\S]*?)<\/script>/);
           if(!match) throw new Error('inline application script missing');
           new Function(match[1]);
           NODE

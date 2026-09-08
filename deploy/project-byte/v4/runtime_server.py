@@ -1384,6 +1384,11 @@ class SafeHandler(app.H):
         return self._not_found(head=True)
 
 
+from ai_runtime import install as install_ai_connections
+
+SafeHandler = install_ai_connections(app, SafeHandler, PUBLIC_FILES)
+
+
 if __name__ == "__main__":
     app.init_db()
     _sync_once()

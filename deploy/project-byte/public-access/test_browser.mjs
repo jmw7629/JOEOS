@@ -20,6 +20,7 @@ try{
  await fs.writeFile(path.join(root,'backend.py'),await concat('server'));
  await fs.copyFile(path.join(source,'runtime_server.py'),path.join(root,'server.py'));
  await fs.copyFile(path.join(source,'execution_permissions.py'),path.join(root,'execution_permissions.py'));
+for(const name of ['ai_runtime.py','ai_connections.py','codex_connection.py','ai-connections.js'])await fs.copyFile(path.join(source,name),path.join(root,name));
  let html=await concat('index');
  for(const name of ['home.js','home-inspector.js','health-runtime.js']){await fs.copyFile(path.join(source,name),path.join(root,name));if(!html.includes(`<script src="/${name}"></script>`))html=html.replace('</body>',`<script src="/${name}"></script></body>`);}
  await fs.writeFile(path.join(root,'index.html'),html);await fs.writeFile(path.join(root,'admin.secret'),owner,{mode:0o600});await fs.mkdir(path.join(root,'bin'));
