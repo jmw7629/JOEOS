@@ -16,7 +16,8 @@ The runtime must be Codex **0.153.4**, with a dedicated private authentication
 directory and an empty private workspace. Configure `PROJECT_BYTE_CODEX_BIN`,
 `PROJECT_BYTE_CODEX_HOME` and `PROJECT_BYTE_CODEX_WORKSPACE` in the service
 environment. Authentication storage must be writable by the service, outside its
-public application directory. Do not install or authenticate another account
+public application directory. Custom authentication or state paths also require
+matching service `ReadWritePaths` entries. Do not install or authenticate another account
 implicitly. OpenAI documents a cached-auth transfer for an already authorized
 headless server in its [authentication guide](https://learn.chatgpt.com/docs/auth).
 

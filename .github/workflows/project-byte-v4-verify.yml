@@ -31,7 +31,7 @@ jobs:
           cp deploy/project-byte/v4/home-inspector.js /tmp/project-byte-v4/home-inspector.js
           cp deploy/project-byte/v4/health-runtime.js /tmp/project-byte-v4/health-runtime.js
           wc -c /tmp/project-byte-v4/execution_permissions.py /tmp/project-byte-v4/backend.py /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js /tmp/project-byte-v4/home-inspector.js /tmp/project-byte-v4/health-runtime.js
-          sha256sum /tmp/project-byte-v4/execution_permissions.py /tmp/project-byte-v4/backend.py /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js /tmp/project-byte-v4/home-inspector.js /tmp/project-byte-v4/health-runtime.js | tee /tmp/project-byte-v4/SHA256SUMS
+          sha256sum /tmp/project-byte-v4/{ai_runtime.py,ai_connections.py,codex_connection.py,ai-connections.js} /tmp/project-byte-v4/execution_permissions.py /tmp/project-byte-v4/backend.py /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js /tmp/project-byte-v4/home-inspector.js /tmp/project-byte-v4/health-runtime.js | tee /tmp/project-byte-v4/SHA256SUMS
 
       - name: Compile backend and runtime boundary
         run: python3 -m py_compile /tmp/project-byte-v4/backend.py /tmp/project-byte-v4/server.py /tmp/project-byte-v4/execution_permissions.py
@@ -270,6 +270,11 @@ jobs:
         with:
           name: project-byte-v4-verified
           path: |
+            /tmp/project-byte-v4/ai_runtime.py
+            /tmp/project-byte-v4/ai_connections.py
+            /tmp/project-byte-v4/codex_connection.py
+            /tmp/project-byte-v4/ai-connections.js
+            /tmp/project-byte-v4/execution_permissions.py
             /tmp/project-byte-v4/backend.py
             /tmp/project-byte-v4/server.py
             /tmp/project-byte-v4/index.html
