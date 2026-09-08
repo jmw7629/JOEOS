@@ -108,6 +108,14 @@ jobs:
         run: PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_observatory.py
       - name: Verify presentation configuration boundaries
         run: PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_workspace_profile.py
+      - name: Verify execution permission boundaries
+        run: PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_execution_permissions.py
+      - name: Verify real isolated OpenCode tools wait for owner decisions
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pb-permission-runner" --ignore-scripts --no-audit --no-fund opencode-linux-x64@1.18.29
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_execution_permissions_runner.py \
+            --binary "$RUNNER_TEMP/pb-permission-runner/node_modules/opencode-linux-x64/bin/opencode" \
+            --output "$RUNNER_TEMP/pb-permission-proof"
       - name: Exercise actual Home on mobile and desktop
         env:
           PB_SCREENSHOTS: ${{ runner.temp }}/pb-orbital-screenshots
@@ -119,6 +127,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: project-byte-orbital-browser-evidence
-          path: ${{ runner.temp }}/pb-orbital-screenshots
+          path: |
+            ${{ runner.temp }}/pb-orbital-screenshots
+            ${{ runner.temp }}/pb-permission-proof/**/result.json
+            ${{ runner.temp }}/pb-permission-proof/**/gateway-request-sequence.json
+            ${{ runner.temp }}/pb-permission-proof/**/request-sequence.json
           retention-days: 7
           if-no-files-found: ignore

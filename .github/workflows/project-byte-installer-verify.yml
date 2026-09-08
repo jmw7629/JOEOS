@@ -29,12 +29,16 @@ jobs:
           cp deploy/project-byte/v4/home.js "$TMP/home.js"
           cp deploy/project-byte/v4/home-inspector.js "$TMP/home-inspector.js"
           cp deploy/project-byte/v4/health-runtime.js "$TMP/health-runtime.js"
+          cp deploy/project-byte/v4/execution_permissions.py "$TMP/execution_permissions.py"
+          PERMISSIONS_SHA="$(sha256sum "$TMP/execution_permissions.py" | awk '{print $1}')"
           BACKEND_SHA="$(sha256sum "$TMP/backend.py" | awk '{print $1}')"
           SERVER_SHA="$(sha256sum "$TMP/server.py" | awk '{print $1}')"
           INDEX_SHA="$(sha256sum "$TMP/index.html" | awk '{print $1}')"
           HOME_SHA="$(sha256sum "$TMP/home.js" | awk '{print $1}')"
           INSPECTOR_SHA="$(sha256sum "$TMP/home-inspector.js" | awk '{print $1}')"
           HEALTH_SHA="$(sha256sum "$TMP/health-runtime.js" | awk '{print $1}')"
+          grep -q "EXPECTED_PERMISSIONS=\"$PERMISSIONS_SHA\"" deploy/project-byte/install.sh
+          python3 -m py_compile "$TMP/execution_permissions.py"
           grep -q "EXPECTED_BACKEND=\"$BACKEND_SHA\"" deploy/project-byte/install.sh
           grep -q "EXPECTED_SERVER=\"$SERVER_SHA\"" deploy/project-byte/install.sh
           grep -q "EXPECTED_INDEX=\"$INDEX_SHA\"" deploy/project-byte/install.sh

@@ -1217,6 +1217,15 @@ def observatory_snapshot():
         return OBS_CACHE["value"]
 
 
+def permission_gateway():
+    # Lazy loading keeps the optional runner boundary out of ordinary page/health reads.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("project_byte_permissions", Path(__file__).with_name("execution_permissions.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.Gateway(app.ROOT, hold=app.execution_hold), module
+
+
 class SafeHandler(app.H):
     """Production HTTP boundary with evidence-backed health."""
 
@@ -1298,6 +1307,10 @@ class SafeHandler(app.H):
 
     def do_GET(self):
         path = unquote(urlparse(self.path).path)
+        if path == "/api/execution-permissions":
+            if not self.need(4):
+                return
+            return self._execution_permissions()
         if path == "/api/workspace-profile":
             try:
                 return self.sendj({"profile": workspace_profile()})
@@ -1320,6 +1333,47 @@ class SafeHandler(app.H):
         if path in GET_API_PATHS or RUN_TERMINAL_RE.fullmatch(path):
             return app.H.do_GET(self)
         return self._not_found()
+
+    def _execution_permissions(self, decision=None, actor=None):
+        try:
+            gateway, module = permission_gateway()
+            try:
+                result = gateway.snapshot() if decision is None else gateway.decide(decision, actor)
+                return self.sendj(result)
+            except module.PermissionError as error:
+                return self.sendj({"error": str(error), "state": "unavailable", "requests": [],
+                                   "history": getattr(error, "history", [])}, error.status)
+        except Exception:
+            # No configuration, credentials, tool output, or SQLite paths in errors.
+            return self.sendj({"error": "Execution permissions are unavailable", "state": "unavailable", "requests": []}, 503)
+
+    def do_POST(self):
+        if unquote(urlparse(self.path).path) != "/api/execution-permissions/decision":
+            return app.H.do_POST(self)
+        actor = self.need(4)
+        if not actor:
+            return
+        # The existing explicit access-key header is required; no cookie credentials.
+        lengths = self.headers.get_all("Content-Length", [])
+        origin = self.headers.get("Origin")
+        if (self.path != "/api/execution-permissions/decision" or self.headers.get("Transfer-Encoding")
+                or len(lengths) != 1 or not lengths[0].isdigit() or not 0 < int(lengths[0]) <= 4096
+                or self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower() != "application/json"
+                or (origin and (urlparse(origin).scheme not in ("http", "https")
+                                or urlparse(origin).netloc != self.headers.get("Host")))):
+            return self.sendj({"error": "Invalid execution permission request"}, 400)
+        try:
+            # Reject duplicate keys and nonfinite values before runner or audit I/O.
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("project_byte_permissions", Path(__file__).with_name("execution_permissions.py"))
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            decision = module.decode(self.rfile.read(int(lengths[0])))
+        except Exception:
+            return self.sendj({"error": "Invalid execution permission request"}, 400)
+        if not isinstance(decision, dict):
+            return self.sendj({"error": "Invalid execution permission request"}, 400)
+        return self._execution_permissions(decision, actor)
 
     def do_HEAD(self):
         path = unquote(urlparse(self.path).path)

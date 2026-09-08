@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {verifyFocusedWorkspaces} from './test_focused_workspaces.mjs';
 import {prepareObservationFixtures,verifyObservatory} from './test_observatory_browser.mjs';
 import {verifyWorkspaceProfile} from './test_workspace_profile_browser.mjs';
+import {verifyExecutionPermissions} from './test_execution_permissions_browser.mjs';
 import {verifyExternalReviewLogout} from './test_external_reviews_browser.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -18,6 +19,7 @@ const key='TEST_ONLY_ORBITAL_UI_ACCESS_2026';
 async function concatenate(folder){const files=(await fs.readdir(path.join(source,folder))).filter(f=>f.endsWith('.part')).sort();return (await Promise.all(files.map(f=>fs.readFile(path.join(source,folder,f),'utf8')))).join('');}
 await fs.writeFile(path.join(root,'backend.py'),await concatenate('server'));
 await fs.copyFile(path.join(source,'runtime_server.py'),path.join(root,'server.py'));
+await fs.copyFile(path.join(source,'execution_permissions.py'),path.join(root,'execution_permissions.py'));
 let html=await concatenate('index');
 for(const name of ['home.js','home-inspector.js','health-runtime.js']){await fs.copyFile(path.join(source,name),path.join(root,name));const tag=`<script src="/${name}"></script>`;if(!html.includes(tag))html=html.replace('</body>',tag+'</body>');}
 await fs.writeFile(path.join(root,'index.html'),html);
@@ -101,6 +103,7 @@ try{
     await page.screenshot({path:path.join(out,`orbital-${width}.png`),fullPage:true});
   }
   await verifyWorkspaceProfile({page,api,root});
+  await verifyExecutionPermissions({page,api,base,out});
   await verifyExternalReviewLogout({page});
   await api('/api/settings','POST',{general:{default_view:'board'}});
   await page.goto(base,{waitUntil:'networkidle'});await page.waitForSelector('#board.active');

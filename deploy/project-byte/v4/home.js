@@ -885,3 +885,83 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});window.setInterval(refresh,15000);
   renderEvidence();renderVisuals();setTimeout(()=>refresh(true),0);
 })();
+
+// Live permissions are separate from the historical Observatory graph and code review.
+(() => {
+  const panel=document.querySelector('#pbObservatory .obs-approval-note');
+  if(!panel)return;
+  const style=document.createElement('style');
+  style.textContent=`.permission-head,.permission-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.permission-head b{flex:1}.permission-card{padding:12px;margin-top:12px;background:#091827;border:1px solid #31465c;border-radius:10px;min-width:0}.permission-card pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;max-height:240px;overflow:auto}.permission-card textarea{display:block;width:100%;box-sizing:border-box;min-height:65px;margin:8px 0;padding:9px;border:1px solid #31465c;border-radius:8px;background:#0b1d2f;color:#dce9f7}.permission-card button,.permission-head button{min-height:44px}.permission-context{overflow-wrap:anywhere}.permission-feedback{margin:9px 0;color:#efcf9b}.permission-history{overflow-wrap:anywhere;margin-top:12px}.permission-card[aria-busy=true]{opacity:.7}`;
+  document.head.appendChild(style);
+  let identity='',epoch=0,controller=null,busy=false,last=0,rows=[],snapshot=null,feedback='',decisionFeedback='';
+  const notes=new Map();
+  const who=()=>JSON.stringify([accessKey,session?.subject,session?.level]);
+  const owner=()=>!!accessKey&&session?.ok&&session?.level===4;
+  const active=()=>!document.hidden&&document.querySelector('#agents')?.classList.contains('active');
+  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function clear(){epoch++;controller?.abort();controller=null;busy=false;rows=[];snapshot=null;notes.clear();feedback='';decisionFeedback='';last=0;}
+  function render(){
+    if(!owner()){
+      panel.innerHTML='<b>Execution permissions</b><p>Owner sign-in is required to view or decide live tool requests. Historical traces and code-review decisions remain separate.</p>';
+      return;
+    }
+    const connected=snapshot?.state==='connected';
+    const title=connected?'Connected to registered runner':snapshot?.state==='not_connected'?'Not connected':'Connection unverified';
+    panel.innerHTML=`<div class="permission-head"><b>Execution permissions · ${title}</b><button data-permission-refresh ${busy?'disabled':''}>Refresh</button></div><p>Approve once releases one requested tool. Deny rejects all pending tools in this session, including requests arriving before the runner processes the decision. Neither action merges code or verifies tool completion.</p><div class="permission-feedback" role="status">${escape(decisionFeedback)}${decisionFeedback&&feedback?'<br>':''}${escape(feedback)}</div>${connected?`<p class="permission-context">${escape(snapshot.repository)} · ${escape(snapshot.session_id)}</p>`:'<p>A permission-capable runner must be registered on the server. Historical traces never create approval requests.</p>'}<div class="permission-queue">${connected?rows.map(row=>{
+      const r=row.request,remaining=Math.max(0,Math.ceil(row.expires_at-snapshot.server_time));
+      const enabled=row.state==='pending'&&remaining>0&&!busy;
+      return `<article class="permission-card" data-permission-handle="${escape(row.handle)}"><b>${escape(r.permission)} · ${escape(row.state)}</b><div class="permission-context">Tool ${escape(r.tool.callID)} · Message ${escape(r.tool.messageID)}</div><pre>${escape(JSON.stringify({patterns:r.patterns,metadata:r.metadata},null,2))}</pre><p>${row.state==='pending'?`Review window: ${remaining} seconds at last refresh. ${row.affected_count} pending in this session.`:'This request cannot be submitted again.'}</p>${enabled?`<label>Decision note (optional)<textarea maxlength="1000" data-permission-note="${escape(row.handle)}" placeholder="Stored in the audit. Denial notes are also sent to the runner.">${escape(notes.get(row.handle)||'')}</textarea></label><div class="permission-actions"><button data-permission-decision="approve_once" data-handle="${escape(row.handle)}">Approve once</button><button data-permission-decision="deny_session" data-handle="${escape(row.handle)}">Deny session’s pending tools</button></div>`:''}</article>`;
+    }).join('')||'<p>No pending tool permission requests.</p>':''}</div>${snapshot?.history?.length?`<details class="permission-history"><summary>Recent permission audit</summary>${snapshot.history.map(item=>`<p>${escape(new Date(item.ts*1000).toLocaleString())} · ${escape(item.decision)} · ${escape(item.result)}${item.note?` · ${escape(item.note)}`:''}</p>`).join('')}</details>`:''}`;
+  }
+  async function request(path,options,current,turn){
+    const response=await fetch(path,{...options,signal:controller.signal,headers:{'Content-Type':'application/json','X-Access-Key':accessKey}});
+    const data=await response.json();
+    if(turn!==epoch||who()!==current||!owner())return null;
+    if(!response.ok){const error=new Error(data.error||'Permission runner is unavailable');error.response=data;throw error;}
+    return data;
+  }
+  async function refresh(force=false){
+    const current=who();
+    if(identity!==current){clear();identity=current;render();}
+    if(!owner()||busy||(!force&&(!active()||Date.now()-last<5000)))return;
+    // Keep a note being edited stable while polling; decisions always recheck server state.
+    if(!force&&panel.contains(document.activeElement)&&document.activeElement.matches('textarea'))return;
+    busy=true;controller=new AbortController();const turn=epoch;
+    try{
+      const data=await request('/api/execution-permissions',{},current,turn);
+      if(!data)return;
+      snapshot=data;rows=data.requests||[];feedback='';
+      const keep=new Set(rows.filter(r=>r.state==='pending').map(r=>r.handle));
+      for(const handle of notes.keys())if(!keep.has(handle))notes.delete(handle);
+    }catch(error){if(turn===epoch&&who()===current){snapshot=error.response||null;rows=[];feedback=error.message;}}
+    finally{if(turn===epoch&&who()===current){busy=false;last=Date.now();render();}}
+  }
+  panel.addEventListener('input',event=>{const handle=event.target.dataset.permissionNote;if(handle)notes.set(handle,event.target.value);});
+  panel.addEventListener('click',async event=>{
+    if(event.target.closest('[data-permission-refresh]')){feedback='';void refresh(true);return;}
+    const button=event.target.closest('[data-permission-decision]');
+    if(!button||busy||!owner()||who()!==identity)return;
+    const row=rows.find(r=>r.handle===button.dataset.handle);
+    if(!row||row.state!=='pending')return;
+    const elapsed=(Date.now()-last)/1000;
+    if(row.expires_at<=snapshot.server_time+elapsed){feedback='The review window expired. Refresh the queue.';void refresh(true);return;}
+    const current=who(),turn=epoch;
+    const body={handle:row.handle,review_token:row.review_token,decision:button.dataset.permissionDecision,message:notes.get(row.handle)||''};
+    busy=true;controller=new AbortController();render();
+    try{
+      const data=await request('/api/execution-permissions/decision',{method:'POST',body:JSON.stringify(body)},current,turn);
+      if(!data)return;
+      decisionFeedback=data.message;notes.delete(row.handle);
+    }catch(error){if(turn===epoch&&who()===current)decisionFeedback='Decision could not be confirmed. Refresh to inspect its state; do not retry blindly. '+error.message;}
+    finally{if(turn===epoch&&who()===current){busy=false;rows=[];snapshot=null;render();void refresh(true);}}
+  });
+  document.addEventListener('click',event=>{
+    if(event.target.closest('#login,#logoutAllLocal')){clear();render();}
+    setTimeout(()=>void refresh(),0);
+  },true);
+  window.addEventListener('project-byte-home-render',()=>void refresh());
+  window.addEventListener('hashchange',()=>void refresh());
+  document.addEventListener('visibilitychange',()=>void refresh());
+  setInterval(()=>void refresh(),1000);
+  render();
+})();
