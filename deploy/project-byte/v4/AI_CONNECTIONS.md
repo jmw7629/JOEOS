@@ -21,11 +21,30 @@ matching service `ReadWritePaths` entries. Do not install or authenticate anothe
 implicitly. OpenAI documents a cached-auth transfer for an already authorized
 headless server in its [authentication guide](https://learn.chatgpt.com/docs/auth).
 
-Workspace chat explicitly disables execution capabilities, requires the effective
-read-only sandbox and expected model/provider, rejects every server tool request,
-and uses ephemeral threads. The native fixture proves the actual inference tool
-inventory on the pinned binary. Only these verified models can be selected through
-the subscription connection, when available to the signed-in account:
+Workspace chat requires the effective read-only sandbox and expected model/provider,
+rejects every server tool request, and uses ephemeral threads. Feature flags alone
+do not remove execution tools: bundled model metadata can restore code-mode,
+`apply_patch`, and delegation tools inside structured `additional_tools` input.
+The chat subprocess therefore uses a private startup catalog derived from the
+pinned binary's offline `debug models --bundled` output. It clears only
+`tool_mode`, `apply_patch_tool_type`, and `multi_agent_version`, and sets
+`agents.enabled=false`. Model IDs and reasoning metadata are preserved.
+
+The catalog is generated with an isolated temporary home, no account credentials,
+a deadline and a bounded output size. Its file is private and removed when the
+chat subprocess closes; source and derived catalog hashes identify the reviewed
+metadata. Ordinary account and model discovery use the original native catalog.
+Each conversation first checks that catalog for the selected model and effort,
+before starting the restricted subprocess. A local catalog never establishes
+subscription access. The documented `model_catalog_json` setting is applied at
+process startup; per-thread overrides have no effect. See the official
+[configuration schema](https://learn.chatgpt.com/docs/config-schema.json) and
+[configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference).
+
+The native fixture checks both ordinary and structured tool definitions, then
+submits synthetic attempts to invoke omitted execution tools and checks that a
+disposable canary file is never created. Only these verified models can be selected
+through the subscription connection, when available to the signed-in account:
 
 - gpt-6-astra
 - gpt-5.6-sol
@@ -33,10 +52,18 @@ the subscription connection, when available to the signed-in account:
 - gpt-5.6-luna
 - gpt-5.3-codex-spark
 
-Other Codex models are excluded until their capabilities are verified. In
-particular, the native negative controls show that gpt-5.5 and gpt-5.4-mini still
-advertise `apply_patch` despite general feature restrictions. Changing the runtime
-version requires another native review; it fails closed in the meantime.
+The first four models have bundled metadata. Spark is absent from that bundle and
+uses the same pinned runtime's separately verified fallback metadata; the
+application does not invent a Spark catalog entry. Other Codex models are excluded
+until their capabilities are verified. Stock-model negative controls retain the
+execution capabilities that the restricted chat subprocess removes. Changing the
+runtime version requires another native review; it fails closed in the meantime.
+
+Astra uses the native **Ultra** setting. In this runtime its primary inference is
+encoded as `xhigh`; automatic delegation remains disabled in workspace chat.
+Other selectable Codex models retain Low effort. If the account's original model
+catalog does not advertise the requested effort, the conversation fails explicitly
+instead of silently substituting a different setting or model.
 
 Selecting a missing or disabled default produces an explicit error. It never
 silently switches to Ollama or paid API usage. The existing execution bridge is a

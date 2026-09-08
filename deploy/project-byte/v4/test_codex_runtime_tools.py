@@ -1,8 +1,10 @@
-"""Opt-in native tool-inventory acceptance against pinned, unauthenticated Codex.
+"""Opt-in native capability acceptance against pinned, unauthenticated Codex.
 
 PROJECT_BYTE_TEST_CODEX_BIN=/absolute/path/to/codex python3 test_codex_runtime_tools.py
 Optional PROJECT_BYTE_CODEX_EVIDENCE_DIR saves only synthetic request/evidence data.
-The local Responses fixture never emits tool calls. No owner authentication is used.
+Synthetic malicious calls target only a disposable workspace canary. The tests
+require native dispatch to reject them as unsupported. No owner authentication
+is used, and every fixture thread retains a read-only sandbox.
 """
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -23,7 +25,17 @@ PINNED_VERSION = '0.153.4'
 FIXTURE_TEXT = 'PROJECT_BYTE_NATIVE_CHAT_FIXTURE'
 # These do not access files or execute work. The production adapter rejects every
 # server request, including item/tool/requestUserInput; unit tests verify that path.
-PLANNING_ONLY_TOOLS = {'update_plan', 'request_user_input'}
+PLANNING_ONLY_TOOLS = {'update_plan', 'request_user_input', 'request_user_input_async', 'curr_time'}
+CANARY_NAME = 'unadvertised-tool-canary.txt'
+
+
+def wire_tools(body):
+    """Newer model families put actual tool definitions in structured input items."""
+    tools = list(body.get('tools', []))
+    for item in body.get('input', []):
+        if item.get('type') == 'additional_tools':
+            tools.extend(item.get('tools', []))
+    return tools
 
 
 def tool_names(tools):
@@ -52,12 +64,20 @@ class ResponseFixture(BaseHTTPRequestHandler):
         self.server.requests.append({'path': self.path, 'body': body})
         if self.path != '/v1/responses':
             self.send_error(404); return
-        item = {'id': 'msg_fixture', 'type': 'message', 'status': 'completed', 'role': 'assistant',
-                'phase': 'final_answer', 'content': [{'type': 'output_text', 'text': FIXTURE_TEXT, 'annotations': []}]}
+        attack = getattr(self.server, 'attack', None)
+        attack_now = attack and len(self.server.requests) == self.server.attack_request
+        item = ({**attack, 'id': 'tool_fixture', 'call_id': 'call_fixture', 'status': 'completed'} if attack_now else
+                {'id': 'msg_fixture', 'type': 'message', 'status': 'completed', 'role': 'assistant',
+                 'phase': 'final_answer', 'content': [{'type': 'output_text', 'text': FIXTURE_TEXT, 'annotations': []}]})
         response = {'id': 'resp_fixture', 'object': 'response', 'created_at': 1, 'model': body.get('model'),
                     'status': 'completed', 'output': [item],
                     'usage': {'input_tokens': 10, 'output_tokens': 5, 'total_tokens': 15}}
         events = [
+            {'type': 'response.created', 'response': {**response, 'status': 'in_progress', 'output': []}},
+            {'type': 'response.output_item.added', 'output_index': 0, 'item': item},
+            {'type': 'response.output_item.done', 'output_index': 0, 'item': item},
+            {'type': 'response.completed', 'response': response},
+        ] if attack_now else [
             {'type': 'response.created', 'response': {**response, 'status': 'in_progress', 'output': []}},
             {'type': 'response.output_item.added', 'output_index': 0,
              'item': {**item, 'status': 'in_progress', 'content': []}},
@@ -94,7 +114,7 @@ class CodexNativeToolTests(unittest.TestCase):
         self.addCleanup(self.server.server_close)
         self.addCleanup(self.server.shutdown)
 
-    def capture(self, label, disabled, model='fixture-chat'):
+    def capture(self, label, disabled, model='fixture-chat', effort='low', chat_only=True, attack=None):
         root = self.root / label; root.mkdir(mode=0o700)
         home = root / 'codex'; home.mkdir(mode=0o700)
         workspace = root / 'workspace'; workspace.mkdir(mode=0o700)
@@ -120,7 +140,8 @@ stream_max_retries = 0
         env = {'PATH': isolated_path, 'HOME': str(login_home), 'LANG': 'en_US.UTF-8',
                'XDG_CONFIG_HOME': str(login_home / 'config'), 'XDG_DATA_HOME': str(login_home / 'data'),
                'XDG_CACHE_HOME': str(login_home / 'cache'), 'CODEX_HOME': str(home)}
-        result = {'label': label, 'model': model, 'disabled': list(disabled), 'source_sha256': hashlib.sha256(
+        result = {'label': label, 'model': model, 'requested_effort': effort,
+                  'chat_only': chat_only, 'disabled': list(disabled), 'source_sha256': hashlib.sha256(
             Path(codex.__file__).read_bytes()).hexdigest()}
         binary_hash = hashlib.sha256()
         with self.binary.open('rb') as binary_stream:
@@ -128,6 +149,8 @@ stream_max_retries = 0
                 binary_hash.update(chunk)
         result['runtime_sha256'] = binary_hash.hexdigest()
         before = len(self.server.requests)
+        self.server.attack = attack
+        self.server.attack_request = before + 1
         rpc = None
         try:
             with patch.dict(os.environ, env, clear=True), patch.object(codex, 'DISABLED', disabled):
@@ -138,7 +161,8 @@ stream_max_retries = 0
                 version = version_process.stdout.strip()
                 result['runtime_version'] = version
                 self.assertEqual('codex-cli ' + PINNED_VERSION, version)
-                rpc = codex._RPC(self.binary, home, workspace, timeout=30)
+                rpc = codex._RPC(self.binary, home, workspace, timeout=30, chat_only=chat_only)
+                result['catalog_provenance'] = getattr(rpc, 'catalog_provenance', None)
                 deadline = time.monotonic() + 35
                 created = rpc.request('thread/start', {'model': model, 'modelProvider': 'fixture',
                     'cwd': str(workspace), 'sandbox': 'read-only', 'approvalPolicy': 'never', 'ephemeral': True,
@@ -147,6 +171,7 @@ stream_max_retries = 0
                     ('modelProvider', 'sandbox', 'approvalPolicy', 'cwd', 'instructionSources')}
                 thread_id = created['thread']['id']; rpc.events.clear()
                 started = rpc.request('turn/start', {'threadId': thread_id,
+                    'effort': effort,
                     'input': [{'type': 'text', 'text': 'Return the fixture reply without using tools.'}]}, deadline=deadline)
                 turn_id = started['turn']['id']
                 item_types = []; replies = []
@@ -169,19 +194,22 @@ stream_max_retries = 0
             requests = self.server.requests[before:]
             result['request_paths'] = [r['path'] for r in requests]
             result['requests'] = requests
-            result['tool_names'] = [name for request in requests for name in tool_names(request['body'].get('tools', []))]
+            result['tool_names'] = [name for request in requests for name in tool_names(wire_tools(request['body']))]
             result['auth_file_created'] = (home / 'auth.json').exists()
+            result['canary_created'] = (workspace / CANARY_NAME).exists()
             if self.evidence:
                 out = Path(self.evidence); out.mkdir(parents=True, exist_ok=True)
                 (out / (label + '.json')).write_text(json.dumps(result, indent=2) + '\n')
-        self.assertEqual(result['request_paths'], ['/v1/responses'])
+        self.assertEqual(result['request_paths'], ['/v1/responses'] * (2 if attack else 1))
         self.assertFalse(result['auth_file_created'])
+        self.assertFalse(result['canary_created'])
         return result
 
     def test_native_tool_inventory_has_no_execution_tools_and_negative_control_detects_shell(self):
         safe = self.capture('tools-disabled', codex.DISABLED)
         # No tool invocation is generated: the negative control advertises a shell only.
-        control = self.capture('shell-enabled-negative-control', tuple(x for x in codex.DISABLED if x != 'shell_tool'))
+        control = self.capture('shell-enabled-negative-control',
+                               tuple(x for x in codex.DISABLED if x != 'shell_tool'), chat_only=False)
         self.assertTrue({'exec_command', 'write_stdin'} <= set(control['tool_names']),
                         'negative control did not expose the expected executable tools')
         self.assertEqual(set(safe['tool_names']) - PLANNING_ONLY_TOOLS, set(), safe['tool_names'])
@@ -194,15 +222,62 @@ stream_max_retries = 0
         self.assertEqual(codex.CHAT_MODELS, reviewed)
         for model in sorted(reviewed):
             with self.subTest(model=model):
-                safe = self.capture('tools-disabled-' + model, codex.DISABLED, model)
+                effort = 'ultra' if model == 'gpt-6-astra' else 'low'
+                safe = self.capture('tools-disabled-' + model, codex.DISABLED, model, effort)
+                body = safe['requests'][0]['body']
+                self.assertEqual(body['model'], model)
+                # Native Ultra combines xhigh inference with orchestration policy.
+                # Private chat disables delegation independently at startup.
+                self.assertEqual(body.get('reasoning', {}).get('effort'), 'xhigh' if effort == 'ultra' else effort)
+                self.assertTrue(safe['catalog_provenance'])
                 self.assertEqual(set(safe['tool_names']) - PLANNING_ONLY_TOOLS, set(), safe['tool_names'])
                 self.assertTrue(set(safe['completed_item_types']) <= {'userMessage', 'agentMessage', 'reasoning', 'plan'})
+
+    def test_stock_model_metadata_is_negative_control_for_structured_execution_tools(self):
+        for model, effort in [('gpt-6-astra', 'low'), ('gpt-6-astra', 'ultra'),
+                              ('gpt-5.6-sol', 'low'), ('gpt-5.6-terra', 'low'), ('gpt-5.6-luna', 'low')]:
+            with self.subTest(model=model, effort=effort):
+                control = self.capture('stock-metadata-' + model + '-' + effort, codex.DISABLED,
+                                       model, effort, chat_only=False)
+                self.assertIn('exec', control['tool_names'])
+                body = control['requests'][0]['body']
+                self.assertTrue(any(item.get('type') == 'additional_tools' for item in body.get('input', [])))
+
+    def test_unadvertised_calls_are_rejected_before_native_file_or_agent_dispatch(self):
+        canary_patch = '*** Begin Patch\n*** Add File: ' + CANARY_NAME + '\n+fixture\n*** End Patch'
+        attacks = [
+            {'type': 'custom_tool_call', 'name': 'apply_patch', 'input': canary_patch},
+            {'type': 'custom_tool_call', 'name': 'functions.exec',
+             'input': 'await tools.apply_patch(' + json.dumps(canary_patch) + ')'},
+            {'type': 'custom_tool_call', 'name': 'exec',
+             'input': 'await tools.apply_patch(' + json.dumps(canary_patch) + ')'},
+            {'type': 'function_call', 'name': 'collaboration.spawn_agent',
+             'arguments': json.dumps({'task_name': 'fixture_only', 'message': 'Return fixture text only.'})},
+            {'type': 'function_call', 'name': 'spawn_agent',
+             'arguments': json.dumps({'task_name': 'fixture_only', 'message': 'Return fixture text only.'})},
+        ]
+        for model in sorted(codex.CHAT_MODELS):
+            for attack in attacks:
+                with self.subTest(model=model, tool=attack['name']):
+                    effort = 'ultra' if model == 'gpt-6-astra' else 'low'
+                    safe = self.capture('unadvertised-' + model + '-' + attack['name'].replace('.', '-'),
+                                        codex.DISABLED, model, effort, attack=attack)
+                    outputs = [item for request in safe['requests'] for item in request['body'].get('input', [])
+                               if item.get('type') in ('function_call_output', 'custom_tool_call_output')]
+                    self.assertEqual(len(outputs), 1)
+                    expected = ('unsupported custom tool call: ' if attack['type'] == 'custom_tool_call'
+                                else 'unsupported call: ') + attack['name']
+                    self.assertEqual(outputs[0]['call_id'], 'call_fixture')
+                    self.assertEqual(outputs[0]['output'], expected)
+                    self.assertTrue(set(safe['completed_item_types']) <= {'userMessage', 'agentMessage', 'reasoning', 'plan'})
+                    self.assertEqual(set(safe['tool_names']) - PLANNING_ONLY_TOOLS, set(), safe['tool_names'])
+                    self.assertEqual(safe['effective']['sandbox'], {'type': 'readOnly', 'networkAccess': False})
 
     def test_excluded_models_remain_negative_controls_for_apply_patch(self):
         for model in ('gpt-5.5', 'gpt-5.4-mini'):
             with self.subTest(model=model):
                 self.assertNotIn(model, codex.CHAT_MODELS)
-                control = self.capture('excluded-model-' + model, codex.DISABLED, model)
+                control = self.capture('excluded-model-' + model, codex.DISABLED, model, chat_only=False)
                 self.assertIn('apply_patch', control['tool_names'])
 
 

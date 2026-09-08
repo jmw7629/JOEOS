@@ -42,11 +42,16 @@ def finished(status='completed', turn='turn-fixture'):
 
 
 class FakeRPC:
-    def __init__(self, workspace, account='chatgpt', events=None, effective=None):
+    def __init__(self, workspace, account='chatgpt', events=None, effective=None, models=None):
         self.workspace = workspace
         self.account = account
         self.reply_events = copy.deepcopy(events if events is not None else [event(), finished()])
         self.effective = effective or {}
+        self.models = copy.deepcopy(models if models is not None else [
+            {'model': model, 'displayName': model,
+             'supportedReasoningEfforts': [{'reasoningEffort': effort, 'description': 'Fixture ' + effort}
+                                          for effort in (('low', 'ultra') if model == 'gpt-6-astra' else ('low',))]}
+            for model in sorted(codex.CHAT_MODELS)])
         self.events = []
         self.requests = []
         self.closed = False
@@ -56,6 +61,8 @@ class FakeRPC:
         self.requests.append((method, params))
         if method == 'account/read':
             return {'account': {'type': self.account} if self.account else None}
+        if method == 'model/list':
+            return {'data': copy.deepcopy(self.models), 'nextCursor': None}
         if method == 'account/login/start':
             return {'type': 'chatgptDeviceCode', 'loginId': 'fresh-login',
                     'verificationUrl': 'https://auth.openai.com/codex/device', 'userCode': 'FRESH-1234'}
@@ -171,6 +178,109 @@ class CodexTransportTests(unittest.TestCase):
         self.assertEqual(seen[0]['CODEX_HOME'], str(self.home))
         rpc.close()
 
+    def test_private_catalog_is_cleaned_after_close_and_failed_process_start(self):
+        for fail in (False, True):
+            with self.subTest(fail=fail):
+                catalog = tempfile.TemporaryDirectory(prefix='byte-catalog-cleanup-')
+                directory = Path(catalog.name)
+                path = directory / 'models.json'; path.write_text('{"models": []}')
+                self.addCleanup(catalog.cleanup)
+                with patch.object(codex, '_chat_catalog', return_value=(catalog, path, {'fixture': True})):
+                    if fail:
+                        with patch.object(codex.subprocess, 'Popen', side_effect=OSError('Fixture process failure')):
+                            with self.assertRaises(OSError):
+                                codex._RPC(self.binary, self.home, self.workspace, chat_only=True)
+                    else:
+                        rpc = codex._RPC(self.binary, self.home, self.workspace, chat_only=True)
+                        self.assertTrue(directory.exists())
+                        rpc.close(); rpc.close()
+                self.assertFalse(directory.exists())
+
+
+class CodexCatalogTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='byte-catalog-unit-')
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name).resolve()
+        self.document = {'fixture_manifest': 'preserved', 'models': [
+            {'slug': name, 'description': 'Original fixture description',
+             'supported_reasoning_levels': [{'effort': 'low'}, {'effort': 'ultra'}],
+             'tool_mode': 'code_mode_only', 'apply_patch_tool_type': 'freeform',
+             'multi_agent_version': 'v2', 'fixture_other_metadata': {'unchanged': True}}
+            for name in ('gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5')]}
+
+    def binary_for(self, source):
+        path = self.root / 'catalog.py'; path.write_text(source)
+        binary = self.root / 'fixture-catalog'
+        binary.write_text('#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' -u '
+                          + shlex.quote(str(path)) + ' "$@"\n')
+        binary.chmod(0o700)
+        return binary
+
+    def test_catalog_preserves_model_metadata_and_exports_without_owner_environment(self):
+        source = '''import os,sys
+assert sys.argv[1:]==['debug','models','--bundled']
+assert not os.getenv('OPENAI_API_KEY') and not os.getenv('ANTHROPIC_API_KEY')
+assert os.environ['HOME']==os.environ['CODEX_HOME']
+assert os.environ['HOME']!='fixture-wrong-home'
+'''
+        binary = self.binary_for(source + 'print(' + repr(json.dumps(self.document)) + ')\n')
+        with patch.dict(os.environ, {'OPENAI_API_KEY': 'fixture-must-not-inherit',
+                                     'ANTHROPIC_API_KEY': 'fixture-must-not-inherit',
+                                     'CODEX_HOME': 'fixture-wrong-home'}):
+            temporary, path, proof = codex._chat_catalog(binary)
+        self.addCleanup(temporary.cleanup)
+        result = json.loads(path.read_text())
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(path.parent.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(result['fixture_manifest'], 'preserved')
+        original = {row['slug']: row for row in self.document['models']}
+        self.assertEqual({row['slug'] for row in result['models']}, set(original) - {'gpt-5.5'})
+        for row in result['models']:
+            expected = {**original[row['slug']], 'tool_mode': None, 'apply_patch_tool_type': None,
+                        'multi_agent_version': None}
+            self.assertEqual(row, expected)
+        self.assertEqual(proof['fallback_models'], ['gpt-5.3-codex-spark'])
+        self.assertEqual(proof['runtime_version'], '0.153.4')
+        temporary.cleanup()
+        self.assertFalse(path.parent.exists())
+
+    def assert_catalog_failure_cleans_up(self, source, timeout=1, limit=None):
+        binary = self.binary_for(source)
+        directories = []; processes = []
+        original_temporary = codex.tempfile.TemporaryDirectory
+        original_process = codex.subprocess.Popen
+        def temporary(*args, **kwargs):
+            result = original_temporary(*args, **kwargs)
+            directories.append(Path(result.name)); return result
+        def process(*args, **kwargs):
+            result = original_process(*args, **kwargs)
+            processes.append(result); return result
+        with patch.object(codex.tempfile, 'TemporaryDirectory', side_effect=temporary), \
+                patch.object(codex.subprocess, 'Popen', side_effect=process), \
+                patch.object(codex, 'LIMIT', limit or codex.LIMIT):
+            with self.assertRaises(codex.CodexError):
+                codex._chat_catalog(binary, timeout=timeout)
+        self.assertTrue(directories); self.assertTrue(processes)
+        self.assertTrue(all(not path.exists() for path in directories))
+        self.assertTrue(all(child.poll() is not None for child in processes))
+
+    def test_invalid_incomplete_and_duplicate_catalogs_fail_closed_and_clean_up(self):
+        missing = copy.deepcopy(self.document)
+        missing['models'] = [row for row in missing['models'] if row['slug'] != 'gpt-6-astra']
+        duplicate = copy.deepcopy(self.document)
+        duplicate['models'].append(copy.deepcopy(duplicate['models'][0]))
+        for document in (None, {'models': [None]}, missing, duplicate):
+            with self.subTest(document=document):
+                self.assert_catalog_failure_cleans_up('print(' + repr(json.dumps(document)) + ')\n')
+        self.assert_catalog_failure_cleans_up('print("not-json")\n')
+
+    def test_catalog_export_size_and_deadline_are_bounded_and_reap_process(self):
+        self.assert_catalog_failure_cleans_up('import sys\nsys.stdout.write("x"*1024)\n', limit=512)
+        started = time.monotonic()
+        self.assert_catalog_failure_cleans_up('import time\ntime.sleep(600)\n', timeout=.1)
+        self.assertLess(time.monotonic() - started, 2.5)
+
 
 class CodexConnectionTests(unittest.TestCase):
     def setUp(self):
@@ -185,9 +295,13 @@ class CodexConnectionTests(unittest.TestCase):
         version.start(); self.addCleanup(version.stop)
         self.addCleanup(self.connection._close_login)
 
-    def complete(self, rpc):
-        with patch.object(self.connection, '_open', return_value=rpc):
-            return self.connection.complete([{'role': 'user', 'content': 'Fixture conversation'}], 'gpt-6-astra')
+    def complete(self, rpc, model='gpt-6-astra'):
+        self.preflight = FakeRPC(self.workspace, account=rpc.account, models=rpc.models)
+        with patch.object(self.connection, '_open', side_effect=[self.preflight, rpc]) as opened:
+            try:
+                return self.connection.complete([{'role': 'user', 'content': 'Fixture conversation'}], model)
+            finally:
+                self.open_calls = list(opened.call_args_list)
 
     def test_expected_reply_uses_ephemeral_read_only_openai_thread(self):
         rpc = FakeRPC(self.workspace)
@@ -198,14 +312,61 @@ class CodexConnectionTests(unittest.TestCase):
         self.assertEqual(params['sandbox'], 'read-only'); self.assertTrue(params['ephemeral'])
         self.assertEqual(params['approvalPolicy'], 'never'); self.assertTrue(rpc.closed)
 
+    def test_astra_ultra_uses_normal_catalog_before_restricted_chat_transport(self):
+        rpc = FakeRPC(self.workspace)
+        self.complete(rpc)
+        self.assertEqual([method for method, _ in self.preflight.requests], ['account/read', 'model/list'])
+        self.assertTrue(self.preflight.closed)
+        self.assertNotIn('thread/start', dict(self.preflight.requests))
+        self.assertFalse(self.open_calls[0].kwargs.get('chat_only', False))
+        self.assertTrue(self.open_calls[1].kwargs['chat_only'])
+        self.assertEqual(dict(rpc.requests)['thread/start']['model'], 'gpt-6-astra')
+        self.assertEqual(dict(rpc.requests)['turn/start']['effort'], 'ultra')
+
+    def test_unavailable_astra_ultra_never_opens_chat_or_starts_a_thread(self):
+        catalogs = [
+            [],
+            [{'model': 'gpt-6-astra'}],
+            [{'model': 'gpt-6-astra', 'supportedReasoningEfforts': [{'reasoningEffort': 'low'}]}],
+            [{'model': 'gpt-5.6-sol', 'supportedReasoningEfforts': [{'reasoningEffort': 'ultra'}]}],
+        ]
+        for catalog in catalogs:
+            with self.subTest(catalog=catalog):
+                rpc = FakeRPC(self.workspace, models=catalog)
+                with self.assertRaises(codex.CodexError):
+                    self.complete(rpc)
+                self.assertEqual(len(self.open_calls), 1)
+                self.assertEqual(rpc.requests, [])
+                self.assertTrue(self.preflight.closed)
+
+    def test_other_reviewed_models_retain_low_effort(self):
+        for model in sorted(codex.CHAT_MODELS - {'gpt-6-astra'}):
+            with self.subTest(model=model):
+                rpc = FakeRPC(self.workspace)
+                self.complete(rpc, model)
+                self.assertEqual(dict(rpc.requests)['thread/start']['model'], model)
+                self.assertEqual(dict(rpc.requests)['turn/start']['effort'], 'low')
+                self.assertTrue(self.open_calls[1].kwargs['chat_only'])
+
     def test_wrong_account_never_starts_a_thread(self):
         for account in ('apiKey', 'amazonBedrock', None):
             with self.subTest(account=account):
                 rpc = FakeRPC(self.workspace, account=account)
                 with self.assertRaisesRegex(codex.CodexError, 'Sign in with ChatGPT'):
                     self.complete(rpc)
-                self.assertEqual([m for m, _ in rpc.requests], ['account/read'])
-                self.assertTrue(rpc.closed)
+                self.assertEqual([m for m, _ in self.preflight.requests], ['account/read'])
+                self.assertEqual(rpc.requests, []); self.assertTrue(self.preflight.closed)
+
+    def test_changed_account_on_restricted_transport_never_starts_a_thread(self):
+        for account in ('apiKey', None):
+            with self.subTest(account=account):
+                preflight = FakeRPC(self.workspace)
+                private = FakeRPC(self.workspace, account=account)
+                with patch.object(self.connection, '_open', side_effect=[preflight, private]):
+                    with self.assertRaises(codex.CodexError):
+                        self.connection.complete([{'role': 'user', 'content': 'Fixture'}], 'gpt-6-astra')
+                self.assertEqual([method for method, _ in private.requests], ['account/read'])
+                self.assertTrue(preflight.closed); self.assertTrue(private.closed)
 
     def test_effective_security_configuration_is_checked_before_turn(self):
         for field, value in [('modelProvider', 'other'), ('cwd', '/another-workspace'),

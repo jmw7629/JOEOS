@@ -6,6 +6,7 @@ on the pinned runtime are accepted; interaction requests are always rejected.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -14,6 +15,7 @@ import select
 import signal
 import stat
 import subprocess
+import tempfile
 import threading
 import time
 
@@ -25,10 +27,13 @@ DISABLED = ('shell_tool', 'shell_snapshot', 'unified_exec', 'apps', 'plugins', '
             'in_app_local_automation', 'skill_mcp_dependency_install')
 LIMIT = 4 * 1024 * 1024
 PINNED_VERSION = '0.153.4'
-# The native fixture captures actual inference tool definitions for each model.
-# Older models still advertise apply_patch despite feature flags; fail closed.
+# The native fixture inspects both top-level and structured input tool definitions,
+# including malicious calls to tools omitted by the private chat catalog.
 CHAT_MODELS = frozenset(('gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra',
                          'gpt-5.6-luna', 'gpt-5.3-codex-spark'))
+# This model uses the pinned runtime's reviewed fallback metadata; it is absent
+# from the bundled catalog, but may be advertised by the account's model list.
+FALLBACK_CHAT_MODELS = frozenset(('gpt-5.3-codex-spark',))
 DEFAULT_MODEL = 'gpt-6-astra'
 
 
@@ -36,8 +41,120 @@ class CodexError(RuntimeError):
     pass
 
 
+def reasoning_effort(model):
+    return 'ultra' if model == DEFAULT_MODEL else 'low'
+
+
+def _stop_process(process):
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    if process.poll() is None:
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=2)
+    for stream in (process.stdin, process.stdout):
+        if stream:
+            stream.close()
+
+
+def _chat_catalog(binary, timeout=10):
+    """Derive a private catalog from the verified binary without loading an account.
+
+    Model metadata can restore tools despite feature flags. The documented catalog
+    override applies at process startup, not through thread/start config.
+    """
+    temporary = tempfile.TemporaryDirectory(prefix='prfkt-codex-chat-')
+    root = Path(temporary.name)
+    process = None
+    ready = False
+    try:
+        env = {'PATH': os.environ.get('PATH', os.defpath), 'HOME': str(root),
+               'CODEX_HOME': str(root), 'XDG_CONFIG_HOME': str(root / 'config'),
+               'XDG_DATA_HOME': str(root / 'data'), 'XDG_CACHE_HOME': str(root / 'cache'),
+               'LANG': 'en_US.UTF-8', 'NO_COLOR': '1'}
+        process = subprocess.Popen([str(binary), 'debug', 'models', '--bundled'],
+                                   cwd=root, env=env, stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                   bufsize=0, start_new_session=True)
+        deadline = time.monotonic() + timeout
+        chunks = []
+        size = 0
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not select.select([process.stdout], [], [], remaining)[0]:
+                raise CodexError('Codex chat capability review timed out')
+            chunk = os.read(process.stdout.fileno(), 65536)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > LIMIT:
+                raise CodexError('Codex chat capability catalog is too large')
+            chunks.append(chunk)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise CodexError('Codex chat capability review timed out')
+        if process.wait(timeout=remaining):
+            raise CodexError('Codex chat capability catalog is unavailable')
+        raw = b''.join(chunks)
+        try:
+            document = json.loads(raw)
+        except (ValueError, UnicodeError):
+            raise CodexError('Codex chat capability catalog is invalid') from None
+        if not isinstance(document, dict) or not isinstance(document.get('models'), list):
+            raise CodexError('Codex chat capability catalog is invalid')
+        selected = []
+        seen = set()
+        for row in document['models']:
+            if not isinstance(row, dict):
+                raise CodexError('Codex chat capability catalog is invalid')
+            name = row.get('slug')
+            if not isinstance(name, str) or name not in CHAT_MODELS:
+                continue
+            if name in seen:
+                raise CodexError('Codex chat capability catalog contains duplicate models')
+            seen.add(name)
+            selected.append({**row, 'tool_mode': None, 'apply_patch_tool_type': None,
+                             'multi_agent_version': None})
+        if CHAT_MODELS - FALLBACK_CHAT_MODELS - seen:
+            raise CodexError('Codex chat capability catalog is incomplete')
+        document['models'] = selected
+        encoded = (json.dumps(document, separators=(',', ':'), sort_keys=True) + '\n').encode()
+        path = root / 'models.json'
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(encoded)
+        proof = {'runtime_version': PINNED_VERSION, 'bundled_sha256': hashlib.sha256(raw).hexdigest(),
+                 'catalog_sha256': hashlib.sha256(encoded).hexdigest(), 'catalog_models': sorted(seen),
+                 'fallback_models': sorted(CHAT_MODELS - seen)}
+        _stop_process(process)
+        process = None
+        ready = True
+        return temporary, path, proof
+    except (OSError, subprocess.TimeoutExpired):
+        raise CodexError('Codex chat capability catalog is unavailable') from None
+    finally:
+        try:
+            if process:
+                _stop_process(process)
+        finally:
+            if not ready:
+                temporary.cleanup()
+
+
 class _RPC:
-    def __init__(self, binary, home, workspace, timeout=20):
+    def __init__(self, binary, home, workspace, timeout=20, chat_only=False):
+        self.process = None
+        self.catalog = None
+        self.catalog_provenance = None
+        self.closed = False
+        self.release = None
         args = [str(binary), 'app-server', '--stdio']
         for name in DISABLED:
             args += ['--disable', name]
@@ -48,17 +165,18 @@ class _RPC:
         # No inherited provider keys, tool configuration or alternate auth modes.
         env = {key: os.environ[key] for key in ('PATH', 'HOME', 'LANG', 'SSL_CERT_FILE', 'SSL_CERT_DIR') if key in os.environ}
         env.update(CODEX_HOME=str(home), NO_COLOR='1')
-        self.process = subprocess.Popen(args, cwd=workspace, env=env, stdin=subprocess.PIPE,
-                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0,
-                                        start_new_session=True)
         self.buffer = b''
-        os.set_blocking(self.process.stdin.fileno(), False)
-        self.closed = False
-        self.release = None
         self.seq = 0
         self.events = []
         self.timeout = timeout
         try:
+            if chat_only:
+                self.catalog, path, self.catalog_provenance = _chat_catalog(binary)
+                args += ['-c', 'model_catalog_json=' + json.dumps(str(path)), '-c', 'agents.enabled=false']
+            self.process = subprocess.Popen(args, cwd=workspace, env=env, stdin=subprocess.PIPE,
+                                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0,
+                                            start_new_session=True)
+            os.set_blocking(self.process.stdin.fileno(), False)
             self.request('initialize', {'clientInfo': {'name': 'project_byte', 'title': 'PRFKT_PROJECT', 'version': '1.0'}})
             self.send({'method': 'initialized', 'params': {}})
         except Exception:
@@ -70,24 +188,17 @@ class _RPC:
             return
         self.closed = True
         try:
-            os.killpg(self.process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        if self.process.poll() is None:
+            if self.process:
+                _stop_process(self.process)
+        finally:
             try:
-                self.process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                try:
-                    os.killpg(self.process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                self.process.wait(timeout=2)
-        for stream in (self.process.stdin, self.process.stdout):
-            if stream:
-                stream.close()
-        if self.release:
-            self.release()
-            self.release = None
+                if self.catalog:
+                    self.catalog.cleanup()
+                    self.catalog = None
+            finally:
+                if self.release:
+                    self.release()
+                    self.release = None
 
     def send(self, message, deadline=None):
         raw = json.dumps(message, separators=(',', ':')).encode() + b'\n'
@@ -170,7 +281,7 @@ class Connection:
         except OSError:
             return False
 
-    def _open(self, timeout=20):
+    def _open(self, timeout=20, chat_only=False):
         if not self.available():
             raise CodexError('Codex is not installed for this workspace')
         if not self.slots.acquire(blocking=False):
@@ -185,7 +296,7 @@ class Connection:
                 raise CodexError('The verified Codex runtime is unavailable') from None
             if version.returncode or version.stdout.strip() != 'codex-cli ' + PINNED_VERSION:
                 raise CodexError('This Codex runtime version needs a new chat capability review')
-            rpc = _RPC(self.binary, self.home, self.workspace, timeout)
+            rpc = _RPC(self.binary, self.home, self.workspace, timeout, chat_only=chat_only)
             rpc.release = self.slots.release
             return rpc
         except Exception:
@@ -298,8 +409,39 @@ class Connection:
         rpc = None
         start = time.monotonic()
         deadline = start + 160
+        effort = reasoning_effort(model)
         try:
             rpc = self._open()
+            account = rpc.request('account/read', {'refreshToken': False}, deadline=deadline).get('account') or {}
+            if account.get('type') != 'chatgpt':
+                raise CodexError('Sign in with ChatGPT to use this subscription connection')
+            # Capability discovery remains account-backed. A restricted local
+            # catalog must never be presented as proof of subscription access.
+            cursor = None
+            supported = False
+            for _ in range(5):
+                listed = rpc.request('model/list', {'limit': 100, 'includeHidden': False, 'cursor': cursor}, deadline=deadline)
+                rows = listed.get('data') or []
+                if not isinstance(rows, list):
+                    raise CodexError('Codex returned an invalid model catalog')
+                for row in rows:
+                    if not isinstance(row, dict):
+                        raise CodexError('Codex returned an invalid model catalog')
+                    if (row.get('model') or row.get('id')) == model:
+                        options = row.get('supportedReasoningEfforts') or []
+                        if not isinstance(options, list):
+                            raise CodexError('Codex returned an invalid model catalog')
+                        supported = any(isinstance(option, dict) and option.get('reasoningEffort') == effort
+                                        for option in options)
+                        break
+                cursor = listed.get('nextCursor')
+                if supported or not cursor:
+                    break
+            if not supported:
+                raise CodexError('The selected Codex model or reasoning effort is unavailable for this account')
+            rpc.close()
+            rpc = None
+            rpc = self._open(chat_only=True)
             account = rpc.request('account/read', {'refreshToken': False}, deadline=deadline).get('account') or {}
             if account.get('type') != 'chatgpt':
                 raise CodexError('Sign in with ChatGPT to use this subscription connection')
@@ -316,7 +458,7 @@ class Connection:
             if not isinstance(thread.get('id'), str):
                 raise CodexError('Codex did not create a chat session')
             rpc.events.clear()
-            turn = rpc.request('turn/start', {'threadId': thread['id'], 'input': [{'type': 'text', 'text': prompt}], 'effort': 'low'}, deadline=deadline)
+            turn = rpc.request('turn/start', {'threadId': thread['id'], 'input': [{'type': 'text', 'text': prompt}], 'effort': effort}, deadline=deadline)
             turn_id = (turn.get('turn') or {}).get('id')
             text = []
             size = 0
