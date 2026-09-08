@@ -40,7 +40,7 @@ jobs:
           grep -Fq 'if path == "/api/external-reviews"' "$runtime"
           grep -Fq 'if not self.need(1)' "$runtime"
           grep -Fq 'EXTERNAL_REVIEW_GH, "pr", "list"' "$runtime"
-          grep -Fq 'Read-only observation. PROJECT_BYTE cannot approve, comment, merge, close, rerun or deploy this external PR.' "$home"
+          grep -Fq 'Read-only observation. PRFKT_PROJECT cannot approve, comment, merge, close, rerun or deploy this external PR.' "$home"
           ! grep -Fq 'data-external-review-action' "$home"
           node --check "$home"
           python3 -m py_compile "$runtime"
