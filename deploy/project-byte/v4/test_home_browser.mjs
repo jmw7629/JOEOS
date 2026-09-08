@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {verifyFocusedWorkspaces} from './test_focused_workspaces.mjs';
 import {prepareObservationFixtures,verifyObservatory} from './test_observatory_browser.mjs';
 import {verifyWorkspaceProfile} from './test_workspace_profile_browser.mjs';
+import {verifyExternalReviewLogout} from './test_external_reviews_browser.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -100,6 +101,7 @@ try{
     await page.screenshot({path:path.join(out,`orbital-${width}.png`),fullPage:true});
   }
   await verifyWorkspaceProfile({page,api,root});
+  await verifyExternalReviewLogout({page});
   await api('/api/settings','POST',{general:{default_view:'board'}});
   await page.goto(base,{waitUntil:'networkidle'});await page.waitForSelector('#board.active');
   assert.equal(errors.length,0,'no browser exceptions: '+errors.join('; '));

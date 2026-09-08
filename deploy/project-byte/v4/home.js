@@ -37,6 +37,9 @@
   let homeExternalReviewState = {state:'unavailable',items:[],repositories:{}};
   let homeExternalReviewRefreshBusy = false;
   let homeExternalReviewUpdatedAt = 0;
+  let homeExternalReviewIdentity = '';
+  let homeExternalReviewRequest = 0;
+  let homeExternalReviewController = null;
 
   const style = document.createElement('style');
   style.textContent = `
@@ -354,6 +357,18 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     el.innerHTML=items.length?items.map(t=>`<button type="button" class="work-item" data-home-task="${escH(t.id)}"><div class="work-top"><b>${escH(t.title)}</b><span class="home-priority ${escH(t.priority)}">${escH(t.priority)}</span></div><span>${escH(t.project)}${t.due_date?' · due '+escH(t.due_date):''}${t.ai_state?' · AI '+escH(t.ai_state):''}</span></button>`).join(''):`<div class="small">${empty}</div>`;
   }
 
+  function syncExternalReviewIdentity() {
+    // Compare credentials only in memory; never include them in rendered evidence.
+    const identity=JSON.stringify([accessKey,session?.subject||'',session?.name||'',session?.level||0]);
+    if(identity!==homeExternalReviewIdentity){
+      homeExternalReviewIdentity=identity;++homeExternalReviewRequest;
+      homeExternalReviewController?.abort();homeExternalReviewController=null;
+      homeExternalReviewRefreshBusy=false;homeExternalReviewUpdatedAt=0;
+      homeExternalReviewState={state:'unavailable',items:[],repositories:{}};
+    }
+    return !!accessKey&&session?.level>=1;
+  }
+
   function externalReviewAge(seconds) {
     if(seconds===null||seconds===undefined||Number.isNaN(Number(seconds)))return 'unknown age';
     const value=Math.max(0,Number(seconds));
@@ -364,6 +379,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   }
 
   function externalReviewsForScope(scoped) {
+    if(!syncExternalReviewIdentity())return [];
     const all=tasks||[],selected=document.getElementById('projectFilter')?.value||'';
     const scopedProjects=new Set((scoped||[]).map(t=>t.project));
     return (homeExternalReviewState.items||[]).filter(item=>{
@@ -374,6 +390,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   }
 
   function renderApprovals(scoped) {
+    syncExternalReviewIdentity();
     const el=document.getElementById('homeApprovals');if(!el)return;
     const ids=new Set(scoped.map(t=>t.id));
     const ready=(runs||[]).filter(r=>ids.has(r.task_id)&&(r.status==='pr-created'||r.pr_url)).slice(0,6);
@@ -395,20 +412,25 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   }
 
   async function refreshExternalReviews(force=false) {
-    if(!(session?.level>=1)){homeExternalReviewState={state:'unavailable',items:[],repositories:{}};renderApprovals(safeVisible());return;}
+    if(!syncExternalReviewIdentity()){renderApprovals(safeVisible());return;}
     const now=Date.now();
     if(homeExternalReviewRefreshBusy||(!force&&homeExternalReviewUpdatedAt&&now-homeExternalReviewUpdatedAt<15000))return;
     homeExternalReviewRefreshBusy=true;
+    const request=++homeExternalReviewRequest,controller=new AbortController();
+    homeExternalReviewController=controller;
+    const current=()=>{syncExternalReviewIdentity();return request===homeExternalReviewRequest;};
     try{
-      const x=await api('/api/external-reviews');
+      const x=await api('/api/external-reviews',{signal:controller.signal});
+      if(!current())return;
       homeExternalReviewState={state:x.state||'unavailable',items:Array.isArray(x.items)?x.items:[],repositories:x.repositories||{}};
       homeExternalReviewUpdatedAt=Date.now();
       renderApprovals(safeVisible());
     }catch{
+      if(!current())return;
       homeExternalReviewState={state:'unavailable',items:[],repositories:{}};
       homeExternalReviewUpdatedAt=Date.now();
       renderApprovals(safeVisible());
-    }finally{homeExternalReviewRefreshBusy=false}
+    }finally{if(request===homeExternalReviewRequest){homeExternalReviewRefreshBusy=false;homeExternalReviewController=null;}}
   }
 
   async function refreshHomeApprovals() {
@@ -591,7 +613,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     const open=(data.tasks||[]).filter(t=>t.status!=='Done');
     for(const t of open.filter(t=>t.status==='Blocked').slice(0,3))add('blocked:'+t.id,`${t.project} · blocked: ${t.title}`,'warning','board',t.id);
     for(const t of open.filter(t=>t.due_date&&typeof daysUntil==='function'&&daysUntil(t.due_date)<0).slice(0,2))add('due:'+t.id,`${t.project} · overdue: ${t.title}`,'warning','board',t.id);
-    if(session?.level>=1&&homeExternalReviewState.state==='fresh')for(const r of (homeExternalReviewState.items||[]).slice(0,3))add('review:'+r.repo+':'+r.number,`${r.project} · PR #${r.number} waiting for review · ${r.title}`,'info','agents');
+    if(syncExternalReviewIdentity()&&homeExternalReviewState.state==='fresh')for(const r of (homeExternalReviewState.items||[]).slice(0,3))add('review:'+r.repo+':'+r.number,`${r.project} · PR #${r.number} waiting for review · ${r.title}`,'info','agents');
     for(const a of (data.activity||[]).slice(0,6)){
       const task=(data.tasks||[]).find(t=>t.id===a.task_id);
       add('activity:'+a.id,`${shortTime(a.ts)} · ${a.actor||'System'} · ${String(a.action||'update').replaceAll('_',' ')}${a.project?' · '+a.project:''}${a.detail?' · '+crawlText(a.detail,85):''}`,'info','activity',task?.id||'');
