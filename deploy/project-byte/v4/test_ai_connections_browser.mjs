@@ -22,7 +22,7 @@ const providers=[
 const settings=()=>({general:{default_view:'home',refresh_seconds:60,show_completed:true},notifications:{},ai:{default_agent:'executive',default_model:defaultKey},security:{session_minutes:480},filters:{saved_views:[]}});
 const files=new Map();
 let html=(await Promise.all((await fs.readdir(path.join(source,'index'))).filter(x=>x.endsWith('.part')).sort().map(x=>fs.readFile(path.join(source,'index',x),'utf8')))).join('');
-for(const name of ['ai-connections.js','home.js','home-inspector.js','health-runtime.js']){
+for(const name of ['ai-connections.js','home.js','home-inspector.js','health-runtime.js','codex-workspace.js']){
  files.set('/'+name,{type:'text/javascript',body:await fs.readFile(path.join(source,name))});
  const tag=`<script src="/${name}"></script>`;if(!html.includes(tag))html=html.replace('</body>',tag+'</body>');
 }
@@ -36,6 +36,13 @@ const server=http.createServer(async(req,res)=>{
   const level=credential===key?4:credential==='VIEWER_UI_FIXTURE'?1:credential==='ADMIN_UI_FIXTURE'?3:0;
   const send=(value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
   if(url.pathname==='/api/session')return send({ok:level>0,level,subject:level?'fixture/'+level:'',name:level===4?'Fixture owner':'Fixture collaborator',role:level===4?'owner':level===3?'admin':level?'viewer':'public'});
+  // This provider-panel fixture has no task executor. Load the actual workspace
+  // asset while reporting that boundary honestly, without inventing a worker.
+  if(url.pathname.startsWith('/api/codex-workspace')){
+   if(level!==4)return send({error:'Owner sign-in required'},403);
+   if(url.pathname==='/api/codex-workspace'&&req.method==='GET')return send({configured:false,connected:false,model:'gpt-6-astra',effort:'ultra',projects:[],conversations:[],detail:'Native task execution is not configured in this provider-panel fixture.'});
+   return send({error:'Native task execution is not configured in this provider-panel fixture.'},503);
+  }
   if(url.pathname.startsWith('/api/ai-connections')&&level!==4)return send({error:'Owner sign-in required'},403);
   if(url.pathname==='/api/ai-connections')return send({providers,subscription_runtimes:[{id:'claude-code',label:'Claude Code',notes:'Requires the native subscription adapter.',connectable:false,state:'adapter_not_configured'}],agents:[{id:'hermes',label:'Hermes',provider:'hermes',notes:'Connect an existing Hermes agent endpoint.'},{id:'openclaw',label:'OpenClaw',provider:'openclaw',notes:'Connect an existing OpenClaw gateway.'}],connections:models,default_model_key:defaultKey,codex:{available:true,connected,auth_mode:connected?'chatgpt':null,detail:connected?'Official server sign-in is ready.':'Authorize this server with your ChatGPT account.'}});
   if(url.pathname==='/api/ai-connections/discover'){
@@ -69,6 +76,8 @@ try{
  const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));page.on('dialog',dialog=>dialog.accept(dialog.type()==='prompt'?key:undefined));
  await page.addInitScript(key=>sessionStorage.setItem('project_byte_access',key),key);
  await page.goto(base+'/#models',{waitUntil:'networkidle'});await page.waitForFunction(()=>session.level===4);
+ assert.equal(await page.evaluate(()=>typeof window.PRFKT_CODEX?.open),'function','the real native workspace asset loads alongside the connection panel');
+ const workspace=await page.evaluate(()=>api('/api/codex-workspace'));assert.equal(workspace.configured,false);assert.equal(workspace.connected,false);assert.deepEqual(workspace.projects,[]);assert.deepEqual(workspace.conversations,[]);
  await page.locator('#addModel').click();await page.locator('#aiConnectionModal.open').waitFor();
  assert.equal(await page.locator('#modelModal.open').count(),0,'legacy model dialog does not also open');
  assert.equal(await page.locator('#aiConnectionProvider').inputValue(),'codex-chatgpt');
