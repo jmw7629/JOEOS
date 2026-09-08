@@ -4,11 +4,16 @@ Uses the reconstructed backend and existing strict AI request parser. The task
 controller is real; Codex, workspace, and publisher implementations are fixtures.
 No account, provider, GitHub, shell, or sandbox work is performed.
 """
+from contextlib import closing
+import gc
 import json
+import runpy
+import sqlite3
 import threading
 import time
+import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import uuid
 
 import codex_tasks_runtime as overlay
@@ -51,6 +56,11 @@ class CodexWorkspaceHTTPTests(unittest.TestCase):
         for thread, done in self.background:
             done.wait(3); thread.join(.1)
         self.controller.db.close()
+        # A lazy anchor can have been created by an HTTP worker. Dropping the
+        # fixture's ownership lets SQLite finalize it without cross-thread use.
+        if hasattr(self.app, '_codex_workspace_wal_anchor'):
+            del self.app._codex_workspace_wal_anchor
+        gc.collect()
         ai_fixture.RuntimeTests.tearDown(self)
 
     def message_body(self, text='Review the fixture workspace', cid=None):
@@ -62,6 +72,152 @@ class CodexWorkspaceHTTPTests(unittest.TestCase):
         self.assertEqual(catalog['projects'][0]['key'], 'joeos'); self.assertEqual(self.factory.instances, [])
         self.assertIn('/codex-workspace.js', self.public_files)
         self.assertEqual(self.request('/api/ai-connections')[0], 200)
+
+    def test_install_and_injected_controller_do_not_eagerly_open_an_app_connection(self):
+        self.assertFalse(hasattr(self.app, '_codex_workspace_wal_anchor'))
+        initialize = self.app.init_db
+        with patch.object(self.app, 'con', side_effect=AssertionError('install must not touch the database')):
+            installed = overlay.install(self.app, self.handler, {}, self.controller)
+            self.assertTrue(issubclass(installed, self.handler))
+        self.assertIs(self.app.init_db, initialize, 'reinstallation must not wrap init_db twice')
+        self.assertEqual(self.request(ROOT)[0], 200)
+        self.assertFalse(hasattr(self.app, '_codex_workspace_wal_anchor'), 'an injected controller remains a fixture seam')
+        mock_app = types.SimpleNamespace()
+        self.assertTrue(issubclass(overlay.install(mock_app, self.handler, {}, self.controller), self.handler))
+
+    def test_wrapped_init_retains_idle_wal_through_gc_and_gateway_auth_updates(self):
+        # This is the real gateway reader, used without constructing its source
+        # mapping store or starting a gateway process. It only reads kanban.db.
+        gateway = runpy.run_path(str(ai_fixture.SOURCE.parent / 'public-access/gateway.py'))
+        database_root = self.root / 'exclusive-wal-fixture'
+        database_root.mkdir()
+        database = database_root / 'kanban.db'
+        # Keep the baseline independent of HTTP fixture setup connections.
+        # Closing this sole writer reproduces the sidecar removal condition.
+        with closing(sqlite3.connect(database)) as initial:
+            initial.execute('PRAGMA journal_mode=WAL')
+            initial.execute('CREATE TABLE exclusive_fixture(value INTEGER)')
+            initial.commit()
+            self.assertEqual(tuple(initial.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()), (0, 0, 0))
+        database_patch = patch.object(self.app, 'DB', database)
+        database_patch.start()
+        self.addCleanup(database_patch.stop)
+        access = object.__new__(gateway['Access'])
+        access.root = database_root
+        access.owner_key = lambda: ai_fixture.OWNER
+        sidecars = [self.app.DB.with_name(self.app.DB.name + suffix) for suffix in ('-wal', '-shm')]
+        # Apple's SQLite can persist sidecars after its sole connection closes.
+        # Reproduce Linux last-close cleanup only in this closed, checkpointed,
+        # disposable database; never unlink sidecars from a live app database.
+        for path in sidecars:
+            path.unlink(missing_ok=True)
+        gc.collect()
+        self.assertTrue(all(not path.exists() for path in sidecars), 'fixture starts without a retained app connection')
+        self.app.init_db()  # Runtime startup invokes this before binding HTTP.
+        anchor = self.app._codex_workspace_wal_anchor
+        self.assertFalse(anchor.in_transaction)
+        with closing(anchor.execute('PRAGMA query_only')) as cursor:
+            self.assertEqual(cursor.fetchone()[0], 1)
+        gc.collect()
+        self.assertTrue(all(path.exists() for path in sidecars), 'last transient close must not remove WAL sidecars')
+        with closing(self.app.con()) as writer:
+            writer.execute('INSERT INTO collaborators VALUES(?,?,?,?,?,?,?)',
+                           ('editor', 'Editor fixture', 'editor', self.app.digest(self.tokens['editor']), 1, self.app.now(), 0))
+            writer.execute('INSERT INTO user_settings VALUES(?,?,?)',
+                           ('owner', json.dumps({'security': {'session_minutes': 120}}), self.app.now()))
+            writer.commit()
+        original_connect = sqlite3.connect
+        reads = []
+
+        def read_only_connect(database, *args, **kwargs):
+            self.assertTrue(str(database).endswith('?mode=ro'))
+            self.assertTrue(kwargs.get('uri'))
+            db = original_connect(database, *args, **kwargs)
+            db.set_trace_callback(reads.append)
+            return db
+
+        def identity(token):
+            with patch.object(gateway['sqlite3'], 'connect', side_effect=read_only_connect):
+                result = access.identity(self.app.digest(token))
+            gc.collect()
+            self.assertTrue(all(path.exists() for path in sidecars))
+            self.assertFalse(anchor.in_transaction)
+            return result
+
+        self.assertEqual(identity(self.tokens['editor'])[0]['role'], 'editor')
+        with closing(self.app.con()) as writer:
+            writer.execute("UPDATE collaborators SET role='admin' WHERE id='editor'")
+            writer.execute("UPDATE user_settings SET data=? WHERE subject='owner'",
+                           (json.dumps({'security': {'session_minutes': 90}}),))
+            writer.commit()
+        # These changes can still be in WAL: immutable reads would be stale.
+        self.assertEqual(identity(self.tokens['editor'])[0]['role'], 'admin')
+        self.assertEqual(identity(self.tokens['owner'])[1], 90 * 60)
+        with closing(self.app.con()) as writer:
+            writer.execute("UPDATE collaborators SET active=0 WHERE id='editor'")
+            writer.commit()
+            checkpoint = writer.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()
+            self.assertEqual(tuple(checkpoint), (0, 0, 0), 'idle anchor must not pin a read transaction')
+        self.assertIsNone(identity(self.tokens['editor']), 'revocation remains visible after checkpoint and GC')
+        self.assertTrue(reads)
+        self.assertTrue(all(sql.lstrip().upper().startswith(('SELECT ', 'PRAGMA QUERY_ONLY=')) for sql in reads), reads)
+        self.app.init_db()
+        self.assertIs(self.app._codex_workspace_wal_anchor, anchor, 'subsequent initialization reuses one app anchor')
+
+    def test_lazy_manager_anchor_precedes_controller_allocation_and_survives_its_gc(self):
+        self.server.RequestHandlerClass = overlay.install(self.app, self.handler, self.public_files)
+        self.assertFalse(hasattr(self.app, '_codex_workspace_wal_anchor'))
+        sidecars = [self.app.DB.with_name(self.app.DB.name + suffix) for suffix in ('-wal', '-shm')]
+
+        def construct(*args, **kwargs):
+            anchor = self.app._codex_workspace_wal_anchor
+            self.assertFalse(anchor.in_transaction)
+            gc.collect()  # Native runtime allocation triggered this production failure.
+            self.assertTrue(all(path.exists() for path in sidecars))
+            with closing(sqlite3.connect(self.app.DB.as_uri() + '?mode=ro', uri=True)) as reader:
+                reader.execute('PRAGMA query_only=ON')
+                self.assertGreater(reader.execute('SELECT count(*) FROM collaborators').fetchone()[0], 0)
+            return self.controller
+
+        with patch.dict('os.environ', {'PRFKT_CODEX_STATE': str(self.state), 'PRFKT_CODEX_REPO': str(self.root), 'PRFKT_CODEX_PUBLISH': ''}), patch.object(overlay, 'Controller', side_effect=construct) as constructor:
+            self.assertEqual(self.request(ROOT)[0], 200)
+            self.assertEqual(self.request(ROOT)[0], 200)
+            constructor.assert_called_once()
+        gc.collect()
+        self.assertTrue(all(path.exists() for path in sidecars))
+
+    def test_init_return_and_error_behavior_remain_transparent_and_setup_failure_closes(self):
+        missing = self.root / 'absent-app.db'
+        initializer = Mock(return_value='INITIALIZER_RESULT_FIXTURE')
+        connection = Mock()
+        connection.in_transaction = False
+        fixture = types.SimpleNamespace(DB=self.app.DB, con=Mock(return_value=connection),
+                                        init_db=lambda *args, **kwargs: initializer(*args, **kwargs))
+        overlay.install(fixture, self.handler, {}, self.controller)
+        self.assertEqual(fixture.init_db('argument', option=True), 'INITIALIZER_RESULT_FIXTURE')
+        initializer.assert_called_once_with('argument', option=True)
+        self.assertIs(fixture._codex_workspace_wal_anchor, connection)
+        connection.close.assert_not_called()
+        failed_initializer = Mock(side_effect=RuntimeError('fixture init failed'))
+        failed = types.SimpleNamespace(DB=missing, con=Mock(), init_db=lambda: failed_initializer())
+        overlay.install(failed, self.handler, {}, self.controller)
+        with self.assertRaisesRegex(RuntimeError, 'fixture init failed'):
+            failed.init_db()
+        failed.con.assert_not_called()
+        absent = types.SimpleNamespace(DB=missing, con=Mock(), init_db=lambda: None)
+        overlay.install(absent, self.handler, {}, self.controller)
+        with self.assertRaisesRegex(overlay.TaskError, 'database is unavailable'):
+            absent.init_db()
+        absent.con.assert_not_called()
+        self.assertFalse(missing.exists())
+        bad_connection = Mock()
+        bad_connection.execute.side_effect = sqlite3.OperationalError('fixture read failed')
+        broken = types.SimpleNamespace(DB=self.app.DB, con=lambda: bad_connection, init_db=lambda: None)
+        overlay.install(broken, self.handler, {}, self.controller)
+        with self.assertRaises(sqlite3.OperationalError):
+            broken.init_db()
+        bad_connection.close.assert_called_once()
+        self.assertFalse(hasattr(broken, '_codex_workspace_wal_anchor'))
 
     def test_all_task_routes_reject_nonowners_before_side_effects(self):
         identity = uuid.uuid4().hex

@@ -9,11 +9,45 @@ from codex_tasks import Controller, TaskError, require_owner
 
 ROOT = '/api/codex-workspace'
 CID = r'([0-9a-f]{32})'
+_APP_WAL_LOCK = threading.Lock()
 
 
 def install(app, BaseHandler, public_files, controller=None):
     public_files['/codex-workspace.js'] = ('codex-workspace.js', 'application/javascript; charset=utf-8')
     guard = threading.Lock()
+
+    def ensure_app_wal():
+        # The public gateway cannot create WAL sidecars in the app directory.
+        # Keep one app-owned connection alive so collecting other connections
+        # during native runtime initialization cannot remove those sidecars.
+        with _APP_WAL_LOCK:
+            if getattr(app, '_codex_workspace_wal_anchor', None) is not None:
+                return
+            if not Path(app.DB).is_file():
+                raise TaskError('Application database is unavailable', 503)
+            anchor = app.con()
+            try:
+                anchor.execute('PRAGMA query_only=ON').close()
+                cursor = anchor.execute('SELECT name FROM sqlite_schema LIMIT 1')
+                try:
+                    cursor.fetchall()
+                finally:
+                    cursor.close()
+                if anchor.in_transaction:
+                    raise RuntimeError('Application database anchor must remain idle')
+            except BaseException:
+                anchor.close()
+                raise
+            app._codex_workspace_wal_anchor = anchor
+
+    initialize = getattr(app, 'init_db', None)
+    if callable(initialize) and not getattr(initialize, '_codex_workspace_wal_init', False):
+        def initialize_with_wal(*args, **kwargs):
+            result = initialize(*args, **kwargs)
+            ensure_app_wal()
+            return result
+        initialize_with_wal._codex_workspace_wal_init = True
+        app.init_db = initialize_with_wal
 
     def manager():
         nonlocal controller
@@ -24,6 +58,7 @@ def install(app, BaseHandler, public_files, controller=None):
                     repo = os.getenv('PRFKT_CODEX_REPO')
                     if not state or not repo or not Path(state).is_absolute() or not Path(repo).is_absolute():
                         raise TaskError('Codex task execution is not configured', 503)
+                    ensure_app_wal()
                     from codex_publisher import Publisher
                     publisher = Publisher(Path(state) / 'publisher', repo,
                                           base_branch=os.getenv('PRFKT_CODEX_BASE_BRANCH', 'project-byte-deploy')) if os.getenv('PRFKT_CODEX_PUBLISH') == '1' else None

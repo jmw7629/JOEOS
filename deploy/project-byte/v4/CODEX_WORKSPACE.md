@@ -79,6 +79,14 @@ activate only the app and dedicated broker, and verify the public gateway's exac
 new allowlisted routes. Preserve the current public gateway sign-in, data and
 settings. Do not start paused BYTE, R3, VITROS or legacy bridge units.
 
+The overlay keeps an idle app-owned SQLite connection after database startup,
+before the HTTP listener binds. This preserves the WAL sidecars that the gateway
+needs to read authentication from its read-only mount. The anchor holds no read
+transaction; fresh gateway reads still observe account changes and revocation.
+Do not replace these reads with SQLite immutable mode or grant the gateway write
+access to the application database. Verify a fresh public sign-in after restarting
+the app, before considering the overlay ready.
+
 Rollback restores only this overlay's replaced code and gateway release, removes
 its app service drop-in, and stops the dedicated Codex broker. Retain private
 conversation storage for review; never replay an interrupted run during rollback.
