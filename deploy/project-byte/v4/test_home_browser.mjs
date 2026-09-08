@@ -17,12 +17,13 @@ const source=path.dirname(fileURLToPath(import.meta.url));
 const root=await fs.mkdtemp(path.join(os.tmpdir(),'pb-orbital-browser-'));
 // Provider credentials must remain outside the fixture's public application root.
 const privateState=await fs.mkdtemp(path.join(os.tmpdir(),'pb-orbital-private-state-'));
+const fixtureEnv=Object.fromEntries(Object.entries(process.env).filter(([name])=>!name.startsWith('PRFKT_CODEX_')));
 const key='TEST_ONLY_ORBITAL_UI_ACCESS_2026';
 async function concatenate(folder){const files=(await fs.readdir(path.join(source,folder))).filter(f=>f.endsWith('.part')).sort();return (await Promise.all(files.map(f=>fs.readFile(path.join(source,folder,f),'utf8')))).join('');}
 await fs.writeFile(path.join(root,'backend.py'),await concatenate('server'));
 await fs.copyFile(path.join(source,'runtime_server.py'),path.join(root,'server.py'));
 await fs.copyFile(path.join(source,'execution_permissions.py'),path.join(root,'execution_permissions.py'));
-for(const name of ['ai_runtime.py','ai_connections.py','codex_connection.py','ai-connections.js'])await fs.copyFile(path.join(source,name),path.join(root,name));
+for(const name of ['ai_runtime.py','ai_connections.py','codex_connection.py','ai-connections.js','codex_tasks.py','codex_tasks_runtime.py','codex_task_rpc.py','codex_sandbox.py','codex_publisher.py','codex-workspace.js'])await fs.copyFile(path.join(source,name),path.join(root,name));
 let html=await concatenate('index');
 for(const name of ['home.js','home-inspector.js','health-runtime.js']){await fs.copyFile(path.join(source,name),path.join(root,name));const tag=`<script src="/${name}"></script>`;if(!html.includes(tag))html=html.replace('</body>',tag+'</body>');}
 await fs.writeFile(path.join(root,'index.html'),html);
@@ -32,7 +33,7 @@ await fs.writeFile(path.join(root,'bin','gh'),'#!/bin/sh\necho "GitHub disabled 
 const port=await new Promise(resolve=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>resolve(p));});});
 const base=`http://127.0.0.1:${port}`;
 await prepareObservationFixtures(root);
-const server=spawn('python3',[path.join(root,'server.py')],{cwd:root,env:{...process.env,HOME:root,XDG_STATE_HOME:privateState,PATH:path.join(root,'bin')+path.delimiter+process.env.PATH,KANBAN_HOST:'127.0.0.1',KANBAN_PORT:String(port),PYTHONDONTWRITEBYTECODE:'1'},stdio:['ignore','pipe','pipe']});
+const server=spawn('python3',[path.join(root,'server.py')],{cwd:root,env:{...fixtureEnv,HOME:root,XDG_STATE_HOME:privateState,PATH:path.join(root,'bin')+path.delimiter+process.env.PATH,KANBAN_HOST:'127.0.0.1',KANBAN_PORT:String(port),PYTHONDONTWRITEBYTECODE:'1'},stdio:['ignore','pipe','pipe']});
 let serverLog='',browser;
 for(const stream of [server.stdout,server.stderr])stream.on('data',b=>{serverLog=(serverLog+b.toString()).slice(-6000);});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));

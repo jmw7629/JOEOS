@@ -14,12 +14,40 @@ export async function verifyFocusedWorkspaces({page,api,base,out}){
     if(view==='ai'){const composer=await page.locator('#chatInput').boundingBox();assert.ok(composer.y+composer.height<730,'Chat composer visible above dock');assert.equal(await page.locator('#pbChatContext').evaluate(e=>e.open),false);}
     if(view==='ai')await page.screenshot({path:path.join(out,'chat-focused-390.png'),fullPage:false});
   }
-  await go('ai');await page.locator('#pbChatContext summary').click();
-  await page.locator('#aiProject').selectOption('Orbital QA');await page.locator('#aiAgent').selectOption('builder');
+  await go('ai');
+  const catalog=await api('/api/codex-workspace');
+  assert.equal(catalog.configured,false,'this real runtime fixture deliberately has no native executor');
+  assert.equal(catalog.connected,false);
+  await page.waitForFunction(()=>document.querySelector('#codexConnection')?.textContent.includes('has not been connected'));
+  assert.equal(await page.locator('#pbChatContext').evaluate(element=>element.hidden),true,'owner routing controls are automatic');
+  assert.equal(await page.locator('#sendChat').isDisabled(),true,'unconfigured execution cannot submit');
+  await page.locator('#chatInput').fill('Keep this unsent owner task draft');
   await page.evaluate(async()=>{document.activeElement?.blur();await refreshWorkspace();});
-  assert.equal(await page.locator('#aiProject').inputValue(),'Orbital QA','refresh preserves chosen chat project');
-  assert.equal(await page.locator('#aiAgent').inputValue(),'builder','refresh preserves chosen agent');
-  await page.locator('#pbChatContext summary').click();
+  assert.equal(await page.locator('#chatInput').inputValue(),'Keep this unsent owner task draft');
+  await page.locator('#chatInput').fill('');
+  // The legacy context controls belong to collaborators. Exercise them with a
+  // real editor session, without inventing a connected native execution API.
+  const editor=await api('/api/team','POST',{name:'Focused chat editor fixture',role:'editor'});
+  assert.equal(typeof editor.access_key,'string');
+  const editorContext=await page.context().browser().newContext({viewport:{width:390,height:844},reducedMotion:'reduce'});
+  try{
+    await editorContext.addInitScript(key=>{sessionStorage.setItem('project_byte_access',key);sessionStorage.setItem('pb_login_at',String(Date.now()));},editor.access_key);
+    const editorPage=await editorContext.newPage(),editorErrors=[];
+    editorPage.on('pageerror',error=>editorErrors.push(error.message));
+    await editorPage.goto(base,{waitUntil:'networkidle'});
+    await editorPage.waitForFunction(()=>typeof session!=='undefined'&&session.role==='editor');
+    await editorPage.locator('#pbWorkspaceButton').click();
+    await editorPage.locator('#pbWorkspaces [data-home-go="ai"]').click();
+    await editorPage.waitForSelector('#ai.active');
+    assert.equal(await editorPage.locator('#codexWorkspacePanel').isVisible(),false);
+    await editorPage.locator('#pbChatContext summary').click();
+    await editorPage.locator('#aiProject').selectOption('Orbital QA');
+    await editorPage.locator('#aiAgent').selectOption('builder');
+    await editorPage.evaluate(async()=>{document.activeElement?.blur();await refreshWorkspace();});
+    assert.equal(await editorPage.locator('#aiProject').inputValue(),'Orbital QA','refresh preserves collaborator chat project');
+    assert.equal(await editorPage.locator('#aiAgent').inputValue(),'builder','refresh preserves collaborator agent');
+    assert.deepEqual(editorErrors,[]);
+  }finally{await editorContext.close();}
   await go('board');await page.locator('#pbScopedFilters').click();
   await page.waitForSelector('#pbFilterDialog[open]');assert.equal(await page.locator('#search').isVisible(),true);
   await page.locator('#ownerFilter').selectOption('Mike');await page.locator('#priorityFilter').selectOption('Critical');
@@ -53,7 +81,8 @@ export async function verifyFocusedWorkspaces({page,api,base,out}){
   await page.locator('#homeCommandInput').fill('');await page.locator('#homeCommandInput').blur();
   const jump=page.locator('.pb-crawl-group:not([aria-hidden]) [data-home-go="agents"]').first();
   if(await jump.count()){await jump.evaluate(e=>e.click());await page.waitForSelector('#agents.active');await go('home');}
-  console.log('CHAT_COMPOSER_FIRST_CONTEXT_REFRESH_PRESERVED=PASS');
+  console.log('OWNER_UNCONFIGURED_CODEX_AND_DRAFT_REFRESH=PASS');
+  console.log('CHAT_COMPOSER_FIRST_COLLABORATOR_CONTEXT_REFRESH_PRESERVED=PASS');
   console.log('NO_REPEATED_HEADER_ALL_11_WORKSPACES=PASS');console.log('ON_DEMAND_FILTERS_AND_WORKSPACE_TITLES=PASS');
   console.log('CONTINUOUS_CRAWL_PAUSE_RESUME_REDUCED_MOTION=PASS');console.log('CRAWL_LIVE_POLL_WHILE_TYPING_DRAFT_PRESERVED=PASS');console.log('CRAWL_FAILURE_TRUTHFUL_AND_EVENT_HTML_ESCAPED=PASS');
 }

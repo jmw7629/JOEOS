@@ -12,9 +12,11 @@ const root=await fs.mkdtemp(path.join(os.tmpdir(),'pb-public-browser-'));
 // Keep provider credential storage separate from files served by the fixture app.
 const privateState=await fs.mkdtemp(path.join(os.tmpdir(),'pb-public-private-state-'));
 const owner='1234',publicOwner=randomBytes(32).toString('base64url'),children=[];let browser,logs='';
+// This fixture deliberately has no native execution configuration or worker.
+const fixtureEnv=Object.fromEntries(Object.entries(process.env).filter(([name])=>!name.startsWith('PRFKT_CODEX_')));
 async function port(){return new Promise(resolve=>{const server=net.createServer();server.listen(0,'127.0.0.1',()=>{const p=server.address().port;server.close(()=>resolve(p));});});}
 async function concat(dir){return (await Promise.all((await fs.readdir(path.join(source,dir))).filter(x=>x.endsWith('.part')).sort().map(x=>fs.readFile(path.join(source,dir,x),'utf8')))).join('');}
-function start(args){const child=spawn('python3',args,{cwd:root,env:{...process.env,HOME:root,XDG_STATE_HOME:privateState,XDG_CONFIG_HOME:path.join(root,'config'),XDG_DATA_HOME:path.join(root,'data'),XDG_CACHE_HOME:path.join(root,'cache'),PATH:path.join(root,'bin')+path.delimiter+process.env.PATH,KANBAN_HOST:'127.0.0.1',KANBAN_PORT:String(backendPort),PYTHONDONTWRITEBYTECODE:'1'},stdio:['ignore','pipe','pipe']});children.push(child);for(const stream of [child.stdout,child.stderr])stream.on('data',b=>logs=(logs+b.toString()).slice(-3000));return child;}
+function start(args){const child=spawn('python3',args,{cwd:root,env:{...fixtureEnv,HOME:root,XDG_STATE_HOME:privateState,XDG_CONFIG_HOME:path.join(root,'config'),XDG_DATA_HOME:path.join(root,'data'),XDG_CACHE_HOME:path.join(root,'cache'),PATH:path.join(root,'bin')+path.delimiter+process.env.PATH,KANBAN_HOST:'127.0.0.1',KANBAN_PORT:String(backendPort),PYTHONDONTWRITEBYTECODE:'1'},stdio:['ignore','pipe','pipe']});children.push(child);for(const stream of [child.stdout,child.stderr])stream.on('data',b=>logs=(logs+b.toString()).slice(-3000));return child;}
 const backendPort=await port(),gatewayPort=await port(),upstream=`http://127.0.0.1:${backendPort}`,base=`http://127.0.0.1:${gatewayPort}`;
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function ready(url){for(let i=0;i<100;i++){try{const r=await fetch(url);if(r.ok)return;}catch{}await sleep(100);}throw new Error('Fixture did not start: '+logs);}
@@ -22,7 +24,7 @@ try{
  await fs.writeFile(path.join(root,'backend.py'),await concat('server'));
  await fs.copyFile(path.join(source,'runtime_server.py'),path.join(root,'server.py'));
  await fs.copyFile(path.join(source,'execution_permissions.py'),path.join(root,'execution_permissions.py'));
-for(const name of ['ai_runtime.py','ai_connections.py','codex_connection.py','ai-connections.js'])await fs.copyFile(path.join(source,name),path.join(root,name));
+ for(const name of ['ai_runtime.py','ai_connections.py','codex_connection.py','ai-connections.js','codex_tasks.py','codex_tasks_runtime.py','codex_task_rpc.py','codex_sandbox.py','codex_publisher.py','codex-workspace.js'])await fs.copyFile(path.join(source,name),path.join(root,name));
  let html=await concat('index');
  for(const name of ['home.js','home-inspector.js','health-runtime.js']){await fs.copyFile(path.join(source,name),path.join(root,name));if(!html.includes(`<script src="/${name}"></script>`))html=html.replace('</body>',`<script src="/${name}"></script></body>`);}
  await fs.writeFile(path.join(root,'index.html'),html);await fs.writeFile(path.join(root,'admin.secret'),owner,{mode:0o600});await fs.mkdir(path.join(root,'bin'));
@@ -48,6 +50,13 @@ for(const name of ['ai_runtime.py','ai_connections.py','codex_connection.py','ai
  const originalStarted=await page.evaluate(()=>sessionStorage.getItem('pb_login_at'));
  assert.equal((await page.evaluate(async()=>{const r=await fetch('/healthz');return r.status;})),200,'headerless health request acquires session nonce');
  await page.reload();await page.waitForFunction(()=>typeof session!=='undefined'&&session.level===4);assert.equal(await page.evaluate(()=>sessionStorage.getItem('pb_login_at')),originalStarted,'reload does not reset TTL');
+ const native=await page.evaluate(async()=>{const r=await fetch('/api/codex-workspace');return {status:r.status,value:await r.json()};});
+ assert.equal(native.status,200);assert.equal(native.value.configured,false);assert.equal(native.value.connected,false);assert.deepEqual(native.value.projects,[]);assert.deepEqual(native.value.conversations,[]);
+ await page.locator('#pbWorkspaceButton').click();await page.locator('#pbWorkspaces [data-home-go="ai"]').click();await page.waitForSelector('#ai.active');
+ await page.waitForFunction(()=>document.querySelector('#codexConnection')?.textContent.includes('has not been connected'));
+ assert.equal(await page.locator('#sendChat').isDisabled(),true,'unconfigured owner execution stays unavailable');
+ assert.equal(await page.locator('#pbChatContext').evaluate(element=>element.hidden),true,'owner workflow does not require manual agent selection');
+ assert.equal((await page.evaluate(async()=>{const r=await fetch('/codex-workspace.js');return r.status;})),200,'authenticated native workspace asset is installed');
  for(const width of [320,390,768,1440]){
   await page.setViewportSize({width,height:900});
   for(const view of ['portfolio','board','agents','ai','settings','models','team','terminalView','activity','intelligence','help','home']){
@@ -68,6 +77,7 @@ for(const name of ['ai_runtime.py','ai_connections.py','codex_connection.py','ai
  const cookies=await context.cookies();const cookie=cookies.find(c=>c.name==='__Host-project_byte_session');
  assert.equal((await fetch(base+'/api/tasks',{headers:{Cookie:cookie.name+'='+cookie.value,'X-Access-Key':oldNonce}})).status,401);
  assert.equal((await tab2.evaluate(async()=>{const r=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});return r.status;})),403,'viewer role still enforced by unchanged app');
+ assert.equal((await tab2.evaluate(async()=>{const r=await fetch('/api/codex-workspace');return r.status;})),403,'native workspace remains owner-only through the real gateway');
  assert.equal((await tab2.evaluate(async()=>{const r=await fetch('/api/tasks');return r.status;})),200,'stale tab cannot revoke current account');
  await tab2.locator('#login').click();await tab2.waitForSelector('#signin');await page.waitForSelector('#signin');
  assert.equal((await fetch(base+upload.value.url,{headers:{Cookie:cookie.name+'='+cookie.value},redirect:'manual'})).status,303,'captured old cookie is revoked after logout');
@@ -76,5 +86,6 @@ for(const name of ['ai_runtime.py','ai_connections.py','codex_connection.py','ai
  console.log('PUBLIC_HEALTH_SESSION_TTL_NEW_TAB_ACCOUNT_SWITCH_VIEWER_LOGOUT=PASS');
  console.log('PUBLIC_PRIVATE_DATA_AND_ATTACHMENTS_REQUIRE_AUTH=PASS');
  console.log('PUBLIC_STRONG_OWNER_ALIAS_PRESERVES_PRIVATE_SHORT_KEY=PASS');
+ console.log('PUBLIC_UNCONFIGURED_CODEX_OWNER_WORKSPACE_AND_ASSET=PASS');
 }catch(error){console.error('PUBLIC_BROWSER_FAILED',error,logs);process.exitCode=1;}
 finally{if(browser)await browser.close();for(const child of children)child.kill('SIGTERM');await Promise.all(children.map(child=>new Promise(resolve=>child.exitCode!==null||child.signalCode?resolve():child.once('exit',resolve))));await fs.rm(privateState,{recursive:true,force:true});}
