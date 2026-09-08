@@ -32,17 +32,19 @@ try{
  assert.equal((await fetch(base+'/api/tasks')).status,401);
  assert.equal((await fetch(base+'/_gateway/login',{method:'POST',headers:{'Origin':base,'Content-Type':'application/json','X-Project-Byte-Gateway':'1'},body:JSON.stringify({key:owner})})).status,401,'private four-character owner key cannot sign in publicly');
  browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'});const page=await context.newPage(),errors=[],external=[];
- context.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));page.on('pageerror',e=>errors.push(e.message));
+ context.on('page',p=>p.on('pageerror',e=>errors.push({url:p.url(),stack:e.stack||e.message})));page.on('pageerror',e=>errors.push({url:page.url(),stack:e.stack||e.message}));
+ // The sign-in document remains active while its asynchronous request is pending.
+ await context.route(base+'/_gateway/login',async route=>{await sleep(100);await route.continue();});
  context.on('request',request=>{if(!request.url().startsWith(base)&&!request.url().startsWith('data:'))external.push(request.url());});
  await page.goto(base);await page.waitForSelector('#signin');
  const out=process.env.PB_SCREENSHOTS||path.join(root,'screenshots');await fs.mkdir(out,{recursive:true});
  for(const width of [320,390,768,1440]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1));await page.screenshot({path:path.join(out,`public-signin-${width}.png`)});}
- await page.locator('#key').fill(publicOwner);await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.waitForSelector('#home.active');await page.waitForFunction(()=>session.ok&&session.level===4);
+ await page.locator('#key').fill(publicOwner);await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.waitForSelector('#home.active');await page.waitForFunction(()=>typeof session!=='undefined'&&session.ok&&session.level===4);
  assert.notEqual(await page.evaluate(()=>sessionStorage.getItem('project_byte_access')),owner,'raw owner key never retained in public browser storage');
  assert.notEqual(await page.evaluate(()=>sessionStorage.getItem('project_byte_access')),publicOwner,'public owner key is replaced by a session nonce');
  const originalStarted=await page.evaluate(()=>sessionStorage.getItem('pb_login_at'));
  assert.equal((await page.evaluate(async()=>{const r=await fetch('/healthz');return r.status;})),200,'headerless health request acquires session nonce');
- await page.reload();await page.waitForFunction(()=>session.level===4);assert.equal(await page.evaluate(()=>sessionStorage.getItem('pb_login_at')),originalStarted,'reload does not reset TTL');
+ await page.reload();await page.waitForFunction(()=>typeof session!=='undefined'&&session.level===4);assert.equal(await page.evaluate(()=>sessionStorage.getItem('pb_login_at')),originalStarted,'reload does not reset TTL');
  for(const width of [320,390,768,1440]){
   await page.setViewportSize({width,height:900});
   for(const view of ['portfolio','board','agents','ai','settings','models','team','terminalView','activity','intelligence','help','home']){
@@ -56,10 +58,10 @@ try{
  const download=await page.evaluate(async url=>{const r=await fetch(url);return {status:r.status,type:r.headers.get('Content-Type'),disposition:r.headers.get('Content-Disposition'),csp:r.headers.get('Content-Security-Policy'),body:await r.text()};},upload.value.url);
  assert.equal(download.status,200);assert.equal(download.type,'application/octet-stream');assert.match(download.disposition,/attachment;/);assert.match(download.csp,/sandbox/);assert.match(download.body,/not executable/);
  assert.equal((await fetch(base+upload.value.url)).url,base+'/signin','anonymous attachment redirects to sign in');
- const tab2=await context.newPage();await tab2.goto(base);await tab2.waitForFunction(()=>session.level===4);assert.equal(await page.evaluate(()=>session.level),4,'new tab does not log out original');
+ const tab2=await context.newPage();await tab2.goto(base);await tab2.waitForFunction(()=>typeof session!=='undefined'&&session.level===4);assert.equal(await page.evaluate(()=>session.level),4,'new tab does not log out original');
  const oldNonce=await page.evaluate(()=>sessionStorage.getItem('project_byte_access'));
- await tab2.goto(base+'/signin');await tab2.locator('#key').fill(viewer);await tab2.getByRole('button',{name:'Sign in',exact:true}).click();await tab2.waitForFunction(()=>session.level===1);
- await page.waitForFunction(()=>session.level===1);assert.equal(await tab2.evaluate(()=>session.role),'viewer');
+ await tab2.goto(base+'/signin');await tab2.locator('#key').fill(viewer);await tab2.getByRole('button',{name:'Sign in',exact:true}).click();await tab2.waitForFunction(()=>typeof session!=='undefined'&&session.level===1);
+ await page.waitForFunction(()=>typeof session!=='undefined'&&session.level===1);assert.equal(await tab2.evaluate(()=>session.role),'viewer');
  const cookies=await context.cookies();const cookie=cookies.find(c=>c.name==='__Host-project_byte_session');
  assert.equal((await fetch(base+'/api/tasks',{headers:{Cookie:cookie.name+'='+cookie.value,'X-Access-Key':oldNonce}})).status,401);
  assert.equal((await tab2.evaluate(async()=>{const r=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});return r.status;})),403,'viewer role still enforced by unchanged app');
