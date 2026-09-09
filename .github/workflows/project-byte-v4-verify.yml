@@ -59,10 +59,10 @@ jobs:
           for (const id of ['ownerFilter','leadFilter','statusFilter','healthFilter','stageFilter','executorFilter','agentFilter','modelFilter','aiStateFilter','dueFilter','completionFilter','dependencyFilter','activityFilter','milestoneFilter','repoFilter','runFilter','scopeFilter','savedView']) {
             if (!html.includes(`id="${id}"`)) throw new Error(`missing filter control: ${id}`);
           }
-          for (const required of ['AI_BYTE','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','New work','Approve review','Request changes','Live execution fabric','VITROS verifier','Model Hub','Portfolio pulse','homeCommandInput','home-nav']) {
+          for (const required of ['AI_BYTE','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','New work','Approve review','Request changes','Live execution fabric','VITROS verifier','Model Hub','Portfolio pulse','homeKpiDialog','home-nav']) {
             if (!home.includes(required)) throw new Error(`missing Home command-center surface: ${required}`);
           }
-          for (const forbidden of ['All systems operational','AI READY','AI CONNECTED']) {
+          for (const forbidden of ['All systems operational','AI READY','AI CONNECTED','homeCommandInput']) {
             if (home.includes(forbidden)) throw new Error(`legacy false-green Home writer remains: ${forbidden}`);
           }
           if (!html.includes('STICKDEATH_BYTE (jmw7629/stickdeath-byte)')) throw new Error('Help missing STICKDEATH_BYTE execution target');
