@@ -1035,3 +1035,199 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   setInterval(()=>void refresh(),1000);
   render();
 })();
+
+// PRFKT_SPOTIFY_PLAYER_BEGIN — isolated from workspace actions and agent execution.
+(() => {
+  'use strict';
+  const ARTIST = '6aGxmrOqjSpDGvIJdId29O';
+  const API = 'https://api.spotify.com/v1';
+  const ACCOUNT = 'https://accounts.spotify.com';
+  const PREFIX = 'prfkt.spotify.';
+  const SCOPE = 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state';
+  const validId = value => typeof value === 'string' && /^[a-zA-Z0-9]{22}$/.test(value);
+  const base64url = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const sha = async value => base64url(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)));
+  const random = () => base64url(crypto.getRandomValues(new Uint8Array(32)));
+  class SpotifySession {
+    constructor({fetcher=(...args)=>fetch(...args),storage=sessionStorage,origin=location.origin,clock=Date.now,timeoutMs=20000}={}) {
+      Object.assign(this,{fetcher,storage,origin,clock,timeoutMs});
+      this.tokens=null;this.epoch=0;this.refreshing=null;this.retryAt=0;this.abort=new AbortController();
+    }
+    read(key) { try { const raw=this.storage.getItem(PREFIX+key);return raw&&raw.length<16000?JSON.parse(raw):null; } catch { return null; } }
+    remove(key) { try { this.storage.removeItem(PREFIX+key); } catch {} }
+    save(key,value) { this.storage.setItem(PREFIX+key,JSON.stringify(value)); }
+    clear() {
+      this.epoch++;this.abort.abort();this.abort=new AbortController();this.tokens=null;this.refreshing=null;this.retryAt=0;
+      for(const key of ['tokens','pending','callback'])this.remove(key);
+    }
+    async authorize(clientId,identity) {
+      if(!/^[a-f0-9]{32}$/i.test(clientId))throw new Error('Enter the public Client ID from your Spotify app. Never enter a client secret.');
+      const u=new URL(this.origin);
+      if(u.protocol!=='https:' && !(u.protocol==='http:'&&['127.0.0.1','[::1]'].includes(u.hostname)))throw new Error('Spotify needs HTTPS or an explicit loopback address.');
+      const turn=this.epoch,verifier=random(),state=random(),bound=await sha(identity),challenge=await sha(verifier);
+      if(turn!==this.epoch)throw new Error('Workspace session changed.');
+      const redirect=this.origin+'/spotify-callback';
+      this.save('pending',{clientId,verifier,state,bound,redirect,at:this.clock()});
+      const params=new URLSearchParams({client_id:clientId,response_type:'code',redirect_uri:redirect,scope:SCOPE,state,code_challenge_method:'S256',code_challenge:challenge});
+      return ACCOUNT+'/authorize?'+params;
+    }
+    async restore(identity) {
+      const turn=this.epoch,bound=await sha(identity);
+      if(turn!==this.epoch)return false;
+      const callback=this.read('callback'),pending=this.read('pending');
+      this.remove('callback');
+      if(callback) {
+        this.remove('pending');
+        if(!pending || pending.bound!==bound || pending.state!==callback.state || pending.redirect!==this.origin+'/spotify-callback' || this.clock()-pending.at>600000 || this.clock()<pending.at)throw new Error('Spotify sign-in expired or did not match this workspace. Connect again.');
+        if(callback.error || typeof callback.code!=='string'||!callback.code||callback.code.length>2048)throw new Error('Spotify sign-in was not completed. Connect again.');
+        this.tokens={clientId:pending.clientId,bound};
+        await this.exchange({grant_type:'authorization_code',code:callback.code,redirect_uri:pending.redirect,code_verifier:pending.verifier},turn);
+        return true;
+      }
+      const saved=this.read('tokens');
+      if(saved && saved.bound===bound && /^[a-f0-9]{32}$/i.test(saved.clientId||'') && typeof saved.access_token==='string' && Number.isFinite(saved.expiresAt)) {
+        this.tokens=saved;await this.token();return true;
+      }
+      this.remove('tokens');return false;
+    }
+    async request(url,options) {
+      const controller=new AbortController(),parent=this.abort.signal;
+      let timedOut=false;
+      const cancel=()=>controller.abort();parent.addEventListener('abort',cancel,{once:true});
+      if(parent.aborted)cancel();
+      const timer=setTimeout(()=>{timedOut=true;controller.abort();},this.timeoutMs);
+      try{return await this.fetcher(url,{...options,signal:controller.signal});}
+      catch(error){if(timedOut)throw new Error('Spotify request timed out. Check playback before retrying.');throw error;}
+      finally{clearTimeout(timer);parent.removeEventListener('abort',cancel);}
+    }
+    async exchange(values,turn=this.epoch) {
+      const current=this.tokens;
+      if(!current)throw new Error('Connect Spotify first.');
+      const response=await this.request(ACCOUNT+'/api/token',{method:'POST',credentials:'omit',referrerPolicy:'no-referrer',signal:this.abort.signal,headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({...values,client_id:current.clientId})});
+      if(turn!==this.epoch)throw new Error('Workspace session changed.');
+      if(!response.ok) { this.remove('tokens');this.tokens=null;throw new Error('Spotify authorization could not be renewed. Connect again.'); }
+      const data=await response.json();
+      if(turn!==this.epoch)throw new Error('Workspace session changed.');
+      if(typeof data.access_token!=='string'||data.access_token.length>10000||!Number.isFinite(data.expires_in)||data.expires_in<=0)throw new Error('Spotify returned an invalid authorization response.');
+      this.tokens={...current,access_token:data.access_token,refresh_token:data.refresh_token||current.refresh_token,expiresAt:this.clock()+data.expires_in*1000};
+      this.save('tokens',this.tokens);
+      return this.tokens.access_token;
+    }
+    async token() {
+      if(!this.tokens)throw new Error('Connect Spotify first.');
+      if(this.tokens.expiresAt>this.clock()+60000)return this.tokens.access_token;
+      if(!this.tokens.refresh_token)throw new Error('Spotify sign-in expired. Connect again.');
+      if(!this.refreshing) { const pending=this.exchange({grant_type:'refresh_token',refresh_token:this.tokens.refresh_token});this.refreshing=pending;pending.finally(()=>{if(this.refreshing===pending)this.refreshing=null;}).catch(()=>{}); }
+      return this.refreshing;
+    }
+    async api(path,method='GET',body) {
+      const url=new URL(API+path);
+      if(url.origin!=='https://api.spotify.com'||!/^\/v1\/(artists\/[A-Za-z0-9]{22}\/albums|albums\/[A-Za-z0-9]{22}\/tracks|me\/player(?:\/(play|repeat|shuffle))?)$/.test(url.pathname))throw new Error('Unexpected Spotify endpoint.');
+      if(this.clock()<this.retryAt)throw new Error('Spotify is rate limiting requests. Wait before trying again.');
+      const turn=this.epoch,token=await this.token();
+      if(turn!==this.epoch)throw new Error('Workspace session changed.');
+      const response=await this.request(url.href,{method,credentials:'omit',referrerPolicy:'no-referrer',signal:this.abort.signal,headers:{Authorization:'Bearer '+token,...(body!==undefined?{'Content-Type':'application/json'}:{})},...(body!==undefined?{body:JSON.stringify(body)}:{})});
+      if(turn!==this.epoch)throw new Error('Workspace session changed.');
+      if(response.status===429) { this.retryAt=this.clock()+Math.min(3600,Math.max(1,Number(response.headers.get('Retry-After'))||30))*1000;throw new Error('Spotify is rate limiting requests. Wait before trying again.'); }
+      if(!response.ok)throw new Error(response.status===401?'Spotify sign-in expired. Connect again.':response.status===403?'Spotify requires Premium and access to this developer app.':response.status===404?'This Spotify device is unavailable. Reconnect the player.':'Spotify request failed. Try again.');
+      const data=response.status===204?null:await response.json();
+      if(turn!==this.epoch)throw new Error('Workspace session changed.');
+      return data;
+    }
+    async pages(path) {
+      const output=[],seen=new Set();let next=path;
+      while(next) {
+        if(seen.has(next)||seen.size>=40)throw new Error('Spotify catalog pagination could not be completed.');
+        seen.add(next);const page=await this.api(next);
+        if(!Array.isArray(page?.items))throw new Error('Spotify catalog is unavailable.');
+        output.push(...page.items);
+        if(page.next) { const url=new URL(page.next);if(url.origin!=='https://api.spotify.com'||url.pathname!==new URL(API+path).pathname)throw new Error('Unexpected Spotify catalog continuation.');next=url.pathname.slice(3)+url.search; } else next=null;
+      }
+      return output;
+    }
+    async discography() {
+      const albums=await this.pages('/artists/'+ARTIST+'/albums?include_groups=album,single&limit=50');
+      const unique=new Map(albums.filter(a=>validId(a?.id)&&a.artists?.some(x=>x.id===ARTIST)).map(a=>[a.id,a]));
+      const ordered=[...unique.values()].sort((a,b)=>(a.release_date||'').localeCompare(b.release_date||'')||a.name.localeCompare(b.name)||a.id.localeCompare(b.id));
+      const seen=new Set(),tracks=[];
+      for(const album of ordered) {
+        const rows=await this.pages('/albums/'+album.id+'/tracks?limit=50');
+        rows.sort((a,b)=>(a.disc_number||1)-(b.disc_number||1)||(a.track_number||0)-(b.track_number||0));
+        for(const t of rows) {
+          if(!validId(t?.id)||t.is_playable===false||!t.artists?.some(a=>a.id===ARTIST))continue;
+          const key=t.linked_from?.id||t.id;
+          if(seen.has(key))continue;seen.add(key);tracks.push({uri:'spotify:track:'+t.id,name:t.name,album:album.name});
+        }
+      }
+      if(!tracks.length)throw new Error('No playable Saxon Shore tracks are available for this Spotify account.');
+      if(tracks.length>100)throw new Error('The catalog exceeds this player’s queue limit; it was not truncated.');
+      return tracks;
+    }
+  }
+  if(typeof module!=='undefined'&&module.exports){module.exports={SpotifySession,ARTIST,sha};return;}
+  if(!document.querySelector('.home-hero-top')||document.getElementById('homeMusic'))return;
+  const css=document.createElement('style');
+  css.textContent=`
+    #homeMusic{width:244px;flex:0 0 244px;min-width:0;margin-left:auto;padding:11px 12px;border:1px solid #759ec044;border-radius:14px;background:linear-gradient(145deg,#142539e8,#06111bea);box-shadow:inset 0 1px 0 #e6f4ff12,0 8px 25px #0004;color:#e8f1fb;text-align:left}
+    #homeMusic *{box-sizing:border-box}#homeMusic .hm-top{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:7px}#homeMusic .hm-spotify{font-size:10px;letter-spacing:.03em;color:#88d9b0;text-decoration:none}#homeMusic .hm-top span{font-size:10px;color:#93a9bb}
+    #homeMusic .hm-track{display:flex;align-items:center;gap:9px;min-width:0}#homeMusic .hm-art{width:36px;height:36px;border-radius:6px;object-fit:contain;flex:none}#homeMusic .hm-art[hidden]{display:none}#homeMusic .hm-meta{min-width:0;flex:1}#homeMusic .hm-title{display:block;color:#eff7ff;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#homeMusic .hm-artist{display:block;font-size:11px;color:#9eb8d0;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #homeMusic .hm-controls{display:flex;align-items:center;gap:5px;margin-top:8px}#homeMusic button{display:grid;place-items:center;min-width:36px;width:36px;min-height:36px;height:36px;padding:0;border-radius:10px;border:1px solid #7499bd42;background:#10263a;color:#bcdbf6;cursor:pointer}#homeMusic button svg{width:16px;height:16px;fill:currentColor;pointer-events:none}#homeMusic button:disabled{opacity:.38;cursor:default}#homeMusic button:focus-visible,#homeMusic a:focus-visible{outline:2px solid #9bcfff;outline-offset:3px}#homeMusic [data-hm=play]{color:#90e6bd;background:#16352d}#homeMusic [data-hm=settings]{margin-left:auto;background:transparent;border-color:transparent}#homeMusic .hm-status{font-size:10px;line-height:1.35;color:#aac0d4;margin-top:5px;overflow-wrap:anywhere}#homeMusic[data-error=true] .hm-status{color:#efbf82}
+    #homeMusicDialog{box-sizing:border-box;width:min(460px,calc(100vw - 28px));max-height:85dvh;overflow:auto;padding:22px;border:1px solid #416280;border-radius:20px;background:#0b1726;color:#e6effa}#homeMusicDialog::backdrop{background:#030914c9;backdrop-filter:blur(5px)}#homeMusicDialog h2{font-size:21px;margin:0 0 12px}#homeMusicDialog p{font-size:13px;line-height:1.6;color:#afc2d6}#homeMusicDialog label{display:block;font-size:13px;margin-top:15px}#homeMusicDialog input{box-sizing:border-box;width:100%;font-size:16px;margin:7px 0 4px;padding:12px;border:1px solid #43617b;background:#08121e;border-radius:10px;color:#edf5ff}#homeMusicDialog code{display:block;overflow-wrap:anywhere;white-space:normal;font-size:12px;color:#b6dbff;padding:10px;background:#06101a;border-radius:8px}#homeMusicDialog .hm-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}#homeMusicDialog button{min-height:42px;padding:9px 14px}#homeMusicDialog a{color:#9bceff}
+    @media(max-width:650px){#homeMusic{width:142px;flex-basis:142px;padding:8px}.home-hero-top>div:first-child{min-width:0;flex:1}.home-hero-top>div:first-child .home-eyebrow{overflow-wrap:anywhere}#homeMusic .hm-title{font-size:11px}#homeMusic .hm-artist{font-size:10px}#homeMusic .hm-art{width:28px;height:28px}#homeMusic .hm-controls{gap:0;justify-content:space-between}#homeMusic button{min-width:30px;width:30px;min-height:40px;height:40px}#homeMusic .hm-status{font-size:9px}#homeMusic .hm-top{margin-bottom:5px}.home-hero-top h2{font-size:clamp(22px,6vw,30px)}}
+  `;document.head.append(css);
+  const widget=document.createElement('section');widget.id='homeMusic';widget.setAttribute('aria-label','Saxon Shore music player');
+  const glyphs={play:'<path d="M6 3l15 9L6 21z"/>',pause:'<path d="M5 3h5v18H5zm9 0h5v18h-5z"/>',stop:'<rect x="4" y="4" width="16" height="16" rx="2"/>',settings:'<circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/>'};
+  widget.innerHTML=`<div class="hm-top"><a class="hm-spotify" href="https://open.spotify.com/artist/${ARTIST}" target="_blank" rel="noopener noreferrer">Spotify ↗</a><span id="hmRepeat" title="Repeat the discography">↻ ALL</span></div><div class="hm-track"><img class="hm-art" alt="Album artwork" hidden referrerpolicy="no-referrer"><div class="hm-meta"><a class="hm-title" href="https://open.spotify.com/artist/${ARTIST}" target="_blank" rel="noopener noreferrer">Discography</a><span class="hm-artist">Saxon Shore</span></div></div><div class="hm-controls">${Object.entries(glyphs).map(([key,svg])=>`<button type="button" data-hm="${key}" aria-label="${key==='settings'?'Spotify connection settings':key[0].toUpperCase()+key.slice(1)+' music'}" title="${key==='settings'?'Spotify connection':key}"><svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg></button>`).join('')}</div><div class="hm-status" role="status" aria-live="polite">Connect Spotify</div>`;
+  document.querySelector('.home-hero-top').append(widget);
+  const dialog=document.createElement('dialog');dialog.id='homeMusicDialog';dialog.setAttribute('aria-labelledby','hmDialogTitle');
+  dialog.innerHTML=`<h2 id="hmDialogTitle">Spotify on Home</h2><p>Play Saxon Shore’s available albums and EPs in release order, on repeat. Playback uses your Spotify Premium account on this device.</p><div id="hmSetup"><p>One-time app setup: register the callback below in your <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer">Spotify developer app</a>, then enter its public Client ID. No client secret is used.</p><code id="hmCallback"></code><label for="hmClientId">Spotify Client ID</label><input id="hmClientId" autocomplete="off" spellcheck="false" maxlength="32" placeholder="32-character public Client ID"></div><p id="hmDialogStatus" role="status"></p><div class="hm-actions"><button type="button" id="hmConnect">Connect Spotify</button><button type="button" id="hmDisconnect">Disconnect</button><button type="button" id="hmClose">Done</button></div><p>Stop pauses and returns the current song to its beginning. Music continues when you navigate the dashboard. Sign-out disconnects this player. Spotify availability and browser playback restrictions apply.</p>`;document.body.append(dialog);
+  dialog.querySelector('#hmCallback').textContent=location.origin+'/spotify-callback';
+  const client=new SpotifySession(),button=name=>widget.querySelector('[data-hm='+name+']');
+  let identity=null,player=null,device='',tracks=[],started=false,paused=true,stopped=false,busy=false,command=0,chain=Promise.resolve(),sdkPromise=null,restoring=false;
+  let status='Connect Spotify',failure=false;
+  const ownerIdentity=()=>typeof session!=='undefined'&&session?.ok&&session.level===4&&typeof accessKey!=='undefined'&&accessKey?JSON.stringify([accessKey,session.subject,session.name,session.level]):null;
+  const message=(value,error=false)=>{status=value;failure=error;render();};
+  function render(){widget.dataset.error=String(failure);widget.querySelector('.hm-status').textContent=identity?status:'Sign in to connect';dialog.querySelector('#hmDialogStatus').textContent=identity?status:'Sign in to your workspace first.';button('play').disabled=!identity||busy;button('pause').disabled=!player||!device||paused||busy;button('stop').disabled=!player||!device;dialog.querySelector('#hmConnect').disabled=!identity||busy;dialog.querySelector('#hmDisconnect').disabled=!client.tokens&&!restoring;widget.querySelector('#hmRepeat').title=started?'Repeat all requested from Spotify':'Repeat all when playback starts';}
+  function reset(){command++;client.clear();player?.disconnect();player=null;device='';tracks=[];started=false;paused=true;stopped=false;busy=false;restoring=false;widget.querySelector('.hm-title').textContent='Discography';widget.querySelector('.hm-title').href='https://open.spotify.com/artist/'+ARTIST;widget.querySelector('.hm-artist').textContent='Saxon Shore';const art=widget.querySelector('.hm-art');art.hidden=true;art.removeAttribute('src');message('Connect Spotify');}
+  function loadSDK(){
+    if(window.Spotify?.Player)return Promise.resolve();if(sdkPromise)return sdkPromise;
+    sdkPromise=new Promise((resolve,reject)=>{const script=document.createElement('script');let timer;const cleanup=()=>{clearTimeout(timer);script.onerror=null;};window.onSpotifyWebPlaybackSDKReady=()=>{cleanup();resolve();};script.src='https://sdk.scdn.co/spotify-player.js';script.async=true;script.referrerPolicy='no-referrer';script.onerror=()=>{cleanup();script.remove();sdkPromise=null;reject(new Error('Spotify player could not load. Check the connection and browser policy.'));};timer=setTimeout(()=>{script.remove();sdkPromise=null;reject(new Error('Spotify player timed out. Reconnect to retry.'));},20000);document.head.append(script);});return sdkPromise;
+  }
+  async function preparePlayer(){
+    const bound=identity,turn=client.epoch;await loadSDK();if(bound!==identity||turn!==client.epoch)return;
+    const p=new window.Spotify.Player({name:'PRFKT_PROJECT · Home',volume:.35,enableMediaSession:true,getOAuthToken:callback=>{client.token().then(token=>{if(player===p&&bound===identity)callback(token);}).catch(()=>{if(player===p)message('Spotify sign-in expired. Reconnect.',true);});}});player=p;
+    p.addListener('ready',({device_id})=>{if(player!==p)return;device=device_id;message('Ready · press Play');});
+    p.addListener('not_ready',()=>{if(player!==p)return;device='';paused=true;message('Spotify device offline. Reconnect.',true);});
+    p.addListener('player_state_changed',state=>{if(player!==p)return;if(!state){paused=true;message('Playback moved to another device');return;}paused=state.paused;const t=state.track_window?.current_track;if(t){widget.querySelector('.hm-title').textContent=t.name||'Untitled track';widget.querySelector('.hm-title').title=t.name||'';widget.querySelector('.hm-title').href=validId(t.id)?'https://open.spotify.com/track/'+t.id:'https://open.spotify.com/artist/'+ARTIST;widget.querySelector('.hm-artist').textContent=(t.artists||[]).map(a=>a.name).join(', ');const art=widget.querySelector('.hm-art'),src=t.album?.images?.[0]?.url;try{const u=new URL(src);if(u.protocol!=='https:'||u.hostname!=='i.scdn.co')throw 0;art.src=u.href;art.hidden=false;}catch{art.hidden=true;art.removeAttribute('src');}}
+      const inQueue=tracks.some(x=>x.uri===t?.uri);if(started&&!inQueue)started=false;
+      message(stopped&&paused?'Stopped':paused?'Paused':state.repeat_mode===1&&inQueue?'Playing · repeat all':'Playing');});
+    for(const [event,text] of Object.entries({initialization_error:'This browser cannot initialize Spotify playback.',authentication_error:'Spotify sign-in expired. Reconnect.',account_error:'Spotify Premium is required for this player.',playback_error:'Spotify could not play this song.',autoplay_failed:'Tap Play to allow audio in this browser.'}))p.addListener(event,()=>{if(player===p)message(text,true);});
+    if(!await p.connect()){if(player===p)message('Spotify connection failed. Reconnect.',true);}
+  }
+  async function reconcile(){const next=ownerIdentity();if(next===identity)return;const old=identity;identity=next;if(old)reset();if(!next){render();return;}restoring=true;render();const turn=client.epoch;try{if(await client.restore(next)){if(identity===next&&client.epoch===turn){message('Connecting Spotify…');await preparePlayer();}}}catch(e){if(identity===next)message(e.name==='AbortError'?'Spotify connection cancelled.':e.message,true);}finally{if(identity===next){restoring=false;render();}}}
+  function openSettings(){try{dialog.querySelector('#hmClientId').value=localStorage.getItem(PREFIX+'clientId')||'';}catch{}render();dialog.showModal();}
+  button('settings').onclick=openSettings;dialog.querySelector('#hmClose').onclick=()=>dialog.close();dialog.onclick=e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}};
+  dialog.querySelector('#hmConnect').onclick=async()=>{if(!identity||busy)return;const bound=identity;busy=true;message('Opening Spotify sign-in…');try{const id=dialog.querySelector('#hmClientId').value.trim();const url=await client.authorize(id,bound);if(bound!==identity)return;try{localStorage.setItem(PREFIX+'clientId',id);}catch{}location.assign(url);}catch(e){message(e.message,true);}finally{busy=false;render();}};
+  dialog.querySelector('#hmDisconnect').onclick=()=>{reset();dialog.close();};
+  function enqueue(action){const ticket=++command;busy=true;render();chain=chain.catch(()=>{}).then(async()=>{if(ticket!==command||!identity)return;try{await action(()=>ticket===command&&!!identity);}catch(e){if(ticket===command)message(e.name==='AbortError'?'Playback request cancelled.':e.message,true);}finally{if(ticket===command){busy=false;render();}}});}
+  button('play').onclick=()=>{
+    if(!identity||busy)return;if(!client.tokens){openSettings();return;}if(!player||!device){message('Reconnect Spotify to make this device ready.',true);openSettings();return;}
+    const activation=player.activateElement();
+    enqueue(async current=>{await activation;if(!current())return;stopped=false;
+      if(started){await player.resume();return;}
+      message('Loading Saxon Shore discography…');if(!tracks.length)tracks=await client.discography();if(!current())return;
+      const target='?device_id='+encodeURIComponent(device);
+      await client.api('/me/player','PUT',{device_ids:[device],play:false});if(!current())return;
+      await client.api('/me/player/shuffle'+target+'&state=false','PUT');if(!current())return;
+      await client.api('/me/player/repeat'+target+'&state=context','PUT');if(!current())return;
+      message('Starting · '+tracks.length+' tracks');await client.api('/me/player/play'+target,'PUT',{uris:tracks.map(t=>t.uri),position_ms:0});if(current())started=true;
+    });
+  };
+  button('pause').onclick=()=>enqueue(async()=>{await player.pause();});
+  button('stop').onclick=()=>enqueue(async current=>{await player.pause();if(!current())return;await player.seek(0);stopped=true;paused=true;message('Stopped');});
+  document.addEventListener('click',e=>{if(e.target.closest('#login,#logoutAllLocal')){identity=null;reset();}},true);
+  window.addEventListener('project-byte-session-ended',()=>{identity=null;reset();});
+  window.addEventListener('project-byte-home-render',()=>void reconcile());
+  window.addEventListener('pagehide',()=>{command++;player?.disconnect();});
+  setInterval(()=>void reconcile(),1000);void reconcile();render();
+})();

@@ -79,6 +79,7 @@ def serve(port):
     class Handler(runtime.SafeHandler):
         def gate(self):
             path = unquote(urlsplit(self.path).path)
+            if path == '/spotify-callback' and self.command in ('GET', 'HEAD'): return True
             if path == '/healthz' or path == '/api/workspace-profile' or path in runtime.PUBLIC_FILES: return True
             if not self.who().get('ok'):
                 self.sendj({'error': 'Sign in to this private workspace'}, 401)

@@ -21,6 +21,9 @@ import threading
 import time
 from urllib.parse import quote, unquote, urlsplit
 
+# No account credentials or workspace data are rendered by this public OAuth return page.
+SPOTIFY_CALLBACK_HTML = b'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Returning to PRFKT_PROJECT</title></head><body><p id="message">Returning to your workspace\xe2\x80\xa6</p><script>\ntry {\n const q=new URLSearchParams(location.search);\n const result={code:q.get(\'code\'),state:q.get(\'state\'),error:q.get(\'error\')};\n history.replaceState(null,\'\',\'/spotify-callback\');\n if(typeof result.state===\'string\' && result.state.length<=128 && (result.code===null || result.code.length<=2048) && (result.error===null || result.error.length<=128))sessionStorage.setItem(\'prfkt.spotify.callback\',JSON.stringify(result));\n location.replace(\'/#home\');\n} catch { document.getElementById(\'message\').textContent=\'Allow session storage, then reconnect Spotify from Home.\'; }\n</script></body></html>'
+
 COOKIE = '__Host-project_byte_session'
 ASSETS = {'/', '/index.html', '/home.js', '/home-inspector.js', '/health-runtime.js', '/ai-connections.js', '/codex-workspace.js'}
 GET_APIS = {'/healthz','/api/session','/api/tasks','/api/projects','/api/intelligence','/api/activity',
@@ -37,7 +40,7 @@ MAX_RESPONSE = 20 * 1024 * 1024
 CODEX_PREFIX = '/api/codex-workspace'
 CODEX_ID = r'[0-9a-f]{32}'
 CODEX_EVENTS = re.compile(CODEX_PREFIX+'/runs/'+CODEX_ID+'/events')
-CSP = "default-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+CSP = "default-src 'self' data:; script-src 'self' 'unsafe-inline' https://sdk.scdn.co; style-src 'self' 'unsafe-inline'; connect-src 'self' https://accounts.spotify.com https://*.spotify.com wss://*.spotify.com https://*.scdn.co; frame-src https://sdk.scdn.co; img-src 'self' data: https://i.scdn.co; media-src 'self' blob: https://*.scdn.co https://*.spotify.com; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
 
 
 def digest(value):
@@ -328,6 +331,8 @@ def handler_for(access, origin, upstream=('127.0.0.1',8094), trusted_serve=False
             mutation=self.command not in ('GET','HEAD')
             if mutation and self.headers.get('Origin') != origin:
                 return self.respond(403, {'error':'Same-origin request required'})
+            if path=='/spotify-callback' and self.command in ('GET','HEAD'):
+                return self.respond(200,SPOTIFY_CALLBACK_HTML,'text/html; charset=utf-8')
             if path=='/signin' and self.command in ('GET','HEAD'):
                 return self.respond(200,login_html,'text/html; charset=utf-8')
             if path=='/_gateway/login' and self.command=='POST':

@@ -3,7 +3,7 @@
   const originalFetch=window.fetch.bind(window);
   const channel='BroadcastChannel' in window?new BroadcastChannel('project-byte-public-session'):null;
   let ending=false;
-  function erase(){sessionStorage.removeItem('project_byte_access');sessionStorage.removeItem('pb_login_at');}
+  function erase(){sessionStorage.removeItem('project_byte_access');sessionStorage.removeItem('pb_login_at');for(const key of ['tokens','pending','callback'])sessionStorage.removeItem('prfkt.spotify.'+key);window.dispatchEvent(new Event('project-byte-session-ended'));}
   async function signOut(){
     if(ending)return;ending=true;document.documentElement.style.visibility='hidden';const csrf=sessionStorage.getItem('project_byte_access')||'';erase();
     try{await originalFetch('/_gateway/logout',{method:'POST',headers:{'Content-Type':'application/json','X-Project-Byte-Gateway':'1','X-Access-Key':csrf},body:'{}',signal:AbortSignal.timeout(3000)});}catch{}

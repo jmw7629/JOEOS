@@ -15,6 +15,8 @@ The agent inspector consumes an explicit Home-render event instead of attempting
 Local browser acceptance ran in Chromium 152 through the installed Playwright package. This is browser emulation, not a physical iPhone or native Safari certification. The existing owner-hold tests and deployment governance tests also ran. GitHub's UX gate now executes browser acceptance in addition to existing checks.
 
 ## Boundaries
+The upper-right Home music player uses Spotify for the owner's Saxon Shore catalog. Its controls, authorization boundary and setup are documented in [Spotify on Home](SPOTIFY_HOME.md). Music is opt-in and has no connection to agent execution.
+
 No application database/schema/auth changes, no live task seeding, no bridge start/stop, no owner-hold removal, and no Funnel changes. Status and counts come from existing APIs. The design mockup's example people, completion percentages, and online statuses are not seeded into production. PRFKT_PROJECT review decisions remain non-merging.
 
 ## Earth asset

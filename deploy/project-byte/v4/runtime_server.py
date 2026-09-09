@@ -15,6 +15,9 @@ from urllib.parse import unquote, urlparse
 
 import backend as app
 
+# No account credentials or workspace data are rendered by this public OAuth return page.
+SPOTIFY_CALLBACK_HTML = b'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Returning to PRFKT_PROJECT</title></head><body><p id="message">Returning to your workspace\xe2\x80\xa6</p><script>\ntry {\n const q=new URLSearchParams(location.search);\n const result={code:q.get(\'code\'),state:q.get(\'state\'),error:q.get(\'error\')};\n history.replaceState(null,\'\',\'/spotify-callback\');\n if(typeof result.state===\'string\' && result.state.length<=128 && (result.code===null || result.code.length<=2048) && (result.error===null || result.error.length<=128))sessionStorage.setItem(\'prfkt.spotify.callback\',JSON.stringify(result));\n location.replace(\'/#home\');\n} catch { document.getElementById(\'message\').textContent=\'Allow session storage, then reconnect Spotify from Home.\'; }\n</script></body></html>'
+
 PUBLIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/index.html": ("index.html", "text/html; charset=utf-8"),
@@ -1475,8 +1478,26 @@ class SafeHandler(app.H):
         content_type = record["content_type"] or "application/octet-stream"
         return self._send_file(candidate, content_type, head=head)
 
+    def log_message(self, fmt, *args):
+        if urlparse(self.path).path == '/spotify-callback':
+            return  # OAuth authorization codes must never enter request logs.
+        return super().log_message(fmt, *args)
+
+    def _spotify_callback(self, head=False):
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Content-Length', str(len(SPOTIFY_CALLBACK_HTML)))
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Referrer-Policy', 'no-referrer')
+        self.send_header('Content-Security-Policy', "default-src 'none'; script-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'")
+        self.end_headers()
+        if not head:
+            self.wfile.write(SPOTIFY_CALLBACK_HTML)
+
     def do_GET(self):
         path = unquote(urlparse(self.path).path)
+        if path == '/spotify-callback':
+            return self._spotify_callback()
         if path == "/api/execution-permissions":
             if not self.need(4):
                 return
@@ -1548,6 +1569,8 @@ class SafeHandler(app.H):
 
     def do_HEAD(self):
         path = unquote(urlparse(self.path).path)
+        if path == "/spotify-callback":
+            return self._spotify_callback(head=True)
         if path in PUBLIC_FILES:
             return self._public_file(path, head=True)
         if path.startswith("/uploads/"):

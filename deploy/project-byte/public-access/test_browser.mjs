@@ -36,7 +36,7 @@ try{
  await fs.writeFile(path.join(root,'gateway_fixture.py'),launcher);start([path.join(root,'gateway_fixture.py')]);await ready(base+'/signin');
  assert.equal((await fetch(base+'/api/tasks')).status,401);
  assert.equal((await fetch(base+'/_gateway/login',{method:'POST',headers:{'Origin':base,'Content-Type':'application/json','X-Project-Byte-Gateway':'1'},body:JSON.stringify({key:owner})})).status,401,'private four-character owner key cannot sign in publicly');
- browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'});const page=await context.newPage(),errors=[],external=[];
+ browser=await chromium.launch({headless:true,...(process.env.PB_BROWSER_PATH?{executablePath:process.env.PB_BROWSER_PATH}:{})});const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'});const page=await context.newPage(),errors=[],external=[];
  context.on('page',p=>p.on('pageerror',e=>errors.push({url:p.url(),stack:e.stack||e.message})));page.on('pageerror',e=>errors.push({url:page.url(),stack:e.stack||e.message}));
  // The sign-in document remains active while its asynchronous request is pending.
  await context.route(base+'/_gateway/login',async route=>{await sleep(100);await route.continue();});
@@ -50,6 +50,13 @@ try{
  const originalStarted=await page.evaluate(()=>sessionStorage.getItem('pb_login_at'));
  assert.equal((await page.evaluate(async()=>{const r=await fetch('/healthz');return r.status;})),200,'headerless health request acquires session nonce');
  await page.reload();await page.waitForFunction(()=>typeof session!=='undefined'&&session.level===4);assert.equal(await page.evaluate(()=>sessionStorage.getItem('pb_login_at')),originalStarted,'reload does not reset TTL');
+ // A cross-site OAuth landing must retain strict workspace cookies after the clean same-origin return.
+ const oauthFixture='https://accounts.spotify.com/prfkt-test-return';
+ await context.route(oauthFixture,route=>route.fulfill({contentType:'text/html',body:'<script>location.replace('+JSON.stringify(base+'/spotify-callback?code=TEST_CODE&state=UNMATCHED')+')</script>'}));
+ await page.goto(oauthFixture);await page.waitForURL(base+'/#home');await page.waitForFunction(()=>typeof session!=='undefined'&&session.level===4);
+ await page.waitForFunction(()=>sessionStorage.getItem('prfkt.spotify.callback')===null);
+ assert.equal(await page.evaluate(()=>sessionStorage.getItem('pb_login_at')),originalStarted);
+ assert.equal(external.filter(x=>x===oauthFixture).length,1);external.splice(external.indexOf(oauthFixture),1);
  const native=await page.evaluate(async()=>{const r=await fetch('/api/codex-workspace');return {status:r.status,value:await r.json()};});
  assert.equal(native.status,200);assert.equal(native.value.configured,false);assert.equal(native.value.connected,false);assert.deepEqual(native.value.projects,[]);assert.deepEqual(native.value.conversations,[]);
  await page.locator('#pbWorkspaceButton').click();await page.locator('#pbWorkspaces [data-home-go="ai"]').click();await page.waitForSelector('#ai.active');
@@ -71,17 +78,22 @@ try{
  assert.equal(download.status,200);assert.equal(download.type,'application/octet-stream');assert.match(download.disposition,/attachment;/);assert.match(download.csp,/sandbox/);assert.match(download.body,/not executable/);
  assert.equal((await fetch(base+upload.value.url)).url,base+'/signin','anonymous attachment redirects to sign in');
  const tab2=await context.newPage();await tab2.goto(base);await tab2.waitForFunction(()=>typeof session!=='undefined'&&session.level===4);assert.equal(await page.evaluate(()=>session.level),4,'new tab does not log out original');
+ await page.evaluate(()=>sessionStorage.setItem('prfkt.spotify.tokens',JSON.stringify({fixture:'not-a-credential'})));
  const oldNonce=await page.evaluate(()=>sessionStorage.getItem('project_byte_access'));
  await tab2.goto(base+'/signin');await tab2.locator('#key').fill(viewer);await tab2.getByRole('button',{name:'Sign in',exact:true}).click();await tab2.waitForFunction(()=>typeof session!=='undefined'&&session.level===1);
  await page.waitForFunction(()=>typeof session!=='undefined'&&session.level===1);assert.equal(await tab2.evaluate(()=>session.role),'viewer');
+ assert.equal(await page.evaluate(()=>sessionStorage.getItem('prfkt.spotify.tokens')),null,'account switch erases Spotify session in original tab');
  const cookies=await context.cookies();const cookie=cookies.find(c=>c.name==='__Host-project_byte_session');
  assert.equal((await fetch(base+'/api/tasks',{headers:{Cookie:cookie.name+'='+cookie.value,'X-Access-Key':oldNonce}})).status,401);
  assert.equal((await tab2.evaluate(async()=>{const r=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});return r.status;})),403,'viewer role still enforced by unchanged app');
  assert.equal((await tab2.evaluate(async()=>{const r=await fetch('/api/codex-workspace');return r.status;})),403,'native workspace remains owner-only through the real gateway');
  assert.equal((await tab2.evaluate(async()=>{const r=await fetch('/api/tasks');return r.status;})),200,'stale tab cannot revoke current account');
+ await tab2.evaluate(()=>sessionStorage.setItem('prfkt.spotify.tokens',JSON.stringify({fixture:'not-a-credential'})));
  await tab2.locator('#login').click();await tab2.waitForSelector('#signin');await page.waitForSelector('#signin');
  assert.equal((await fetch(base+upload.value.url,{headers:{Cookie:cookie.name+'='+cookie.value},redirect:'manual'})).status,303,'captured old cookie is revoked after logout');
+ assert.equal(await tab2.evaluate(()=>sessionStorage.getItem('prfkt.spotify.tokens')),null,'public logout erases music authorization');
  assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
+ console.log('PUBLIC_SPOTIFY_CROSS_SITE_CALLBACK_STRICT_COOKIES_AND_LOGOUT=PASS');
  console.log('PUBLIC_SIGNIN_12_WORKSPACES_4_WIDTHS_CREATE_UPLOAD_DOWNLOAD=PASS');
  console.log('PUBLIC_HEALTH_SESSION_TTL_NEW_TAB_ACCOUNT_SWITCH_VIEWER_LOGOUT=PASS');
  console.log('PUBLIC_PRIVATE_DATA_AND_ATTACHMENTS_REQUIRE_AUTH=PASS');

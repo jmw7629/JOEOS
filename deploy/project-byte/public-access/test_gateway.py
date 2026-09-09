@@ -53,6 +53,28 @@ class GatewayTests(unittest.TestCase):
         conn=http.client.HTTPConnection('127.0.0.1',self.server.server_port,timeout=4)
         conn.request(method,path,json.dumps(body).encode() if body is not None else (b'' if method not in ('GET','HEAD') else None),h)
         response=conn.getresponse();raw=response.read();result=(response.status,dict(response.getheaders()),raw);conn.close();return result
+    def test_spotify_return_does_not_expose_workspace_or_weaken_session(self):
+        status, headers, body = self.request('/spotify-callback?code=TEST_CALLBACK_SECRET&state=TEST_STATE')
+        self.assertEqual(status, 200)
+        self.assertNotIn(b'TEST_CALLBACK_SECRET', body)
+        self.assertNotIn(b'PRIVATE WORKSPACE', body)
+        self.assertNotIn('Set-Cookie', headers)
+        self.assertIn('no-store', headers['Cache-Control'])
+        self.assertIn(b"history.replaceState", body)
+        self.assertIn(b"sessionStorage.setItem('prfkt.spotify.callback'", body)
+        self.assertEqual(self.calls, [])
+        self.assertEqual(self.request('/')[0], 303)
+        self.assertEqual(self.request('/api/tasks')[0], 401)
+        self.assertEqual(self.request('/spotify-callback', 'POST', {})[0], 303)
+        token = self.login()
+        status, headers, body = self.request('/', token=token)
+        self.assertEqual(status, 200)
+        policy = headers['Content-Security-Policy']
+        self.assertIn('https://sdk.scdn.co', policy)
+        self.assertIn("frame-ancestors 'none'", policy)
+        self.assertIn("object-src 'none'", policy)
+        self.assertNotIn('https:;', policy)
+
     def login(self,key=None):
         status,headers,raw=self.request('/_gateway/login','POST',{'key':key or self.key});self.assertEqual(status,200,raw)
         cookie=headers['Set-Cookie'];self.assertIn('Secure; HttpOnly; SameSite=Strict',cookie)
