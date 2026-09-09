@@ -12,6 +12,16 @@ from an OpenAI API key and API billing. An existing authorized server sign-in is
 detected automatically; otherwise the panel offers the official device sign-in.
 The application never parses or returns subscription tokens.
 
+When the owner opens or refreshes AI connection status, an existing ChatGPT sign-in
+automatically registers `gpt-6-astra` if the native catalog offers it. It reuses an
+existing managed Astra connection and sets the owner's default only when that
+setting is empty. Explicit defaults, including unavailable ones, are preserved.
+A disconnected Astra connection stays disconnected; refresh never recreates or
+reenables it. Registration and default selection are idempotent and preserve
+other settings, agents and users. This performs account/model discovery only:
+no login, token copying, generation, API fallback or worker is started. Missing
+model access remains visible and the owner can configure another connection.
+
 The runtime must be Codex **0.153.4**, with a dedicated private authentication
 directory and an empty private workspace. Configure `PROJECT_BYTE_CODEX_BIN`,
 `PROJECT_BYTE_CODEX_HOME` and `PROJECT_BYTE_CODEX_WORKSPACE` in the service

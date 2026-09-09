@@ -14,7 +14,7 @@ import types
 import unittest
 from unittest.mock import patch
 
-from ai_connections import ConnectionError, Manager
+from ai_connections import ConnectionError, Manager, AUTO_CODEX_MODEL, AUTO_CODEX_KEY
 from ai_runtime import install
 from codex_connection import CodexError
 
@@ -166,6 +166,38 @@ class RuntimeTests(unittest.TestCase):
             self.assertEqual(after[field], before_owner[field])
         self.assertEqual(self.app.get_settings('collab:editor'), before_editor)
         self.assertEqual(len(self.codex.calls), 1)
+
+    def test_owner_status_auto_connects_existing_subscription_and_routes_blank_default(self):
+        before_editor=self.app.get_settings('collab:editor')
+        self.app.save_settings('owner',{'ai':{'default_model':''}})
+        with patch.object(self.codex,'models',return_value=[{'id':AUTO_CODEX_MODEL}]), patch.object(self.codex,'login',side_effect=AssertionError('Automatic status must never start sign-in')):
+            code,result=self.request('/api/ai-connections')
+            self.assertEqual(code,200,result)
+            self.assertTrue(result['codex_auto_connection']['created'])
+            self.assertEqual(result['default_model_key'],AUTO_CODEX_KEY)
+            self.assertEqual(len(result['connections']),1)
+            self.assertFalse(self.request('/api/ai-connections')[1]['codex_auto_connection']['created'])
+        self.assertEqual(self.codex.calls,[])
+        code,result=self.request('/api/chat',{'message':'Use detected subscription'})
+        self.assertEqual(code,200,result);self.assertEqual(result['model_key'],AUTO_CODEX_KEY)
+        self.assertEqual(self.app.get_settings('collab:editor'),before_editor)
+        self.assertEqual(len(self.codex.calls),1)
+
+    def test_owner_status_preserves_explicit_choice_and_exposes_unavailable_auto_setup(self):
+        with patch.object(self.codex,'models',return_value=[{'id':AUTO_CODEX_MODEL}]):
+            code,result=self.request('/api/ai-connections')
+            self.assertEqual(code,200,result)
+            self.assertEqual(result['default_model_key'],'ollama-local')
+            self.assertFalse(result['codex_auto_connection']['default_set'])
+        self.app.save_settings('owner',{'ai':{'default_model':''}})
+        with patch.object(self.codex,'models',side_effect=CodexError('PRIVATE_PROVIDER_DETAIL')):
+            code,result=self.request('/api/ai-connections')
+            self.assertEqual(code,200,result)
+            self.assertEqual(result['codex_auto_connection']['state'],'unavailable')
+            self.assertTrue(result['codex']['connected'])
+            self.assertIn('Automatic Astra setup is unavailable',result['codex']['detail'])
+            self.assertNotIn('PRIVATE_PROVIDER_DETAIL',json.dumps(result))
+        self.assertEqual(self.app.get_settings('owner')['ai']['default_model'],'')
 
 
     def test_legacy_supported_provider_rows_use_validated_transport_without_migration(self):

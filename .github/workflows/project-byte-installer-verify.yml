@@ -6,6 +6,7 @@ on:
     paths:
       - 'deploy/project-byte/install.sh'
       - 'deploy/project-byte/v4/**'
+      - 'deploy/project-byte/private-install/**'
       - '.github/workflows/project-byte-installer-verify.yml'
   pull_request:
     branches: [project-byte-deploy]
@@ -144,3 +145,6 @@ jobs:
           node --check "$TMP/health-runtime.js"
           python3 -m py_compile "$TMP/backend.py" "$TMP/server.py"
           echo "INSTALLER_LOCK=PASS backend=$BACKEND_SHA runtime=$SERVER_SHA ui=$INDEX_SHA home=$HOME_SHA inspector=$INSPECTOR_SHA health=$HEALTH_SHA"
+
+      - name: Verify empty private installations and recovery
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s deploy/project-byte/private-install -v

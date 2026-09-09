@@ -1,4 +1,4 @@
-# PROJECT_BYTE Agent Observatory
+# PRFKT_PROJECT Agent Observatory
 
 Open **Agents** in the existing dashboard. Home, the activity crawl and all other workspaces remain unchanged. The original agent-role cards, existing run list and memory tools are retained in an expandable section below the Observatory.
 
@@ -28,11 +28,13 @@ The evidence enhancement is self-contained in `runtime_server.py`: replace the c
 
 **Recorded history is not live-process proof.** A `running` status within a log describes that event when recorded. The existing evidence-backed Home execution health remains authoritative about current processes and owner holds. Buffered worker logs cannot expose events before the worker actually writes them.
 
-## Deliberate non-parity
-Execution permission interception is not connected. The app does not pretend existing PR review decisions can approve a tool or resume a paused agent. Genuine remote Approve/Deny with a message requires an authenticated, correlated permission-capable runner adapter, expiry/replay protection and exact-request auditing. Do not enable Synapse's unauthenticated LAN relay or clear BYTE's owner hold to simulate this capability. Unredacted payload disclosure and unrecorded token/compaction metrics are not implemented.
+## Live execution and recorded traces
+The native Codex permission inbox is connected in the owner's installation. It displays actual pending requests and frozen review cards, with Approve once and Deny bound to the original request, project, run generation and expiry. See [Execution permissions](EXECUTION_PERMISSIONS.md) and [Codex workspace](CODEX_WORKSPACE.md) for the current controller, isolation and publication contract. Chat, Terminal and Graph share the selected native conversation; visible coordinator and specialist messages remain readable in chronological order.
+
+The bridge-log Observatory described above remains a read-only history view. Selecting a trace or making a code-review decision does not approve a native tool request or resume a paused worker. Disconnected installations report their actual unconfigured state. Neither integration clears BYTE's owner hold, resumes R3, or enables an unauthenticated runner relay. Credentials, private internal reasoning and measurements that were never recorded remain excluded.
 
 ## Reference review
-Reviewed the official usesynapse.dev feature page, Soarcer/synapse README and the linked YouTube interaction demo `j4WqJHcVUc4` in Chromium. The normal watch page played; the embed initially returned error 153. Inspected graph navigation, grouped tools, lens highlighting and the metadata inspector from the actual video frames. The installed Synapse CLI describes Claude Code hooks, whereas PROJECT_BYTE's current workers use OpenCode. This is an original native implementation over existing execution records, not an iframe, copied landing page or substituted sample dashboard. No third-party source was copied.
+Reviewed the official usesynapse.dev feature page, Soarcer/synapse README and the linked YouTube interaction demo `j4WqJHcVUc4` in Chromium. The normal watch page played; the embed initially returned error 153. Inspected graph navigation, grouped tools, lens highlighting and the metadata inspector from the actual video frames. The installed Synapse CLI describes Claude Code hooks, while the original recorded bridge workers use OpenCode; the newer native workspace uses Codex. This is an original native implementation over existing execution records, not an iframe, copied landing page or substituted sample dashboard. No third-party source was copied.
 
 ## Verification
 `test_observatory.py` validates Owner-readable evidence, Editor/Admin non-disclosure after Owner cache use, authorization before reads, credential redaction, hidden-reasoning exclusion, payload bounds, stable de-duplication, unknown metrics, recorded tokens/delegation, symlinks, malformed/truncated logs, bounded history, legacy-repository exclusion and absence of shell execution or file writes. `test_observatory_browser.mjs`, imported by the required Home browser gate, uses disposable log fixtures and tests API authorization, real parsing, all lenses, cross-selection, keyboard/zoom, focus exit, all tool grouping modes, search and mobile/desktop overflow. Production acceptance must use existing logs without seeding test data and must not claim physical iPhone/Safari certification.

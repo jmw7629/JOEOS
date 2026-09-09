@@ -26,6 +26,8 @@ MAX_RESPONSE = 2 * 1024 * 1024
 MAX_REQUEST = 256 * 1024
 DISCOVERY_TIMEOUT = 12
 CHAT_TIMEOUT = 120
+AUTO_CODEX_MODEL = 'gpt-6-astra'
+AUTO_CODEX_KEY = 'connection/codex-chatgpt/automatic'
 MODEL_RE = re.compile(r"[A-Za-z0-9_.:/@+\-]{1,140}")
 ENV_RE = re.compile(r"(?:PROJECT_BYTE_AI_[A-Z0-9_]{1,80}|PROJECT_BYTE_OPENAI_API_KEY)")
 PRIVATE_PROVIDERS = frozenset({'ollama', 'openai-compatible', 'openclaw', 'hermes'})
@@ -321,6 +323,48 @@ class Manager:
         return {'providers':json.loads(json.dumps(PROVIDERS)), 'agents':json.loads(json.dumps(AGENTS)),
                 'subscription_runtimes':runtimes}
 
+    def autoconnect_codex(self, actor):
+        """Register an existing sign-in; never authenticate, generate, or replace a choice."""
+        require_owner(actor)
+        if not self.codex or not self.codex.status().get('connected'):
+            return {'state':'sign_in_required'}
+        with self.app.con() as db:
+            selected=self._owner_settings(db).get('ai',{}).get('default_model','')
+            existing=db.execute('''SELECT m.model_key,m.enabled FROM models m JOIN ai_connections a USING(model_key)
+                WHERE m.provider='codex-chatgpt' AND m.model_name=? AND a.auth_mode='subscription'
+                ORDER BY m.enabled DESC,a.created_at,m.model_key LIMIT 1''',(AUTO_CODEX_MODEL,)).fetchone()
+        if existing and not existing['enabled']:
+            return {'state':'disabled','model_key':existing['model_key']}
+        if existing and selected:
+            return {'state':'registered','model_key':existing['model_key'],'created':False,'default_set':False}
+        catalog=self.discover({'provider':'codex-chatgpt'},actor)
+        if AUTO_CODEX_MODEL not in {model['id'] for model in catalog['models']}:
+            return {'state':'model_unavailable'}
+        with self.lock,self.app.con() as db:
+            # Re-read choices under the database writer lock: a concurrent owner
+            # selection or another process's registration must win over discovery.
+            db.execute('BEGIN IMMEDIATE')
+            selected=self._owner_settings(db).get('ai',{}).get('default_model','')
+            existing=db.execute('''SELECT m.model_key,m.enabled FROM models m JOIN ai_connections a USING(model_key)
+                WHERE m.provider='codex-chatgpt' AND m.model_name=? AND a.auth_mode='subscription'
+                ORDER BY m.enabled DESC,a.created_at,m.model_key LIMIT 1''',(AUTO_CODEX_MODEL,)).fetchone()
+            if existing and not existing['enabled']:
+                return {'state':'disabled','model_key':existing['model_key']}
+            created=existing is None
+            key=existing['model_key'] if existing else AUTO_CODEX_KEY
+            if created:
+                if db.execute('SELECT 1 FROM models WHERE model_key=?',(key,)).fetchone():
+                    raise ConnectionError('Automatic Codex connection key is already in use; existing model preserved',409)
+                ts=self.app.now()
+                db.execute('''INSERT INTO models(model_key,display_name,provider,endpoint,model_name,secret_env,
+                    capabilities,enabled,local,notes,last_status,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)''',
+                    (key,'Codex · Astra Ultra','codex-chatgpt','',AUTO_CODEX_MODEL,'','["chat"]',1,0,
+                     REGISTRY['codex-chatgpt']['notes'],'not-tested',ts))
+                db.execute('INSERT INTO ai_connections VALUES(?,?,?,?,?,?)',(key,'subscription','','owner','',ts))
+                self.app.audit(db,'ai_connection_added','','','Codex · Astra Ultra',actor['name'])
+            if not selected:self._set_default(db,key,actor)
+        return {'state':'registered','model_key':key,'created':created,'default_set':not bool(selected)}
+
     def managed(self, model_key):
         with self.app.con() as db:
             return db.execute('SELECT 1 FROM ai_connections WHERE model_key=?',(model_key,)).fetchone() is not None
@@ -463,12 +507,17 @@ class Manager:
         return {'model_key':model_key,'display_name':name,'provider':config['provider'],'model_name':config['model_name'],
                 'agent_key':agent_key,'default_set':body.get('set_default',False),'owner_only':True}
 
-    def _set_default(self, db, key, actor):
+    def _owner_settings(self, db):
         row=db.execute('SELECT data FROM user_settings WHERE subject=?',('owner',)).fetchone()
         try:settings=json.loads(row['data']) if row else {}
         except (ValueError,TypeError):raise ConnectionError('Existing owner settings could not be read',503) from None
-        if not isinstance(settings,dict) or not isinstance(settings.get('ai',{}),dict):
+        if (not isinstance(settings,dict) or not isinstance(settings.get('ai',{}),dict)
+                or not isinstance(settings.get('ai',{}).get('default_model',''),str)):
             raise ConnectionError('Existing owner settings could not be read',503)
+        return settings
+
+    def _set_default(self, db, key, actor):
+        settings=self._owner_settings(db)
         settings.setdefault('ai',{})['default_model']=key
         db.execute('INSERT INTO user_settings(subject,data,updated_at) VALUES(?,?,?) ON CONFLICT(subject) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',
                    ('owner',json.dumps(settings),self.app.now()))

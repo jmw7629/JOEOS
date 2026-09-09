@@ -113,6 +113,16 @@ def install(app, BaseHandler, public_files, codex=None):
         def ai_manager():
             return get_manager()
 
+        def _codex_status(self, manager, actor):
+            state=manager.codex.status()
+            try:
+                automatic=manager.autoconnect_codex(actor)
+            except (ConnectionError, CodexError):
+                automatic={'state':'unavailable'}
+            if state.get('connected') and automatic['state'] in ('unavailable','model_unavailable'):
+                state={**state,'detail':'ChatGPT sign-in is connected. Automatic Astra setup is unavailable; manage connections to choose an available model.'}
+            return state,automatic
+
         def body(self, limit=1024*1024):
             if hasattr(self, '_ai_cached_body'):
                 return self._ai_cached_body
@@ -177,7 +187,8 @@ def install(app, BaseHandler, public_files, codex=None):
                     require_owner(actor)
                     m = get_manager()
                     result = m.catalog()
-                    result.update(codex=m.codex.status(), connections=m.connections(actor),
+                    codex_status, automatic = self._codex_status(m, actor)
+                    result.update(codex=codex_status, codex_auto_connection=automatic, connections=m.connections(actor),
                                   default_model_key=app.get_settings('owner').get('ai', {}).get('default_model', ''))
                     return self.sendj(result)
                 except Exception as error:
@@ -234,7 +245,9 @@ def install(app, BaseHandler, public_files, codex=None):
                     else:
                         if body:
                             raise ConnectionError('Invalid Codex sign-in request', 400)
-                        result = {'login': m.codex.login(), 'codex': m.codex.status()}
+                        login = m.codex.login()
+                        codex_status, automatic = self._codex_status(m, actor)
+                        result = {'login': login, 'codex': codex_status, 'codex_auto_connection': automatic}
                     return self.sendj(result)
                 except Exception as error:
                     return self._ai_error(error)

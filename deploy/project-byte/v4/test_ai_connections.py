@@ -7,10 +7,11 @@ import tempfile
 import threading
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
 
-from ai_connections import (Manager, ConnectionError, REGISTRY, SecretStore,
+from ai_connections import (Manager, ConnectionError, REGISTRY, SecretStore, AUTO_CODEX_MODEL, AUTO_CODEX_KEY,
                             http_json, validate_endpoint, _address_allowed, MAX_RESPONSE)
 
 OWNER={'ok':True,'role':'owner','level':4,'subject':'owner','name':'Fixture owner'}
@@ -81,6 +82,103 @@ class ManagerTests(unittest.TestCase):
             self.assertNotIn(runtime['id'],REGISTRY)
         catalog['providers'][0]['id']='changed';self.assertIn('codex-chatgpt',REGISTRY)
 
+    def auto_fixture(self, default=''):
+        with self.app.con() as db:
+            settings=json.loads(db.execute("SELECT data FROM user_settings WHERE subject='owner'").fetchone()[0])
+            settings['ai']['default_model']=default
+            db.execute("UPDATE user_settings SET data=? WHERE subject='owner'",(json.dumps(settings),))
+        self.codex.models=lambda:[{'id':AUTO_CODEX_MODEL}]
+        return settings
+
+    def test_auto_codex_registers_verified_signin_once_without_credentials_or_generation(self):
+        before=self.auto_fixture()
+        with self.app.con() as db:
+            other=tuple(db.execute("SELECT * FROM user_settings WHERE subject='collab:fixture'").fetchone())
+            agents=[tuple(r) for r in db.execute('SELECT * FROM agents')]
+        result=self.manager.autoconnect_codex(OWNER)
+        self.assertEqual(result,{'state':'registered','model_key':AUTO_CODEX_KEY,'created':True,'default_set':True})
+        self.assertEqual(self.manager.autoconnect_codex(OWNER),{**result,'created':False,'default_set':False})
+        with self.app.con() as db:
+            after=json.loads(db.execute("SELECT data FROM user_settings WHERE subject='owner'").fetchone()[0])
+            before['ai']['default_model']=AUTO_CODEX_KEY
+            self.assertEqual(after,before)
+            self.assertEqual(tuple(db.execute("SELECT * FROM user_settings WHERE subject='collab:fixture'").fetchone()),other)
+            self.assertEqual([tuple(r) for r in db.execute('SELECT * FROM agents')],agents)
+            self.assertEqual(db.execute('SELECT count(*) FROM ai_connections').fetchone()[0],1)
+            self.assertEqual(db.execute('SELECT count(*) FROM activity').fetchone()[0],2)
+            model=dict(db.execute('SELECT * FROM models WHERE model_key=?',(AUTO_CODEX_KEY,)).fetchone())
+        self.assertEqual(model['last_status'],'not-tested')
+        self.assertEqual(model['secret_env'],'');self.assertFalse((self.root/'private').exists());self.assertEqual(self.calls,[])
+
+    def test_auto_codex_preserves_existing_explicit_defaults_and_reuses_owner_model(self):
+        before=self.auto_fixture('missing-explicit-default')
+        self.connect('codex-chatgpt',model_key='connection/codex-chatgpt/owner',model_name=AUTO_CODEX_MODEL)
+        result=self.manager.autoconnect_codex(OWNER)
+        self.assertEqual(result['model_key'],'connection/codex-chatgpt/owner')
+        self.assertFalse(result['created']);self.assertFalse(result['default_set'])
+        with self.app.con() as db:
+            self.assertEqual(json.loads(db.execute("SELECT data FROM user_settings WHERE subject='owner'").fetchone()[0]),before)
+            self.assertEqual(db.execute('SELECT count(*) FROM ai_connections').fetchone()[0],1)
+        self.auto_fixture()
+        self.assertTrue(self.manager.autoconnect_codex(OWNER)['default_set'])
+
+    def test_auto_codex_never_revives_disconnected_connection_even_after_restart(self):
+        self.auto_fixture();result=self.manager.autoconnect_codex(OWNER)
+        self.manager.disconnect(result['model_key'],OWNER)
+        self.auto_fixture()
+        fresh=Manager(self.app,self.codex,secret_dir=self.root/'private')
+        self.assertEqual(fresh.autoconnect_codex(OWNER),{'state':'disabled','model_key':AUTO_CODEX_KEY})
+        with self.app.con() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM ai_connections').fetchone()[0],1)
+            self.assertEqual(json.loads(db.execute("SELECT data FROM user_settings WHERE subject='owner'").fetchone()[0])['ai']['default_model'],'')
+
+    def test_auto_codex_absent_auth_or_model_leaves_all_configuration_unchanged(self):
+        self.auto_fixture()
+        for connected,models,state in ((False,[{'id':AUTO_CODEX_MODEL}],'sign_in_required'),(True,[],'model_unavailable')):
+            self.codex.connected=connected;self.codex.models=lambda:models
+            self.assertEqual(self.manager.autoconnect_codex(OWNER),{'state':state})
+        with self.app.con() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM ai_connections').fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT count(*) FROM activity').fetchone()[0],0)
+        self.assertFalse((self.root/'private').exists())
+
+    def test_auto_codex_invalid_settings_and_key_collision_cannot_overwrite_configuration(self):
+        self.auto_fixture()
+        with self.app.con() as db:db.execute("UPDATE user_settings SET data='invalid' WHERE subject='owner'")
+        with self.assertRaises(ConnectionError):self.manager.autoconnect_codex(OWNER)
+        with self.app.con() as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM ai_connections').fetchone()[0],0)
+            db.execute("UPDATE user_settings SET data='{}' WHERE subject='owner'")
+            db.execute('UPDATE models SET model_key=? WHERE model_key=?',(AUTO_CODEX_KEY,'legacy-custom'))
+        with self.assertRaises(ConnectionError):self.manager.autoconnect_codex(OWNER)
+        with self.app.con() as db:
+            self.assertEqual(db.execute('SELECT model_name FROM models WHERE model_key=?',(AUTO_CODEX_KEY,)).fetchone()[0],'kept')
+            self.assertEqual(db.execute('SELECT count(*) FROM ai_connections').fetchone()[0],0)
+
+    def test_auto_codex_concurrent_registrations_share_one_connection_and_default(self):
+        self.auto_fixture();barrier=threading.Barrier(2)
+        def models():
+            barrier.wait(timeout=3)
+            return [{'id':AUTO_CODEX_MODEL}]
+        self.codex.models=models
+        other=Manager(self.app,self.codex,secret_dir=self.root/'private')
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results=list(pool.map(lambda manager:manager.autoconnect_codex(OWNER),(self.manager,other)))
+        self.assertEqual(sum(result['created'] for result in results),1)
+        self.assertEqual(sum(result['default_set'] for result in results),1)
+        self.assertEqual({result['model_key'] for result in results},{AUTO_CODEX_KEY})
+
+    def test_auto_codex_rechecks_owner_choice_after_slow_discovery(self):
+        self.auto_fixture()
+        def models():
+            self.manager.set_default('legacy-custom',OWNER)
+            return [{'id':AUTO_CODEX_MODEL}]
+        self.codex.models=models
+        result=self.manager.autoconnect_codex(OWNER)
+        self.assertTrue(result['created']);self.assertFalse(result['default_set'])
+        with self.app.con() as db:
+            self.assertEqual(json.loads(db.execute("SELECT data FROM user_settings WHERE subject='owner'").fetchone()[0])['ai']['default_model'],'legacy-custom')
+
     def test_malformed_json_field_types_are_controlled_errors_without_side_effects(self):
         for field in ('provider','endpoint','model_name','display_name','model_key','api_key','secret_env','auth_mode','agent_template'):
             for bad in ([],{},True,12,None):
@@ -96,6 +194,7 @@ class ManagerTests(unittest.TestCase):
         connected=self.connect();key=connected['model_key']
         for actor in (None,VIEWER,{**OWNER,'subject':'collab:fake'},{**OWNER,'role':'admin'}):
             for operation in (lambda:self.manager.connect(self.body(),actor),lambda:self.manager.discover(self.body(),actor),
+                              lambda:self.manager.autoconnect_codex(actor),
                               lambda:self.manager.set_default(key,actor),lambda:self.manager.connections(actor),
                               lambda:self.manager.disconnect(key,actor),lambda:self.manager.call(key,[{'role':'user','content':'hello'}],actor)):
                 with self.assertRaises(ConnectionError) as raised:operation()
