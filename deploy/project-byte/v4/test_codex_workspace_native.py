@@ -270,6 +270,10 @@ class NativeWorkspaceControllerTests(unittest.TestCase):
             self.assertEqual(row['body']['reasoning']['effort'], 'xhigh')
             if row['specialist']:
                 self.assertLessEqual(names, {'workspace_list', 'workspace_read', 'curr_time', 'request_user_input', 'request_user_input_async', 'update_plan'})
+        inbox = self.controller.catalog(OWNER)['execution_permissions']
+        self.assertEqual([r['id'] for r in inbox['requests']], [permission['id']])
+        self.assertTrue(inbox['requests'][0]['can_decide'])
+        self.assertEqual(inbox['requests'][0]['review_token'], permission['review_token'])
         code = {'request_id': str(uuid.uuid4()), 'review_token': permission['review_token'], 'decision': 'approve_once', 'note': 'Synthetic local publisher sink only'}
         self.controller.decide(OWNER, permission['id'], code)
         self.wait(lambda: run not in self.controller.live)

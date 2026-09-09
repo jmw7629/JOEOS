@@ -1,5 +1,11 @@
 # Execution permissions
 
+The default PRFKT_PROJECT Observatory inbox now connects to the native Codex task controller. Its owner-only catalog includes actual pending requests across conversations, bound to their original project/run, with a frozen-patch viewer and Approve once / Deny. Deny applies to the selected request. The authoritative controller validates the one-time token, generation, expiry, active run and project binding; the inbox creates no synthetic requests and starts no new runner. Existing isolated edits/tests retain task authorization; publication requires review. The old OpenCode bridge below remains an optional separate API integration, not the native Codex approval queue.
+
+The inbox replaces the historical static “not connected” message. Historical traces and code-review decisions remain separate. Disconnected state, errors, expired requests and logout disable or remove decision controls; pending notes survive polling. Owner-wide request outcomes come from the existing private ledger, without exposing authority bindings.
+
+## Optional legacy OpenCode bridge
+
 PROJECT_BYTE can present real pending tool permissions from one explicitly registered
 OpenCode **1.18.29 V1** session. This is separate from the historical Observatory
 adapter and code-review decisions. No configuration means **not connected**: no

@@ -10,7 +10,7 @@ const source = path.dirname(fileURLToPath(import.meta.url));
 const credential = 'NATIVE_TRACE_OWNER_FIXTURE_ONLY', reviewToken = 'NATIVE_TRACE_REVIEW_TOKEN_MUST_STAY_PRIVATE';
 const attack = '<img src=x onerror="window.TRACE_XSS=true">';
 const errors = [], external = [], requests = [], eventsAfter = [];
-const fileMap = new Map(), conversations = new Map(), runs = new Map();
+const fileMap = new Map(), conversations = new Map(), runs = new Map(), permissionHistory = [];
 const projects = ['joeos','memory'].map(key => ({key,label:key.toUpperCase()+' · trace fixture',repo:'fixture/'+key,mode:'execute',configured:true,connected:true,publication:true}));
 const settings = {general:{default_view:'ai',refresh_seconds:60,show_completed:true},notifications:{},ai:{default_agent:'executive',default_model:'fixture'},security:{},filters:{saved_views:[]}};
 let html = (await Promise.all((await fs.readdir(path.join(source,'index'))).filter(name => name.endsWith('.part')).sort().map(name => fs.readFile(path.join(source,'index',name),'utf8')))).join('');
@@ -36,7 +36,7 @@ const server = http.createServer(async (req,res) => {
     if (url.pathname.startsWith('/api/codex-workspace')) {
       if (!owner) return send({error:'Owner required'},403);
       if (req.method==='POST') requests.push({path:url.pathname,body});
-      if (url.pathname==='/api/codex-workspace') return send({configured:true,connected:true,model:'gpt-6-astra',effort:'ultra',projects,conversations:[...conversations.values()].map(c=>({id:c.id,title:c.title,project_key:c.project_key,updated_at:1}))});
+      if (url.pathname==='/api/codex-workspace') return send({configured:true,connected:true,model:'gpt-6-astra',effort:'ultra',projects,execution_permissions:{runner:'codex',capable:true,server_time:Date.now()/1000,requests:[...runs.values()].flatMap(r=>r.permissions.map(p=>({...p,can_decide:true,run_id:r.id,conversation_id:'trace-conversation',conversation_title:'Review fixture',project_key:'memory',repository:'fixture/memory'}))),history:permissionHistory},conversations:[...conversations.values()].map(c=>({id:c.id,title:c.title,project_key:c.project_key,updated_at:1}))});
       const conversationMatch=url.pathname.match(/^\/api\/codex-workspace\/conversations\/([^/]+)$/);
       if (conversationMatch) {
         const c=conversations.get(conversationMatch[1]);
@@ -47,7 +47,12 @@ const server = http.createServer(async (req,res) => {
         const run=runs.get(eventsMatch[1]), after=Number(url.searchParams.get('after')||0);eventsAfter.push(after);
         return run?send(snapshot(run,after)):send({error:'No run'},404);
       }
-      if (/\/permissions\/[^/]+\/decision$/.test(url.pathname)) return send({accepted:true});
+      if (url.pathname=== '/api/codex-workspace/artifacts/'+'1'.repeat(32)) return send({content_type:'text/plain',content:'FROZEN_PATCH '+attack});
+      if (/\/permissions\/[^/]+\/decision$/.test(url.pathname)) {
+        const id=url.pathname.split('/').at(-2);
+        if(id.startsWith('inbox-'))for(const run of runs.values()){const row=run.permissions.find(p=>p.id===id);if(row){permissionHistory.push({...row,state:body.decision==='deny'?'denied':'completed',note:body.note});run.permissions=run.permissions.filter(p=>p.id!==id);}}
+        return send({accepted:true});
+      }
       if (/\/runs\/[^/]+\/stop$/.test(url.pathname)) return send({accepted:true});
       return send({error:'Unexpected trace fixture route'},404);
     }
@@ -135,14 +140,37 @@ try {
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Home fits mobile');
   await page.screenshot({path:path.join(out,'embossed-home-mobile.png'),fullPage:true});
   await page.locator('.home-nav [data-home-go="ai"]').click();
+  run.permissions=['inbox-approve','inbox-deny'].map(id=>({id,tool:'publish_pull_request',summary:'Frozen publication review',state:'pending',review_token:reviewToken,expires_at:Date.now()/1000+45,arguments:{review_artifact:{id:'1'.repeat(32)}}}));
+  await page.locator('.home-nav [data-home-go="agents"]').click();
+  await page.waitForFunction(()=>document.getElementById('codexPermissionInbox')?.textContent.includes('Codex connected'));
+  assert.equal(await page.locator('[data-cw-inbox-id]').count(),2);
+  assert.doesNotMatch(await page.locator('#codexPermissionInbox').innerHTML(),new RegExp(reviewToken));
+  await page.locator('[data-cw-inbox-review="inbox-approve"]').click();
+  await page.waitForFunction(()=>document.querySelector('[data-cw-inbox-patch="inbox-approve"]')?.textContent.includes('FROZEN_PATCH'));
+  assert.equal(await page.locator('#codexPermissionInbox img').count(),0);
+  await page.locator('[data-cw-inbox-note="inbox-approve"]').fill('Reviewed exact patch');
+  const remaining=await page.locator('[data-cw-inbox-countdown="inbox-approve"]').innerText();
+  await page.waitForFunction(previous=>document.querySelector('[data-cw-inbox-countdown="inbox-approve"]')?.textContent!==previous,remaining,{timeout:5000});
+  assert.equal(await page.locator('[data-cw-inbox-note="inbox-approve"]').inputValue(),'Reviewed exact patch');
+  await page.locator('[data-cw-inbox-decision="approve_once"][data-permission="inbox-approve"]').click();
+  await page.waitForFunction(()=>document.querySelectorAll('[data-cw-inbox-id]').length===1);
+  assert.equal(await page.locator('[data-cw-inbox-id="inbox-deny"]').count(),1);
+  await page.locator('[data-cw-inbox-decision="deny"][data-permission="inbox-deny"]').click();
+  await page.waitForFunction(()=>document.getElementById('codexPermissionInbox')?.textContent.includes('No pending permission requests'));
+  assert.deepEqual(requests.filter(r=>r.path.includes('/permissions/inbox-')).map(r=>r.body.decision),['approve_once','deny']);
+  await page.screenshot({path:path.join(out,'permission-inbox-mobile.png'),fullPage:true});
+  await page.locator('.home-nav [data-home-go="ai"]').click();
   run.status='completed';run.permissions=[];
   await page.waitForFunction(()=>document.getElementById('codexRunState').textContent==='Completed');
   await page.locator('#codexProject').selectOption('memory');
   assert.equal(await page.locator('#codexTraceStudio').isVisible(),false);
   assert.equal(await page.locator('#codexTraceInspector').innerText(),'');
+  await page.locator('#login').click();
+  assert.match(await page.locator('#codexPermissionInbox').innerText(),/Owner sign-in/);
+  assert.equal(await page.locator('[data-cw-inbox-id]').count(),0);
   assert.equal(requests.filter(r=>r.path.endsWith('/message')).length,0,'graph controls never launch work');
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
-  console.log(JSON.stringify({ok:true,checks:['correlation','pagination','tokens','xss','live-deny-while-paused','server-countdown','focus','motion','mobile','project-clear'],screenshots:out}));
+  console.log(JSON.stringify({ok:true,checks:['correlation','pagination','tokens','xss','live-deny-while-paused','server-countdown','focus','motion','mobile','project-clear','permission-inbox','frozen-patch','approve-once','deny-one-request','inbox-logout'],screenshots:out}));
 
 } finally {
   await browser?.close();server.closeAllConnections?.();await new Promise(resolve=>server.close(resolve));

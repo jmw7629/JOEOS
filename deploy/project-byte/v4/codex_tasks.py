@@ -304,7 +304,47 @@ class Controller:
             rows = [dict(r) for r in self.db.execute('SELECT id,title,project_key,updated_at FROM conversations WHERE owner=? ORDER BY updated_at DESC LIMIT 100', (owner,))]
         return {'configured': bool(ready), 'connected': bool(status.get('connected')), 'model': MODEL, 'effort': EFFORT,
                 'detail': 'Codex task workspace is connected' if ready and status.get('connected') else 'The Codex task workspace is unavailable',
-                'projects': projects, 'conversations': rows}
+                'projects': projects, 'conversations': rows,
+                'execution_permissions': self.permission_snapshot(actor)}
+
+    def permission_snapshot(self, actor):
+        """Owner-wide view of real requests; authority stays in decide()."""
+        owner = require_owner(actor)
+        now = time.time()
+        requests, history = [], []
+        with self.lock:
+            rows = self.db.execute("""SELECT p.*,r.conversation_id,r.status AS run_status,
+                c.project_key,c.title AS conversation_title FROM permissions p
+                JOIN runs r ON r.id=p.run_id JOIN conversations c ON c.id=r.conversation_id
+                WHERE r.owner=? ORDER BY CASE WHEN p.state IN ('pending','approved','dispatching')
+                THEN 0 ELSE 1 END,p.expires_at DESC LIMIT 100""", (owner,)).fetchall()
+            for row in rows:
+                context = self.live.get(row['run_id'])
+                can_decide = bool(row['state'] == 'pending' and row['expires_at'] > now
+                    and row['run_status'] in ACTIVE and context and not context.get('closing')
+                    and not context['stop'].is_set() and context['generation'] == row['generation'])
+                if can_decide:
+                    try:
+                        self._context_project(row['run_id'], context)
+                    except TaskError:
+                        can_decide = False
+                project = self.projects.get(row['project_key'])
+                value = {k: row[k] for k in ('id', 'run_id', 'conversation_id', 'conversation_title',
+                    'project_key', 'tool', 'summary', 'expires_at', 'state')}
+                value.update(repository=project.repo if project else '', can_decide=can_decide,
+                             tool_id=tool_identity(row['run_id'], json.loads(row['binding'])))
+                if row['state'] in ('pending', 'approved', 'dispatching'):
+                    value['arguments'] = {k: v for k, v in json.loads(row['arguments']).items()
+                                          if k not in ('project_fingerprint', 'project_key')}
+                    if can_decide:
+                        value['review_token'] = row['review_token']
+                    requests.append(value)
+                elif len(history) < 20:
+                    value['note'] = row['note']
+                    history.append(value)
+        return {'runner': 'codex', 'capable': True, 'decision_scope': 'request',
+                'supported_tools': ['publish_pull_request'], 'server_time': now,
+                'requests': requests, 'history': history}
 
     def _message_admission(self):
         # Deployment holds this private marker until verification or rollback

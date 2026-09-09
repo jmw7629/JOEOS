@@ -923,7 +923,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   async function refresh(force=false){
     const current=who();
     if(identity!==current){clear();identity=current;render();}
-    if(!owner()||busy||(!force&&(!active()||Date.now()-last<5000)))return;
+    if(!panel.isConnected||!owner()||busy||(!force&&(!active()||Date.now()-last<5000)))return;
     // Keep a note being edited stable while polling; decisions always recheck server state.
     if(!force&&panel.contains(document.activeElement)&&document.activeElement.matches('textarea'))return;
     busy=true;controller=new AbortController();const turn=epoch;

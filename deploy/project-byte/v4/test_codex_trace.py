@@ -58,9 +58,21 @@ class TraceTests(unittest.TestCase):
         permission=snapshot['permissions'][0];start=next(e['data'] for e in snapshot['events'] if e['type']=='tool_started')
         self.assertEqual(permission['tool_id'],start['tool_id']);self.assertLessEqual(permission['expires_at']-snapshot['server_time'],600)
         self.assertNotIn(permission['review_token'],json.dumps(snapshot['events']))
+        inbox=self.controller.catalog(OWNER)['execution_permissions']
+        self.assertTrue(inbox['capable']);self.assertEqual(inbox['decision_scope'],'request')
+        self.assertEqual(len(inbox['requests']),1)
+        self.assertTrue(inbox['requests'][0]['can_decide'])
+        self.assertEqual(inbox['requests'][0]['review_token'],permission['review_token'])
+        self.assertNotIn('project_fingerprint',json.dumps(inbox))
+        with self.assertRaises(tasks.TaskError):self.controller.permission_snapshot({**OWNER,'level':3})
+
         self.controller.decide(OWNER,permission['id'],{'request_id':rid(),'review_token':permission['review_token'],'decision':'deny','note':'Fixture'})
         self.wait(lambda:result['run_id'] not in self.controller.live)
         self.assertEqual(self.publisher.published,[])
+        inbox=self.controller.permission_snapshot(OWNER)
+        self.assertEqual(inbox['requests'],[])
+        self.assertEqual(inbox['history'][0]['state'],'denied')
+        self.assertNotIn('review_token',json.dumps(inbox))
         self.assertTrue(any(e['type']=='tool_completed' and not e['data']['success'] for e in self.controller.events(OWNER,result['run_id'])['events']))
 
 if __name__=='__main__':unittest.main()

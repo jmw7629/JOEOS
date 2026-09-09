@@ -550,3 +550,84 @@
   new MutationObserver(apply).observe(document.body,{attributes:true,attributeFilter:['class']});
   media.addEventListener('change',apply);document.addEventListener('visibilitychange',apply);window.addEventListener('project-byte-home-render',mount);window.addEventListener('hashchange',mount);mount();
 })();
+
+// Observatory permission inbox: native owner requests across conversations.
+// The detached legacy panel cannot submit decisions or replace this inbox.
+(() => {
+  const legacy=document.querySelector('#pbObservatory .obs-approval-note');
+  if (!legacy || !window.PRFKT_CODEX) return;
+  const panel=document.createElement('section');panel.className='obs-approval-note';panel.id='codexPermissionInbox';panel.setAttribute('aria-label','Codex execution permissions');legacy.replaceWith(panel);
+  const css=document.createElement('style');css.textContent=`#codexPermissionInbox{min-width:0}#codexPermissionInbox .cw-permission{margin-top:14px}#codexPermissionInbox button{min-height:44px}#codexPermissionInbox pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto}#codexPermissionInbox textarea{box-sizing:border-box;width:100%;min-height:65px}#codexPermissionInbox .cw-heading{gap:10px}#codexPermissionInbox .cw-inbox-context{overflow-wrap:anywhere}`;document.head.append(css);
+  const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const who=()=>JSON.stringify([accessKey,session?.subject,session?.level,session?.ok]);
+  let identity='',blocked=null,generation=0,snapshot=null,busy=false,last=0,feedback='',signature='',clock=null;
+  const notes=new Map(),decisions=new Map(),controllers=new Set();
+  const owner=()=>who()!==blocked && !!accessKey && session?.ok && session.level===4;
+  const valid=(id,gen)=>owner() && who()===id && generation===gen;
+  const seconds=row=>clock&&Number.isFinite(row.expires_at)?Math.max(0,Math.ceil(row.expires_at-clock.time-(performance.now()-clock.at)/1000)):0;
+  function clear(){generation++;for(const c of controllers)c.abort();controllers.clear();snapshot=null;busy=false;last=0;feedback='';signature='';clock=null;notes.clear();decisions.clear();panel.replaceChildren();}
+  async function request(path,body,id,gen){
+    const controller=new AbortController();controllers.add(controller);const timeout=setTimeout(()=>controller.abort(),15000);
+    try {const data=await api(path,{signal:controller.signal,...(body===undefined?{}:{method:'POST',body:JSON.stringify(body)})});return valid(id,gen)?data:null;}
+    finally{clearTimeout(timeout);controllers.delete(controller);}
+  }
+  function render(){
+    if(!owner()){panel.innerHTML='<b>Execution permissions</b><p>Owner sign-in is required to review live tool requests.</p>';signature='';return;}
+    const queue=snapshot?.execution_permissions,connected=snapshot?.configured && snapshot?.connected && queue?.capable;
+    const rows=queue?.requests || [], history=queue?.history || [];
+    const sig=JSON.stringify([connected,!!queue,rows,history,feedback,[...decisions]]);
+    if(sig!==signature){
+      signature=sig;
+      panel.innerHTML=`<div class="cw-heading"><b>Execution permissions · ${connected?'Codex connected':queue?'Codex connection unavailable':'Checking Codex runner…'}</b><button type="button" class="mini" data-cw-inbox-refresh>Refresh</button></div>
+        <p>Review actual Codex requests from every workspace conversation here. Approve once permits the exact requested action. Deny rejects that request. Code-review decisions remain separate; nothing merges automatically.</p>
+        <p class="small">Isolated workspace edits and tests use the existing task authorization. Publishing an issue and pull request requires your approval of the frozen patch.</p>
+        <p class="cw-feedback" role="status">${escape(feedback)}</p>
+        <div class="cw-inbox-queue">${rows.map(row=>{const decision=decisions.get(row.id),enabled=connected && row.can_decide && seconds(row)>0 && !decision;
+          return `<article class="cw-permission" data-cw-inbox-id="${escape(row.id)}"><h3>${escape(row.tool)}</h3><p class="cw-inbox-context">${escape(row.repository || row.project_key)} · ${escape(row.conversation_title)}</p><p>${escape(row.summary)}</p><details><summary>Exact requested action</summary><pre>${escape(JSON.stringify(row.arguments || {},null,2))}</pre></details>${row.arguments?.review_artifact?.id?`<button type="button" class="mini" data-cw-inbox-review="${escape(row.id)}">Read frozen patch</button><pre data-cw-inbox-patch="${escape(row.id)}" hidden></pre>`:''}<p class="small" data-cw-inbox-countdown="${escape(row.id)}"></p>${decision?`<p role="status">${escape(decision.state==='sending'?'Sending decision…':decision.state==='accepted'?'Decision accepted. Waiting for the runner result.':'Decision could not be confirmed. Refresh to inspect its state; this submission will not be repeated automatically.')}</p>`:`<label>Decision note (optional)<textarea class="field" maxlength="1000" data-cw-inbox-note="${escape(row.id)}" ${enabled?'':'disabled'}>${escape(notes.get(row.id)||'')}</textarea></label><div class="flex"><button type="button" class="btn primary" data-cw-inbox-decision="approve_once" data-permission="${escape(row.id)}" ${enabled?'':'disabled'}>Approve once</button><button type="button" class="btn" data-cw-inbox-decision="deny" data-permission="${escape(row.id)}" ${enabled?'':'disabled'}>Deny</button></div>`}</article>`;}).join('') || `<p>${connected?'No pending permission requests. New requests appear here automatically.':'Live requests are unavailable until the Codex workspace connection is verified.'}</p>`}</div>
+        ${history.length?`<details class="cw-inbox-history"><summary>Recent request outcomes</summary>${history.map(row=>`<p class="cw-inbox-context">${escape(row.repository || row.project_key)} · ${escape(row.tool)} · ${escape(row.state)}${row.note?' · '+escape(row.note):''}</p>`).join('')}</details>`:''}`;
+    }
+    for(const row of rows){
+      const element=[...panel.querySelectorAll('[data-cw-inbox-countdown]')].find(el=>el.dataset.cwInboxCountdown===row.id);
+      if(element)element.textContent=row.state==='pending'?(seconds(row)>0?seconds(row)+'s remaining · '+(row.can_decide?'awaiting your decision':'request unavailable'):'Review window expired.'):row.state==='approved'?'Approved · awaiting runner dispatch':row.state==='dispatching'?'Runner is executing the approved action':row.state;
+      if(!row.can_decide || seconds(row)<=0 || !connected)for(const b of panel.querySelectorAll('[data-permission]'))if(b.dataset.permission===row.id)b.disabled=true;
+    }
+  }
+  async function refresh(force=false){
+    const id=who();if(identity!==id){clear();identity=id;if(blocked!==id)blocked=null;}
+    if(!owner()){render();return;}
+    if(busy || (!force && (document.hidden || !document.querySelector('#agents')?.classList.contains('active') || Date.now()-last<3000))){render();return;}
+    busy=true;const gen=generation;
+    try {const data=await request('/api/codex-workspace',undefined,id,gen);if(!data)return;snapshot=data;
+      const time=data.execution_permissions?.server_time;if(typeof time==='number' && Number.isFinite(time))clock={time,at:performance.now()};
+      feedback='';
+    }catch(error){if(valid(id,gen)){snapshot=null;feedback='Could not verify live permission requests: '+error.message;}}
+    finally{if(valid(id,gen)){busy=false;last=Date.now();render();}}
+  }
+  panel.addEventListener('input',e=>{if(e.target.dataset.cwInboxNote)notes.set(e.target.dataset.cwInboxNote,e.target.value);});
+  panel.addEventListener('click',async e=>{
+    if(e.target.closest('[data-cw-inbox-refresh]')){void refresh(true);return;}
+    const review=e.target.closest('[data-cw-inbox-review]');
+    if(review && owner()) {
+      const row=snapshot?.execution_permissions?.requests?.find(r=>r.id===review.dataset.cwInboxReview),aid=row?.arguments?.review_artifact?.id;
+      if(!/^[0-9a-f]{32}$/.test(aid || ''))return;
+      const id=who(),gen=generation;review.disabled=true;
+      try {const data=await request('/api/codex-workspace/artifacts/'+aid,undefined,id,gen);if(!data)return;
+        const pre=[...panel.querySelectorAll('[data-cw-inbox-patch]')].find(el=>el.dataset.cwInboxPatch===row.id);
+        if(pre){pre.textContent=data.content_type==='text/plain' && typeof data.content==='string'?data.content:'Patch unavailable';pre.hidden=false;}
+      }catch(error){if(valid(id,gen)){feedback='Could not load the frozen patch: '+error.message;render();}}
+      finally{if(valid(id,gen))review.disabled=false;}
+      return;
+    }
+    const button=e.target.closest('[data-cw-inbox-decision]');if(!button || !owner())return;
+    const row=snapshot?.execution_permissions?.requests?.find(r=>r.id===button.dataset.permission);
+    if(!row?.can_decide || !row.review_token || seconds(row)<=0 || decisions.has(row.id))return;
+    const id=who(),gen=generation,record={request_id:crypto.randomUUID(),state:'sending'};
+    decisions.set(row.id,record);render();
+    try {const data=await request('/api/codex-workspace/permissions/'+encodeURIComponent(row.id)+'/decision',{request_id:record.request_id,review_token:row.review_token,decision:button.dataset.cwInboxDecision,note:notes.get(row.id)||''},id,gen);if(!data)return;decisions.set(row.id,{...record,state:'accepted'});feedback='Decision accepted. The runner outcome will appear here.';}
+    catch(error){if(valid(id,gen)){decisions.set(row.id,{...record,state:'unknown'});feedback='Decision could not be confirmed: '+error.message;}}
+    finally{if(valid(id,gen)){render();void refresh(true);}}
+  });
+  document.addEventListener('click',e=>{if(e.target.closest('#login,#logoutAllLocal') && owner()){blocked=who();clear();render();}else if(e.target.closest('[data-view],[data-home-go],[data-home-action]'))setTimeout(()=>void refresh(),0);},true);
+  window.addEventListener('hashchange',()=>void refresh());window.addEventListener('project-byte-home-render',()=>void refresh());document.addEventListener('visibilitychange',()=>void refresh());
+  setInterval(()=>void refresh(),750);render();
+})();
