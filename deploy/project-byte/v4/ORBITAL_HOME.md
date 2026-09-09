@@ -34,3 +34,7 @@ The focused browser regression suite verifies all eleven non-Home workspaces hav
 The six Home counters open exact matching records with existing task, board and run actions. Project Lead filtering supports named and unassigned leads while preserving the other scopes. The Home layout remains intact; the duplicate chat composer and AI CHAT status badge are removed.
 
 The embedded original nebula background follows bounded phone orientation when supported and permitted. Reduced motion disables movement, and the old embossed/motion toggles are removed. See [Conversation UI](CONVERSATION_UI.md) for the mobile remote layout, optional message popups and browser acceptance. Native execution permissions are connected separately from read-only historical traces.
+
+## Direct interaction
+
+Kanban supports grab-and-drop status changes with server-confirmed Undo, keyboard/touch controls and edge scrolling. Card titles open details, and wide boards/Home scope chips support grab-to-pan. See [Direct interaction](DIRECT_INTERACTION.md) for behavior, permission boundaries and verification.

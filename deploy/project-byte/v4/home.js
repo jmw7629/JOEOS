@@ -1231,3 +1231,223 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   window.addEventListener('pagehide',()=>{command++;player?.disconnect();});
   setInterval(()=>void reconcile(),1000);void reconcile();render();
 })();
+
+// PRFKT direct manipulation: task status only; execution remains an explicit queue action.
+(() => {
+  if (window.PRFKT_DIRECT_INTERACTION || typeof card !== 'function') return;
+  window.PRFKT_DIRECT_INTERACTION = true;
+  const board = document.getElementById('boardGrid');
+  if (!board) return;
+  let gesture = null, saving = false, frame = 0, suppressClickUntil = 0, undo = null;
+  const editable = () => session.ok && session.level >= 2;
+  const actor = () => String(session.subject || session.name || '') + ':' + session.level;
+  const style = document.createElement('style');
+  style.textContent = `
+    #boardGrid .task{position:relative;transition:border-color .12s,box-shadow .12s}
+    #boardGrid .task[data-grabbable=true]{cursor:grab}
+    #boardGrid .task-title{display:block;padding:0;border:0;background:none;color:inherit;font:inherit;font-weight:inherit;text-align:left;width:100%;cursor:pointer}
+    #boardGrid .task h3{padding-right:42px}
+    #boardGrid .task-grip{position:absolute;right:7px;top:7px;display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid #78b5df38;border-radius:10px;background:#0b1a29;color:#97cbed;cursor:grab;touch-action:none;font-size:23px}
+    #boardGrid .task-grip:disabled{opacity:.35;cursor:default}
+    #boardGrid .task-grip:focus-visible,#boardGrid .task-title:focus-visible{outline:2px solid #77caff;outline-offset:3px}
+    #boardGrid .task.is-lifted{opacity:.35;border-style:dashed}
+    #boardGrid .col.drop-candidate{outline:1px dashed #8ac7ef60;outline-offset:-3px}
+    #boardGrid .col.drop-target{outline:2px solid #78cfff;outline-offset:-3px;box-shadow:inset 0 0 40px #158cdc25}
+    #boardGrid .col.drop-target>.colhead{color:#bce8ff;background:#133754}
+    .prfkt-drag-ghost{position:fixed;left:0;top:0;z-index:10000;pointer-events:none;max-width:min(290px,75vw);padding:15px 18px;border:1px solid #7dcfff;border-radius:14px;background:#10243af5;color:#edf7ff;box-shadow:0 18px 44px #0009;overflow-wrap:anywhere}
+    .prfkt-drag-ghost small{display:block;color:#9ed4f7;margin-top:6px}
+    body.prfkt-grabbing,body.prfkt-grabbing *{cursor:grabbing!important;user-select:none!important}
+    .boardscroll{cursor:grab;overscroll-behavior-x:contain}
+    body.prfkt-grabbing .boardscroll,body.prfkt-grabbing .home-scopes{scroll-snap-type:none!important;scroll-behavior:auto!important}
+    .prfkt-board-help{color:#a8bfd2;font-size:12px;margin:0 0 10px;line-height:1.6}
+    .prfkt-move-toast{position:fixed;right:16px;bottom:100px;z-index:160;max-width:min(440px,calc(100vw - 32px));padding:14px 16px;background:#102237;border:1px solid #6fa7cc;border-radius:14px;box-shadow:0 12px 35px #0009;color:#ecf7ff;display:flex;align-items:center;gap:12px}
+    .prfkt-move-toast[hidden]{display:none}.prfkt-move-toast span{overflow-wrap:anywhere;min-width:0}.prfkt-move-toast button{min-height:40px;flex-shrink:0;background:#183952;color:#c5eaff;border:1px solid #658eac;border-radius:9px;padding:7px 11px}.prfkt-move-toast button:focus-visible{outline:2px solid #8bd2ff;outline-offset:2px}
+    body.reduced-motion #boardGrid .task{transition:none}
+    @media(prefers-reduced-motion:reduce){#boardGrid .task{transition:none}}
+  `;
+  document.head.append(style);
+  const help = document.createElement('p');
+  help.className = 'prfkt-board-help'; help.id = 'prfktMoveHelp';
+  help.textContent = 'Drag a card or grip to move. Space + arrows + Enter for keyboard. Grab empty space to pan.';
+  board.parentElement.before(help);
+  const toast = document.createElement('div'); toast.className = 'prfkt-move-toast'; toast.hidden = true;
+  const message = document.createElement('span'); message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite');
+  const undoButton = document.createElement('button'); undoButton.textContent = 'Undo'; undoButton.hidden = true;
+  const dismiss = document.createElement('button'); dismiss.textContent = '×'; dismiss.setAttribute('aria-label', 'Dismiss move message');
+  toast.append(message, undoButton, dismiss); document.body.append(toast);
+  dismiss.onclick = () => { toast.hidden = true; undo = null; };
+  function announce(text, offerUndo = false) {
+    toast.hidden = false; message.textContent = text; undoButton.hidden = !offerUndo;
+  }
+  function focusCard(id) {
+    board.querySelector('[data-task-id="' + CSS.escape(String(id)) + '"] .task-grip')?.focus({preventScroll:true});
+  }
+  async function saveMove(id, from, to, title, isUndo = false) {
+    if (saving || !editable() || from === to || !S.includes(to)) return;
+    saving = true; board.setAttribute('aria-busy','true'); board.inert = true; const owner = actor(); undo = null;
+    announce(isUndo ? 'Undoing move…' : 'Saving move…');
+    let persisted = false;
+    try {
+      const latest = await api('/api/tasks');
+      const current = latest.tasks.find(t => String(t.id) === String(id));
+      if (owner !== actor() || !editable()) throw new Error('Your access changed. Sign in again to move this card.');
+      if (!current) throw new Error('This card is no longer available. Refresh the board.');
+      if (current.status !== from) throw new Error('This card has changed since you picked it up. Refresh the board before moving it.');
+      await api('/api/tasks/' + encodeURIComponent(id), {method:'PATCH', body:JSON.stringify({status:to})});
+      persisted = true;
+      // Never render a successful move before the server accepts it.
+      const local = tasks.find(t => String(t.id) === String(id)); if (local) local.status = to;
+      await load();
+      if (owner !== actor() || !editable()) { toast.hidden = true; return; }
+      undo = isUndo ? null : {id, from:to, to:from, title, actor:owner};
+      announce(isUndo ? 'Move undone.' : '“' + title + '” moved to ' + to + '.', !!undo);
+    } catch (error) {
+      if (owner === actor()) announce((persisted ? 'Move saved; refresh needed. ' : 'Move not saved. ') + error.message);
+    } finally { saving = false; board.inert = false; board.setAttribute('aria-busy','false'); renderBoard(); focusCard(id); }
+  }
+  undoButton.onclick = () => {
+    const change = undo;
+    if (change && change.actor === actor()) saveMove(change.id, change.from, change.to, change.title, true);
+  };
+  const originalCard = card;
+  card = function(t) {
+    const el = originalCard(t); el.dataset.taskId = t.id; el.dataset.grabbable = String(editable() && !saving);
+    const heading = el.querySelector('h3');
+    if (heading) {
+      const title = document.createElement('button'); title.className = 'task-title'; title.textContent = t.title;
+      title.onclick = () => openTask(t.id); heading.replaceChildren(title);
+    }
+    const grip = document.createElement('button'); grip.type = 'button'; grip.className = 'task-grip'; grip.textContent = '⠿';
+    grip.disabled = !editable() || saving; grip.setAttribute('aria-label', 'Move ' + t.title);
+    grip.setAttribute('aria-describedby', 'prfktMoveHelp'); grip.title = 'Drag to move · Space for keyboard controls';
+    el.prepend(grip);
+    return el;
+  };
+  const originalRender = renderBoard;
+  renderBoard = function(...args) {
+    if (gesture) cancel('Move cancelled because the board updated.');
+    if (!editable()) { undo = null; toast.hidden = true; }
+    originalRender(...args);
+    board.querySelectorAll(':scope > .col').forEach((col, i) => { col.dataset.dropStatus = S[i]; });
+    help.textContent = editable() ? 'Drag a card or grip to move. Space + arrows + Enter for keyboard. Grab empty space to pan.' : 'Read-only board. Open a card title to view details. Grab empty space to pan.';
+  };
+  const originalEditing = userIsEditing;
+  userIsEditing = function(...args) { return !!gesture || saving || originalEditing(...args); };
+  function setTarget(status) {
+    if (!gesture || gesture.kind !== 'card') return;
+    if (gesture.target === status) return;
+    gesture.target = status;
+    board.querySelectorAll('.col').forEach(c => c.classList.toggle('drop-target', c.dataset.dropStatus === status));
+    if (gesture.label) gesture.label.textContent = status ? 'Drop in ' + status : 'Release outside a column to cancel';
+    if (gesture.keyboard) announce('Move to ' + status + '. Enter to drop, Escape to cancel.');
+  }
+  function activate() {
+    const g = gesture; if (!g || g.active) return;
+    g.active = true; document.body.classList.add('prfkt-grabbing');
+    if (g.kind !== 'card') return;
+    undo = null; g.el.classList.add('is-lifted');
+    board.querySelectorAll('.col').forEach(c => c.classList.add('drop-candidate'));
+    if (!g.keyboard) {
+      const ghost = document.createElement('div'); ghost.className = 'prfkt-drag-ghost'; ghost.setAttribute('aria-hidden', 'true');
+      ghost.append(document.createTextNode(g.title)); g.label = document.createElement('small'); ghost.append(g.label);
+      document.body.append(ghost); g.ghost = ghost;
+    }
+    announce('Moving “' + g.title + '”. Escape cancels.'); setTarget(g.from);
+  }
+  function cleanup() {
+    const g = gesture; gesture = null; cancelAnimationFrame(frame); frame = 0;
+    if (!g) return null;
+    g.ghost?.remove(); g.el?.classList.remove('is-lifted');
+    board.querySelectorAll('.col').forEach(c => c.classList.remove('drop-candidate', 'drop-target'));
+    document.body.classList.remove('prfkt-grabbing');
+    if (g.capture?.hasPointerCapture?.(g.pointerId)) g.capture.releasePointerCapture(g.pointerId);
+    return g;
+  }
+  function cancel(text = 'Move cancelled.') {
+    const g = cleanup(); if (!g) return;
+    if (g.active && g.kind === 'card') { announce(text); focusCard(g.id); }
+  }
+  function hitTest() {
+    const g = gesture; if (!g || g.kind !== 'card' || g.keyboard || !g.active) return;
+    g.ghost.style.transform = 'translate(' + Math.min(innerWidth-g.ghost.offsetWidth-6, Math.max(4, g.x+14)) + 'px,' + Math.max(4,g.y+12) + 'px)';
+    const col = document.elementFromPoint(g.x, g.y)?.closest('#boardGrid > .col');
+    setTarget(col?.dataset.dropStatus || null);
+  }
+  function autoScroll() {
+    const g = gesture; if (!g || !g.active || g.kind !== 'card' || g.keyboard) return;
+    const scroller = board.parentElement, box = scroller.getBoundingClientRect();
+    if (g.y >= box.top && g.y <= box.bottom) {
+      const left = Math.max(0,box.left), right = Math.min(innerWidth,box.right);
+      if (g.x > right-54) scroller.scrollLeft += 12;
+      else if (g.x < left+54) scroller.scrollLeft -= 12;
+    }
+    if (g.y > innerHeight-70) window.scrollBy(0,10);
+    else if (g.y < 70) window.scrollBy(0,-10);
+    hitTest(); frame = requestAnimationFrame(autoScroll);
+  }
+  document.addEventListener('pointerdown', e => {
+    suppressClickUntil = 0;
+    if (!e.isPrimary || e.button !== 0 || gesture || saving) return;
+    const target = e.target, el = target.closest('#boardGrid .task'), grip = target.closest('.task-grip');
+    if (el) {
+      if (!editable() || (e.pointerType !== 'mouse' && !grip)) return;
+      if (!grip && target.closest('button:not(.task-title),select,input,a,textarea')) return;
+      const t = tasks.find(t => String(t.id) === el.dataset.taskId); if (!t) return;
+      gesture = {kind:'card',id:t.id,title:t.title,from:t.status,el,actor:actor(),capture:el,pointerId:e.pointerId,x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY};
+    } else {
+      const scroller = target.closest('.boardscroll,.home-scopes');
+      if (!scroller || e.pointerType !== 'mouse' || (target.closest('button,input,select,a,textarea') && !scroller.matches('.home-scopes'))) return;
+      if (scroller.scrollWidth <= scroller.clientWidth) return;
+      gesture = {kind:'pan',el:scroller,capture:scroller,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,startScroll:scroller.scrollLeft};
+    }
+    // Capture only once movement crosses the drag threshold; a normal click stays a click.
+  });
+  document.addEventListener('pointermove', e => {
+    const g = gesture; if (!g || g.keyboard || g.pointerId !== e.pointerId) return;
+    g.x = e.clientX; g.y = e.clientY;
+    if (!g.active && Math.hypot(g.x-g.startX,g.y-g.startY) >= 7) {
+      g.capture.setPointerCapture(e.pointerId); activate();
+      if (g.kind === 'card') frame = requestAnimationFrame(autoScroll);
+    }
+    if (!g.active) return;
+    e.preventDefault();
+    if (g.kind === 'pan') g.el.scrollLeft = g.startScroll-(g.x-g.startX); else hitTest();
+  }, {passive:false});
+  document.addEventListener('pointerup', e => {
+    const g = gesture; if (!g || g.keyboard || g.pointerId !== e.pointerId) return;
+    if (g.active) { e.preventDefault(); suppressClickUntil = performance.now()+400; hitTest(); }
+    cleanup();
+    if (g.kind === 'card' && g.active) {
+      if (g.target && g.target !== g.from && g.actor === actor()) saveMove(g.id,g.from,g.target,g.title);
+      else { announce('Move cancelled.'); focusCard(g.id); }
+    }
+  });
+  document.addEventListener('pointercancel', () => cancel());
+  document.addEventListener('lostpointercapture', e => { if (gesture?.pointerId === e.pointerId && gesture.capture === e.target) cancel(); });
+  document.addEventListener('click', e => {
+    if (e.detail > 0 && performance.now() < suppressClickUntil) { suppressClickUntil = 0; e.preventDefault(); e.stopImmediatePropagation(); }
+    else if (gesture?.keyboard && !e.target.closest('.task-grip')) cancel();
+  }, true);
+  document.addEventListener('dragstart', e => { if (e.target.closest('#boardGrid .task')) e.preventDefault(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && gesture) { e.preventDefault(); cancel(); return; }
+    const grip = e.target.closest('.task-grip');
+    if (!gesture && grip && editable() && !saving && [' ', 'Enter'].includes(e.key)) {
+      e.preventDefault(); const el = grip.closest('.task'), t = tasks.find(t => String(t.id) === el.dataset.taskId); if (!t) return;
+      gesture = {kind:'card',keyboard:true,id:t.id,title:t.title,from:t.status,actor:actor(),el}; activate(); return;
+    }
+    const g = gesture; if (!g?.keyboard) return;
+    if (e.key === 'Tab') { cancel(); return; }
+    if (['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) {
+      e.preventDefault(); const current = S.indexOf(g.target), index = e.key === 'Home' ? 0 : e.key === 'End' ? S.length-1 : Math.max(0,Math.min(S.length-1,current+(e.key === 'ArrowRight' ? 1 : -1)));
+      setTarget(S[index]); board.querySelector('[data-drop-status="'+CSS.escape(S[index])+'"]').scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+    } else if ([' ', 'Enter'].includes(e.key)) {
+      e.preventDefault(); cleanup();
+      if (g.target !== g.from && g.actor === actor()) saveMove(g.id,g.from,g.target,g.title); else announce('Move cancelled.');
+    }
+  });
+  window.addEventListener('blur', () => cancel());
+  window.addEventListener('hashchange', () => cancel());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) cancel(); });
+  renderBoard();
+})();
