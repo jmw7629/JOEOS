@@ -6,7 +6,7 @@ Settings → Chat & agents provides automatic, desktop and mobile layouts plus o
 
 Observatory owner sessions can inspect recorded visible prompts, tool arguments, responses, errors and agent messages. Credentials are redacted and content is bounded. Hidden reasoning is excluded. Missing historical tokens and timings remain null and display Not recorded; no estimates are presented as measurements. See OBSERVATORY.md for the audience and evidence contract.
 
-Home keeps its layout. Each of the six counters opens the exact matching records with existing record actions. The duplicate Home composer and Ask AI action are removed. Projects Lead view applies the selected lead scope, including unassigned projects. Presentation changes do not queue, resume, approve or publish work.
+Home keeps its layout. Each of the six counters opens the exact matching records with existing record actions. The duplicate Home composer, Ask AI action and AI CHAT status badge are removed. Detailed health remains available in the existing health views. Projects Lead view applies the selected lead scope, including unassigned projects. Presentation changes do not queue, resume, approve or publish work.
 
 ## Design references and image credit
 

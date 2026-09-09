@@ -138,6 +138,7 @@ try {
   assert.ok(Math.abs(tilted.x)<=65 && Math.abs(tilted.y)<=65,'orientation displacement is bounded');
   await page.screenshot({path:path.join(out,'conversation-chat-1440.png'),fullPage:false});
   await go('home');
+  assert.equal(await page.locator('#homeAIState').isVisible(),false,'Home AI CHAT status badge is removed');
   await page.screenshot({path:path.join(out,'conversation-nebula-1440.png'),fullPage:false});
   assert.equal(await page.locator('[data-depth],[data-motion],.pb-depth-controls button').count(),0,'Home does not remount removed appearance buttons');
   await go('ai');
