@@ -556,7 +556,8 @@
 (() => {
   const legacy=document.querySelector('#pbObservatory .obs-approval-note');
   if (!legacy || !window.PRFKT_CODEX) return;
-  const panel=document.createElement('section');panel.className='obs-approval-note';panel.id='codexPermissionInbox';panel.setAttribute('aria-label','Codex execution permissions');legacy.replaceWith(panel);
+  const panel=document.createElement('section');panel.className='obs-approval-note';panel.id='codexPermissionInbox';panel.setAttribute('aria-label','Codex execution permissions');
+  const mount=()=>{if(!panel.isConnected && legacy.isConnected)legacy.replaceWith(panel);};
   const css=document.createElement('style');css.textContent=`#codexPermissionInbox{min-width:0}#codexPermissionInbox .cw-permission{margin-top:14px}#codexPermissionInbox button{min-height:44px}#codexPermissionInbox pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto}#codexPermissionInbox textarea{box-sizing:border-box;width:100%;min-height:65px}#codexPermissionInbox .cw-heading{gap:10px}#codexPermissionInbox .cw-inbox-context{overflow-wrap:anywhere}`;document.head.append(css);
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const who=()=>JSON.stringify([accessKey,session?.subject,session?.level,session?.ok]);
@@ -597,7 +598,7 @@
     if(!owner()){render();return;}
     if(busy || (!force && (document.hidden || !document.querySelector('#agents')?.classList.contains('active') || Date.now()-last<3000))){render();return;}
     busy=true;const gen=generation;
-    try {const data=await request('/api/codex-workspace',undefined,id,gen);if(!data)return;snapshot=data;
+    try {const data=await request('/api/codex-workspace',undefined,id,gen);if(!data)return;snapshot=data;if(data.execution_permissions?.capable===true)mount();
       const time=data.execution_permissions?.server_time;if(typeof time==='number' && Number.isFinite(time))clock={time,at:performance.now()};
       feedback='';
     }catch(error){if(valid(id,gen)){snapshot=null;feedback='Could not verify live permission requests: '+error.message;}}
