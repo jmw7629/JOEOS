@@ -100,8 +100,8 @@ try {
   await page.locator('#codexTraceApproval').waitFor({state:'visible'});
   await page.locator('[data-codex-note="permission"]').fill('Keep this note');
   const countdown=await page.locator('[data-codex-countdown="permission"]').innerText();
-  await page.waitForTimeout(1200);
-  assert.notEqual(await page.locator('[data-codex-countdown="permission"]').innerText(),countdown);
+  await page.waitForFunction(previous=>document.querySelector('[data-codex-countdown="permission"]')?.textContent!==previous,countdown,{timeout:5000});
+  assert.match(await page.locator('[data-codex-countdown="permission"]').innerText(),/remaining/);
   assert.equal(await page.locator('[data-codex-note="permission"]').inputValue(),'Keep this note');
   assert.equal(await page.locator('#codexTraceCanvas [data-trace-node="tool:publication"]').count(),0,'paused graph did not redraw');
   assert.doesNotMatch(await page.locator('#codexTraceStudio').innerText(),new RegExp(reviewToken));
