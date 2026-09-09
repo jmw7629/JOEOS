@@ -82,7 +82,7 @@ try {
   const context = await browser.newContext({viewport:{width:390,height:844},reducedMotion:'reduce'}), page = await context.newPage();
   page.on('pageerror',error => errors.push(error.message)); page.on('request',request => { if (!request.url().startsWith(base) && !request.url().startsWith('data:')) external.push(request.url()); });
   page.on('dialog',dialog => dialog.accept(dialog.type()==='prompt'?credential:undefined));
-  await page.addInitScript(key => sessionStorage.setItem('project_byte_access',key),credential);
+  await page.addInitScript(key => {sessionStorage.setItem('project_byte_access',key);localStorage.setItem('prfkt.workspace.layout','desktop');},credential);
   await page.goto(base+'/#ai',{waitUntil:'networkidle'}); await page.waitForFunction(() => document.querySelector('#codexConnection')?.textContent.includes('Connected'));
   assert.equal(await page.locator('#pbChatContext').isVisible(),false,'owner does not have to select agents or models');
   assert.match(await page.locator('#codexRoute').textContent(),/gpt-6-astra.*Ultra/);
@@ -157,7 +157,7 @@ try {
     ['external-history','stickdeath','EXTERNAL_PROJECT_RECORDED_HISTORY',undefined],
     ['mismatched-history','vitros','WRONG_PROJECT_HISTORY_MUST_NOT_RENDER','memory']
   ]) conversations.set(id,{id,title:id,project_key,responseProjectKey,messages:[{id:'message-'+id,role:'assistant',text:body}],run_ids:[]});
-  await page.locator('#codexRefresh').click(); await page.waitForFunction(() => document.querySelector('#codexProject option[value="memory"]'));
+  await page.locator('#loadChat').click(); await page.waitForFunction(() => document.querySelector('#codexProject option[value="memory"]'));
   await page.locator('#codexProject').selectOption('memory');
   assert.equal(await page.locator('#sendChat').isEnabled(),true,'available selected project overrides unavailable aggregate');
   assert.match(await page.locator('#codexConnection').textContent(),/Connected/);
@@ -173,7 +173,7 @@ try {
   await page.reload({waitUntil:'networkidle'}); await page.waitForFunction(() => document.querySelector('#chatlog').textContent.includes('PERSISTED_FIXTURE_RESULT'));
   assert.equal(await page.locator('#codexProject').inputValue(),'joeos','legacy JO EOS remains the default among multiple projects');
   assert.equal(await page.locator('#codexConversation').inputValue(),'conversation-2','newer other-project conversations cannot replace JO EOS history');
-  catalogConfigured=true; catalogConnected=true; await page.locator('#codexRefresh').click();
+  catalogConfigured=true; catalogConnected=true; await page.locator('#loadChat').click();
   await page.waitForFunction(() => !document.querySelector('#sendChat').disabled);
   const beforeUnavailable=requests.filter(r=>r.path.endsWith('/message')).length;
   for (const [key,history,expected] of [
@@ -214,12 +214,12 @@ try {
   await page.waitForFunction(() => document.querySelector('#chatlog').textContent.includes('PERSISTED_FIXTURE_RESULT'));
   assert.equal(await page.locator('#sendChat').isEnabled(),true,'legacy per-project field defaults remain usable');
   const allProjects=projects; projects=projects.filter(project=>project.key!=='joeos');
-  await page.locator('#codexRefresh').click();
+  await page.locator('#loadChat').click();
   await page.waitForFunction(() => document.querySelector('#codexConnection').textContent.includes('no longer available'));
   assert.equal(await page.locator('#codexProject').inputValue(),'joeos','catalog removal cannot silently retarget existing history');
   assert.equal(await page.locator('#codexConversation').inputValue(),'conversation-2');
   assert.equal(await page.locator('#sendChat').isDisabled(),true);
-  projects=allProjects; await page.locator('#codexRefresh').click();
+  projects=allProjects; await page.locator('#loadChat').click();
   await page.waitForFunction(() => !document.querySelector('#sendChat').disabled);
   await page.setViewportSize({width:390,height:844});
   runs.get('run-2').status='working'; await page.locator('#loadChat').click(); await page.waitForFunction(() => document.querySelector('#codexRunState').textContent==='Working');

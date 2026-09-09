@@ -95,6 +95,11 @@ jobs:
           PB_PLAYWRIGHT_MODULE="$RUNNER_TEMP/pb-ai-tools/node_modules/playwright/index.mjs" \
           PB_SCREENSHOTS="$RUNNER_TEMP/pb-ai-evidence/trace-browser" \
           node deploy/project-byte/v4/test_codex_trace_browser.mjs
+          PB_PLAYWRIGHT_MODULE="$RUNNER_TEMP/pb-ai-tools/node_modules/playwright/index.mjs" \
+          PB_SCREENSHOTS="$RUNNER_TEMP/pb-ai-evidence/conversation-browser" \
+          node deploy/project-byte/v4/test_codex_conversation_browser.mjs
+          PB_PLAYWRIGHT_MODULE="$RUNNER_TEMP/pb-ai-tools/node_modules/playwright/index.mjs" \
+          node deploy/project-byte/v4/test_home_drilldown_browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -10,7 +10,7 @@ export async function verifyWorkspaceProfile({page,api,root}){
     await page.reload({waitUntil:'networkidle'});
     await page.waitForFunction(()=>document.title==='Acme Operations');
     assert.equal(await page.locator('.home-hero-top h2').textContent(),'Atlas');
-    assert.equal(await page.locator('#homeCommandInput').getAttribute('aria-label'),'Ask Atlas');
+    assert.equal(await page.locator('#homeCommandInput').count(),0,'Home chat entry remains removed for custom profiles');
     assert.equal(await page.locator('.agent-node.center').getAttribute('aria-label'),'Open Atlas');
     assert.equal(await page.locator('[data-home-scope="mike"]').count(),0);
     await page.locator('[data-home-scope="person-0"]').click();
@@ -22,7 +22,7 @@ export async function verifyWorkspaceProfile({page,api,root}){
     assert.match(await page.locator('#pbWorkspaces [data-home-go="ai"]').textContent(),/Atlas chat/);
     await page.locator('#pbWorkspaces [data-home-go="ai"]').click();
     assert.equal(await page.locator('#pbWorkspaceTitle').textContent(),'Atlas chat');
-    assert.equal(await page.locator('#ai .chatbox h2').textContent(),'Atlas');
+    assert.equal(await page.locator('#ai .chatbox h2').first().textContent(),'Atlas');
     await fs.writeFile(file,JSON.stringify({schema_version:1,display_name:'W'.repeat(48),assistant_name:'A'.repeat(48),owner_shortcuts:Array.from({length:6},(_,i)=>String(i).repeat(48))}));
     await page.reload({waitUntil:'networkidle'});
     await page.waitForFunction(()=>document.title==='W'.repeat(48));
@@ -49,13 +49,9 @@ export async function verifyWorkspaceProfile({page,api,root}){
     await page.setViewportSize({width:320,height:900});
     await page.locator('#login').click();
     await page.waitForFunction(()=>!session.ok);
-    await page.locator('#homeCommandInput').fill('Signed-out fixture');
-    await page.locator('#homeCommandSend').click();
-    await page.waitForSelector('.pb-home-toast');
-    assert.ok(await page.locator('.pb-home-toast').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'long assistant sign-in message stays inside its toast');
-    // The harness accepts the normal sign-in prompt with its disposable fixture key.
-    await page.waitForFunction(()=>session.ok);
-    await page.locator('#homeCommandInput').fill('');
+    assert.equal(await page.locator('#homeCommandInput,#homeCommandSend').count(),0);
+    // Normal sign-in remains available after removing the Home composer.
+    await page.locator('#login').click();await page.waitForFunction(()=>session.ok);
     await fs.writeFile(file,JSON.stringify({schema_version:1,display_name:'Acme Operations',assistant_name:'Atlas',owner_shortcuts:['Avery','Taylor']}));
     await verifyFirstNotification({page});
     await verifyFirstNotification({page,logoutPending:true});

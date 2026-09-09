@@ -1035,12 +1035,17 @@ def health_snapshot():
 # Native observation adapter. No arbitrary paths, hooks, shell execution or writes.
 OBS_REPOS = (("stickdeath", "STICKDEATH_BYTE", "jmw7629/stickdeath-byte"), ("vitros", "DASH_BYTE / VITROS", "jmw7629/vitros-web-dashboard"))
 OBS_CACHE = {"at": 0.0, "value": None}
+OBS_OWNER_CACHE = {"at": 0.0, "value": None}
 OBS_LOCK = threading.Lock()
 OBS_LOG_BYTES = 262144
 OBS_LOG_LIMIT = 6
 OBS_SCAN_LIMIT = 1000
 OBS_EVENT_LIMIT = 320
+OBS_EVIDENCE_FIELD_CHARS = 8192
+OBS_EVIDENCE_EVENT_CHARS = 24576
 OBS_LOG_RE = re.compile(r"^(?:issue-\d+|verify-\d+-[a-f0-9]{6,64})\.log$")
+OBS_SECRET_KEY_RE = re.compile(r"(?i)(?:password|passwd|secret|api.?key|token|authorization|cookie|credential|private.?key|access.?key|connection.?string)")
+OBS_HIDDEN_KINDS = frozenset({"analysis", "reasoning", "thinking", "chain_of_thought", "reasoning_text", "redacted_thinking"})
 
 
 def _obs_id(*parts):
@@ -1049,10 +1054,149 @@ def _obs_id(*parts):
 
 
 def _obs_label(value, maximum=100):
-    text = str(value or "")[:2000]
-    text = re.sub(r"(?i)(?:sk-|gh[pousr]_|github_pat_|pb_)[A-Za-z0-9_-]{8,}", "[redacted]", text)
-    text = re.sub(r"(?i)(?:bearer\s+|(?:password|secret|api.?key|token)\s*[=:]\s*)\S+", "[redacted]", text)
+    text = _obs_redact_text(str(value or ""))
     return re.sub(r"[\x00-\x1f\x7f]", " ", text)[:maximum]
+
+
+def _obs_redact_text(value, known_secrets=()):
+    # Inspect only already-read evidence. Never discover secrets from other files or the environment.
+    text = value
+    for secret in sorted(known_secrets, key=len, reverse=True):
+        text = text.replace(secret, "[redacted]")
+    text = re.sub(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)", "[redacted private key]", text)
+    text = re.sub(r"(?i)(?:sk-|gh[pousr]_|github_pat_|pb_|xox[baprs]-)[A-Za-z0-9_-]{8,}", "[redacted]", text)
+    text = re.sub(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b", "[redacted]", text)
+    text = re.sub(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b", "[redacted]", text)
+    text = re.sub(r"(?i)\b(?:Bearer|Basic)\s+[A-Za-z0-9_+/=.:-]+", "[redacted authorization]", text)
+    text = re.sub(r"(?im)\b(?:set-cookie|cookie|authorization|proxy-authorization)\s*:\s*[^\r\n]+", "[redacted header]", text)
+    text = re.sub(r"(?i)([a-z][a-z0-9+.-]*://)[^\s/@:]+:[^\s/@]+@", r"\1[redacted]@", text)
+    # Consume complete shell words, including quoted/escaped segments, before display truncation.
+    shell_word = r'''(?:"(?:\\[^\r\n]|[^"\\\r\n])*"|'[^'\r\n]*'|\\[^\r\n]|[^\s;&|<>\\'"])+'''
+    credential_option = r'''(?<![\w.-])(?:(?:"--(?i:cookie|user|proxy-user)"|'--(?i:cookie|user|proxy-user)'|--(?i:cookie|user|proxy-user))(?:\s*=\s*|\s+)|(?:"-[buU]"|'-[buU]'|-[buU])(?:\s*=\s*|\s+|(?=[^\s])))'''
+    text = re.sub(credential_option+shell_word, "[redacted credential option]", text)
+    # Quoted JSON/shell assignments, environment assignments, query values and command flags.
+    text = re.sub(r'''(?ix)(?<![\w.-])(?:["']?[\w.-]*(?:password|passwd|secret|api[_-]?key|access[_-]?key|token|credential|private[_-]?key|cookie|authorization)[\w.-]*["']?\s*[=:]\s*|--(?:password|passwd|secret|api[_-]?key|token)\s+)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s&,;]+)''', "[redacted credential]", text)
+    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+
+
+def _obs_known_secrets(value, depth=0):
+    if depth > 12:
+        return set()
+    found = set()
+    if isinstance(value, dict):
+        for key, item in list(value.items())[:120]:
+            if OBS_SECRET_KEY_RE.search(str(key)) and isinstance(item, str) and len(item) >= 4:
+                found.add(item)
+            else:
+                found.update(_obs_known_secrets(item, depth+1))
+    elif isinstance(value, list):
+        for item in value[:120]:
+            found.update(_obs_known_secrets(item, depth+1))
+    return found
+
+
+def _obs_evidence_value(value, source, budget, known_secrets):
+    if value is None:
+        return None
+    structured = not isinstance(value, str)
+    original = json.dumps(value, ensure_ascii=False, default=str) if structured else value
+    clipped = False
+    def clean(item, depth=0):
+        nonlocal clipped
+        if depth > 12:
+            clipped = True
+            return "[depth limit]"
+        if isinstance(item, dict):
+            if (any(str(item.get(field, "")).lower() in OBS_HIDDEN_KINDS for field in ("type", "channel", "phase"))
+                    or item.get("hidden") is True or item.get("visibility") in {"hidden", "internal"}):
+                return "[not visible]"
+            clipped |= len(item) > 120
+            return {_obs_redact_text(str(key), known_secrets):
+                    ("[not visible]" if str(key).lower() in OBS_HIDDEN_KINDS or key == "encrypted_content" else
+                     "[redacted]" if OBS_SECRET_KEY_RE.search(str(key)) else clean(child, depth+1))
+                    for key, child in list(item.items())[:120]}
+        if isinstance(item, list):
+            clipped |= len(item) > 120
+            return [clean(child, depth+1) for child in item[:120]
+                    if not isinstance(child, dict) or str(child.get("type", "")).lower() not in OBS_HIDDEN_KINDS]
+        return _obs_redact_text(item, known_secrets) if isinstance(item, str) else item
+    cleaned = clean(value)
+    result = json.dumps(cleaned, ensure_ascii=False, indent=2, default=str) if structured else cleaned
+    limit = max(0, min(OBS_EVIDENCE_FIELD_CHARS, budget[0]))
+    budget[0] -= min(len(result), limit)
+    return {"text": result[:limit], "format": "json" if structured else "text", "source": source,
+            "recorded_chars": len(original), "truncated": bool(clipped or len(result) > limit),
+            "redacted": cleaned != value}
+
+
+def _obs_visible_text(raw, part, depth=0):
+    if depth > 1:
+        return None, ""
+    for container in (raw, part):
+        if (any(str(container.get(field, "")).lower() in OBS_HIDDEN_KINDS for field in ("type", "channel", "phase"))
+                or container.get("hidden") is True or container.get("visibility") in {"hidden", "internal"}
+                or container.get("role") not in (None, "", "user", "assistant", "tool")):
+            return None, ""
+    for container, source in ((part, "part"), (raw, "event")):
+        if isinstance(container.get("text"), str):
+            return container["text"], source+".text"
+        content = container.get("content")
+        if isinstance(content, str):
+            return content, source+".content"
+        if isinstance(content, list):
+            texts = [item["text"] for item in content if isinstance(item, dict)
+                     and item.get("type") in {"text", "input_text", "output_text"} and isinstance(item.get("text"), str)
+                     and not any(str(item.get(field, "")).lower() in OBS_HIDDEN_KINDS for field in ("channel", "phase"))
+                     and item.get("hidden") is not True and item.get("visibility") not in {"hidden", "internal"}]
+            if texts:
+                return "\n".join(texts), source+".content[text]"
+    message = raw.get("message")
+    if isinstance(message, dict):
+        value, source = _obs_visible_text(message, {}, depth+1)
+        return value, source.replace("event", "event.message", 1)
+    return None, ""
+
+
+def _obs_evidence(raw, part, state, inputs, kind, role):
+    known = _obs_known_secrets(raw)
+    budget = [OBS_EVIDENCE_EVENT_CHARS]
+    text, text_source = _obs_visible_text(raw, part) if kind in {"text", "message", "prompt", "user_message", "assistant_message"} else (None, "")
+    prompt = inputs.get("prompt") if isinstance(inputs, dict) else None
+    prompt_source = "part.state.input.prompt"
+    if kind == "prompt":
+        prompt, prompt_source = raw.get("prompt", text), "event.prompt" if "prompt" in raw else text_source
+    elif role == "user" and text is not None:
+        prompt, prompt_source = text, text_source
+    return {"prompt": _obs_evidence_value(prompt, prompt_source, budget, known),
+            "arguments": _obs_evidence_value(state.get("input"), "part.state.input", budget, known) if kind == "tool_use" else None,
+            "response": _obs_evidence_value(state.get("output"), "part.state.output", budget, known) if kind == "tool_use" else None,
+            "message": _obs_evidence_value(text, text_source, budget, known) if role != "user" and kind != "prompt" else None,
+            "error": _obs_evidence_value(state.get("error", raw.get("error")), "part.state.error" if "error" in state else "event.error", budget, known)}
+
+
+def _obs_summary(event):
+    kind, tool, status = event["kind"], event["tool"], event["status"]
+    if kind == "tool_use":
+        description = f"{tool or 'Tool'}: {status}."
+    else:
+        description = {"step_start": "Model step started.", "step_finish": "Model step finished.",
+                       "compaction": "Context compaction was recorded.", "error": "An error was recorded.",
+                       "prompt": "User prompt was recorded.", "user_message": "User message was recorded.",
+                       "assistant_message": "Assistant update was recorded."}.get(kind, "Visible message was recorded.")
+    evidence = event.get("evidence") or {}
+    for field in ("message", "prompt", "error"):
+        if evidence.get(field) and evidence[field]["text"]:
+            return description+" "+_obs_label(evidence[field]["text"], 220)
+    if kind == "tool_use" and evidence.get("arguments"):
+        try:
+            args = json.loads(evidence["arguments"]["text"])
+            if isinstance(args, dict):
+                value = next((args[key] for key in ("description", "command", "filePath", "path", "query", "url") if isinstance(args.get(key), str)), None)
+                if value:
+                    return description+" "+_obs_label(value, 220)
+        except (TypeError, ValueError):
+            pass
+    return description
 
 
 def _obs_number(value):
@@ -1066,14 +1210,29 @@ def _obs_time(value):
     return number / 1000 if number is not None and number > 1e11 else number
 
 
-def _obs_event(raw, trace_id, ordinal):
+def _obs_event(raw, trace_id, ordinal, include_evidence=False):
     part = raw.get("part") if isinstance(raw.get("part"), dict) else {}
     kind = str(raw.get("type") or part.get("type") or "")
-    if kind not in {"tool_use", "step_start", "step_finish", "text", "error", "compaction"}:
+    if kind not in {"tool_use", "step_start", "step_finish", "text", "message", "prompt", "user_message", "assistant_message", "error", "compaction"}:
         return None
+    message = raw.get("message") if isinstance(raw.get("message"), dict) else {}
+    for container in (raw, part, message):
+        if (str(container.get("type", "")).lower() in OBS_HIDDEN_KINDS
+                or str(container.get("channel", "")).lower() in OBS_HIDDEN_KINDS
+                or str(container.get("phase", "")).lower() in OBS_HIDDEN_KINDS
+                or container.get("hidden") is True or container.get("visibility") in {"hidden", "internal"}):
+            return None
+    role = str(raw.get("role") or part.get("role") or message.get("role") or "")
+    if role and role not in {"user", "assistant", "tool"}:
+        return None
+    if not role and kind in {"text", "assistant_message"}:
+        role = "assistant"
+    elif kind in {"user_message", "prompt"}:
+        role = "user"
     state = part.get("state") if isinstance(part.get("state"), dict) else {}
-    timing = state.get("time") if isinstance(state.get("time"), dict) else {}
-    start = _obs_time(timing.get("start")) or _obs_time(raw.get("timestamp"))
+    timing = state.get("time") if isinstance(state.get("time"), dict) else part.get("time") if isinstance(part.get("time"), dict) else {}
+    recorded_start = _obs_time(timing.get("start"))
+    start = recorded_start if recorded_start is not None else _obs_time(raw.get("timestamp"))
     end = _obs_time(timing.get("end"))
     status = state.get("status") if state.get("status") in {"pending", "running", "completed", "error"} else "recorded"
     tool = _obs_label(part.get("tool"), 60) if kind == "tool_use" else kind.replace("_", " ")
@@ -1081,21 +1240,26 @@ def _obs_event(raw, trace_id, ordinal):
     metadata = state.get("metadata") if isinstance(state.get("metadata"), dict) else {}
     tokens = part.get("tokens") if isinstance(part.get("tokens"), dict) else {}
     measured = {k: _obs_number(tokens.get(k)) for k in ("input", "output", "reasoning", "total")}
+    cache_tokens = tokens.get("cache") if isinstance(tokens.get("cache"), dict) else {}
+    measured.update({"cache_read": _obs_number(cache_tokens.get("read")), "cache_write": _obs_number(cache_tokens.get("write"))})
     sid = _obs_id(trace_id, raw.get("sessionID") or part.get("sessionID") or "default")
     child = metadata.get("sessionId") or metadata.get("sessionID")
     event_id = _obs_id(trace_id, part.get("id") or part.get("callID") or json.dumps(raw, sort_keys=True))
-    return {"id": event_id, "session": sid, "kind": kind, "tool": tool, "status": status,
-            "time": start, "end": end, "duration_ms": round((end-start)*1000, 2) if start and end and end >= start else None,
+    event = {"id": event_id, "session": sid, "kind": kind, "tool": tool, "status": status, "message_role": role or None,
+            "time": start, "end": end, "duration_ms": round((end-recorded_start)*1000, 2) if recorded_start is not None and end is not None and end >= recorded_start else None,
             "tokens": measured, "cost": _obs_number(part.get("cost")),
             "argument_fields": [_obs_label(k, 50) for k in list(inputs)[:20]],
             "response_chars": len(state["output"]) if isinstance(state.get("output"), str) else None,
             "error_recorded": bool(state.get("error")) or kind == "error",
             "delegate": _obs_label(inputs.get("subagent_type"), 60) if tool == "task" else "",
             "child_session": _obs_id(trace_id, child) if isinstance(child, str) and child else "",
-            "payload_policy": "Argument values, response bodies and model text are withheld to protect credentials and project content."}
+            "evidence": _obs_evidence(raw, part, state, inputs, kind, role) if include_evidence else None,
+            "payload_policy": "Owner evidence: recorded visible content, with credential redaction and explicit length limits; hidden reasoning is excluded." if include_evidence else "Owner access is required for recorded prompts, arguments, responses and visible messages."}
+    event["summary"] = _obs_summary(event)
+    return event
 
 
-def _obs_parse_log(path, repo, project, record=None):
+def _obs_parse_log(path, repo, project, record=None, include_evidence=False):
     import stat
     descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(descriptor, "rb") as handle:
@@ -1116,7 +1280,7 @@ def _obs_parse_log(path, repo, project, record=None):
             continue
         try:
             raw = json.loads(line)
-            event = _obs_event(raw, trace_id, ordinal) if isinstance(raw, dict) else None
+            event = _obs_event(raw, trace_id, ordinal, include_evidence) if isinstance(raw, dict) else None
         except (ValueError, TypeError, RecursionError, OverflowError):
             if line.lstrip().startswith(b"{"):
                 skipped += 1
@@ -1129,6 +1293,7 @@ def _obs_parse_log(path, repo, project, record=None):
     clipped = len(events) > OBS_EVENT_LIMIT
     events = events[-OBS_EVENT_LIMIT:]
     stamps = [e["time"] for e in events if e["time"] is not None]
+    ends = [e["end"] if e["end"] is not None else e["time"] for e in events if e["end"] is not None or e["time"] is not None]
     total_values = [e["tokens"]["total"] for e in events if e["kind"] == "step_finish" and e["tokens"]["total"] is not None]
     tools = [e for e in events if e["kind"] == "tool_use"]
     status = str((record or {}).get("status") or "historical")
@@ -1137,7 +1302,7 @@ def _obs_parse_log(path, repo, project, record=None):
     return {"id": trace_id, "label": path.stem, "project": project, "repo": repo,
             "role": "verifier" if path.name.startswith("verify-") else "builder", "status": status,
             "updated_at": info.st_mtime, "started_at": min(stamps) if stamps else None,
-            "ended_at": max(stamps) if stamps else None, "tokens": sum(total_values) if total_values else None,
+            "ended_at": max(ends) if ends else None, "tokens": sum(total_values) if total_values else None,
             "tool_count": len(tools), "event_count": len(events), "events": events,
             "partial": bool(offset or clipped or skipped), "skipped_records": skipped,
             "source": "bridge-log", "owner": "", "task_id": ""}
@@ -1162,7 +1327,7 @@ def _obs_processed(state_dir):
         return {}
 
 
-def _obs_build_snapshot():
+def _obs_build_snapshot(include_evidence=False):
     traces, sources = [], []
     for key, project, repo in OBS_REPOS:
         root = app.BRIDGE_STATE.get(repo)
@@ -1188,7 +1353,7 @@ def _obs_build_snapshot():
             for _, path in candidates[:OBS_LOG_LIMIT]:
                 number = path.stem.split("-")[1]
                 record = records.get(number) if path.name.startswith("issue-") else None
-                traces.append(_obs_parse_log(path, repo, project, record if isinstance(record, dict) else None))
+                traces.append(_obs_parse_log(path, repo, project, record if isinstance(record, dict) else None, include_evidence))
             source["state"] = "available"
         except (OSError, ValueError, TypeError, RecursionError) as exc:
             source["state"] = "unavailable"; source["error_type"] = type(exc).__name__
@@ -1206,15 +1371,20 @@ def _obs_build_snapshot():
     traces.sort(key=lambda item: item["updated_at"], reverse=True)
     return {"version": 1, "observed_at": int(time.time()), "traces": traces, "sources": sources,
             "state": "available" if all(s["state"] == "available" for s in sources) else "partial",
-            "limits": {"logs_per_repository": OBS_LOG_LIMIT, "bytes_per_log": OBS_LOG_BYTES, "events_per_log": OBS_EVENT_LIMIT},
-            "capabilities": {"read_only": True, "execution_permissions": False, "token_metrics": "recorded step totals only", "payloads": "metadata only"}}
+            "limits": {"logs_per_repository": OBS_LOG_LIMIT, "bytes_per_log": OBS_LOG_BYTES, "events_per_log": OBS_EVENT_LIMIT,
+                       "evidence_chars_per_field": OBS_EVIDENCE_FIELD_CHARS, "evidence_chars_per_event": OBS_EVIDENCE_EVENT_CHARS},
+            "capabilities": {"read_only": True, "execution_permissions": False, "token_metrics": "recorded counts only; totals are not inferred",
+                             "owner_evidence": include_evidence, "hidden_reasoning": False,
+                             "payloads": "owner redacted recorded content" if include_evidence else "metadata only"}}
 
 
-def observatory_snapshot():
+def observatory_snapshot(actor=None):
+    include_evidence = bool(isinstance(actor, dict) and actor.get("role") == "owner" and actor.get("level", 0) >= 4)
+    cache = OBS_OWNER_CACHE if include_evidence else OBS_CACHE
     with OBS_LOCK:
-        if OBS_CACHE["value"] is None or time.monotonic()-OBS_CACHE["at"] > 15:
-            OBS_CACHE["value"] = _obs_build_snapshot(); OBS_CACHE["at"] = time.monotonic()
-        return OBS_CACHE["value"]
+        if cache["value"] is None or time.monotonic()-cache["at"] > 15:
+            cache["value"] = _obs_build_snapshot(include_evidence); cache["at"] = time.monotonic()
+        return cache["value"]
 
 
 def permission_gateway():
@@ -1319,9 +1489,10 @@ class SafeHandler(app.H):
         if path == "/healthz":
             return self.sendj(health_snapshot())
         if path == "/api/observatory":
-            if not self.need(2):
+            actor = self.need(2)
+            if not actor:
                 return
-            return self.sendj(observatory_snapshot())
+            return self.sendj(observatory_snapshot(actor))
         if path == "/api/external-reviews":
             if not self.need(1):
                 return

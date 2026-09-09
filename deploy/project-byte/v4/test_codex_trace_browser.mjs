@@ -77,7 +77,7 @@ try {
   const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'}), page=await context.newPage();
   page.on('pageerror',error=>errors.push(error.message));
   page.on('request',request=>{if (!request.url().startsWith(base)&&!request.url().startsWith('data:')) external.push(request.url());});
-  await page.addInitScript(key=>sessionStorage.setItem('project_byte_access',key),credential);
+  await page.addInitScript(key=>{sessionStorage.setItem('project_byte_access',key);localStorage.setItem('prfkt.workspace.layout','desktop');},credential);
   const run={id:'trace-run',status:'working',events:[],permissions:[],agents:[{id:'coordinator',role:'coordinator',status:'working',model:'gpt-6-astra',effort:'ultra'}]};
   runs.set(run.id,run); conversations.set('trace-conversation',{id:'trace-conversation',title:'Native trace fixture',project_key:'joeos',messages:[],run_ids:[run.id]});
   append(run,'prompt',{message_id:'prompt',text:'Read the fixture',created_at:Date.now()/1000});
@@ -89,6 +89,7 @@ try {
   append(run,'tool_completed',{tool_id:'tool-a',agent_id:'coordinator',name:'workspace_read',success:true,duration_ms:42,result:{text:'Result A',bytes:8,truncated:true,format:'text'}});
   for(const count of [12,12,18]) append(run,'token_usage',{agent_id:'coordinator',native:{thread_id:'native-thread'},source:'native_codex',total:{total_tokens:count},last:{total_tokens:6}});
   await page.goto(base+'/#ai');
+  await page.locator('[data-cw-view=graph]').click();
   await page.waitForFunction(()=>document.querySelector('[data-trace-node="tool:tool-a"][data-status="completed"]'));
   assert.ok(eventsAfter.some(after=>after>=200),'all event pages drained');
   await page.locator('#codexTraceCanvas [data-trace-node="tool:tool-a"]').click();
@@ -96,9 +97,11 @@ try {
   assert.doesNotMatch(await page.locator('#codexTraceInspector').innerText(),/Result B/);
   assert.equal(await page.evaluate(()=>!!window.TRACE_XSS),false);
   assert.equal(await page.locator('#codexTraceInspector img').count(),0);
+  await page.locator('[data-codex-trace-tab=usage]').click();
   await page.locator('#codexTraceMetric').selectOption('tokens');
   assert.match(await page.locator('#codexTraceList').innerText(),/18/);
   assert.doesNotMatch(await page.locator('#codexTraceList').innerText(),/42/);
+  await page.locator('[data-codex-trace-tab=graph]').click();
   await page.locator('#codexTracePause').click();
   append(run,'tool_started',{tool_id:'publication',agent_id:'coordinator',name:'publish_pull_request'});
   run.permissions=[{id:'permission',tool_id:'publication',tool:'publish_pull_request',summary:'Review exact fixture patch',state:'pending',arguments:{title:'Fixture'},review_token:reviewToken,expires_at:Date.now()/1000+60}];
@@ -122,9 +125,7 @@ try {
   assert.equal(await page.locator('body.pb-depth').count(),1);
   assert.equal(await page.locator('body.pb-depth-motion').count(),0,'OS reduced motion respected');
   await page.emulateMedia({reducedMotion:'no-preference'});
-  await page.waitForFunction(()=>document.body.classList.contains('pb-depth-motion'));
-  await page.locator('#codexTraceStudio [data-motion]').click();
-  assert.equal(await page.locator('body.pb-depth-motion').count(),0);
+  assert.equal(await page.locator('.pb-depth-controls').count(),0,'depth and motion toggle buttons removed');
   await page.screenshot({path:path.join(out,'native-trace-desktop.png'),fullPage:true});
   await page.setViewportSize({width:390,height:844});
   await page.locator('[data-codex-trace-tab="details"]').click();
@@ -143,7 +144,8 @@ try {
   run.permissions=['inbox-approve','inbox-deny'].map(id=>({id,tool:'publish_pull_request',summary:'Frozen publication review',state:'pending',review_token:reviewToken,expires_at:Date.now()/1000+45,arguments:{review_artifact:{id:'1'.repeat(32)}}}));
   await page.locator('.home-nav [data-home-go="agents"]').click();
   await page.waitForFunction(()=>document.getElementById('codexPermissionInbox')?.textContent.includes('Codex connected'));
-  assert.equal(await page.locator('[data-cw-inbox-id]').count(),2);
+  await page.waitForFunction(()=>document.querySelectorAll('[data-cw-inbox-id]').length===2);
+  if(await page.locator('#cwAgentPopup').isVisible())await page.locator('#cwPopupDismiss').click();
   assert.doesNotMatch(await page.locator('#codexPermissionInbox').innerHTML(),new RegExp(reviewToken));
   await page.locator('[data-cw-inbox-review="inbox-approve"]').click();
   await page.waitForFunction(()=>document.querySelector('[data-cw-inbox-patch="inbox-approve"]')?.textContent.includes('FROZEN_PATCH'));

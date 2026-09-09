@@ -65,7 +65,7 @@ body[data-pb-view="home"] .wrap{padding:12px 24px 36px;max-width:1360px;margin:a
 .home-command>.pb-icon{color:#96ceff;width:20px}.home-command:focus-within{border-color:#8fd4ff;outline:2px solid rgba(65,151,255,.18);outline-offset:2px}
 .home-command input{flex:1;min-width:0;background:transparent;color:var(--txt);border:0;outline:0;min-height:40px;font-size:16px;padding:0}.home-command input::placeholder{color:#95abc5}
 .home-command button{width:44px;height:44px;flex-shrink:0;display:grid;place-items:center;border-radius:50%;color:white;border:1px solid #96d8ff;background:linear-gradient(135deg,#6fc4ff,#167aeb);box-shadow:0 0 18px rgba(51,150,252,.35),inset 0 1px 1px #c2ebff}
-.home-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}.home-action{display:flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:10px;border:1px solid rgba(122,173,224,.44);border-radius:12px;color:#e7f2ff;background:linear-gradient(155deg,rgba(35,65,102,.87),rgba(13,30,51,.84));box-shadow:inset 0 1px rgba(232,245,255,.13);font-size:13px;font-weight:600}
+.home-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}.home-action{display:flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:10px;border:1px solid rgba(122,173,224,.44);border-radius:12px;color:#e7f2ff;background:linear-gradient(155deg,rgba(35,65,102,.87),rgba(13,30,51,.84));box-shadow:inset 0 1px rgba(232,245,255,.13);font-size:13px;font-weight:600}
 .home-action .pb-icon{color:#a2d6ff}.home-action:hover,.home-command button:hover{filter:brightness(1.15)}.home-action:active,.home-kpi:active,.home-chip:active{transform:translateY(1px)}
 .home-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}.home-kpi{appearance:none;cursor:pointer;display:grid;grid-template-columns:38px 1fr;gap:2px 12px;padding:16px;text-align:left;color:var(--txt);border-radius:14px}
 .home-kpi .kpi-orbit{grid-row:1/4;align-self:center;border:1px solid currentColor;box-shadow:0 0 16px rgba(73,156,241,.13);width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--home-blue)}
@@ -146,7 +146,7 @@ body[data-pb-view="home"] > header{padding:16px 24px 6px}body[data-pb-view="home
  .pb-filter-dialog{padding:14px}.pb-filter-dialog .filters,.pb-filter-dialog .filtergrid{grid-template-columns:repeat(2,minmax(0,1fr))}.pb-filter-dialog .filters #priorityFilter{grid-column:1/-1}.pb-filter-dialog .pb-filter-head{top:-14px}
  body[data-pb-view="home"] .wrap{padding:8px 12px 24px}.home-shell{gap:11px}.home-hero{padding:14px 13px;border-radius:16px}.home-hero h2{font-size:30px;margin-top:10px}.home-hero-top{min-height:57px;gap:9px}.home-eyebrow{font-size:9px;max-width:235px;min-height:15px}.home-ai-state{max-width:97px;font-size:8px;padding:5px 7px}.home-planet{width:510px;height:510px;right:-175px;top:18px;opacity:.96}
  .pb-crawl{margin-top:12px;height:42px;gap:5px;padding-left:8px}.pb-crawl-item{font-size:11px;min-height:42px}.pb-crawl-label{font-size:8px;gap:4px}.pb-crawl-toggle{width:29px;min-height:42px}.home-command{margin-top:9px;padding:4px 6px 4px 11px}.home-command input{min-height:38px}.home-command button{height:40px;width:40px}
- .home-actions{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}.home-action{flex-direction:column;gap:5px;min-height:61px;padding:7px 3px;font-size:10px;line-height:1.25}.home-action .pb-icon{width:18px;height:18px}
+ .home-actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:10px}.home-action{flex-direction:column;gap:5px;min-height:61px;padding:7px 3px;font-size:10px;line-height:1.25}.home-action .pb-icon{width:18px;height:18px}
  .home-kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.home-kpi{grid-template-columns:27px minmax(0,1fr);gap:1px 7px;padding:11px 8px;min-height:65px;border-radius:12px}.home-kpi .kpi-orbit{width:27px;height:27px;margin:0;grid-row:1/3}.home-kpi b{font-size:20px}.home-kpi .kpi-label{font-size:10px;line-height:1.2}.home-kpi small{display:none}.home-scopes{gap:6px;padding-bottom:3px}.home-chip{min-height:40px;font-size:10px;padding:7px 12px}
  .home-card{padding:12px;border-radius:14px}.home-card-head h3{font-size:13px}.home-card-head{margin-bottom:6px}.agent-map{height:232px}.agent-node{width:94px;min-height:63px;padding:6px 3px}.agent-node .pb-icon{margin-bottom:3px}.agent-node small{font-size:8px}.agent-node.center{height:66px;width:66px;min-height:66px}
  .org-map{gap:8px}.org-top{padding:9px 12px}.org-top b{font-size:12px}.org-avatar{height:32px;width:32px}.org-row{gap:7px}.org-person{min-height:68px;padding:9px 4px;gap:4px}.home-lower{gap:11px}.execution-fabric{gap:7px}.fabric-node{min-height:65px;padding:10px 8px 10px 23px}.fabric-node b{font-size:10px}.fabric-node span{font-size:10px}
@@ -189,9 +189,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
           <span class="pb-crawl-label">UPDATES</span><div class="pb-crawl-viewport"><div class="pb-crawl-track" aria-live="off"></div></div>
           <button id="pbCrawlToggle" type="button" class="pb-crawl-toggle" aria-label="Pause activity crawl" aria-pressed="false">${icon('blocked')}</button>
         </section>
-        <div class="home-command">${icon("sparkle")}<input aria-label="Ask AI_BYTE" id="homeCommandInput" type="text" maxlength="1200" placeholder="Ask, create work, get status, or troubleshoot…"><button id="homeCommandSend" type="button" aria-label="Send to AI_BYTE">${icon("send")}</button></div>
         <div class="home-actions">
-          <button type="button" class="home-action" data-home-action="ask">${icon("chat")}Ask AI</button>
           <button type="button" class="home-action authonly" data-home-action="create">${icon("plus")}New work</button>
           <button type="button" class="home-action" data-home-action="agents">${icon("agents")}Review agents</button>
           <button type="button" class="home-action" data-home-action="troubleshoot">${icon("tools")}Troubleshoot</button>
@@ -248,13 +246,57 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     if(typeof renderAll==='function')renderAll();
   }
 
-  function homeKpiScope(kind) {
-    const map={open:['completionFilter','open'],active:['statusFilter','Active'],blocked:['statusFilter','Blocked'],critical:['priorityFilter','Critical'],ai:['runFilter','active'],due:['dueFilter','7d']};
-    const pair=map[kind];if(!pair)return;
-    const control=document.getElementById(pair[0]);
-    setHomeFilter(pair[0],control?.value===pair[1]?'':pair[1]);
-    if(typeof renderAll==='function')renderAll();
+  const kpiLabels={open:'Open',active:'Active',blocked:'Blocked',critical:'Critical',ai:'AI running',due:'Due soon'};
+  const kpiDialog=document.createElement('dialog');
+  kpiDialog.id='homeKpiDialog';kpiDialog.className='pb-filter-dialog home-kpi-dialog';
+  kpiDialog.setAttribute('aria-labelledby','homeKpiTitle');
+  document.body.appendChild(kpiDialog);
+  const drilldownStyle=document.createElement('style');
+  drilldownStyle.textContent='.home-kpi-dialog{width:min(780px,calc(100vw - 24px));max-height:85dvh;padding:18px}.home-kpi-dialog .pb-filter-head{gap:16px}.home-kpi-dialog h2{margin:0}.home-kpi-scope{color:#a8bfd4;font-size:12px;line-height:1.6;margin:12px 0}.home-kpi-records{display:grid;gap:10px;padding:0;list-style:none}.home-kpi-record{border:1px solid var(--home-border);border-radius:12px;padding:13px;min-width:0}.home-kpi-record h3{margin:0 0 7px;font-size:14px;overflow-wrap:anywhere}.home-kpi-record p{color:#b5c5d7;font-size:12px;margin:6px 0;overflow-wrap:anywhere}.home-kpi-record .flex{gap:8px;margin-top:10px}.home-kpi-record button{min-height:40px}.home-kpi-dialog::backdrop{background:#020810ad}';
+  document.head.appendChild(drilldownStyle);
+
+  function homeKpiRecords(kind,scoped) {
+    if(kind==='ai'){const ids=new Set(scoped.map(t=>t.id));return (runs||[]).filter(r=>ids.has(r.task_id)&&r.status==='running');}
+    return scoped.filter(t=>{
+      if(kind==='active'||kind==='blocked')return t.status===(kind==='active'?'Active':'Blocked');
+      if(t.status==='Done')return false;
+      if(kind==='critical')return t.priority==='Critical';
+      if(kind==='due'){const d=typeof daysUntil==='function'?daysUntil(t.due_date):null;return d!==null&&d>=0&&d<=7;}
+      return kind==='open';
+    });
   }
+
+  function homeScopeDescription() {
+    const criteria=typeof filterCriteria==='function'?filterCriteria():{};
+    const labels={search:'Search',projectFilter:'Project',ownerFilter:'Owner',leadFilter:'Lead',priorityFilter:'Priority',statusFilter:'Status',completionFilter:'Completion',dueFilter:'Due',runFilter:'Run state'};
+    return Object.entries(criteria).filter(([,value])=>value).map(([key,value])=>{
+      const el=document.getElementById(key),label=labels[key]||el?.closest('label')?.firstChild?.textContent?.trim()||key.replace(/Filter$/,'');
+      const selected=el?.selectedOptions?.[0]?.textContent||value;
+      return `${label}: ${selected}`;
+    }).join(' · ')||'All projects';
+  }
+
+  function homeKpiScope(kind) {
+    if(!kpiLabels[kind])return;
+    // Use the same pre-click scope and predicate as the counter, including runs
+    // that are still running even if a task's last_run_id now points elsewhere.
+    const scoped=safeVisible(),records=homeKpiRecords(kind,scoped),scope=homeScopeDescription();
+    const byTask=new Map(scoped.map(t=>[t.id,t]));
+    const rows=records.map(record=>{
+      const task=kind==='ai'?byTask.get(record.task_id):record;
+      const details=kind==='ai'?`${record.agent_key||'Agent'} · Running · ${record.project||task?.project||''}`:`${task.project||'No project'} · ${task.owner||'Unassigned'} · ${task.status} · ${task.priority||'No priority'}`;
+      const actions=(kind==='ai'?`<button type="button" class="mini" data-home-run="${escH(record.id)}">Open run</button>`:'')+(task?`<button type="button" class="mini" data-home-task="${escH(task.id)}">Open task</button><button type="button" class="mini" data-home-board="${escH(task.project||'')}">Open board</button>`:'');
+      return `<li class="home-kpi-record" data-home-record="${escH(record.id)}"><h3>${escH(task?.title||record.id)}</h3><p>${escH(details)}</p>${task?.due_date?`<p>Due ${escH(task.due_date)}</p>`:''}${kind==='ai'?`<p>Run ${escH(record.id)}</p>`:''}<div class="flex">${actions}</div></li>`;
+    }).join('');
+    kpiDialog.innerHTML=`<div class="pb-filter-head"><h2 id="homeKpiTitle">${kpiLabels[kind]} · ${records.length} ${kind==='ai'?'runs':'tasks'}</h2><button type="button" class="pb-filter-close" data-home-kpi-close aria-label="Close matching records">Done</button></div><p class="home-kpi-scope">${escH(scope)}</p>${records.length?`<ul class="home-kpi-records">${rows}</ul>`:'<p class="home-empty">No matching records in this scope.</p>'}`;
+    // Preserve the established filter interaction for task counters. AI running
+    // cannot use runFilter=active: that includes queued and only checks last_run_id.
+    const pair={open:['completionFilter','open'],active:['statusFilter','Active'],blocked:['statusFilter','Blocked'],critical:['priorityFilter','Critical'],due:['dueFilter','7d']}[kind];
+    if(pair)setHomeFilter(...pair);
+    if(typeof renderAll==='function')renderAll();
+    if(!kpiDialog.open)kpiDialog.showModal();
+  }
+  kpiDialog.addEventListener('click',event=>{if(event.target.closest('[data-home-kpi-close]'))kpiDialog.close();});
 
   function safeVisible() {
     try { return typeof visible === 'function' ? visible() : (tasks || []); } catch { return tasks || []; }
@@ -268,14 +310,11 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   }
 
   function renderKpis(scoped) {
-    const open=scoped.filter(t=>t.status!=='Done');
-    const dueSoon=open.filter(t=>{const d=typeof daysUntil==='function'?daysUntil(t.due_date):null;return d!==null&&d>=0&&d<=7;}).length;
-    const ids=new Set(scoped.map(t=>t.id)),activeRuns=(runs||[]).filter(r=>ids.has(r.task_id));
-    const running=activeRuns.filter(r=>r.status==='running').length,queued=activeRuns.filter(r=>r.status==='queued').length;
+    const counts=Object.fromEntries(Object.keys(kpiLabels).map(kind=>[kind,homeKpiRecords(kind,scoped).length]));
     const c=typeof filterCriteria==='function'?filterCriteria():{};
-    const data=[['Open',open.length,'open','work items',c.completionFilter==='open'],['Active',scoped.filter(t=>t.status==='Active').length,'active','in progress',c.statusFilter==='Active'],['Blocked',scoped.filter(t=>t.status==='Blocked').length,'blocked','needs attention',c.statusFilter==='Blocked'],['Critical',open.filter(t=>t.priority==='Critical').length,'critical','highest priority',c.priorityFilter==='Critical'],['AI running',running,'ai',queued+' queued',c.runFilter==='active'],['Due soon',dueSoon,'due','next 7 days',c.dueFilter==='7d']];
+    const data=[['Open',counts.open,'open','work items',c.completionFilter==='open'],['Active',counts.active,'active','in progress',c.statusFilter==='Active'],['Blocked',counts.blocked,'blocked','needs attention',c.statusFilter==='Blocked'],['Critical',counts.critical,'critical','highest priority',c.priorityFilter==='Critical'],['AI running',counts.ai,'ai','running records',false],['Due soon',counts.due,'due','next 7 days',c.dueFilter==='7d']];
     const el=document.getElementById('homeKpis');if(!el)return;
-    el.innerHTML=data.map(([label,value,key,sub,pressed])=>`<button type="button" class="home-kpi" data-kind="${key}" data-home-kpi="${key}" aria-label="Filter Home to ${label}" aria-pressed="${pressed}"><div class="kpi-orbit">${icon(key)}</div><b>${value}</b><span class="kpi-label">${label}</span><small>${sub}</small></button>`).join('');
+    el.innerHTML=data.map(([label,value,key,sub,pressed])=>`<button type="button" class="home-kpi" data-kind="${key}" data-home-kpi="${key}" aria-label="Show ${value} ${label} ${key==='ai'?'runs':'tasks'}" aria-haspopup="dialog" aria-pressed="${pressed}"><div class="kpi-orbit">${icon(key)}</div><b>${value}</b><span class="kpi-label">${label}</span><small>${sub}</small></button>`).join('');
   }
 
   function renderScopes() {
@@ -483,7 +522,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   const oldRenderAll = typeof renderAll === 'function' ? renderAll : null;
   if (oldRenderAll) renderAll = function(){ oldRenderAll(); renderHome(); };
   document.addEventListener('click',e=>{
-    const b=e.target.closest('[data-view],[data-home-go],[data-home-action],[data-home-scope],[data-home-kpi],[data-home-agent],[data-home-person],[data-home-task],[data-home-run],[data-home-project],[data-home-approval]');
+    const b=e.target.closest('[data-view],[data-home-go],[data-home-action],[data-home-scope],[data-home-kpi],[data-home-agent],[data-home-person],[data-home-task],[data-home-run],[data-home-project],[data-home-board],[data-home-approval]');
     if(!b)return;
     if(b.dataset.view){document.body.dataset.pbView=b.dataset.view;syncHomeNav();setTimeout(renderHome,0)}
     if(b.dataset.homeGo){go(b.dataset.homeGo);e.preventDefault()}
@@ -491,8 +530,9 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     if(b.dataset.homeKpi){homeKpiScope(b.dataset.homeKpi);e.preventDefault()}
     if(b.dataset.homeAgent){if(document.getElementById('agentFilter'))document.getElementById('agentFilter').value=b.dataset.homeAgent;if(typeof renderAll==='function')renderAll();go('agents');e.preventDefault()}
     if(b.dataset.homePerson){if(b.dataset.homePerson==='AI Agents')go('agents');else if(b.dataset.homePerson==='Systems')go('settings');else {if(document.getElementById('ownerFilter'))document.getElementById('ownerFilter').value=b.dataset.homePerson;if(typeof renderAll==='function')renderAll();go('board')}e.preventDefault()}
-    if(b.dataset.homeTask){if(typeof openTask==='function')openTask(b.dataset.homeTask);e.preventDefault()}
-    if(b.dataset.homeRun){if(document.getElementById('terminalRun'))document.getElementById('terminalRun').value=b.dataset.homeRun;go('terminalView');if(typeof terminalLoad==='function')terminalLoad();e.preventDefault()}
+    if(b.dataset.homeTask){if(kpiDialog.open)kpiDialog.close();if(typeof openTask==='function')openTask(b.dataset.homeTask);e.preventDefault()}
+    if(b.dataset.homeRun){if(kpiDialog.open)kpiDialog.close();if(document.getElementById('terminalRun'))document.getElementById('terminalRun').value=b.dataset.homeRun;go('terminalView');if(typeof terminalLoad==='function')terminalLoad();e.preventDefault()}
+    if(b.hasAttribute('data-home-board')){if(kpiDialog.open)kpiDialog.close();setHomeFilter('projectFilter',b.dataset.homeBoard);if(typeof renderAll==='function')renderAll();go('board');e.preventDefault()}
     if(b.dataset.homeProject){if(document.getElementById('projectFilter'))document.getElementById('projectFilter').value=b.dataset.homeProject;if(typeof renderAll==='function')renderAll();go('portfolio');e.preventDefault()}
     if(b.dataset.homeApproval){void decideHomeApproval(b.dataset.homeApproval,b.dataset.reviewAction);e.preventDefault()}
     if(b.dataset.homeAction){
@@ -504,25 +544,36 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     }
   });
 
-  let homeSendBusy=false;
-  const send=async()=>{
-    const input=document.getElementById('homeCommandInput'),text=input?.value.trim();
-    if(!text||homeSendBusy)return;
-    if(!(session?.level>=2)){homeToast(`Sign in with your owner or team key to use ${workspaceProfile.assistant_name}.`);document.getElementById('login')?.click();return;}
-    homeSendBusy=true;const button=document.getElementById('homeCommandSend');button.disabled=true;
-    go('ai');const composer=document.getElementById('chatInput');if(composer)composer.value=text;
-    try{if(typeof sendChat==='function')await sendChat(text);if(composer&&!composer.value)input.value='';else homeToast(document.getElementById('status')?.textContent||'Message kept as a draft.');}
-    finally{homeSendBusy=false;button.disabled=false;}
-  };
-  document.getElementById('homeCommandSend')?.addEventListener('click',send);
-  document.getElementById('homeCommandInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();send()}});
-
   function setHomeFilter(id,value) {
     const el=document.getElementById(id);if(!el)return;
     if(value&&el.tagName==='SELECT'&&![...el.options].some(o=>o.value===value))el.add(new Option(value,value));
     el.value=value;
     const saved=document.getElementById('savedView');if(saved)saved.value='';
   }
+  const unassignedLead='__pb_unassigned_project_lead__';
+  function withoutUnassignedLead(callback) {
+    const control=document.getElementById('leadFilter');
+    if(control?.value!==unassignedLead)return callback(false);
+    control.value='';
+    try{return callback(true);}finally{control.value=unassignedLead;}
+  }
+  const originalVisible=typeof visible==='function'?visible:null;
+  if(originalVisible)visible=function(){return withoutUnassignedLead(unassigned=>{const rows=originalVisible();return unassigned?rows.filter(t=>!projectFor(t).lead):rows;});};
+  const originalProjectMatches=typeof projectMatches==='function'?projectMatches:null;
+  if(originalProjectMatches)projectMatches=function(project,rows){return withoutUnassignedLead(unassigned=>(!unassigned||!project.lead)&&originalProjectMatches(project,rows));};
+  document.addEventListener('click',event=>{
+    const button=event.target.closest('#projects [data-lead]');
+    if(!button)return;
+    // Capture before the base handler opens the advanced panel inside a closed dialog.
+    event.preventDefault();event.stopImmediatePropagation();
+    const lead=button.getAttribute('data-lead')||'',control=document.getElementById('leadFilter');
+    if(!lead&&control&&![...control.options].some(o=>o.value===unassignedLead))control.add(new Option('Unassigned lead',unassignedLead));
+    setHomeFilter('leadFilter',lead||unassignedLead);
+    if(typeof renderAll==='function')renderAll();
+    syncWorkspaceChrome();
+    document.getElementById('pbWorkspaceTitle')?.scrollIntoView({block:'nearest'});
+  },true);
+
   function syncHomeNav() {
     syncWorkspaceChrome();
     const view=document.body.dataset.pbView||'home';
@@ -556,9 +607,9 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   }
   const originalSyncSelectors=typeof syncSelectors==='function'?syncSelectors:null;
   if(originalSyncSelectors)syncSelectors=function(){
-    const ids=['aiProject','aiTask','aiAgent','aiModel','terminalRun'],kept=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)?.value||'']));
+    const ids=['aiProject','aiTask','aiAgent','aiModel','terminalRun','leadFilter'],kept=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)?.value||'']));
     originalSyncSelectors();
-    for(const id of ids){const el=document.getElementById(id);if(el&&[...el.options].some(o=>o.value===kept[id]))el.value=kept[id];if(id==='aiProject'&&typeof syncAITasks==='function')syncAITasks();}
+    for(const id of ids){const el=document.getElementById(id);if(id==='leadFilter'&&kept[id]===unassignedLead&&el&&![...el.options].some(o=>o.value===unassignedLead))el.add(new Option('Unassigned lead',unassignedLead));if(el&&[...el.options].some(o=>o.value===kept[id]))el.value=kept[id];if(id==='aiProject'&&typeof syncAITasks==='function')syncAITasks();}
   };
 
   // Keep one set of real filter controls, inside an on-demand dialog.
@@ -580,7 +631,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     const view=document.body.dataset.pbView||'home',record=spaces.find(([id])=>id===view),count=typeof activeFilterCount==='function'?activeFilterCount():0;
     if(view!==lastChromeView){if(filterDialog.open)filterDialog.close();lastChromeView=view;if(view==='home')requestAnimationFrame(sizeLiveCrawl);}
     contextBar.hidden=view==='home';document.getElementById('pbWorkspaceTitle').textContent=view==='ai'?workspaceProfile.assistant_name+' chat':record?.[1]||'Workspace';
-    const criteria=typeof filterCriteria==='function'?filterCriteria():{},names=[criteria.projectFilter,criteria.ownerFilter,criteria.priorityFilter,criteria.statusFilter].filter(Boolean);
+    const criteria=typeof filterCriteria==='function'?filterCriteria():{},leadScope=criteria.leadFilter?'Lead: '+(criteria.leadFilter===unassignedLead?'Unassigned':criteria.leadFilter):'',names=[leadScope,criteria.projectFilter,criteria.ownerFilter,criteria.priorityFilter,criteria.statusFilter].filter(Boolean);
     document.getElementById('pbWorkspaceScope').textContent=scopeViews.has(view)&&count?(names.join(' · ')||`${count} active filters`):'';
     const toggle=document.getElementById('pbScopedFilters');toggle.hidden=!scopeViews.has(view);toggle.textContent=count?`Filters · ${count}`:'Filters';toggle.setAttribute('aria-pressed',String(count>0));
     const login=document.getElementById('login');if(login&&!session?.ok)login.textContent='Sign in';
@@ -681,8 +732,6 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
       if(title){if(p.display_name==='PRFKT_PROJECT')title.innerHTML='PRFKT<span class="pb-wordmark">_PROJECT</span>';else title.textContent=p.display_name;}
       document.querySelector('.home-hero-top h2').textContent=p.assistant_name;
       if(p.assistant_name!=='AI_BYTE'){const heading=document.querySelector('#ai .chatbox h2');if(heading)heading.textContent=p.assistant_name;}
-      document.getElementById('homeCommandInput').setAttribute('aria-label','Ask '+p.assistant_name);
-      document.getElementById('homeCommandSend').setAttribute('aria-label','Send to '+p.assistant_name);
       document.querySelector('.home-asset-credit span').textContent=p.display_name+' · Your executive workspace';
       const chat=document.querySelector('#pbWorkspaces [data-home-go="ai"]');
       if(chat)for(const node of chat.childNodes)if(node.nodeType===Node.TEXT_NODE)node.textContent=p.assistant_name+' chat';
@@ -714,6 +763,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   .obs-inspector{border-left:1px solid #263d55;background:#0c1827;padding:15px;max-height:580px;overflow:auto;min-width:0}.obs-inspector h3{font-size:15px;line-height:1.4;margin:0 0 10px;overflow-wrap:anywhere}.obs-inspector dl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0;font-size:11px}.obs-inspector dt{color:#8da6bf}.obs-inspector dd{margin:0;color:#d9e9f8;overflow-wrap:anywhere}.obs-inspector pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#050d17;border:1px solid #233951;padding:10px;font-size:10px;line-height:1.5;border-radius:9px}.obs-inspector .obs-note{font-size:11px;color:#a5b5c8;line-height:1.5}.obs-inspector button{margin-top:10px}.obs-inspector-close{float:right}
   .obs-summary{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;padding:10px 15px;color:#94b1ce;border-bottom:1px solid #20364b}.obs-summary b{color:#deedfc}.obs-legend{font-size:10px;padding:8px 14px;color:#90a6be;line-height:1.6}.obs-empty{padding:38px 18px;text-align:center;color:#9db3cc;font-size:13px;line-height:1.7}.obs-canvas .obs-map{width:100%;height:100%;min-height:350px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:5px;padding:12px}.obs-map .obs-block{min-width:80px;min-height:75px;flex-grow:1;text-align:left;overflow:hidden;border-color:#6b61b3;background:#302856}.obs-block.selected{outline:2px solid #9cd8ff}.obs-block b{display:block;font-size:17px}.obs-block small{font-size:10px;display:block;margin-top:4px}
   .obs-flow{position:relative;min-width:690px;height:380px;padding:12px}.obs-flow svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.obs-flow path{fill:none;stroke:#528ccc88}.obs-flow button{position:absolute;width:142px;min-height:44px;text-align:left;font-size:11px;background:#152b40}.obs-flow button.selected{outline:2px solid #83ceff}
+  .obs-recorded-activity{border-top:1px solid #294359;padding:12px 15px}.obs-recorded-activity h3{font-size:13px;margin:0 0 9px}.obs-event-feed{display:grid;gap:7px;max-height:260px;overflow:auto}.obs-event-feed button{display:block;width:100%;text-align:left;padding:10px;min-height:44px}.obs-event-feed span{display:block;white-space:normal;overflow-wrap:anywhere;line-height:1.5;font-size:12px}.obs-event-feed small{display:block;color:#93adc5;font-size:10px;margin-bottom:4px}.obs-event-feed button.selected{outline:1px solid #85caff}.obs-readable-section{margin:15px 0}.obs-readable-section header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}.obs-readable-section h4{margin:0;font-size:12px;color:#cde7fd}.obs-readable-section button{font-size:10px;min-height:32px;padding:4px 9px}.obs-event-text{white-space:pre-wrap;overflow-wrap:anywhere;max-height:330px;overflow:auto;padding:10px;border:1px solid #2a4259;border-radius:8px;background:#091623;line-height:1.65;font-size:12px}.obs-event-text[data-format="json"]{font-family:ui-monospace,monospace;font-size:11px}.obs-event-metadata{margin-top:16px}.obs-event-metadata summary{cursor:pointer;min-height:36px;font-size:12px}.obs-recorded-event{padding-top:10px;border-top:1px solid #294359}.obs-recorded-event>h4{margin:0 0 7px;font-size:13px}.obs-focused>.obs-recorded-activity{display:none}
   .obs-tool-body{padding:12px 15px;max-height:300px;overflow:auto}.obs-pills{display:flex;flex-wrap:wrap;gap:7px}.obs-pills button{font-size:11px;min-height:38px}.obs-pills button.selected{outline:2px solid #83ceff}.obs-table{border-collapse:collapse;width:100%;font-size:11px}.obs-table td,.obs-table th{padding:7px 10px;text-align:left;border-bottom:1px solid #21374e;white-space:nowrap}.obs-table th{color:#9bb6d1}.obs-table button{font-size:11px;min-height:32px;padding:4px 8px}.obs-table tr.selected{background:#19436555}.obs-bar-track{height:12px;background:#142b40;border-radius:4px;width:200px;position:relative}.obs-bar{position:absolute;height:12px;min-width:3px;background:#5cb4cf;border-radius:3px}.obs-bar.error{background:#ce7387}.obs-matrix td button{background:rgba(68,131,178,var(--intensity,.1));min-width:42px}
   .obs-roles{padding:12px 0}.obs-roles>summary{cursor:pointer;min-height:44px;padding:12px;background:#0f2134;border:1px solid #2b435c;border-radius:12px;margin-bottom:12px;font-size:13px}.obs-approval-note{border:1px solid #4d4633;border-radius:11px;padding:11px;margin:12px 15px;font-size:11px;color:#d0ba95;line-height:1.6}.obs-zoom{margin-left:auto;display:flex;gap:5px}.obs-zoom button{min-width:38px}
   @media(max-width:800px){.obs-layout{grid-template-columns:1fr}.obs-inspector{border-left:0;border-top:1px solid #294762;max-height:350px}.obs-inspector[hidden]{display:none}.obs-canvas{height:400px}.obs-toolbar{display:grid;grid-template-columns:1fr 1fr}.obs-toolbar input{grid-column:1/-1;width:100%;font-size:16px}.obs-toolbar select{font-size:14px;width:100%}.obs-lenses{gap:6px;padding:9px}.obs-lenses button{font-size:11px;padding:7px 10px}.obs-header{padding:12px}.obs-header h2{font-size:16px}.obs-summary{gap:9px}.obs-zoom{margin-left:0}.obs-tool-body{max-height:250px}.obs-flow{min-width:650px}}
@@ -729,6 +779,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   <div class="obs-lenses" role="group" aria-label="Analysis lens"><button type="button" data-obs-mode="tree">Tree</button><button type="button" data-obs-mode="treemap">Treemap</button><button type="button" data-obs-mode="flow">Sankey</button><button type="button" data-obs-mode="timeline">Timeline</button><div class="obs-zoom"><button type="button" id="obsZoomOut" aria-label="Zoom out">−</button><button type="button" id="obsFit">Fit</button><button type="button" id="obsZoomIn" aria-label="Zoom in">+</button><button type="button" id="obsPause">Pause live</button></div></div>
   <div class="obs-toolbar"><select id="obsMetric" aria-label="Analysis size metric"><option value="count">Event count</option><option value="duration">Recorded tool duration</option><option value="tokens">Recorded tokens</option></select><span class="obs-sub">Select a node to link graph, lens and tools.</span></div>
   <div id="obsSummary" class="obs-summary"></div><div class="obs-layout"><aside id="obsLinkedLens" class="obs-linked-lens" aria-label="Cross-linked count lens"></aside><div class="obs-stage"><div id="obsCanvas" class="obs-canvas" tabindex="0" aria-label="Interactive execution graph"></div><div id="obsLegend" class="obs-legend"></div></div><aside id="obsInspector" class="obs-inspector" aria-label="Selected node details" hidden></aside></div>
+  <section class="obs-recorded-activity" aria-label="Recorded activity"><h3>Recorded activity</h3><div id="obsEventFeed" class="obs-event-feed"></div></section>
   <div class="obs-tools-switch" role="group" aria-label="Tool grouping"><b class="obs-sub">Tool calls</b><button type="button" data-obs-tools="pills">Pill grid</button><button type="button" data-obs-tools="timeline">Swimlanes</button><button type="button" data-obs-tools="matrix">Frequency matrix</button></div><div id="obsTools" class="obs-tool-body"></div>
   <div class="obs-approval-note"><b>Execution permissions: not connected.</b> These traces are read-only. A code-review decision does not approve a tool, resume an agent or merge code. Live Approve / Deny requires a connected permission-capable runner; no such request is being fabricated here.</div>`;
   host.append(studio,legacy);
@@ -810,11 +861,28 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     const maximum=Math.max(1,...names.flatMap(name=>states.map(state=>events.filter(e=>e.tool===name&&e.status===state).length)));
     $('obsTools').innerHTML=`<table class="obs-table obs-matrix"><thead><tr><th>Tool / event state</th>${states.map(s=>`<th>${s}</th>`).join('')}</tr></thead><tbody>${names.map(name=>`<tr><th>${escape(name)}</th>${states.map(status=>{const matches=events.filter(e=>e.tool===name&&e.status===status),n=matches.length?toolNodeFor(matches[0]):null;return `<td><button type="button" ${n?`data-obs-node="${escape(n.id)}"`:'disabled'} style="--intensity:${.12+.8*matches.length/maximum}">${matches.length}</button></td>`;}).join('')}</tr>`).join('')}</tbody></table>`;
   }
+  const evidenceLabels={prompt:'Prompt',message:'Agent update',arguments:'Arguments',response:'Result',error:'Error'};
+  function renderRecordedActivity(){
+    const events=selectedEvents().filter(e=>!ui.search||`${e.summary||''} ${e.tool||''}`.toLowerCase().includes(ui.search.toLowerCase())).slice(-120).reverse();
+    $('obsEventFeed').innerHTML=events.length?events.map(event=>{const node=toolNodeFor(event);return `<button type="button" class="${ui.event===event.id?'selected':''}" data-obs-event="${escape(event.id)}" data-obs-node="${escape(node?.id||event.trace)}"><small>${stamp(event.time)} · ${escape(event.project||'')} · ${escape(event.status||'recorded')}</small><span>${escape(event.summary||event.tool||event.kind||'Recorded event')}</span></button>`;}).join(''):'<div class="obs-empty">No recorded activity in this selection.</div>';
+  }
+  function readableEvidence(event){
+    const fields=Object.entries(evidenceLabels).filter(([key])=>event.evidence?.[key]&&typeof event.evidence[key].text==='string');
+    if(!fields.length)return '';
+    return `<article class="obs-recorded-event" data-inspected-event="${escape(event.id)}"><h4>${escape(event.tool||event.kind||'Recorded event')}</h4><p class="obs-note">${stamp(event.time)} · ${escape(event.status||'recorded')}</p>${fields.map(([key,label])=>{
+      const field=event.evidence[key],notes=[field.truncated?'Truncated excerpt':null,field.redacted?'Credentials redacted':null].filter(Boolean);
+      return `<section class="obs-readable-section" data-obs-evidence="${key}"><header><h4>${label}</h4><button type="button" data-obs-copy="${escape(event.id)}" data-obs-copy-field="${key}" aria-label="Copy ${label.toLowerCase()}">Copy</button></header><div class="obs-event-text" data-format="${field.format==='json'?'json':'text'}">${escape(field.text)||'No content recorded.'}</div>${notes.length?`<p class="obs-note">${notes.join(' · ')}</p>`:''}</section>`;
+    }).join('')}</article>`;
+  }
   function renderInspector(){
     const panel=$('obsInspector'),node=nodeMap.get(ui.selected);panel.hidden=!node;if(!node)return;
-    const selectedEvent=node.items.find(e=>e.id===ui.event)||null,metadata=selectedEvent||{node_type:node.kind,recorded_events:node.count,observed_status:node.status||'recorded',source:node.metadata?.source||'bridge-log',partial_trace:node.metadata?.partial??null};
+    const selectedEvent=node.items.find(e=>e.id===ui.event)||null;
+    const metadata=selectedEvent?Object.fromEntries(Object.entries(selectedEvent).filter(([key])=>!['evidence','summary'].includes(key))):{node_type:node.kind,recorded_events:node.count,observed_status:node.status||'recorded',source:node.metadata?.source||'bridge-log',partial_trace:node.metadata?.partial??null};
     const ancestors=[];let p=node.parent;for(let i=0;p&&i<15;i++){const n=nodeMap.get(p);if(!n)break;ancestors.unshift(n.label);p=n.parent;}
-    panel.innerHTML=`<button type="button" class="obs-inspector-close" id="obsInspectorClose" aria-label="Close node inspector">×</button><h3>${escape(node.label)}</h3><div class="obs-note">${escape(ancestors.join(' › '))}</div><dl><dt>Events</dt><dd>${node.count}</dd><dt>Tool duration</dt><dd>${node.duration===null?'Not recorded':number(node.duration)+' ms'}</dd><dt>Tokens</dt><dd>${number(node.tokens)}</dd><dt>Source</dt><dd>Recorded bridge log</dd></dl><div class="obs-note">${node.referencedOnly?'Delegation reference recorded; child tool details are not captured.':'Counts reflect the available log window, not the complete lifetime of the agent.'}</div>${node.trace?`<button type="button" data-obs-open-run="${escape(node.trace)}">Open this run</button>`:''}<pre>${escape(JSON.stringify(metadata,null,2))}</pre><div class="obs-note">Sensitive argument values, response bodies and model text are deliberately withheld. Missing tokens or timings remain “Not recorded”.</div>`;
+    const readable=selectedEvent?[selectedEvent]:node.items.filter(e=>e.evidence&&Object.values(e.evidence).some(value=>value&&typeof value.text==='string')).slice(-3);
+    const content=readable.map(readableEvidence).join('');
+    const metrics=[['Events',node.count],['Tool duration',node.duration===null?'Not recorded':number(node.duration)+' ms'],['Tokens',number(node.tokens)],['Input tokens',number(sum(node.items,e=>e.tokens?.input))],['Output tokens',number(sum(node.items,e=>e.tokens?.output))],['Cache read',number(sum(node.items,e=>e.tokens?.cache_read))],['Cache write',number(sum(node.items,e=>e.tokens?.cache_write))]];
+    panel.innerHTML=`<button type="button" class="obs-inspector-close" id="obsInspectorClose" aria-label="Close node inspector">×</button><h3>${escape(node.label)}</h3><div class="obs-note">${escape(ancestors.join(' › '))}</div><dl>${metrics.map(([label,value])=>`<dt>${label}</dt><dd>${value}</dd>`).join('')}<dt>Source</dt><dd>Recorded bridge log</dd></dl><div class="obs-note">${node.referencedOnly?'Delegation reference recorded; child tool details are not captured.':'Metrics reflect the available recorded log window.'}</div>${node.trace?`<button type="button" data-obs-open-run="${escape(node.trace)}">Open this run</button>`:''}${content?`${!selectedEvent&&readable.length>1?'<p class="obs-note">Recent recorded events. Select an activity row to inspect one event.</p>':''}${content}`:`<p class="obs-note">${ui.data?.capabilities?.owner_evidence?'No readable content recorded for this selection.':'Recorded prompts, arguments and results are available to the workspace owner.'}</p>`}<details class="obs-event-metadata"><summary>Event metadata</summary><pre>${escape(JSON.stringify(metadata,null,2))}</pre></details>`;
     $('obsInspectorClose').onclick=()=>{ui.selected='';ui.event='';renderVisuals();};
   }
   function renderVisuals(){
@@ -826,7 +894,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     $('obsMetric').parentElement.hidden=ui.mode!=='treemap';$('obsMetric').disabled=!['treemap'].includes(ui.mode);for(const id of ['obsZoomOut','obsZoomIn','obsFit'])$(id).disabled=ui.mode!=='tree';
     const linked=nodes.filter(n=>n.kind==='tool'&&nodeMatches(n)).slice(0,24);
     $('obsLinkedLens').innerHTML='<p>Linked tool groups<br>Click to inspect in any lens</p>'+linked.map(n=>`<button type="button" class="${ui.selected===n.id?'selected':''}" data-obs-node="${escape(n.id)}">${escape(n.label)}<small>${n.count} events</small></button>`).join('');
-    renderTools();renderInspector();
+    renderTools();renderRecordedActivity();renderInspector();
     const list=traces(),events=observedEvents();$('obsSummary').innerHTML=`<span><b>${list.length}</b> recorded runs</span><span><b>${events.filter(e=>e.kind==='tool_use').length}</b> tool events</span><span><b>${number(sum(list,t=>t.tokens))}</b> recorded tokens</span><span><b>${list.filter(t=>t.partial).length}</b> partial log windows</span>`;
   }
   function renderEvidence(){
@@ -859,6 +927,8 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   $('obsProject').onchange=e=>{ui.project=e.target.value;ui.trace='';ui.selected='';updateSelects();renderVisuals();};$('obsTrace').onchange=e=>{ui.trace=e.target.value;ui.selected='';ui.zoom=1;renderVisuals();};$('obsSearch').oninput=e=>{ui.search=e.target.value;renderVisuals();};$('obsMetric').onchange=e=>{ui.metric=e.target.value;renderVisuals();};
   $('obsZoomOut').onclick=()=>{ui.zoom=Math.max(.25,ui.zoom-.15);renderVisuals();};$('obsZoomIn').onclick=()=>{ui.zoom=Math.min(2.5,ui.zoom+.15);renderVisuals();};$('obsFit').onclick=()=>{const graph=$('obsCanvas').querySelector('.obs-graph');ui.zoom=graph?Math.max(.25,Math.min(1,$('obsCanvas').clientWidth/parseFloat(graph.style.width))):1;renderVisuals();$('obsCanvas').scrollTo(0,0);};
   studio.addEventListener('click',e=>{
+    const copy=e.target.closest('[data-obs-copy]');
+    if(copy){const event=observedEvents().find(item=>item.id===copy.dataset.obsCopy),field=event?.evidence?.[copy.dataset.obsCopyField];if(field&&typeof field.text==='string')navigator.clipboard.writeText(field.text).then(()=>{copy.textContent='Copied';}).catch(()=>{copy.textContent='Copy unavailable';});return;}
     const b=e.target.closest('[data-obs-mode],[data-obs-node],[data-obs-tools],[data-obs-open-run]');if(!b)return;
     if(b.dataset.obsMode){ui.mode=b.dataset.obsMode;renderVisuals();}
     if(b.dataset.obsTools){ui.tools=b.dataset.obsTools;renderTools();}

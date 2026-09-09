@@ -70,6 +70,7 @@ try{
   assert.match(await page.locator('#homeWork').textContent(),/Mike integration/);
   assert.ok(!(await page.locator('#homeWork').textContent()).includes('Joe launch'));
   await page.locator('[data-home-kpi="blocked"]').click();
+  await page.locator('#homeKpiDialog').press('Escape');
   assert.equal(await page.locator('#ownerFilter').inputValue(),'Mike');
   assert.equal(await page.locator('#statusFilter').inputValue(),'Blocked');
   await page.locator('[data-home-scope="all"]').click();

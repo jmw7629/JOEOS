@@ -32,6 +32,7 @@ export async function verifyExecutionPermissions({page,api,base,out}){
   try{
     await page.goto(base+'/#agents',{waitUntil:'domcontentloaded'});
     await page.waitForSelector('#agents.active');
+    if(await page.locator('#cwRemoteHistory').isVisible() && await page.locator('#cwRemoteHistory').getAttribute('aria-pressed')==='false')await page.locator('#cwRemoteHistory').click();
     await panel.getByRole('button',{name:'Refresh',exact:true}).click();
     await panel.getByRole('button',{name:'Approve once',exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>!!window.PERMISSION_XSS),false,'request metadata is escaped');

@@ -64,11 +64,12 @@ export async function verifyFocusedWorkspaces({page,api,base,out}){
   await sleep(250);const before=await transform();await sleep(550);assert.notEqual(await transform(),before,'crawl continuously moves');
   await page.locator('#pbCrawlToggle').click();await sleep(100);const stopped=await transform();await sleep(300);assert.equal(await transform(),stopped,'pause control stops crawl');
   await page.locator('#pbCrawlToggle').click();await sleep(300);assert.notEqual(await transform(),stopped,'resume restarts motion');
-  await page.locator('#homeCommandInput').fill('Do not erase this unsent draft');
+  assert.equal(await page.locator('#homeCommandInput').count(),0,'Home chat entry removed');
+  await go('ai');await page.locator('#chatInput').fill('Do not erase this unsent draft');await go('home');
   const title='Crawl update <img src=x onerror=alert(1)>';
   await api('/api/tasks','POST',{title,project:'Orbital QA',owner:'Mike',status:'Blocked',priority:'High'});
   await page.waitForFunction(text=>document.querySelector('.pb-crawl-group').textContent.includes(text),title,{timeout:22000});
-  assert.equal(await page.locator('#homeCommandInput').inputValue(),'Do not erase this unsent draft','independent live polling cannot reset a focused draft');
+  assert.equal(await page.locator('#chatInput').inputValue(),'Do not erase this unsent draft','independent live polling cannot reset a focused draft');
   assert.equal(await page.locator('#pbLiveCrawl img').count(),0,'event text must be escaped, never HTML');
   await page.route('**/api/activity',r=>r.abort());
   await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));
@@ -78,7 +79,7 @@ export async function verifyFocusedWorkspaces({page,api,base,out}){
   await page.waitForFunction(()=>document.querySelector('#pbLiveCrawl').dataset.state==='fresh');
   await page.emulateMedia({reducedMotion:'reduce'});await sleep(100);
   assert.equal(await track.evaluate(e=>getComputedStyle(e).animationName),'none','reduced motion uses readable nonmoving strip');
-  await page.locator('#homeCommandInput').fill('');await page.locator('#homeCommandInput').blur();
+  await go('ai');await page.locator('#chatInput').fill('');await go('home');
   const jump=page.locator('.pb-crawl-group:not([aria-hidden]) [data-home-go="agents"]').first();
   if(await jump.count()){await jump.evaluate(e=>e.click());await page.waitForSelector('#agents.active');await go('home');}
   console.log('OWNER_UNCONFIGURED_CODEX_AND_DRAFT_REFRESH=PASS');
