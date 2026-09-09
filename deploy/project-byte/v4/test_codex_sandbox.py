@@ -52,6 +52,31 @@ class RepositoryFixture(unittest.TestCase):
 
 
 class WorkspaceTests(RepositoryFixture):
+    def test_missing_promisor_objects_never_invoke_source_transport_commands(self):
+        marker = self.root / 'promisor-ssh-ran'
+        helper = self.root / 'promisor-ssh-fixture.sh'
+        helper.write_text('#!/bin/sh\nprintf invoked > "' + str(marker) + '"\nexit 73\n')
+        helper.chmod(0o700)
+        self.git('remote', 'add', 'origin', 'git@github.com:fixture/missing-objects.git')
+        self.git('config', 'remote.origin.promisor', 'true')
+        self.git('config', 'extensions.partialClone', 'origin')
+        self.git('config', 'core.sshCommand', str(helper))
+        self.git('config', 'protocol.ssh.allow', 'always')
+        objects = [(kind, self.git('rev-parse', revision).decode().strip())
+                   for kind, revision in (('commit', 'HEAD'), ('blob', 'HEAD:hello.txt'))]
+        for kind, oid in objects:
+            with self.subTest(missing=kind):
+                path = self.repo / '.git' / 'objects' / oid[:2] / oid[2:]
+                content = path.read_bytes(); path.unlink()
+                try:
+                    with patch.dict(os.environ, {'GIT_NO_LAZY_FETCH': '0', 'GIT_ALLOW_PROTOCOL': 'ssh'}):
+                        with self.assertRaises(sandbox.SandboxError):
+                            self.factory.create('missing-' + kind)
+                    self.assertFalse(marker.exists(), 'local export must not execute a configured SSH helper')
+                    self.assertFalse((self.factory.run_root / ('missing-' + kind)).exists())
+                finally:
+                    path.write_bytes(content)
+
     def test_export_is_committed_content_without_git_or_source_mutations(self):
         (self.repo / "hello.txt").write_text("uncommitted private source edit\n")
         (self.repo / "private-untracked").write_text("synthetic host-only value")

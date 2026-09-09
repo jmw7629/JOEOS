@@ -21,6 +21,7 @@ BASE = {
 FILES = ('codex_tasks.py', 'codex_tasks_runtime.py', 'codex_projects.py', 'codex_task_rpc.py',
          'codex_sandbox.py', 'codex_publisher.py', 'codex-workspace.js', 'ai_runtime.py')
 PROJECT_BASE = {
+    'codex_sandbox.py': '9d14155fc5389a8ad8c1baf852a60ec978ed615c88e0b6f467b9a58e71d49d4c',
     'codex_tasks.py': '148394701be108217559b725b2b376a30825e074ce2569c761b179c9ee54f5d0',
     'codex_tasks_runtime.py': '708dd6954948ef48a9b739929d75dcfd2125ad421229362080524e80be49a863',
     'codex_publisher.py': '5014d9338b9b6ff36ea6fcb2330adbfc3d8dafe2634c2f47f1b586789c99d4e0',

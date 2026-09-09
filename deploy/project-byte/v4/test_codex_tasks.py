@@ -272,6 +272,78 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(len(self.factory.instances), 1)
         self.assertEqual(len(restarted.conversation(OWNER, result['conversation_id'])['messages']), 2)
 
+    def test_maintenance_marker_rejects_messages_without_effects_and_can_be_removed(self):
+        marker = self.state / 'maintenance.projects'
+        body = {'request_id': rid(), 'conversation_id': None, 'project_key': 'joeos', 'message': 'Create fixture'}
+        for entry in ('regular', 'dangling_symlink', 'directory'):
+            with self.subTest(entry=entry):
+                if entry == 'regular':
+                    marker.write_text('Operator maintenance')
+                elif entry == 'dangling_symlink':
+                    marker.symlink_to(self.state / 'missing-target')
+                else:
+                    marker.mkdir()
+                try:
+                    with patch.object(self.controller, 'catalog', side_effect=AssertionError('Readiness must not run')):
+                        with self.assertRaises(tasks.TaskError) as raised:
+                            self.controller.message(OWNER, body)
+                    self.assertEqual(raised.exception.status, 503)
+                    for table in ('conversations', 'conversation_projects', 'runs', 'messages', 'requests', 'events'):
+                        self.assertEqual(self.controller.db.execute('SELECT COUNT(*) FROM ' + table).fetchone()[0], 0)
+                    self.assertFalse(self.factory.instances)
+                    self.assertFalse(self.sandbox.created)
+                finally:
+                    marker.rmdir() if entry == 'directory' else marker.unlink()
+        result = self.controller.message(OWNER, body)
+        self.assertEqual(self.finished(result['run_id']), 'completed')
+        self.assertEqual(self.controller.message(OWNER, body), result)
+        self.assertEqual(len(self.factory.instances), 1)
+
+    def test_maintenance_marker_added_during_readiness_blocks_final_admission(self):
+        original = self.controller.catalog
+        def readiness(actor):
+            status = original(actor)
+            (self.state / 'maintenance.projects').write_text('Operator maintenance')
+            return status
+        with patch.object(self.controller, 'catalog', side_effect=readiness):
+            with self.assertRaises(tasks.TaskError) as raised:
+                self.send()
+        self.assertEqual(raised.exception.status, 503)
+        for table in ('conversations', 'conversation_projects', 'runs', 'messages', 'requests', 'events'):
+            self.assertEqual(self.controller.db.execute('SELECT COUNT(*) FROM ' + table).fetchone()[0], 0)
+        self.assertFalse(self.factory.instances)
+        self.assertFalse(self.sandbox.created)
+
+    def test_maintenance_blocks_duplicate_returns_and_fails_closed_on_marker_stat_error(self):
+        body, result = self.send()
+        self.assertEqual(self.finished(result['run_id']), 'completed')
+        marker = self.state / 'maintenance.projects'
+        marker.write_text('Operator maintenance')
+        with self.assertRaises(tasks.TaskError) as raised:
+            self.controller.message(OWNER, body)
+        self.assertEqual(raised.exception.status, 503)
+        marker.unlink()
+        with patch.object(Path, 'lstat', side_effect=PermissionError('Synthetic inaccessible marker')):
+            with self.assertRaises(tasks.TaskError) as raised:
+                self.controller.message(OWNER, body)
+        self.assertEqual(raised.exception.status, 503)
+        self.assertEqual(self.controller.message(OWNER, body), result)
+        self.assertEqual(len(self.factory.instances), 1)
+
+    def test_maintenance_keeps_existing_permission_denial_and_stop_available(self):
+        run, context = self.seed()
+        result, done = self.tool_background(run, context, call())
+        row = self.permission(run)
+        (self.state / 'maintenance.projects').write_text('Operator maintenance')
+        self.assertTrue(self.controller.catalog(OWNER)['configured'])
+        self.decide(row, decision='deny')
+        self.assertTrue(done.wait(2), result)
+        self.assertFalse(self.publisher.published)
+        stopped = self.controller.stop(OWNER, run, {'request_id': rid()})
+        self.assertTrue(stopped['accepted'])
+        self.assertEqual(self.controller.db.execute('SELECT status FROM runs WHERE id=?', (run,)).fetchone()[0], 'stopping')
+        self.assertTrue(context['stop'].is_set())
+
     def test_terminal_status_follows_agent_completion_and_streamed_text(self):
         _, result = self.send(); self.finished(result['run_id'])
         events = self.controller.events(OWNER, result['run_id'])['events']

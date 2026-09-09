@@ -265,6 +265,18 @@ class Controller:
                 'detail': 'Codex task workspace is connected' if ready and status.get('connected') else 'The Codex task workspace is unavailable',
                 'projects': projects, 'conversations': rows}
 
+    def _message_admission(self):
+        # Deployment holds this private marker until verification or rollback
+        # finishes. Check with lstat so every entry, including a dangling link,
+        # closes admission without reading operator-controlled file contents.
+        try:
+            (self.state / 'maintenance.projects').lstat()
+        except FileNotFoundError:
+            return
+        except OSError:
+            pass
+        raise TaskError('Codex task workspace is being updated. Try again shortly.', 503)
+
     def message(self, actor, body):
         owner = require_owner(actor)
         if not isinstance(body, dict) or set(body) != {'request_id', 'conversation_id', 'project_key', 'message'}:
@@ -275,6 +287,7 @@ class Controller:
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt.encode()) > 24000:
             raise TaskError('Enter a message of up to 24 KB')
         with self.lock:
+            self._message_admission()
             duplicate, fingerprint = self._duplicate(owner, key, 'message', body)
             if duplicate:
                 return duplicate
@@ -283,6 +296,7 @@ class Controller:
         if not selected['configured'] or not selected['connected']:
             raise TaskError(self.project_errors.get(project.key, 'This project\'s Codex task connection or hard sandbox is unavailable'), 503)
         with self.lock:
+            self._message_admission()
             duplicate, fingerprint = self._duplicate(owner, key, 'message', body)
             if duplicate:
                 return duplicate

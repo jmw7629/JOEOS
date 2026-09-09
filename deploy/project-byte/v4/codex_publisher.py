@@ -144,10 +144,12 @@ class Publisher:
             finally:
                 os.close(fd)
 
-    def _environment(self, auth=False):
+    def _environment(self, auth=False, *, git_protocols=''):
+        if git_protocols not in ('', 'file', 'https'):
+            raise PublisherError('Unsupported trusted Git transport')
         env = {'PATH':'/usr/bin:/bin:/usr/sbin:/sbin', 'HOME':str(self.home), 'LANG':'C.UTF-8', 'LC_ALL':'C',
                'GIT_CONFIG_GLOBAL':os.devnull, 'GIT_CONFIG_SYSTEM':os.devnull, 'GIT_CONFIG_NOSYSTEM':'1',
-               'GIT_NO_REPLACE_OBJECTS':'1',
+               'GIT_NO_REPLACE_OBJECTS':'1', 'GIT_NO_LAZY_FETCH':'1', 'GIT_ALLOW_PROTOCOL':git_protocols,
                'GIT_TERMINAL_PROMPT':'0', 'GIT_ASKPASS':'/usr/bin/false', 'SSH_ASKPASS':'/usr/bin/false',
                'GIT_AUTHOR_NAME':'PRFKT_PROJECT', 'GIT_COMMITTER_NAME':'PRFKT_PROJECT',
                'GIT_AUTHOR_EMAIL':'prfkt-project@users.noreply.github.com',
@@ -161,17 +163,17 @@ class Publisher:
                     env[key] = os.environ[key]
         return env
 
-    def _execute(self, args, *, auth=False, stop_event=None, output_limit=MAX_PATCH):
+    def _execute(self, args, *, auth=False, stop_event=None, output_limit=MAX_PATCH, git_protocols=''):
         stop_event = stop_event if stop_event is not None else self.stop_context.get()
         if stop_event is not None and stop_event.is_set():
             raise PublisherError('Publication was stopped before the next command')
-        result = _process(args, cwd=self.state, env=self._environment(auth), timeout=120,
+        result = _process(args, cwd=self.state, env=self._environment(auth, git_protocols=git_protocols), timeout=120,
                           output_limit=output_limit, stop_event=stop_event)
         if (result['exit_code'] != 0 or result['timed_out'] or result['stopped'] or result['truncated']):
             raise PublisherError('A trusted publication command did not complete successfully')
         return result['stdout']
 
-    def _git(self, arguments, folder=None, *, auth=False, stop_event=None, output_limit=MAX_PATCH):
+    def _git(self, arguments, folder=None, *, auth=False, stop_event=None, output_limit=MAX_PATCH, transport=None):
         args = [self.git, '-c', 'core.hooksPath='+os.devnull, '-c', 'core.fsmonitor=false',
                 '-c', 'core.attributesFile='+os.devnull, '-c', 'commit.gpgSign=false',
                 '-c', 'tag.gpgSign=false', '-c', 'protocol.ext.allow=never',
@@ -179,7 +181,10 @@ class Publisher:
         if auth:
             args += ['-c', 'credential.https://github.com.helper=!'+shlex.quote(self.gh)+' auth git-credential']
         args += ['--git-dir='+str(folder / 'git')] if folder else ['-C', str(self.source)]
-        return self._execute(args + arguments, auth=auth, stop_event=stop_event, output_limit=output_limit)
+        # All inspection denies transports, including source-local overrides.
+        # Only the explicit fixed-source fetch and fixed-target push opt in.
+        return self._execute(args + arguments, auth=auth, stop_event=stop_event, output_limit=output_limit,
+                             git_protocols=transport if transport is not None else '')
 
     def _base(self):
         value = self._git(['rev-parse', '--verify', 'refs/heads/'+self.base_branch+'^{commit}']).decode().strip()
@@ -300,7 +305,7 @@ class Publisher:
                                '--template='+str(self.template), str(folder / 'git')])
                 # Only the fixed trusted local checkout can supply base objects.
                 self._git(['-c','protocol.file.allow=always','fetch','--no-tags','--no-recurse-submodules',
-                           '--no-write-fetch-head',str(self.source),base], folder)
+                           '--no-write-fetch-head',str(self.source),base], folder, transport='file')
                 self._git(['read-tree',base],folder)
                 before = self._index(folder,base)
                 for change in changes:
@@ -402,8 +407,8 @@ class Publisher:
                 # An empty expected value is a create-only lease: an existing
                 # remote branch is rejected, even when a fast-forward is possible.
                 self._git(['push','--porcelain','--no-verify','--force-with-lease=refs/heads/'+public['branch']+':',
-                           'https://github.com/'+self.repo+'.git',commit+':refs/heads/'+public['branch']],
-                          folder,auth=True,stop_event=stop_event)
+                          'https://github.com/'+self.repo+'.git',commit+':refs/heads/'+public['branch']],
+                          folder,auth=True,stop_event=stop_event,transport='https')
                 record('create_pr')
                 atomic(pr_body,(public['body']+'\n\nRelated issue: '+issue+provenance).encode())
                 pr = self._execute([self.gh,'pr','create','--repo',self.repo,'--base',self.base_branch,'--head',public['branch'],

@@ -67,8 +67,14 @@ class PublisherTests(unittest.TestCase):
             if self.failure == 'push':
                 raise PublisherError('Synthetic uncertain push response')
             self.assertIn('https://github.com/'+self.expected_repo+'.git',args)
+            self.assertEqual(options.get('git_protocols'), 'https')
             self.assertIn('--force-with-lease=refs/heads/prfkt/task-'+self.run+':',args)
             return b''
+        if 'fetch' in args:
+            self.assertEqual(options.get('git_protocols'), 'file')
+            self.assertIn(str(self.source), args)
+        elif args[0] == self.publisher.git:
+            self.assertEqual(options.get('git_protocols', ''), '')
         return self.real_execute(args,**options)
 
     def changed(self):
@@ -227,6 +233,37 @@ class PublisherTests(unittest.TestCase):
         self.changed();self.prepare()
         self.assertFalse(marker.exists(),'source-local unprotected uploadpack hook is never executed')
         self.assertEqual(self.external(),[])
+
+    def test_missing_promisor_objects_never_execute_ssh_during_preparation(self):
+        marker=self.root/'PROMISOR_SSH_RAN';helper=self.root/'promisor-ssh-fixture.sh'
+        helper.write_text('#!/bin/sh\nprintf invoked > "'+str(marker)+'"\nexit 73\n');helper.chmod(0o700)
+        self.command(['config','remote.origin.url','git@github.com:'+REPOSITORY+'.git'])
+        self.command(['config','remote.origin.promisor','true'])
+        self.command(['config','extensions.partialClone','origin'])
+        self.command(['config','core.sshCommand',str(helper)])
+        self.command(['config','protocol.ssh.allow','always'])
+        self.changed()
+        objects=[(kind,self.command(['rev-parse',revision]).decode().strip())
+                 for kind,revision in (('commit','HEAD'),('blob','HEAD:README.md'))]
+        for kind,oid in objects:
+            with self.subTest(missing=kind):
+                path=self.source/'.git'/'objects'/oid[:2]/oid[2:]
+                content=path.read_bytes();path.unlink()
+                try:
+                    with patch.dict(os.environ,{'GIT_NO_LAZY_FETCH':'0','GIT_ALLOW_PROTOCOL':'ssh'}):
+                        with self.assertRaises(PublisherError):self.prepare()
+                    self.assertFalse(marker.exists(),'source inspection/fetch must never execute a configured SSH helper')
+                    self.assertFalse((self.publisher.state/self.run).exists());self.assertEqual(self.external(),[])
+                finally:
+                    path.write_bytes(content)
+
+    def test_local_inspection_denies_transport_even_when_auth_environment_exists(self):
+        for auth in (False,True):
+            env=self.publisher._environment(auth)
+            self.assertEqual(env['GIT_NO_LAZY_FETCH'],'1');self.assertEqual(env['GIT_ALLOW_PROTOCOL'],'')
+        self.assertEqual(self.publisher._environment(git_protocols='file')['GIT_ALLOW_PROTOCOL'],'file')
+        self.assertEqual(self.publisher._environment(True,git_protocols='https')['GIT_ALLOW_PROTOCOL'],'https')
+        with self.assertRaises(PublisherError):self.publisher._environment(git_protocols='ssh')
 
     def test_cancelled_preparation_never_invokes_git_or_creates_frozen_files(self):
         self.changed();stop=threading.Event();stop.set();before=len(self.calls)

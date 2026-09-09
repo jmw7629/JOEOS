@@ -73,3 +73,16 @@ Source work is available where connected; dependency installation, publishing,
 deployment and physical G2/iOS acceptance each need their actual supported path.
 Project availability is not a claim that every app is complete or continuously
 building. Existing paused work and independent coordinators keep their ownership.
+
+For a reviewed registry update, the private `maintenance.projects` entry in the
+controller state directory closes new message admission, including idempotent
+replays. Catalog reads, Stop and permission denial remain available. An operator
+upgrading an older controller must first reserve the native SQLite ledger with
+`BEGIN IMMEDIATE`, confirm no active run, and stop the app while holding that
+reservation. Keep admission closed through verification or complete rollback;
+never restart an active owner task to install an update.
+
+Local Git object inspection cannot lazily fetch missing objects or invoke a
+repository-configured transport. Publication permits only its explicit local
+source fetch and exact registered GitHub HTTPS push. Missing local objects fail
+closed before a publication decision is offered.

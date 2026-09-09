@@ -224,7 +224,10 @@ def _process(args, *, cwd, env, timeout, output_limit=MAX_OUTPUT, stop_event=Non
 def _host_environment(home):
     return {"PATH": SYSTEM_PATH, "HOME": str(home), "LANG": "C.UTF-8", "LC_ALL": "C",
             "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull,
-            "GIT_TERMINAL_PROMPT": "0", "GIT_NO_REPLACE_OBJECTS": "1", "NO_COLOR": "1"}
+            "GIT_TERMINAL_PROMPT": "0", "GIT_NO_REPLACE_OBJECTS": "1",
+            # Object reads in a partial clone can otherwise fetch and invoke
+            # repository-configured transport commands. Export is local only.
+            "GIT_NO_LAZY_FETCH": "1", "GIT_ALLOW_PROTOCOL": "", "NO_COLOR": "1"}
 
 
 def _tree(root):
