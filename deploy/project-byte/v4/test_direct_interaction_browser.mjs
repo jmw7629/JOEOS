@@ -91,10 +91,32 @@ export async function verifyDirectInteraction({browser,api,base,out,key}) {
     await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:destinationX,y:y+15}]});
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await waitStatus('Active');
     assert.equal(await page.locator('.prfkt-drag-ghost').count(),0);
+    // Phone users can move by tapping, without holding a card across columns.
+    const tabs=page.getByRole('navigation',{name:'Kanban columns'});
+    await tabs.locator('[data-column="Done"]').click();
+    await page.waitForFunction(()=>document.querySelector('[data-column="Done"]').getAttribute('aria-pressed')==='true');
+    await tabs.locator('[data-column="Active"]').click();await task().scrollIntoViewIfNeeded();
+    const mobileGrip=task().locator('.task-grip');const size=await mobileGrip.boundingBox();assert.ok(size.width>=44&&size.height>=44);
+    await mobileGrip.tap();const sheet=page.locator('.prfkt-move-sheet[open]');await sheet.waitFor();
+    assert.equal(await sheet.locator('[data-move-status="Active"]').isDisabled(),true);
+    assert.equal(await page.evaluate(()=>userIsEditing()),true,'open sheet defers refresh');
+    await page.keyboard.press('Escape');await page.locator('.prfkt-move-sheet[open]').waitFor({state:'hidden'});assert.equal(await current(),'Active');
+    await mobileGrip.tap();await page.locator('[data-move-status="Review"]').tap();await waitStatus('Review');
+    assert.equal(await tabs.locator('[data-column="Review"]').getAttribute('aria-pressed'),'true','saved move follows destination column');
+    await page.locator('.prfkt-move-toast button',{hasText:'Undo'}).tap();await waitStatus('Active');
     for(const width of [320,390,768,1440]) {
       await page.setViewportSize({width,height:900});await page.screenshot({path:path.join(out,'kanban-grab-'+width+'.png')});
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'no page overflow at '+width);
+      if(width<=650){
+        await task().scrollIntoViewIfNeeded();await task().locator('.task-grip').tap();await page.locator('.prfkt-move-sheet[open]').waitFor();
+        const bounds=await page.locator('.prfkt-move-sheet').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width+1&&bounds.y>=0&&bounds.y+bounds.height<=901);
+        await page.screenshot({path:path.join(out,'kanban-move-sheet-'+width+'.png')});await page.getByRole('button',{name:'Close move menu'}).tap();
+      }
     }
+    await page.setViewportSize({width:844,height:390});await page.waitForSelector('.task-grip[aria-haspopup=dialog]');await task().locator('.task-grip').tap();
+    await page.locator('.prfkt-move-sheet[open]').waitFor();const landscape=await page.locator('.prfkt-move-sheet').boundingBox();
+    assert.ok(landscape.y>=0&&landscape.y+landscape.height<=391,'landscape sheet stays within viewport and scrolls');
+    await page.screenshot({path:path.join(out,'kanban-move-sheet-landscape.png')});await page.getByRole('button',{name:'Close move menu'}).tap();
     await page.setViewportSize({width:390,height:844});await page.locator('[data-home-go="home"]').first().click();
     const scopes=page.locator('#homeScopes');await scopes.scrollIntoViewIfNeeded();await scopes.evaluate(e=>e.scrollLeft=0);
     const scopeBefore=await page.evaluate(()=>filterCriteria());const strip=await scopes.boundingBox();

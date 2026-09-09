@@ -13,3 +13,9 @@ The interaction module is embedded in `home.js`, so existing deployed static-rou
 ## Verification
 
 `test_direct_interaction_browser.mjs`, called by the isolated Home browser fixture, covers real persisted mouse and keyboard moves, reload, Undo, cancellation, read-only access, rejected PATCH requests, changed status before drop/Undo, refresh cancellation, narrow-board panning, Chromium touch events with edge scrolling, four viewport widths, and absence of execution requests. Physical iPhone/Safari behavior still requires a device check; emulated Chromium touch is recorded separately from hardware evidence.
+
+## Phone controls
+
+At widths up to 650px (or touch-primary screens up to 1024px, including phone landscape), the board shows a horizontal status navigator with visible-card counts and the current column highlighted. Tap a column to jump; swiping the board updates the highlight. Grips are 44px and open a bottom move sheet on tap (Enter when keyboard-focused); dragging or Space-based keyboard movement still works. The sheet lists all existing statuses, disables the current one, respects permissions and offers the same server-confirmed Undo. Successful moves follow the destination column.
+
+Phone cards use a 44px status menu and details control; redundant left/right arrows are hidden. Help copy is shorter, empty columns use less vertical space, and move notifications respect the bottom safe area. The desktop layout is unchanged. Browser verification covers tap/save/Undo, sheet cancellation, current-status disabling, refresh deferral, 320/390px sheet bounds and 44px targets in addition to the existing drag/touch/keyboard suite. Physical iPhone/Safari verification remains outstanding.

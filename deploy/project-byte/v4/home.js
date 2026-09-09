@@ -1241,6 +1241,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   let gesture = null, saving = false, frame = 0, suppressClickUntil = 0, undo = null;
   const editable = () => session.ok && session.level >= 2;
   const actor = () => String(session.subject || session.name || '') + ':' + session.level;
+  const phone = matchMedia('(max-width:650px), (pointer:coarse) and (max-width:1024px)');
   const style = document.createElement('style');
   style.textContent = `
     #boardGrid .task{position:relative;transition:border-color .12s,box-shadow .12s}
@@ -1264,12 +1265,63 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     .prfkt-move-toast[hidden]{display:none}.prfkt-move-toast span{overflow-wrap:anywhere;min-width:0}.prfkt-move-toast button{min-height:40px;flex-shrink:0;background:#183952;color:#c5eaff;border:1px solid #658eac;border-radius:9px;padding:7px 11px}.prfkt-move-toast button:focus-visible{outline:2px solid #8bd2ff;outline-offset:2px}
     body.reduced-motion #boardGrid .task{transition:none}
     @media(prefers-reduced-motion:reduce){#boardGrid .task{transition:none}}
+    .prfkt-column-nav{display:none}
+    .prfkt-move-sheet{box-sizing:border-box;width:min(480px,calc(100% - 16px));max-height:calc(100dvh - 24px);overflow:auto;margin:auto auto 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));border:1px solid #55758e;border-radius:22px 22px 0 0;background:#0b1b2c;color:#eef7ff;box-shadow:0 -12px 50px #0009}
+    .prfkt-move-sheet::backdrop{background:#020913b8}.prfkt-move-sheet h2{font-size:20px;margin:0 0 8px;padding-right:45px}.prfkt-move-sheet p{font-size:14px;color:#b2c9dc;overflow-wrap:anywhere;margin:0 0 16px}
+    .prfkt-move-sheet .sheet-close{position:absolute;right:12px;top:12px;width:44px;height:44px;font-size:22px;border:1px solid #55758e;border-radius:12px;background:#132b40;color:#cde8ff}
+    .prfkt-move-options{display:grid;gap:8px}.prfkt-move-options button{display:flex;align-items:center;justify-content:space-between;min-height:50px;padding:12px 15px;font-size:16px;text-align:left;color:#e3f2ff;background:#132d43;border:1px solid #52738c;border-radius:12px}.prfkt-move-options button:disabled{opacity:.5}.prfkt-move-options button:focus-visible{outline:2px solid #80d0ff;outline-offset:2px}
+    @media(max-width:650px),(pointer:coarse) and (max-width:1024px){
+      .prfkt-column-nav{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:thin;overscroll-behavior-x:contain}
+      .prfkt-column-nav button{flex:none;min-height:44px;padding:9px 12px;border:1px solid #42627c;border-radius:22px;background:#102538;color:#b8d0e4;font-size:13px;white-space:nowrap}
+      .prfkt-column-nav button[aria-pressed=true]{background:#1763a5;border-color:#73c6ff;color:white}.prfkt-column-nav button:focus-visible{outline:2px solid #9ddfff;outline-offset:2px}
+      #boardGrid .task-grip{width:44px;height:44px;top:7px;right:7px}#boardGrid .task h3{padding-right:48px;line-height:1.5}
+      #boardGrid .taskactions{grid-template-columns:minmax(0,1fr) 48px;gap:8px}#boardGrid .taskactions>button:first-child,#boardGrid .taskactions>button:nth-child(3){display:none}
+      #boardGrid .taskactions select,#boardGrid .taskactions button{min-height:44px;font-size:16px}
+      #boardGrid .col{min-height:240px}#boardGrid .tasknote{font-size:14px;line-height:1.55}
+      .prfkt-board-help{font-size:12px;margin-bottom:8px}
+      .prfkt-move-toast{bottom:calc(94px + env(safe-area-inset-bottom));right:10px;max-width:calc(100vw - 20px);padding:10px 12px;gap:8px;font-size:13px}
+      .prfkt-move-toast button{min-width:44px;min-height:44px}.prfkt-drag-ghost{max-width:65vw;padding:10px 12px;font-size:13px}
+    }
   `;
   document.head.append(style);
   const help = document.createElement('p');
   help.className = 'prfkt-board-help'; help.id = 'prfktMoveHelp';
   help.textContent = 'Drag a card or grip to move. Space + arrows + Enter for keyboard. Grab empty space to pan.';
   board.parentElement.before(help);
+  const columnNav = document.createElement('nav'); columnNav.className = 'prfkt-column-nav'; columnNav.setAttribute('aria-label','Kanban columns');
+  help.after(columnNav);
+  const sheet = document.createElement('dialog'); sheet.className = 'prfkt-move-sheet'; sheet.setAttribute('aria-labelledby','prfktMoveSheetTitle');
+  const sheetHeading = document.createElement('h2'); sheetHeading.id = 'prfktMoveSheetTitle'; sheetHeading.textContent = 'Move card';
+  const sheetTitle = document.createElement('p');
+  const sheetClose = document.createElement('button'); sheetClose.className = 'sheet-close'; sheetClose.textContent = '×'; sheetClose.setAttribute('aria-label','Close move menu'); sheetClose.onclick = () => sheet.close();
+  const sheetOptions = document.createElement('div'); sheetOptions.className = 'prfkt-move-options';
+  sheet.append(sheetHeading,sheetTitle,sheetClose,sheetOptions);document.body.append(sheet);
+  sheet.addEventListener('click',e=>{if(e.target===sheet){const b=sheet.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)sheet.close();}});
+  function showColumn(status) {
+    const col = board.querySelector('[data-drop-status="'+CSS.escape(status)+'"]'); if (!col) return;
+    const scroller = board.parentElement;
+    scroller.scrollTo({left:scroller.scrollLeft+col.getBoundingClientRect().left-scroller.getBoundingClientRect().left,behavior:'instant'});
+    updateColumnNav();
+  }
+  function updateColumnNav() {
+    const cols = [...board.children]; if (!cols.length) return;
+    const left = board.parentElement.getBoundingClientRect().left;
+    const nearest = cols.reduce((a,b)=>Math.abs(a.getBoundingClientRect().left-left)<Math.abs(b.getBoundingClientRect().left-left)?a:b);
+    columnNav.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.column===nearest.dataset.dropStatus)));
+    if(phone.matches){const button=columnNav.querySelector('[aria-pressed="true"]');if(button){const b=button.getBoundingClientRect(),n=columnNav.getBoundingClientRect();if(b.right>n.right)columnNav.scrollLeft+=b.right-n.right;else if(b.left<n.left)columnNav.scrollLeft-=n.left-b.left;}}
+  }
+  board.parentElement.addEventListener('scroll',updateColumnNav,{passive:true});
+  phone.addEventListener('change',()=>{if(gesture)cancel();renderBoard();});
+  function openMoveMenu(t) {
+    if (!editable() || saving || gesture) return;
+    sheetTitle.textContent = t.title;sheetOptions.replaceChildren();const owner = actor();
+    for (const status of S) {
+      const button = document.createElement('button');button.type='button';button.dataset.moveStatus=status;
+      button.textContent=status+(status===t.status?' · Current':'');button.disabled=status===t.status;
+      button.onclick=()=>{sheet.close();if(owner===actor())saveMove(t.id,t.status,status,t.title);};sheetOptions.append(button);
+    }
+    sheet.showModal();
+  }
   const toast = document.createElement('div'); toast.className = 'prfkt-move-toast'; toast.hidden = true;
   const message = document.createElement('span'); message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite');
   const undoButton = document.createElement('button'); undoButton.textContent = 'Undo'; undoButton.hidden = true;
@@ -1303,7 +1355,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
       announce(isUndo ? 'Move undone.' : '“' + title + '” moved to ' + to + '.', !!undo);
     } catch (error) {
       if (owner === actor()) announce((persisted ? 'Move saved; refresh needed. ' : 'Move not saved. ') + error.message);
-    } finally { saving = false; board.inert = false; board.setAttribute('aria-busy','false'); renderBoard(); focusCard(id); }
+    } finally { saving = false; board.inert = false; board.setAttribute('aria-busy','false'); renderBoard(); if(persisted&&phone.matches)showColumn(to); focusCard(id); }
   }
   undoButton.onclick = () => {
     const change = undo;
@@ -1320,19 +1372,21 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     const grip = document.createElement('button'); grip.type = 'button'; grip.className = 'task-grip'; grip.textContent = '⠿';
     grip.disabled = !editable() || saving; grip.setAttribute('aria-label', 'Move ' + t.title);
     grip.setAttribute('aria-describedby', 'prfktMoveHelp'); grip.title = 'Drag to move · Space for keyboard controls';
+    if(phone.matches){grip.title='Tap to move, or drag';grip.setAttribute('aria-haspopup','dialog');grip.onclick=()=>openMoveMenu(t);}
     el.prepend(grip);
     return el;
   };
   const originalRender = renderBoard;
   renderBoard = function(...args) {
     if (gesture) cancel('Move cancelled because the board updated.');
-    if (!editable()) { undo = null; toast.hidden = true; }
+    if (!editable()) { undo = null; toast.hidden = true; if(sheet.open)sheet.close(); }
     originalRender(...args);
     board.querySelectorAll(':scope > .col').forEach((col, i) => { col.dataset.dropStatus = S[i]; });
-    help.textContent = editable() ? 'Drag a card or grip to move. Space + arrows + Enter for keyboard. Grab empty space to pan.' : 'Read-only board. Open a card title to view details. Grab empty space to pan.';
+    columnNav.replaceChildren();board.querySelectorAll(':scope > .col').forEach(col=>{const button=document.createElement('button');button.type='button';button.dataset.column=col.dataset.dropStatus;button.textContent=col.dataset.dropStatus+' '+col.querySelectorAll('.task').length;button.onclick=()=>showColumn(col.dataset.dropStatus);columnNav.append(button);});updateColumnNav();
+    help.textContent = phone.matches ? (editable()?'Swipe columns · Tap ⠿ to move, or drag it.':'Swipe columns · Tap a title to view details.') : (editable() ? 'Drag a card or grip to move. Space + arrows + Enter for keyboard. Grab empty space to pan.' : 'Read-only board. Open a card title to view details. Grab empty space to pan.');
   };
   const originalEditing = userIsEditing;
-  userIsEditing = function(...args) { return !!gesture || saving || originalEditing(...args); };
+  userIsEditing = function(...args) { return !!gesture || saving || sheet.open || originalEditing(...args); };
   function setTarget(status) {
     if (!gesture || gesture.kind !== 'card') return;
     if (gesture.target === status) return;
@@ -1432,6 +1486,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && gesture) { e.preventDefault(); cancel(); return; }
     const grip = e.target.closest('.task-grip');
+    if(!gesture&&grip&&phone.matches&&e.key==='Enter'&&editable()&&!saving){e.preventDefault();const t=tasks.find(t=>String(t.id)===grip.closest('.task').dataset.taskId);if(t)openMoveMenu(t);return;}
     if (!gesture && grip && editable() && !saving && [' ', 'Enter'].includes(e.key)) {
       e.preventDefault(); const el = grip.closest('.task'), t = tasks.find(t => String(t.id) === el.dataset.taskId); if (!t) return;
       gesture = {kind:'card',keyboard:true,id:t.id,title:t.title,from:t.status,actor:actor(),el}; activate(); return;
