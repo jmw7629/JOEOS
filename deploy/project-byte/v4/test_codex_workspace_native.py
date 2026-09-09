@@ -282,8 +282,21 @@ class NativeWorkspaceControllerTests(unittest.TestCase):
         self.assertTrue(any(row['type'] == 'tool_output' and 'NATIVE_SANDBOX_COMMAND' in str(row['data']) for row in events['events']))
         self.assertTrue(any(row['method'] == 'item/agentMessage/delta' for row in self.native_events))
         self.assertTrue(any(row['name'] == 'workspace-changes.txt' for row in events['artifacts']))
+        starts = {e['data']['tool_id']: e['data'] for e in events['events'] if e['type'] == 'tool_started'}
+        completions = {e['data']['tool_id']: e['data'] for e in events['events'] if e['type'] == 'tool_completed'}
+        self.assertEqual(set(starts), set(completions))
+        self.assertGreaterEqual(len(starts), 6)
+        for tid, completion in completions.items():
+            self.assertGreaterEqual(completion['duration_ms'], 0)
+            self.assertGreaterEqual(completion['ended_at'], starts[tid]['started_at'])
+            self.assertIn('arguments', starts[tid])
+            self.assertIn('result' if completion['success'] else 'error', completion)
+        self.assertEqual(events['permissions'][0]['tool_id'], tasks.tool_identity(run, genuine[0]))
+        self.assertNotIn(permission['review_token'], json.dumps(events['events']))
+        self.assertTrue(any(e['type'] == 'agent_message' for e in events['events']))
         self.assertFalse((self.auth / 'auth.json').exists())
-        self.result.update(passed=True, final_status='completed', approval_binding=binding)
+        self.result.update(passed=True, final_status='completed', approval_binding=binding,
+                           correlated_tools=len(starts), native_trace_verified=True)
 
     def test_stop_cancels_actual_native_pending_publish_without_dispatch(self):
         self.server.scenario = 'stop'

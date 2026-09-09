@@ -651,7 +651,9 @@ class ControllerTests(unittest.TestCase):
         with self.assertRaises(tasks.TaskError):
             self.controller._session(result['run_id'], captured['context'], 'reviewer', agent)
         self.assertEqual(len(self.factory.instances), count, 'A specialist session was created after the run ended')
-        self.assertEqual(self.controller.events(OWNER, result['run_id']), original,
+        updated = self.controller.events(OWNER, result['run_id'])
+        original.pop('server_time'); updated.pop('server_time')
+        self.assertEqual(updated, original,
                          'A late specialist start/completion mutated a terminal run')
 
     def test_project_catalog_is_publicly_scoped_and_observation_cannot_execute(self):

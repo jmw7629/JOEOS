@@ -27,6 +27,8 @@ jobs:
           bash -n deploy/project-byte/install.sh
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_task_rpc.py
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_sandbox.py
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_trace.py
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_stage_codex_trace_overlay.py
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_tasks.py
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_tasks_runtime.py
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_projects.py
@@ -90,6 +92,9 @@ jobs:
           PB_PLAYWRIGHT_MODULE="$RUNNER_TEMP/pb-ai-tools/node_modules/playwright/index.mjs" \
           PB_SCREENSHOTS="$RUNNER_TEMP/pb-ai-evidence/workspace-browser" \
           node deploy/project-byte/v4/test_codex_workspace_browser.mjs
+          PB_PLAYWRIGHT_MODULE="$RUNNER_TEMP/pb-ai-tools/node_modules/playwright/index.mjs" \
+          PB_SCREENSHOTS="$RUNNER_TEMP/pb-ai-evidence/trace-browser" \
+          node deploy/project-byte/v4/test_codex_trace_browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -38,6 +38,47 @@ def encoded(value):
     return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
 
 
+def envelope(value, limit=32768):
+    value_format = 'text' if isinstance(value, str) else 'json'
+    raw = (value if isinstance(value, str) else encoded(value)).encode('utf-8', errors='replace')
+    return {'text': raw[:limit].decode('utf-8', errors='ignore'), 'bytes': len(raw),
+            'truncated': len(raw) > limit, 'format': value_format}
+
+
+def native_ids(params, item=False):
+    names = [('threadId', 'thread_id'), ('turnId', 'turn_id')]
+    names += [('itemId', 'item_id')] if item else [('callId', 'call_id'), ('requestId', 'request_id')]
+    return {target: params[source] for source, target in names
+            if isinstance(params.get(source), (str, int)) and not isinstance(params[source], bool)}
+
+
+def tool_identity(run, call):
+    keys = ('threadId', 'turnId', 'callId', 'requestId', 'tool')
+    if any(not isinstance(call.get(k), (str, int)) or isinstance(call[k], bool) for k in keys):
+        return None
+    return hashlib.sha256(encoded([run, {k: call[k] for k in keys}]).encode()).hexdigest()[:32]
+
+
+def usage_data(params, aid):
+    usage = params.get('tokenUsage')
+    if not isinstance(usage, dict) or not isinstance(params.get('threadId'), str):
+        return None
+    fields = {'inputTokens': 'input_tokens', 'cachedInputTokens': 'cached_input_tokens',
+              'outputTokens': 'output_tokens', 'reasoningOutputTokens': 'reasoning_output_tokens',
+              'totalTokens': 'total_tokens', 'cacheWriteInputTokens': 'cache_write_input_tokens'}
+    def valid(v):
+        return isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 9007199254740991
+    result = {'agent_id': aid, 'native': {k: v for k, v in native_ids(params).items()
+                                        if k in ('thread_id', 'turn_id')}, 'source': 'native_codex'}
+    for kind in ('last', 'total'):
+        values = usage.get(kind)
+        result[kind] = {target: values[source] for source, target in fields.items()
+                        if valid(values.get(source))} if isinstance(values, dict) else {}
+    if 'modelContextWindow' in usage and (usage['modelContextWindow'] is None or valid(usage['modelContextWindow'])):
+        result['model_context_window'] = usage['modelContextWindow']
+    return result if result['last'] or result['total'] else None
+
+
 def identifier(value):
     if not isinstance(value, str) or not ID.fullmatch(value):
         raise TaskError('Invalid workspace identifier')
@@ -312,7 +353,9 @@ class Controller:
             run = uuid.uuid4().hex
             generation = secrets.token_hex(24)
             self.db.execute('INSERT INTO runs VALUES(?,?,?,?,?,?,?,?)', (run, cid, owner, 'queued', MODEL, EFFORT, generation, time.time()))
-            self.db.execute('INSERT INTO messages VALUES(?,?,?,?,?,?)', (uuid.uuid4().hex, cid, run, 'user', prompt, time.time()))
+            mid, created = uuid.uuid4().hex, time.time()
+            self.db.execute('INSERT INTO messages VALUES(?,?,?,?,?,?)', (mid, cid, run, 'user', prompt, created))
+            self._event(run, 'prompt', {'id': mid, 'message_id': mid, 'role': 'user', 'text': prompt, 'run_id': run, 'conversation_id': cid, 'created_at': created})
             self.db.execute('UPDATE conversations SET updated_at=? WHERE id=?', (time.time(), cid))
             self._event(run, 'status', {'status': 'queued'})
             result = {'conversation_id': cid, 'run_id': run, 'project_key': project.key}
@@ -329,10 +372,10 @@ class Controller:
         owner = require_owner(actor)
         with self.lock:
             conversation = self._conversation(cid, owner)
-            messages = [dict(r) for r in self.db.execute('SELECT id,role,text,run_id FROM messages WHERE conversation_id=? ORDER BY ts,id', (cid,))]
-            runs = [dict(r) for r in self.db.execute('SELECT id,status,model,effort FROM runs WHERE conversation_id=? ORDER BY created_at,id', (cid,))]
+            messages = [dict(r) for r in self.db.execute('SELECT id,role,text,run_id,ts FROM messages WHERE conversation_id=? ORDER BY ts,id', (cid,))]
+            runs = [dict(r) for r in self.db.execute('SELECT id,status,model,effort,created_at,conversation_id FROM runs WHERE conversation_id=? ORDER BY created_at,id', (cid,))]
             artifacts = [dict(r) for r in self.db.execute('SELECT a.id,a.name,a.url FROM artifacts a JOIN runs r ON a.run_id=r.id WHERE r.conversation_id=?', (cid,))]
-        return {'conversation': conversation, 'messages': messages, 'runs': runs, 'artifacts': artifacts}
+        return {'conversation': conversation, 'messages': messages, 'runs': runs, 'artifacts': artifacts, 'server_time': time.time()}
 
     def events(self, actor, run, after=0):
         owner = require_owner(actor)
@@ -344,9 +387,14 @@ class Controller:
             permissions = []
             for r in self.db.execute('SELECT * FROM permissions WHERE run_id=? ORDER BY expires_at', (run,)):
                 permissions.append({k: json.loads(r[k]) if k == 'arguments' else r[k] for k in ('id', 'tool', 'summary', 'arguments', 'review_token', 'expires_at', 'state')})
+                permissions[-1]['tool_id'] = tool_identity(run, json.loads(r['binding']))
+            usage = {}
+            for r in self.db.execute("SELECT seq,data,ts FROM events WHERE run_id=? AND type='token_usage' ORDER BY seq", (run,)):
+                data = json.loads(r['data'])
+                usage[(data['agent_id'], data['native']['thread_id'])] = {**data, 'seq': r['seq'], 'ts': r['ts']}
             agents = [dict(r) for r in self.db.execute('SELECT id,role,model,effort,status,parent_id FROM agents WHERE run_id=?', (run,))]
             artifacts = [dict(r) for r in self.db.execute('SELECT id,name,url FROM artifacts WHERE run_id=?', (run,))]
-        return {'run': {k: record[k] for k in ('id', 'status', 'model', 'effort')}, 'events': events, 'permissions': permissions, 'agents': agents, 'artifacts': artifacts}
+        return {'run': {k: record[k] for k in ('id', 'status', 'model', 'effort', 'conversation_id', 'created_at')}, 'events': events, 'permissions': permissions, 'agents': agents, 'artifacts': artifacts, 'server_time': time.time(), 'telemetry_version': 1, 'usage': list(usage.values())}
 
     def artifact(self, actor, aid):
         owner = require_owner(actor)
@@ -444,7 +492,7 @@ class Controller:
             if self.db.execute('SELECT 1 FROM permissions WHERE run_id=? AND generation=? AND binding=?',
                                (run, context['generation'], encoded(binding))).fetchone():
                 raise TaskError('This native request has already been handled', 409)
-            self.db.execute('INSERT INTO permissions(id,run_id,generation,binding,tool,summary,arguments,review_token,expires_at,state) VALUES(?,?,?,?,?,?,?,?,?,?)', (pid, run, context['generation'], encoded(binding), call['tool'], summary, encoded(arguments), secrets.token_urlsafe(32), time.time()+600, 'pending'))
+            self.db.execute('INSERT INTO permissions(id,run_id,generation,binding,tool,summary,arguments,review_token,expires_at,state) VALUES(?,?,?,?,?,?,?,?,?,?)', (pid, run, context['generation'], encoded(binding), call['tool'], summary, encoded(arguments), secrets.token_urlsafe(32), time.time()+max(0, min(600, context['deadline']-time.monotonic())), 'pending'))
             self._status(run, 'waiting_approval')
             while True:
                 row = self.db.execute('SELECT * FROM permissions WHERE id=?', (pid,)).fetchone()
@@ -470,7 +518,8 @@ class Controller:
             if not record or record['status'] not in ACTIVE or context.get('closing') or context['stop'].is_set() or context['finished'].is_set():
                 raise TaskError('Task is stopping', 409)
             self.db.execute('INSERT INTO agents VALUES(?,?,?,?,?,?,?)', (aid, run, role, MODEL, EFFORT, 'working', parent))
-            self._event(run, 'agent_started', {'id': aid, 'role': role, 'model': MODEL, 'effort': EFFORT, 'status': 'working', 'parent_id': parent})
+            context.setdefault('agent_clocks', {})[aid] = time.monotonic()
+            self._event(run, 'agent_started', {'id': aid, 'role': role, 'model': MODEL, 'effort': EFFORT, 'status': 'working', 'parent_id': parent, 'started_at': time.time(), 'run_id': run})
             self.db.commit()
         def event(message):
             method, params = message.get('method', ''), message.get('params') or {}
@@ -479,7 +528,22 @@ class Controller:
             if method == 'item/agentMessage/delta':
                 delta = params.get('delta')
                 if isinstance(delta, str):
-                    self.event(run, 'message_delta' if role == 'coordinator' else 'tool_output', {'text': delta, 'agent_id': aid})
+                    native = native_ids(params, item=True)
+                    mid = hashlib.sha256(encoded([aid, native]).encode()).hexdigest()[:32] if native.get('item_id') else None
+                    self.event(run, 'message_delta' if role == 'coordinator' else 'tool_output', {'text': delta, 'agent_id': aid, 'message_id': mid, 'native': native, 'output_kind': 'agent_delta'})
+            elif method == 'item/completed' and isinstance(params.get('item'), dict) and params['item'].get('type') == 'agentMessage':
+                item = params['item']
+                native = native_ids({**params, 'itemId': item.get('id')}, item=True)
+                mid = hashlib.sha256(encoded([aid, native]).encode()).hexdigest()[:32] if native.get('item_id') else None
+                content = envelope(item.get('text') if isinstance(item.get('text'), str) else '')
+                with self.lock:
+                    if mid:
+                        context.setdefault('native_messages', {}).setdefault(aid, []).append(mid)
+                self.event(run, 'agent_message', {'message_id': mid, 'agent_id': aid, 'native': native, 'text': content['text'], 'content': content, 'phase': item.get('phase') if item.get('phase') in ('commentary', 'final_answer') else None})
+            elif method == 'thread/tokenUsage/updated':
+                data = usage_data(params, aid)
+                if data:
+                    self.event(run, 'token_usage', data)
         try:
             session = self.session_factory(binary=self.connection.binary, auth_home=self.connection.home,
                 workspace=self.connection.workspace, model=MODEL, effort=EFFORT,
@@ -496,13 +560,20 @@ class Controller:
                 raise TaskError('Task stopped', 409)
         return aid, session
 
+    def _agent_completion(self, run, aid, status):
+        data = {'id': aid, 'status': status, 'ended_at': time.time()}
+        start = self.live.get(run, {}).get('agent_clocks', {}).pop(aid, None)
+        if start is not None:
+            data['duration_ms'] = max(0, round((time.monotonic()-start)*1000))
+        self._event(run, 'agent_completed', data)
+
     def _agent_done(self, run, aid, status):
         with self.lock:
             row = self.db.execute('SELECT status FROM runs WHERE id=?', (run,)).fetchone()
             if not row or row['status'] not in ACTIVE or self.live.get(run, {}).get('closing'):
                 return
             self.db.execute('UPDATE agents SET status=? WHERE id=?', (status, aid))
-            self._event(run, 'agent_completed', {'id': aid, 'status': status})
+            self._agent_completion(run, aid, status)
             self.db.commit()
 
     def _execute(self, run, context, prompt):
@@ -552,8 +623,9 @@ class Controller:
             response = result.get('text') or ''
             if response:
                 with self.lock:
-                    self.db.execute('INSERT INTO messages VALUES(?,?,?,?,?,?)', (uuid.uuid4().hex, cid, run, 'assistant', response[:200000], time.time()))
-                    self._event(run, 'message', {'role': 'assistant', 'text': response[:200000]})
+                    mid, created = uuid.uuid4().hex, time.time()
+                    self.db.execute('INSERT INTO messages VALUES(?,?,?,?,?,?)', (mid, cid, run, 'assistant', response[:200000], created))
+                    self._event(run, 'message', {'role': 'assistant', 'text': response[:200000], 'id': mid, 'message_id': mid, 'agent_id': aid, 'run_id': run, 'conversation_id': cid, 'created_at': created, 'native_message_ids': context.get('native_messages', {}).get(aid, [])})
                     self.db.commit()
             terminal = 'completed'
         except Exception as error:
@@ -584,7 +656,7 @@ class Controller:
                 self.db.execute("UPDATE permissions SET state=CASE WHEN state='dispatching' THEN 'unknown' ELSE 'expired' END WHERE run_id=? AND state IN ('pending','approved','dispatching')", (run,))
                 for row in self.db.execute("SELECT id FROM agents WHERE run_id=? AND status='working'", (run,)).fetchall():
                     self.db.execute('UPDATE agents SET status=? WHERE id=?', (terminal, row['id']))
-                    self._event(run, 'agent_completed', {'id': row['id'], 'status': terminal})
+                    self._agent_completion(run, row['id'], terminal)
                 self._status(run, terminal)
                 self.db.commit()
                 self.live.pop(run, None)
@@ -604,6 +676,8 @@ class Controller:
 
     def _dispatch_tool(self, run, context, call, aid, role):
         name, args = call.get('tool'), call.get('arguments')
+        tid, started = tool_identity(run, call), time.monotonic()
+        correlation = {'tool_id': tid} if tid else {}
         allowed = {t['name']: t for t in TOOLS if role == 'coordinator' or t['name'] in ('workspace_list', 'workspace_read')}
         try:
             if context['finished'].is_set() or name not in allowed or not isinstance(args, dict):
@@ -617,7 +691,7 @@ class Controller:
                 if context['stop'].is_set() or context['tool_count'] > 100 or time.monotonic() > context['deadline']:
                     raise TaskError('Task stopped or reached its execution limit')
             summary = str(args.get('path') or args.get('command') or args.get('title') or name)[:1000]
-            self.event(run, 'tool_started', {'name': name, 'summary': summary, 'agent_id': aid})
+            self.event(run, 'tool_started', {'name': name, 'summary': summary, 'agent_id': aid, **correlation, 'native': native_ids(call), 'arguments': envelope(args, 16384), 'started_at': time.time()})
             workspace = context['workspace']
             if name == 'workspace_list':
                 result = workspace.list(args.get('path', ''))
@@ -632,7 +706,7 @@ class Controller:
                 if isinstance(timeout, bool) or not isinstance(timeout, int) or not 1 <= timeout <= 120 or not isinstance(args['command'], str) or len(args['command']) > 16000:
                     raise TaskError('Invalid command or timeout')
                 result = workspace.execute(args['command'], timeout=timeout, stop_event=context['stop'],
-                    on_output=lambda stream, text: self.event(run, 'tool_output', {'text': text[:50000], 'stream': stream, 'agent_id': aid})
+                    on_output=lambda stream, text: self.event(run, 'tool_output', {'text': text[:50000], 'stream': stream, 'agent_id': aid, **correlation, 'output_kind': 'stream', 'truncated': len(text) > 50000})
                     if not context['stop'].is_set() and not context['finished'].is_set() else None)
             elif name == 'workspace_diff':
                 result = workspace.diff()
@@ -667,12 +741,12 @@ class Controller:
                         self.db.commit()
                     raise TaskError('Publishing did not finish with a verified result. Check GitHub before retrying; this request will not run again.', 503) from None
             output = result if isinstance(result, str) else encoded(result)
-            self.event(run, 'tool_output', {'text': output[:50000], 'agent_id': aid})
-            self.event(run, 'tool_completed', {'name': name, 'success': True, 'agent_id': aid})
+            self.event(run, 'tool_output', {'text': output[:50000], 'agent_id': aid, **correlation, 'output_kind': 'result', 'truncated': len(output) > 50000})
+            self.event(run, 'tool_completed', {'name': name, 'success': True, 'agent_id': aid, **correlation, 'ended_at': time.time(), 'duration_ms': max(0, round((time.monotonic()-started)*1000)), 'result': envelope(result)})
             return {'success': True, 'text': output[:100000]}
         except Exception as error:
             message = str(error)[:1000] if isinstance(error, (TaskError, ValueError, SandboxError, PublisherError)) else 'Tool operation failed; it was not retried.'
-            self.event(run, 'tool_completed', {'name': str(name)[:100], 'success': False, 'agent_id': aid})
+            self.event(run, 'tool_completed', {'name': str(name)[:100], 'success': False, 'agent_id': aid, **correlation, 'ended_at': time.time(), 'duration_ms': max(0, round((time.monotonic()-started)*1000)), 'error': envelope(message)})
             return {'success': False, 'text': message}
 
     def _delegate(self, run, context, tasks, parent):
