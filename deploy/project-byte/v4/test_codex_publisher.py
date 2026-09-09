@@ -24,6 +24,7 @@ class PublisherTests(unittest.TestCase):
                         'GIT_AUTHOR_NAME':'Fixture','GIT_AUTHOR_EMAIL':'fixture@example.invalid',
                         'GIT_COMMITTER_NAME':'Fixture','GIT_COMMITTER_EMAIL':'fixture@example.invalid'}
         self.command(['init','-q','-b','main'])
+        self.command(['remote','add','origin','https://github.com/'+REPOSITORY+'.git'])
         (self.source/'README.md').write_text('Original\n')
         (self.source/'delete.txt').write_text('Delete me\n')
         (self.source/'script.sh').write_text('echo fixture\n')
@@ -38,6 +39,7 @@ class PublisherTests(unittest.TestCase):
         self.publisher = Publisher(self.root/'publications',self.source,base_branch='main')
         self.publisher.gh = '/fixture/gh'
         self.calls = []; self.failure = None; self.stop_on_issue = None
+        self.expected_repo = REPOSITORY; self.issue_reply = None; self.pr_reply = None
         self.real_execute = self.publisher._execute
         self.addCleanup(patch.stopall)
         patch.object(self.publisher,'_execute',side_effect=self.fake_execute).start()
@@ -54,17 +56,17 @@ class PublisherTests(unittest.TestCase):
             body = Path(args[args.index('--body-file')+1]).read_text()
             self.assertIn('Frozen patch SHA-256:',body)
             self.assertNotIn('PROJECT_BYTE_AGENT_HINT:',body)
-            self.assertEqual(args[args.index('--repo')+1],REPOSITORY)
+            self.assertEqual(args[args.index('--repo')+1],self.expected_repo)
             if args[1:3] == ['issue','create']:
                 if self.stop_on_issue:
                     self.stop_on_issue.set()
-                return b'https://github.com/jmw7629/JOEOS/issues/71\n'
+                return (self.issue_reply or 'https://github.com/'+self.expected_repo+'/issues/71').encode()+b'\n'
             self.assertEqual(args[1:3],['pr','create'])
-            return b'https://github.com/jmw7629/JOEOS/pull/72\n' if self.failure != 'url' else b'https://github.com/someone/else/pull/72\n'
+            return (self.pr_reply or 'https://github.com/'+self.expected_repo+'/pull/72').encode()+b'\n' if self.failure != 'url' else b'https://github.com/someone/else/pull/72\n'
         if 'push' in args:
             if self.failure == 'push':
                 raise PublisherError('Synthetic uncertain push response')
-            self.assertIn('https://github.com/jmw7629/JOEOS.git',args)
+            self.assertIn('https://github.com/'+self.expected_repo+'.git',args)
             self.assertIn('--force-with-lease=refs/heads/prfkt/task-'+self.run+':',args)
             return b''
         return self.real_execute(args,**options)
@@ -80,6 +82,17 @@ class PublisherTests(unittest.TestCase):
 
     def external(self):
         return [args for args,options in self.calls if options.get('auth')]
+
+    def registered(self, repo):
+        self.command(['config','--replace-all','remote.origin.url','https://github.com/'+repo+'.git'])
+        self.publisher = Publisher(self.publisher.state,self.source,repo=repo,registered_repo=repo,base_branch='main')
+        self.publisher.gh = '/fixture/gh'; self.expected_repo = repo
+        self.real_execute = self.publisher._execute
+        patch.object(self.publisher,'_execute',side_effect=self.fake_execute).start()
+
+    def fresh_workspace(self):
+        self.run=uuid.uuid4().hex;self.workspace=self.factory.create(self.run)
+        self.calls.clear();self.issue_reply=None;self.pr_reply=None
 
     def test_frozen_binary_modes_deletions_no_filters_hooks_or_host_untracked_files(self):
         self.changed(); frozen=self.prepare()
@@ -220,6 +233,109 @@ class PublisherTests(unittest.TestCase):
         with self.assertRaisesRegex(PublisherError,'stopped'):
             self.publisher.prepare(self.workspace,self.run,{'title':'Cancelled','body':'Fixture'},stop_event=stop)
         self.assertEqual(len(self.calls),before);self.assertFalse((self.publisher.state/self.run).exists())
+
+    def test_explicit_repository_registration_requires_exact_valid_configuration(self):
+        for repo in ('jmw7629/vitros-ios','jmw7629/MEMORY_BYTE'):
+            with self.subTest(unregistered=repo), self.assertRaises(PublisherError):
+                Publisher(self.root/'invalid',self.source,repo=repo,base_branch='main')
+        invalid = ('https://github.com/jmw7629/vitros-ios','--repo=attacker/repo','jmw7629/repo\n',
+                   'jmw7629/repo?x=1','jmw7629/repo/extra','jmw7629/..','jmw7629/.',
+                   '-owner/repo','owner-/repo','owner/--option','owner/repo space',None,3)
+        for repo in invalid:
+            with self.subTest(invalid=repr(repo)), self.assertRaises(PublisherError):
+                Publisher(self.root/'invalid',self.source,repo=repo,registered_repo=repo,base_branch='main')
+        with self.assertRaises(PublisherError):
+            Publisher(self.root/'invalid',self.source,repo='jmw7629/MEMORY_BYTE',registered_repo='jmw7629/memory_byte',base_branch='main')
+        self.assertFalse((self.root/'invalid').exists());self.assertEqual(self.external(),[])
+
+    def test_registered_repositories_bind_review_issue_push_and_pr_without_merge(self):
+        for repo in ('jmw7629/vitros-ios','jmw7629/MEMORY_BYTE'):
+            with self.subTest(repo=repo):
+                self.fresh_workspace();self.registered(repo);self.changed();frozen=self.prepare()
+                self.assertEqual(frozen['public']['repo'],repo)
+                self.assertIn('"repo": "'+repo+'"',frozen['review'])
+                self.assertFalse(frozen['public']['automatic_merge']);self.assertEqual(self.external(),[])
+                result=self.publisher.publish(frozen)
+                self.assertEqual(result,{'issue_url':'https://github.com/'+repo+'/issues/71',
+                                         'pull_request_url':'https://github.com/'+repo+'/pull/72'})
+                self.assertEqual(len(self.external()),3)
+                self.assertFalse(any('merge' in args or '--force' in args for args in self.external()))
+                before=len(self.calls);self.assertEqual(self.publisher.publish(frozen),result)
+                self.assertEqual(len(self.calls),before)
+
+    def test_frozen_review_cannot_replay_under_another_registered_repository(self):
+        self.registered('jmw7629/vitros-ios');self.changed();frozen=self.prepare()
+        self.registered('jmw7629/MEMORY_BYTE');before=len(self.calls)
+        with self.assertRaisesRegex(PublisherError,'changed after review'):
+            self.publisher.publish(frozen)
+        self.assertEqual(len(self.calls),before);self.assertEqual(self.external(),[])
+        ledger=json.loads((self.publisher.state/self.run/'ledger.json').read_text())
+        self.assertEqual(ledger['state'],'prepared')
+
+    def test_registered_repository_rejects_cross_repo_and_case_mismatched_response_urls(self):
+        self.registered('jmw7629/MEMORY_BYTE')
+        for field,reply,count in (('issue_reply','https://github.com/jmw7629/JOEOS/issues/71',1),
+                                  ('issue_reply','https://github.com/jmw7629/memory_byte/issues/71',1),
+                                  ('pr_reply','https://github.com/jmw7629/JOEOS/pull/72',3),
+                                  ('pr_reply','https://github.com/jmw7629/MEMORY_BYTE.evil/pull/72',3)):
+            with self.subTest(field=field,reply=reply):
+                self.fresh_workspace();self.changed();frozen=self.prepare();setattr(self,field,reply)
+                with self.assertRaises(PublisherError):self.publisher.publish(frozen)
+                self.assertEqual(len(self.external()),count)
+                self.assertEqual(json.loads((self.publisher.state/self.run/'ledger.json').read_text())['state'],'unknown')
+                before=len(self.calls)
+                with self.assertRaises(PublisherError):self.publisher.publish(frozen)
+                self.assertEqual(len(self.calls),before,'a mismatched response cannot be replayed')
+
+    def test_source_origin_requires_exact_registered_repository_before_freeze(self):
+        self.changed()
+        for remote in ('https://github.com/jmw7629/other.git','https://github.com/jmw7629/joeos.git',
+                       'https://github.com.evil/jmw7629/JOEOS.git','https://github.com/jmw7629/JOEOS.git?x=1',
+                       'https://github.com/jmw7629/JOEOS.git\n','file:///untrusted/source'):
+            with self.subTest(remote=remote):
+                self.command(['config','--replace-all','remote.origin.url',remote])
+                with self.assertRaises(PublisherError):self.prepare()
+                self.assertFalse((self.publisher.state/self.run).exists());self.assertEqual(self.external(),[])
+        self.command(['remote','remove','origin'])
+        with self.assertRaises(PublisherError):self.prepare()
+        self.assertFalse((self.publisher.state/self.run).exists());self.assertEqual(self.external(),[])
+
+    def test_source_remote_rewrites_push_overrides_and_multiple_urls_are_rejected(self):
+        self.changed()
+        self.command(['config','remote.origin.pushurl','https://github.com/jmw7629/other.git'])
+        with self.assertRaises(PublisherError):self.prepare()
+        self.command(['config','--unset-all','remote.origin.pushurl'])
+        self.command(['config','url.https://github.com/jmw7629/other.git.insteadOf','https://github.com/'+REPOSITORY+'.git'])
+        with self.assertRaises(PublisherError):self.prepare()
+        self.command(['config','--unset-all','url.https://github.com/jmw7629/other.git.insteadOf'])
+        self.command(['config','--add','remote.origin.url','https://github.com/'+REPOSITORY+'.git'])
+        with self.assertRaises(PublisherError):self.prepare()
+        self.assertFalse((self.publisher.state/self.run).exists());self.assertEqual(self.external(),[])
+
+    def test_source_origin_is_rechecked_after_review_before_any_external_write(self):
+        self.changed();frozen=self.prepare()
+        self.command(['config','remote.origin.url','https://github.com/jmw7629/other.git'])
+        with self.assertRaises(PublisherError):self.publisher.publish(frozen)
+        self.assertEqual(self.external(),[])
+        self.assertEqual(json.loads((self.publisher.state/self.run/'ledger.json').read_text())['state'],'prepared')
+
+    def test_source_accepts_exact_https_and_ssh_github_origins(self):
+        self.registered('jmw7629/vitros-ios')
+        for remote in ('https://github.com/jmw7629/vitros-ios',
+                       'git@github.com:jmw7629/vitros-ios.git',
+                       'ssh://git@github.com/jmw7629/vitros-ios.git'):
+            with self.subTest(remote=remote):
+                self.fresh_workspace();self.changed();self.command(['config','remote.origin.url',remote])
+                self.assertEqual(self.prepare()['public']['repo'],'jmw7629/vitros-ios')
+                self.assertEqual(self.external(),[])
+
+    def test_completed_result_cannot_return_urls_from_another_repository(self):
+        self.registered('jmw7629/vitros-ios');self.changed();frozen=self.prepare();self.publisher.publish(frozen)
+        ledger_path=self.publisher.state/self.run/'ledger.json';ledger=json.loads(ledger_path.read_text())
+        ledger['result']['issue_url']='https://github.com/jmw7629/JOEOS/issues/71';ledger_path.write_text(json.dumps(ledger))
+        before=len(self.calls)
+        with self.assertRaisesRegex(PublisherError,'saved publication result'):self.publisher.publish(frozen)
+        self.assertEqual(len(self.calls),before)
 
 
 if __name__ == '__main__':

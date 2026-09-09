@@ -13,7 +13,7 @@ files = {'AI_RUNTIME': 'ai_runtime.py', 'AI_CONNECTIONS': 'ai_connections.py',
          'CODEX_CONNECTION': 'codex_connection.py', 'AI_UI': 'ai-connections.js',
          'CODEX_TASK_RPC': 'codex_task_rpc.py', 'CODEX_SANDBOX': 'codex_sandbox.py',
          'CODEX_TASKS': 'codex_tasks.py', 'CODEX_TASKS_RUNTIME': 'codex_tasks_runtime.py',
-         'CODEX_PUBLISHER': 'codex_publisher.py', 'CODEX_UI': 'codex-workspace.js'}
+         'CODEX_PROJECTS': 'codex_projects.py', 'CODEX_PUBLISHER': 'codex_publisher.py', 'CODEX_UI': 'codex-workspace.js'}
 for key, name in files.items():
     digest = hashlib.sha256((HERE / name).read_bytes()).hexdigest()
     assert f'EXPECTED_{key}="{digest}"' in installer, f'Stale {name} checksum'
@@ -81,7 +81,7 @@ version = re.search(r"PINNED_VERSION = '([^']+)'",(HERE/'codex_connection.py').r
 workflow = (HERE.parents[2]/'.github/workflows/project-byte-ai-connections-verify.yml').read_text()
 assert '@openai/codex@'+version in workflow, 'CI native runtime does not match the transport pin'
 for name in ('test_codex_task_rpc.py','test_codex_sandbox.py','test_codex_tasks.py',
-             'test_codex_tasks_runtime.py','test_codex_publisher.py','test_codex_workspace_native.py',
+             'test_codex_tasks_runtime.py','test_codex_projects.py','test_codex_publisher.py','test_codex_workspace_native.py',
              'test_codex_workspace_browser.mjs','test_stage_codex_overlay.py'):
     assert name in workflow, f'Missing native workspace CI gate: {name}'
 print('AI_RELEASE_PINS_ASSETS_MODULES_ROUTES_AND_ROLLBACK=PASS')

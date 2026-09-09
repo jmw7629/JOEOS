@@ -20,10 +20,11 @@ EXPECTED_CODEX_CONNECTION="835877142e6c5dc80729533144df11746d326dd364abfc75fcaad
 EXPECTED_AI_UI="bc13a5d862ab55fc397f57a15ba48676dea3c6277c76c94f1540371b31872c1e"
 EXPECTED_CODEX_TASK_RPC="be991db3ceda3e9ca89dc7361aeeba0ec6ab4a3ebac79e1b452558fc21ab1881"
 EXPECTED_CODEX_SANDBOX="9d14155fc5389a8ad8c1baf852a60ec978ed615c88e0b6f467b9a58e71d49d4c"
-EXPECTED_CODEX_TASKS="148394701be108217559b725b2b376a30825e074ce2569c761b179c9ee54f5d0"
-EXPECTED_CODEX_TASKS_RUNTIME="708dd6954948ef48a9b739929d75dcfd2125ad421229362080524e80be49a863"
-EXPECTED_CODEX_PUBLISHER="5014d9338b9b6ff36ea6fcb2330adbfc3d8dafe2634c2f47f1b586789c99d4e0"
-EXPECTED_CODEX_UI="e52c37ac6d99cde3d7f3aa2742a32d40413bcf466707e6f5ed88142ad6bc5051"
+EXPECTED_CODEX_TASKS="f589cd8cd84335d9e469f13ae05c39042aa590fe359c64af117afe2fc7be9ce1"
+EXPECTED_CODEX_TASKS_RUNTIME="af38ee1e335f4245b9e8480fb5b975149b309c6816f1ae1b133d6e37cda3e0b4"
+EXPECTED_CODEX_PROJECTS="f528b817ffb614532058deb00333ad33325a1734f031a6b98ad6303f601abca5"
+EXPECTED_CODEX_PUBLISHER="6f13fc314c674176f6aecfcf700d4c0dd8d5bd82f1dffc4c0b01aa1e246b0b85"
+EXPECTED_CODEX_UI="411e89a68c31ec58d2a021d3ede30e37440279be0a941a188f2e34ac72f37abc"
 
 if [ "$(id -un)" != "joevps" ]; then
   echo "Run this as joevps, not root." >&2
@@ -75,6 +76,7 @@ if [ -f "$DEST/codex_task_rpc.py" ]; then cp -p "$DEST/codex_task_rpc.py" "$DEST
 if [ -f "$DEST/codex_sandbox.py" ]; then cp -p "$DEST/codex_sandbox.py" "$DEST/backups/codex_sandbox.py-${STAMP}"; fi
 if [ -f "$DEST/codex_tasks.py" ]; then cp -p "$DEST/codex_tasks.py" "$DEST/backups/codex_tasks.py-${STAMP}"; fi
 if [ -f "$DEST/codex_tasks_runtime.py" ]; then cp -p "$DEST/codex_tasks_runtime.py" "$DEST/backups/codex_tasks_runtime.py-${STAMP}"; fi
+if [ -f "$DEST/codex_projects.py" ]; then cp -p "$DEST/codex_projects.py" "$DEST/backups/codex_projects.py-${STAMP}"; fi
 if [ -f "$DEST/codex_publisher.py" ]; then cp -p "$DEST/codex_publisher.py" "$DEST/backups/codex_publisher.py-${STAMP}"; fi
 if [ -f "$DEST/codex-workspace.js" ]; then cp -p "$DEST/codex-workspace.js" "$DEST/backups/codex-workspace.js-${STAMP}"; fi
 
@@ -101,6 +103,7 @@ curl --fail --silent --show-error --location "$V4/codex_task_rpc.py" -o "$TMP/co
 curl --fail --silent --show-error --location "$V4/codex_sandbox.py" -o "$TMP/codex_sandbox.py"
 curl --fail --silent --show-error --location "$V4/codex_tasks.py" -o "$TMP/codex_tasks.py"
 curl --fail --silent --show-error --location "$V4/codex_tasks_runtime.py" -o "$TMP/codex_tasks_runtime.py"
+curl --fail --silent --show-error --location "$V4/codex_projects.py" -o "$TMP/codex_projects.py"
 curl --fail --silent --show-error --location "$V4/codex_publisher.py" -o "$TMP/codex_publisher.py"
 curl --fail --silent --show-error --location "$V4/codex-workspace.js" -o "$TMP/codex-workspace.js"
 cat "$TMP"/backend/*.part > "$TMP/backend.py"
@@ -128,7 +131,9 @@ CODEX_SANDBOX_SHA="$(sha256sum "$TMP/codex_sandbox.py" | awk '{print $1}')"
 CODEX_TASKS_SHA="$(sha256sum "$TMP/codex_tasks.py" | awk '{print $1}')"
 [ "$CODEX_TASKS_SHA" = "$EXPECTED_CODEX_TASKS" ] || { echo "codex_tasks.py checksum mismatch; refusing deployment." >&2; exit 5; }
 CODEX_TASKS_RUNTIME_SHA="$(sha256sum "$TMP/codex_tasks_runtime.py" | awk '{print $1}')"
+CODEX_PROJECTS_SHA="$(sha256sum "$TMP/codex_projects.py" | awk '{print $1}')"
 [ "$CODEX_TASKS_RUNTIME_SHA" = "$EXPECTED_CODEX_TASKS_RUNTIME" ] || { echo "codex_tasks_runtime.py checksum mismatch; refusing deployment." >&2; exit 5; }
+[ "$CODEX_PROJECTS_SHA" = "$EXPECTED_CODEX_PROJECTS" ] || { echo "codex_projects.py checksum mismatch; refusing deployment." >&2; exit 5; }
 CODEX_PUBLISHER_SHA="$(sha256sum "$TMP/codex_publisher.py" | awk '{print $1}')"
 [ "$CODEX_PUBLISHER_SHA" = "$EXPECTED_CODEX_PUBLISHER" ] || { echo "codex_publisher.py checksum mismatch; refusing deployment." >&2; exit 5; }
 CODEX_UI_SHA="$(sha256sum "$TMP/codex-workspace.js" | awk '{print $1}')"
@@ -140,7 +145,7 @@ CODEX_UI_SHA="$(sha256sum "$TMP/codex-workspace.js" | awk '{print $1}')"
 [ "$HOME_SHA" = "$EXPECTED_HOME" ] || { echo "Home module checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$INSPECTOR_SHA" = "$EXPECTED_INSPECTOR" ] || { echo "Home inspector checksum mismatch; refusing deployment." >&2; exit 5; }
 [ "$HEALTH_SHA" = "$EXPECTED_HEALTH" ] || { echo "Health UI checksum mismatch; refusing deployment." >&2; exit 5; }
-python3 -m py_compile "$TMP/backend.py" "$TMP/server.py" "$TMP/execution_permissions.py" "$TMP/ai_runtime.py" "$TMP/ai_connections.py" "$TMP/codex_connection.py" "$TMP/codex_task_rpc.py" "$TMP/codex_sandbox.py" "$TMP/codex_tasks.py" "$TMP/codex_tasks_runtime.py" "$TMP/codex_publisher.py"
+python3 -m py_compile "$TMP/backend.py" "$TMP/server.py" "$TMP/execution_permissions.py" "$TMP/ai_runtime.py" "$TMP/ai_connections.py" "$TMP/codex_connection.py" "$TMP/codex_task_rpc.py" "$TMP/codex_sandbox.py" "$TMP/codex_tasks.py" "$TMP/codex_tasks_runtime.py" "$TMP/codex_projects.py" "$TMP/codex_publisher.py"
 if command -v node >/dev/null 2>&1; then
   node --check "$TMP/ai-connections.js"
   node --check "$TMP/codex-workspace.js"
@@ -192,6 +197,7 @@ install -m 0644 "$TMP/codex_task_rpc.py" "$DEST/codex_task_rpc.py"
 install -m 0644 "$TMP/codex_sandbox.py" "$DEST/codex_sandbox.py"
 install -m 0644 "$TMP/codex_tasks.py" "$DEST/codex_tasks.py"
 install -m 0644 "$TMP/codex_tasks_runtime.py" "$DEST/codex_tasks_runtime.py"
+install -m 0644 "$TMP/codex_projects.py" "$DEST/codex_projects.py"
 install -m 0644 "$TMP/codex_publisher.py" "$DEST/codex_publisher.py"
 install -m 0644 "$TMP/codex-workspace.js" "$DEST/codex-workspace.js"
 # Packaging never configures PRFKT_CODEX_STATE/REPO/PUBLISH or starts a broker.
@@ -281,6 +287,7 @@ if ! echo "$HEALTH" | grep -q '"version":4' || ! echo "$HEALTH" | grep -q '"ok":
   if [ -f "$DEST/backups/codex_sandbox.py-${STAMP}" ]; then cp -p "$DEST/backups/codex_sandbox.py-${STAMP}" "$DEST/codex_sandbox.py"; else rm -f "$DEST/codex_sandbox.py"; fi
   if [ -f "$DEST/backups/codex_tasks.py-${STAMP}" ]; then cp -p "$DEST/backups/codex_tasks.py-${STAMP}" "$DEST/codex_tasks.py"; else rm -f "$DEST/codex_tasks.py"; fi
   if [ -f "$DEST/backups/codex_tasks_runtime.py-${STAMP}" ]; then cp -p "$DEST/backups/codex_tasks_runtime.py-${STAMP}" "$DEST/codex_tasks_runtime.py"; else rm -f "$DEST/codex_tasks_runtime.py"; fi
+  if [ -f "$DEST/backups/codex_projects.py-${STAMP}" ]; then cp -p "$DEST/backups/codex_projects.py-${STAMP}" "$DEST/codex_projects.py"; else rm -f "$DEST/codex_projects.py"; fi
   if [ -f "$DEST/backups/codex_publisher.py-${STAMP}" ]; then cp -p "$DEST/backups/codex_publisher.py-${STAMP}" "$DEST/codex_publisher.py"; else rm -f "$DEST/codex_publisher.py"; fi
   if [ -f "$DEST/backups/codex-workspace.js-${STAMP}" ]; then cp -p "$DEST/backups/codex-workspace.js-${STAMP}" "$DEST/codex-workspace.js"; else rm -f "$DEST/codex-workspace.js"; fi
   sudo systemctl restart project-byte.service

@@ -29,6 +29,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_sandbox.py
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_tasks.py
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_tasks_runtime.py
+          PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_projects.py
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_codex_publisher.py
           PYTHONDONTWRITEBYTECODE=1 python3 deploy/project-byte/v4/test_stage_codex_overlay.py
       - name: Install pinned isolated verification tools

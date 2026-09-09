@@ -113,7 +113,7 @@ class LocalPublisherSink:
         assert stop_event is None or not stop_event.is_set(), 'stopped preparation must not continue'
         diff = workspace.diff()
         assert diff['changes'], 'fixture must present a real patch for review'
-        frozen = {'review': diff['patch'], 'public': {'title': args['title'], 'base_commit': diff['base_commit'],
+        frozen = {'review': diff['patch'], 'public': {'repo': 'jmw7629/JOEOS', 'title': args['title'], 'base_commit': diff['base_commit'],
             'patch_sha256': hashlib.sha256(diff['patch'].encode()).hexdigest(), 'files': [row['path'] for row in diff['changes']]}}
         self.prepared.append(frozen)
         return frozen
@@ -255,7 +255,9 @@ class NativeWorkspaceControllerTests(unittest.TestCase):
         binding = json.loads(permission['binding'])
         genuine = [value for value in self.native_calls if value['tool'] == 'publish_pull_request']
         self.assertEqual(len(genuine), 1)
-        self.assertEqual(binding, {key: genuine[0][key] for key in ('threadId', 'turnId', 'callId', 'requestId', 'tool')})
+        expected_binding = {key: genuine[0][key] for key in ('threadId', 'turnId', 'callId', 'requestId', 'tool')}
+        expected_binding.update(project_key='joeos', project_fingerprint=self.controller.projects['joeos'].fingerprint)
+        self.assertEqual(binding, expected_binding)
         self.assertEqual(self.controller.workspaces[cid].read('hello.txt'), CHANGED.encode())
         self.assertEqual((self.repo / 'hello.txt').read_text(), 'first\nsecond\n')
         self.assertEqual(len(self.sessions), 3)

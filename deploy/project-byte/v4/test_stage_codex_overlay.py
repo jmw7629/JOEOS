@@ -56,6 +56,41 @@ class CodexOverlayTests(unittest.TestCase):
         self.assertFalse(self.output.exists())
         self.assertFalse(self.output.is_symlink())
 
+    def test_project_upgrade_replaces_only_pinned_modules_and_preserves_live_data(self):
+        baseline = {}
+        for name in overlay.PROJECT_BASE:
+            data = b'// old fixture\n' if name.endswith('.js') else b'# old fixture\n'
+            (self.source / name).write_bytes(data)
+            baseline[name] = hashlib.sha256(data).hexdigest()
+        (self.source / 'kanban.db').write_bytes(b'PRIVATE_DATA_FIXTURE')
+        (self.source / 'projects.json').write_bytes(b'PRIVATE_REGISTRY_FIXTURE')
+        original = {p.name: p.read_bytes() for p in self.source.iterdir()}
+        with patch.object(overlay, 'PROJECT_BASE', baseline):
+            manifest = overlay.stage(self.source, self.output, self.features, project_upgrade=True)
+        self.assertEqual(manifest['operation'], 'stage-project-routing-code-only')
+        self.assertEqual(set(manifest['output_sha256']), set(overlay.PROJECT_FILES))
+        self.assertEqual(manifest['baseline_sha256'], baseline)
+        self.assertEqual({p.name: p.read_bytes() for p in self.source.iterdir()}, original)
+        self.assertFalse((self.output / 'index.html').exists())
+        self.assertFalse((self.output / 'server.py').exists())
+        self.assertFalse((self.output / 'projects.json').exists())
+
+    def test_project_upgrade_rejects_drift_and_already_present_registry_module(self):
+        baseline = {}
+        for name in overlay.PROJECT_BASE:
+            data = b'// old fixture\n' if name.endswith('.js') else b'# old fixture\n'
+            (self.source / name).write_bytes(data)
+            baseline[name] = hashlib.sha256(data).hexdigest()
+        with patch.object(overlay, 'PROJECT_BASE', baseline):
+            (self.source / 'codex_projects.py').write_text('# installed already\n')
+            with self.assertRaisesRegex(ValueError, 'already present'):
+                overlay.stage(self.source, self.output, self.features, project_upgrade=True)
+            (self.source / 'codex_projects.py').unlink()
+            (self.source / 'codex_tasks.py').write_text('# drift\n')
+            with self.assertRaisesRegex(ValueError, 'baseline differs'):
+                overlay.stage(self.source, self.output, self.features, project_upgrade=True)
+        self.assert_no_output()
+
     def test_manifest_and_allowlisted_output_preserve_every_unmodified_byte(self):
         # Both app state and unexpected feature files remain unread and uncopied.
         for directory in (self.source, self.features):

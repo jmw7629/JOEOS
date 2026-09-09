@@ -12,6 +12,8 @@ import threading
 import time
 import unittest
 import uuid
+from dataclasses import replace
+from unittest.mock import patch
 
 import codex_tasks as tasks
 
@@ -105,13 +107,16 @@ class FixtureFactory:
 
 
 class FixturePublisher:
-    def __init__(self):
-        self.prepared = []; self.published = []
+    def __init__(self, repo='jmw7629/JOEOS'):
+        self.prepared = []; self.published = []; self.repo = repo; self.workspaces = []
     def prepare(self, workspace, run, args, stop_event=None):
         if stop_event is not None and stop_event.is_set():
             raise RuntimeError('Stopped before preparation')
         frozen = {'review': 'Synthetic reviewed patch', 'public': {'title': args['title'],
             'patch_sha256': hashlib.sha256(b'fixture patch').hexdigest()}, 'snapshot': 'fixture-snapshot'}
+        if self.repo is not None:
+            frozen['public']['repo'] = self.repo
+        self.workspaces.append(workspace)
         self.prepared.append(frozen)
         return frozen
     def publish(self, frozen, *, stop_event):
@@ -130,9 +135,9 @@ class ControllerTests(unittest.TestCase):
         self.publisher = FixturePublisher(); self.controllers = []; self.background = []
         self.controller = self.make_controller()
 
-    def make_controller(self):
+    def make_controller(self, **kwargs):
         controller = tasks.Controller(self.state, self.root, connection=self.connection, sandbox=self.sandbox,
-                                      session_factory=self.factory, publisher=self.publisher)
+                                      session_factory=self.factory, publisher=self.publisher, **kwargs)
         self.controllers.append(controller)
         return controller
 
@@ -171,8 +176,8 @@ class ControllerTests(unittest.TestCase):
             time.sleep(.01)
         self.fail(message)
 
-    def send(self, text='Make a private fixture change', cid=None, request=None):
-        body = {'request_id': request or rid(), 'conversation_id': cid, 'project_key': 'joeos', 'message': text}
+    def send(self, text='Make a private fixture change', cid=None, request=None, project='joeos'):
+        body = {'request_id': request or rid(), 'conversation_id': cid, 'project_key': project, 'message': text}
         return body, self.controller.message(OWNER, body)
 
     def finished(self, run, controller=None):
@@ -183,17 +188,42 @@ class ControllerTests(unittest.TestCase):
                 return row['status'] if row and row['status'] not in tasks.ACTIVE and run not in controller.live else None
         return self.wait(terminal)
 
-    def seed(self):
+    def seed(self, project='joeos'):
         controller = self.controller; cid = uuid.uuid4().hex; run = uuid.uuid4().hex; generation = 'fixture-generation'
         context = {'stop': threading.Event(), 'sessions': [], 'generation': generation, 'conversation': cid,
                    'tool_count': 0, 'agents': 0, 'deadline': time.monotonic() + 60,
                    'workspace': FixtureWorkspace(), 'fixture_seed': True, 'finished': threading.Event(),
                    'closing': False, 'inflight': 0}
         with controller.lock:
-            controller.db.execute('INSERT INTO conversations VALUES(?,?,?,?,?)', (cid, 'owner', 'Fixture', 'joeos', time.time()))
+            controller.db.execute('INSERT INTO conversations VALUES(?,?,?,?,?)', (cid, 'owner', 'Fixture', project, time.time()))
+            if project != 'joeos':
+                controller.db.execute('INSERT INTO conversation_projects VALUES(?,?,?)', (cid, project, controller.projects[project].fingerprint))
             controller.db.execute('INSERT INTO runs VALUES(?,?,?,?,?,?,?,?)', (run, cid, 'owner', 'working', tasks.MODEL, tasks.EFFORT, generation, time.time()))
             controller.db.commit(); controller.live[run] = context
         return run, context
+
+    def registered_projects(self):
+        from codex_projects import Project, default_project
+        self.project_sources = {}
+        self.project_sandboxes = {'joeos': self.sandbox}
+        self.project_publishers = {'joeos': self.publisher}
+        projects = [default_project(self.root, publication=True)]
+        for key in ('alpha', 'beta'):
+            source = (self.root / ('source-' + key)).resolve(); source.mkdir(exist_ok=True)
+            self.project_sources[key] = source
+            self.project_sandboxes[key] = FixtureSandbox(self.state / 'workspaces')
+            self.project_publishers[key] = FixturePublisher('fixture/' + key)
+            projects.append(Project(key, key.title(), 'fixture/' + key, source, 'main', 'execute', True,
+                                    'Registered fixture', 'HISTORICAL_' + key + ': never new authorization'))
+        projects.extend((Project('external', 'External owner', 'fixture/external', None, 'main', 'observe', False, 'Existing worker retains control'),
+                         Project('missing', 'Missing source', None, None, None, 'blocked', False, 'Source is not mapped')))
+        return tuple(projects)
+
+    def configure_projects(self, projects=None):
+        projects = projects or self.registered_projects()
+        self.controller = self.make_controller(projects=projects, project_sandboxes=self.project_sandboxes,
+                                               project_publishers=self.project_publishers)
+        return projects
 
     def tool_background(self, run, context, native_call):
         result = {}; done = threading.Event()
@@ -551,3 +581,160 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(len(self.factory.instances), count, 'A specialist session was created after the run ended')
         self.assertEqual(self.controller.events(OWNER, result['run_id']), original,
                          'A late specialist start/completion mutated a terminal run')
+
+    def test_project_catalog_is_publicly_scoped_and_observation_cannot_execute(self):
+        self.configure_projects()
+        catalog = self.controller.catalog(OWNER)
+        entries = {p['key']: p for p in catalog['projects']}
+        self.assertEqual(set(entries), {'joeos', 'alpha', 'beta', 'external', 'missing'})
+        self.assertTrue(entries['alpha']['configured']); self.assertTrue(entries['alpha']['publication'])
+        self.assertFalse(entries['external']['configured']); self.assertFalse(entries['missing']['publication'])
+        self.assertNotIn('HISTORICAL_', json.dumps(catalog)); self.assertNotIn(str(self.root), json.dumps(catalog))
+        for key in ('external', 'missing', 'unregistered', '../alpha'):
+            with self.subTest(project=key), self.assertRaises(tasks.TaskError):
+                self.send(project=key)
+        self.assertFalse(self.factory.instances)
+        self.assertEqual(self.controller.db.execute('SELECT COUNT(*) FROM requests').fetchone()[0], 0)
+        for publisher in self.project_publishers.values():
+            self.assertFalse(publisher.prepared); self.assertFalse(publisher.published)
+        with patch.object(self.project_sandboxes['alpha'], 'capabilities', return_value={'available': False}):
+            self.assertTrue(self.controller.catalog(OWNER)['configured'], 'An unavailable project disabled every project')
+            with self.assertRaises(tasks.TaskError) as denied:
+                self.send(project='alpha')
+            self.assertEqual(denied.exception.status, 503)
+        self.assertFalse(self.factory.instances)
+
+    def test_registered_projects_use_only_their_selected_sandbox_and_reference(self):
+        self.configure_projects()
+        seen = []
+        def hook(session, prompt):
+            context = next(iter(self.controller.live.values()))
+            key = context['project'].key
+            write = session.kwargs['on_tool'](call('workspace_write', {'path': 'selected.txt', 'content': key}))
+            read = session.kwargs['on_tool'](call('workspace_read', {'path': 'selected.txt'}))
+            self.assertTrue(write['success']); self.assertEqual(read['text'], key)
+            seen.append((key, prompt))
+            return {'status': 'completed', 'text': 'Isolated ' + key}
+        self.factory.hook = hook
+        _, a = self.send(project='alpha'); self.finished(a['run_id'])
+        _, b = self.send(project='beta'); self.finished(b['run_id'])
+        self.assertNotEqual(a['conversation_id'], b['conversation_id'])
+        for key, result in (('alpha', a), ('beta', b)):
+            self.assertEqual(self.project_sandboxes[key].created, [result['conversation_id']])
+            self.assertEqual(self.project_sandboxes[key].workspaces[result['conversation_id']].read('selected.txt'), key.encode())
+            history = self.controller.conversation(OWNER, result['conversation_id'])
+            self.assertEqual(history['conversation']['project_key'], key)
+        self.assertFalse(self.sandbox.created)
+        for key, prompt in seen:
+            other = 'beta' if key == 'alpha' else 'alpha'
+            self.assertIn('HISTORICAL_' + key, prompt); self.assertNotIn('HISTORICAL_' + other, prompt)
+            self.assertIn('untrusted background', prompt)
+
+    def test_cross_project_conversation_and_request_reuse_are_rejected(self):
+        self.configure_projects()
+        original, a = self.send(project='alpha'); self.finished(a['run_id'])
+        for body in ({**original, 'project_key': 'beta'},
+                     {**original, 'request_id': rid(), 'conversation_id': a['conversation_id'], 'project_key': 'beta'}):
+            with self.assertRaises(tasks.TaskError) as denied:
+                self.controller.message(OWNER, body)
+            self.assertEqual(denied.exception.status, 409)
+        self.assertFalse(self.project_sandboxes['beta'].created)
+        self.assertEqual(len(self.factory.instances), 1)
+        self.assertEqual(self.controller.db.execute('SELECT COUNT(*) FROM runs').fetchone()[0], 1)
+
+    def test_project_identity_binding_survives_restart_and_rejects_source_changes(self):
+        projects = self.configure_projects()
+        _, a = self.send(project='alpha'); self.finished(a['run_id'])
+        binding = dict(self.controller.db.execute('SELECT * FROM conversation_projects WHERE conversation_id=?', (a['conversation_id'],)).fetchone())
+        changed = tuple(replace(p, repo='fixture/changed') if p.key == 'alpha' else p for p in projects)
+        self.configure_projects(changed)
+        with self.assertRaises(tasks.TaskError) as denied:
+            self.send(project='alpha', cid=a['conversation_id'])
+        self.assertEqual(denied.exception.status, 409)
+        self.assertEqual(dict(self.controller.db.execute('SELECT * FROM conversation_projects WHERE conversation_id=?', (a['conversation_id'],)).fetchone()), binding)
+        self.assertEqual(self.controller.conversation(OWNER, a['conversation_id'])['conversation']['project_key'], 'alpha')
+        self.assertEqual(len(self.factory.instances), 1)
+        self.configure_projects(projects)
+        _, resumed = self.send(project='alpha', cid=a['conversation_id']); self.finished(resumed['run_id'])
+        self.assertEqual(self.project_sandboxes['alpha'].resumed, [a['conversation_id']])
+
+    def test_only_original_joeos_history_can_adopt_a_missing_project_binding(self):
+        _, legacy = self.send(); self.finished(legacy['run_id'])
+        self.controller.db.execute('DELETE FROM conversation_projects'); self.controller.db.commit()
+        self.configure_projects()
+        _, continued = self.send(cid=legacy['conversation_id']); self.finished(continued['run_id'])
+        self.assertIsNotNone(self.controller.db.execute('SELECT 1 FROM conversation_projects WHERE conversation_id=?', (legacy['conversation_id'],)).fetchone())
+        _, foreign = self.send(project='alpha'); self.finished(foreign['run_id'])
+        self.controller.db.execute('DELETE FROM conversation_projects WHERE conversation_id=?', (foreign['conversation_id'],)); self.controller.db.commit()
+        with self.assertRaises(tasks.TaskError) as denied:
+            self.send(project='alpha', cid=foreign['conversation_id'])
+        self.assertEqual(denied.exception.status, 409)
+
+    def test_one_coordinator_admission_gate_covers_all_registered_projects(self):
+        self.configure_projects()
+        release = threading.Event(); self.addCleanup(release.set)
+        def hook(session, prompt):
+            release.wait(3)
+            return {'status': 'completed', 'text': 'Held fixture'}
+        self.factory.hook = hook
+        _, a = self.send(project='alpha'); self.assertTrue(self.factory.entered.wait(2))
+        try:
+            with self.assertRaises(tasks.TaskError) as denied:
+                self.send(project='beta')
+            self.assertEqual(denied.exception.status, 409)
+            self.assertFalse(self.project_sandboxes['beta'].created)
+        finally:
+            release.set()
+        self.finished(a['run_id'])
+        _, b = self.send(project='beta'); self.finished(b['run_id'])
+        self.assertEqual(len(self.factory.instances), 2)
+
+    def test_project_approval_is_bound_to_selected_publisher_and_identity(self):
+        self.configure_projects()
+        run, context = self.seed(project='alpha')
+        result, done = self.tool_background(run, context, call())
+        row = self.permission(run)
+        review = json.loads(row['arguments']); binding = json.loads(row['binding'])
+        self.assertEqual(review['project_key'], 'alpha'); self.assertEqual(review['repo'], 'fixture/alpha')
+        self.assertEqual(binding['project_fingerprint'], self.controller.projects['alpha'].fingerprint)
+        self.assertEqual(review['project_fingerprint'], binding['project_fingerprint'])
+        self.decide(row); self.assertTrue(done.wait(2)); self.assertTrue(result['value']['success'])
+        self.assertEqual(len(self.project_publishers['alpha'].published), 1)
+        self.assertEqual(self.project_publishers['alpha'].workspaces, [context['workspace']])
+        self.assertFalse(self.project_publishers['beta'].prepared); self.assertFalse(self.publisher.prepared)
+
+    def test_changed_project_identity_cannot_approve_a_pending_publication(self):
+        self.configure_projects()
+        run, context = self.seed(project='alpha')
+        result, done = self.tool_background(run, context, call())
+        row = self.permission(run)
+        current = self.controller.projects
+        self.controller.projects = {**current, 'alpha': replace(current['alpha'], repo='fixture/other')}
+        try:
+            with self.assertRaises(tasks.TaskError) as denied:
+                self.decide(row)
+            self.assertEqual(denied.exception.status, 409)
+            self.controller.stop(OWNER, run, {'request_id': rid()})
+            self.assertTrue(done.wait(2)); self.assertFalse(result['value']['success'])
+            self.assertFalse(self.project_publishers['alpha'].published)
+        finally:
+            self.controller.projects = current
+
+    def test_publisher_repository_mismatch_never_creates_an_approval(self):
+        self.configure_projects()
+        self.project_publishers['alpha'].repo = 'fixture/beta'
+        run, context = self.seed(project='alpha')
+        result = self.controller._tool(run, context, call(), 'fixture-agent', 'coordinator')
+        self.assertFalse(result['success']); self.assertIn('different repository', result['text'])
+        self.assertEqual(self.controller.db.execute('SELECT COUNT(*) FROM permissions').fetchone()[0], 0)
+        self.assertFalse(self.project_publishers['alpha'].published)
+
+    def test_publisher_missing_repository_never_creates_an_approval(self):
+        self.configure_projects()
+        self.project_publishers['alpha'].repo = None
+        run, context = self.seed(project='alpha')
+        result = self.controller._tool(run, context, call(), 'fixture-agent', 'coordinator')
+        self.assertFalse(result['success']); self.assertIn('different repository', result['text'])
+        self.assertEqual(self.controller.db.execute('SELECT COUNT(*) FROM permissions').fetchone()[0], 0)
+        self.assertEqual(self.controller.db.execute('SELECT COUNT(*) FROM artifacts').fetchone()[0], 0)
+        self.assertFalse(self.project_publishers['alpha'].published)

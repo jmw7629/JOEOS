@@ -5,6 +5,7 @@ controller is real; Codex, workspace, and publisher implementations are fixtures
 No account, provider, GitHub, shell, or sandbox work is performed.
 """
 from contextlib import closing
+from dataclasses import asdict
 import gc
 import json
 import runpy
@@ -17,6 +18,7 @@ from unittest.mock import Mock, patch
 import uuid
 
 import codex_tasks_runtime as overlay
+from codex_projects import Project, default_project
 import test_ai_runtime as ai_fixture
 import test_codex_tasks as controller_fixture
 
@@ -65,6 +67,47 @@ class CodexWorkspaceHTTPTests(unittest.TestCase):
 
     def message_body(self, text='Review the fixture workspace', cid=None):
         return {'request_id': str(uuid.uuid4()), 'conversation_id': cid, 'project_key': 'joeos', 'message': text}
+
+    def test_private_registry_reaches_controller_and_exact_publisher_with_legacy_state_preserved(self):
+        source = self.root / 'memory-source'
+        source.mkdir()
+        source = source.resolve()
+        projects = (default_project(self.root, publication=True),
+                    Project('memory', 'Memory', 'fixture/MEMORY', source, 'main', 'execute', True, '',
+                            'PRIVATE_REFERENCE_MUST_NOT_REACH_CATALOG'))
+        registry = self.root / 'projects.json'
+        registry.write_text(json.dumps({'schema_version': 1, 'projects': [asdict(p) for p in projects]}, default=str))
+        registry.chmod(0o600)
+        self.server.RequestHandlerClass = overlay.install(self.app, self.handler, self.public_files)
+        environment = {'PRFKT_CODEX_STATE': str(self.state), 'PRFKT_CODEX_REPO': str(self.root),
+                       'PRFKT_CODEX_PROJECTS': str(registry.resolve()), 'PRFKT_CODEX_PUBLISH': '1',
+                       'PRFKT_CODEX_BASE_BRANCH': 'project-byte-deploy'}
+        with patch.dict('os.environ', environment), patch.object(overlay, 'Controller', return_value=self.controller) as construct, \
+                patch('codex_publisher.Publisher', return_value=self.publisher) as publish:
+            code, catalog = self.request(ROOT)
+            self.assertEqual(code, 200)
+            self.assertEqual(construct.call_args.kwargs['projects'], projects)
+            self.assertEqual(set(construct.call_args.kwargs['project_publishers']), {'joeos', 'memory'})
+            self.assertEqual(publish.call_args_list[0].args[0], self.state / 'publisher')
+            self.assertEqual(publish.call_args_list[1].args[0], self.state / 'publishers' / 'memory')
+            self.assertEqual(publish.call_args_list[1].kwargs,
+                             {'repo': 'fixture/MEMORY', 'registered_repo': 'fixture/MEMORY', 'base_branch': 'main'})
+            self.assertNotIn('PRIVATE_REFERENCE', json.dumps(catalog))
+
+    def test_invalid_registry_fails_closed_before_any_controller_or_publisher(self):
+        registry = self.root / 'projects.json'
+        registry.write_text('{"PRIVATE_REFERENCE_MUST_NOT_LEAK":true}')
+        registry.chmod(0o600)
+        self.server.RequestHandlerClass = overlay.install(self.app, self.handler, self.public_files)
+        with patch.dict('os.environ', {'PRFKT_CODEX_STATE': str(self.state), 'PRFKT_CODEX_REPO': str(self.root),
+                                      'PRFKT_CODEX_PROJECTS': str(registry.resolve())}), \
+                patch.object(overlay, 'Controller') as construct, patch('codex_publisher.Publisher') as publish:
+            self.assertEqual(self.request(ROOT, role='viewer')[0], 403)
+            code, result = self.request(ROOT)
+            self.assertEqual(code, 503)
+            self.assertEqual(result, {'error': 'Codex task workspace is unavailable'})
+            construct.assert_not_called()
+            publish.assert_not_called()
 
     def test_catalog_is_owner_scoped_and_does_not_launch_a_session(self):
         code, catalog = self.request(ROOT)

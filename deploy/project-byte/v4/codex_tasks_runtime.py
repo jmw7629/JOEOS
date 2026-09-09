@@ -59,10 +59,26 @@ def install(app, BaseHandler, public_files, controller=None):
                     if not state or not repo or not Path(state).is_absolute() or not Path(repo).is_absolute():
                         raise TaskError('Codex task execution is not configured', 503)
                     ensure_app_wal()
+                    from codex_projects import default_project, load_projects
                     from codex_publisher import Publisher
-                    publisher = Publisher(Path(state) / 'publisher', repo,
-                                          base_branch=os.getenv('PRFKT_CODEX_BASE_BRANCH', 'project-byte-deploy')) if os.getenv('PRFKT_CODEX_PUBLISH') == '1' else None
-                    controller = Controller(state, repo, publisher=publisher)
+                    default = default_project(repo, publication=os.getenv('PRFKT_CODEX_PUBLISH') == '1',
+                                              base_branch=os.getenv('PRFKT_CODEX_BASE_BRANCH', 'project-byte-deploy'))
+                    projects = load_projects(os.getenv('PRFKT_CODEX_PROJECTS'), default, state=state)
+                    publishers = {}
+                    for project in projects:
+                        if not project.publication:
+                            continue
+                        # The original publisher ledger remains at its existing
+                        # path, so uncertain operations are never forgotten.
+                        if project.key == 'joeos':
+                            directory = Path(state) / 'publisher'
+                        else:
+                            parent = Path(state) / 'publishers'
+                            parent.mkdir(mode=0o700, exist_ok=True)
+                            directory = parent / project.key
+                        publishers[project.key] = Publisher(directory, project.source, repo=project.repo,
+                                                            registered_repo=project.repo, base_branch=project.base_branch)
+                    controller = Controller(state, repo, projects=projects, project_publishers=publishers)
         return controller
 
     class CodexWorkspaceHandler(BaseHandler):

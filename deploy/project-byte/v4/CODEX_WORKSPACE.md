@@ -20,7 +20,7 @@ tools. The coordinator performs edits after their reports. A run has a bounded
 lifetime, command deadlines, output limits and a specialist budget. One owner
 run is active at a time.
 
-Each conversation keeps its own working files from the registered JO EOS base
+Each conversation keeps its own working files from its registered project base
 commit. Raw Git objects supply the initial files; repository filters, hooks,
 replacement objects, links and untracked host files are not exported. Git
 metadata, OAuth, publisher credentials and other projects remain outside the
@@ -32,7 +32,7 @@ desktop control and external connectors are not task capabilities in this releas
 
 The `publish_pull_request` tool freezes the exact patch and shows it for one-time
 owner approval. Approval is bound to the actual native request, run generation
-and frozen review. The trusted publisher creates a GitHub `[OC]` issue, a new
+and frozen review, including the fixed project identity. The trusted publisher creates a GitHub `[OC]` issue, a new
 branch and a PR, without legacy bridge dispatch markers. It exposes no merge
 operation. Partial or uncertain publication is recorded as unknown and is never
 retried automatically. Read-only review decisions do not approve unrelated tools.
@@ -59,6 +59,9 @@ account. Configure only the intended private install:
 - `PRFKT_CODEX_SANDBOX_SOCKET`: the authenticated root broker Unix socket.
 - `PRFKT_CODEX_PUBLISH=1`: enable the trusted JO EOS publisher after verifying the
   host GitHub connection. It still requires an exact review-card approval.
+- `PRFKT_CODEX_PROJECTS`: optional absolute path to an owner-private JSON project
+  registry. Without it the existing JO EOS behavior and storage remain intact.
+  See [PROJECT_REGISTRY.md](PROJECT_REGISTRY.md) for its schema and admission rules.
 
 Install `codex_sandbox.py` as root-owned code outside app-writable directories.
 Its `--serve` argument takes a root-owned 0600 configuration containing exactly
@@ -78,6 +81,12 @@ browser checks before activation. Save all replaced code and service drop-ins,
 activate only the app and dedicated broker, and verify the public gateway's exact
 new allowlisted routes. Preserve the current public gateway sign-in, data and
 settings. Do not start paused BYTE, R3, VITROS or legacy bridge units.
+
+For an already verified native installation, `stage_codex_overlay.py
+--upgrade-projects` pins the previous native module hashes and stages only the
+four updated modules/assets and the new registry module. It does not rewrite
+server.py, index.html, auth, data, gateway or broker code. Keep private registry
+configuration and source snapshots outside the public repository.
 
 The overlay keeps an idle app-owned SQLite connection after database startup,
 before the HTTP listener binds. This preserves the WAL sidecars that the gateway

@@ -1,4 +1,4 @@
-"""Trusted, one-shot JO EOS publication of an owner-reviewed frozen snapshot.
+"""Trusted, one-shot publication of an owner-reviewed frozen snapshot.
 
 The worker never receives this module's private files, Git metadata, or GitHub
 credentials. Preparation performs local plumbing only. Publication requires the
@@ -25,6 +25,7 @@ from codex_sandbox import _process
 
 
 REPOSITORY = 'jmw7629/JOEOS'
+REPOSITORY_NAME = re.compile(r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9_.][A-Za-z0-9_.-]{0,99}\Z')
 ID = re.compile(r'[0-9a-f]{32}\Z')
 OBJECT = re.compile(r'(?:[0-9a-f]{40}|[0-9a-f]{64})\Z')
 MAX_FILE = 16 * 1024 * 1024
@@ -97,9 +98,14 @@ def relative_path(value):
 
 
 class Publisher:
-    def __init__(self, state, trusted_repo, repo=REPOSITORY, *, base_branch):
-        if repo != REPOSITORY:
-            raise PublisherError('Only the registered JO EOS repository can be published')
+    def __init__(self, state, trusted_repo, repo=REPOSITORY, *, base_branch, registered_repo=None):
+        # Registration is trusted application configuration, never a tool or
+        # request argument. Legacy callers remain limited to the original repo.
+        allowed = REPOSITORY if registered_repo is None else registered_repo
+        if (not isinstance(repo, str) or not isinstance(allowed, str)
+                or not REPOSITORY_NAME.fullmatch(repo) or not REPOSITORY_NAME.fullmatch(allowed)
+                or repo.split('/')[1] in ('.', '..') or repo != allowed):
+            raise PublisherError('Only the exact registered GitHub repository can be published')
         if (not isinstance(base_branch, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._/-]{0,159}', base_branch)
                 or '..' in base_branch or any(part in ('', '.') or part.endswith('.lock') for part in base_branch.split('/'))
                 or base_branch.endswith('.')):
@@ -181,6 +187,33 @@ class Publisher:
             raise PublisherError('The configured base commit is unavailable')
         return value
 
+    def _source_remote(self):
+        # Resolve fetch and push URLs without contacting a remote. This also
+        # catches source-local insteadOf/pushInsteadOf rewrites and pushurl
+        # overrides; publication itself always uses our fixed HTTPS target.
+        allowed = {prefix + self.repo + suffix for prefix in
+                   ('https://github.com/', 'git@github.com:', 'ssh://git@github.com/')
+                   for suffix in ('', '.git')}
+        for direction in ([], ['--push']):
+            raw = self._git(['remote', 'get-url', *direction, '--all', 'origin'], output_limit=4096)
+            try:
+                urls = raw.decode('utf-8').splitlines()
+            except UnicodeError:
+                raise PublisherError('The source origin does not match the registered repository') from None
+            if len(urls) != 1 or urls[0] not in allowed:
+                raise PublisherError('The source origin does not match the registered repository')
+
+    def _github_url(self, value, kind):
+        return isinstance(value, str) and bool(re.fullmatch(
+            r'https://github\.com/' + re.escape(self.repo) + '/' + kind + r'/[1-9][0-9]*', value))
+
+    def _result(self, result):
+        if (not isinstance(result, dict) or set(result) != {'issue_url', 'pull_request_url'}
+                or not self._github_url(result['issue_url'], 'issues')
+                or not self._github_url(result['pull_request_url'], 'pull')):
+            raise PublisherError('The saved publication result does not match the registered repository')
+        return result
+
     def _index(self, folder, base):
         entries = {}
         for raw in self._git(['ls-tree', '-rz', '--full-tree', base], folder).split(b'\0'):
@@ -219,6 +252,7 @@ class Publisher:
             folder = self.state / run
             if folder.exists() or folder.is_symlink():
                 raise PublisherError('This run already has a frozen publication; use its existing review')
+            self._source_remote()
             delta, inventory = workspace.diff(), workspace.snapshot()
             self._check_stop()
             base = self._base()
@@ -330,7 +364,7 @@ class Publisher:
             folder,manifest = self._frozen(frozen)
             ledger = json.loads(read_private(folder / 'ledger.json', 16384))
             if ledger['state'] == 'completed':
-                return ledger['result']
+                return self._result(ledger['result'])
             if ledger['state'] != 'prepared':
                 ledger.update(state='unknown',updated_at=time.time()); atomic(folder / 'ledger.json',encoded(ledger))
                 raise PublisherError('Publication may have partially completed. Inspect GitHub; this request will not run again')
@@ -338,6 +372,7 @@ class Publisher:
                 raise PublisherError('The trusted GitHub CLI is unavailable')
             if stop_event is not None and stop_event.is_set():
                 raise PublisherError('Publication stopped before any GitHub action')
+            self._source_remote()
             public = manifest['public']; patch = read_private(folder / 'patch', MAX_PATCH)
             current = self._git(['diff','--cached','--binary','--full-index','--no-ext-diff','--no-textconv',public['base_commit'],'--'],folder)
             if (sha(patch) != public['patch_sha256'] or current != patch
@@ -357,8 +392,7 @@ class Publisher:
                 record('create_issue')
                 issue = self._execute([self.gh,'issue','create','--repo',self.repo,'--title','[OC] '+public['title'],
                                        '--body-file',str(issue_body)],auth=True,stop_event=stop_event).decode().strip()
-                match = re.fullmatch(r'https://github\.com/jmw7629/JOEOS/issues/([1-9][0-9]*)',issue)
-                if not match:
+                if not self._github_url(issue, 'issues'):
                     raise PublisherError('GitHub issue creation did not return the expected repository URL')
                 record('create_commit',issue_url=issue)
                 commit = self._git(['commit-tree',manifest['tree'],'-p',public['base_commit'],'-F',str(commit_body)],folder,stop_event=stop_event).decode().strip()
@@ -374,7 +408,7 @@ class Publisher:
                 atomic(pr_body,(public['body']+'\n\nRelated issue: '+issue+provenance).encode())
                 pr = self._execute([self.gh,'pr','create','--repo',self.repo,'--base',self.base_branch,'--head',public['branch'],
                                     '--title',public['title'],'--body-file',str(pr_body)],auth=True,stop_event=stop_event).decode().strip()
-                if not re.fullmatch(r'https://github\.com/jmw7629/JOEOS/pull/[1-9][0-9]*',pr):
+                if not self._github_url(pr, 'pull'):
                     raise PublisherError('GitHub PR creation did not return the expected repository URL')
                 result = {'issue_url':issue,'pull_request_url':pr}
                 ledger.update(state='completed',step='complete',result=result,updated_at=time.time())

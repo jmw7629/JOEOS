@@ -35,7 +35,7 @@
   `;
   document.head.appendChild(style);
   let identity = '', blockedIdentity = null, epoch = 0, catalog = null, catalogAt = 0, catalogBusy = false;
-  let conversationId = '', projectKey = '', messages = [], run = null, seq = 0, stream = '', tools = [], agents = [], artifacts = [], permissions = [];
+  let conversationId = '', conversationProjectKey = '', projectKey = '', messages = [], run = null, seq = 0, stream = '', tools = [], agents = [], artifacts = [], permissions = [];
   let loading = false, sending = false, polling = false, stopBusy = false, feedback = '', lastPoll = 0, restored = false, pendingSend = null, pendingEvents = false;
   let messagesSignature = '', permissionSignature = '', agentSignature = '', toolSignature = '', artifactSignature = '';
   const controllers = new Set(), permissionNotes = new Map(), decisions = new Map(), stopRequests = new Map(), downloads = new Set(), downloadUrls = new Set();
@@ -45,14 +45,32 @@
   const same = (current, turn) => current === who() && turn === epoch && owner();
   const uuid = () => crypto.randomUUID();
   const expires = value => Number(value) > 1e12 ? Number(value) : Number(value) * 1000;
-  const connected = () => catalog?.configured === true && catalog?.connected === true;
+  const projectList = () => Array.isArray(catalog?.projects) ? catalog.projects : [];
+  function projectState() {
+    const project = projectList().find(item => item.key === projectKey);
+    const mode = project && Object.hasOwn(project,'mode') ? project.mode : 'execute';
+    const flag = name => project && Object.hasOwn(project,name) ? project[name] === true : catalog?.[name] === true;
+    const configured = !!project && flag('configured'), connected = !!project && flag('connected');
+    return {project,mode,configured,connected,ready:mode === 'execute' && configured && connected};
+  }
+  function projectStatus(state = projectState()) {
+    if (!catalog) return 'Checking the Codex workspace…';
+    if (state.ready) return 'Connected · agents selected automatically';
+    if (!state.project && projectKey) return 'This project is no longer available in the workspace. Its recorded conversation remains open.';
+    if (text(state.project?.detail)) return state.project.detail;
+    if (state.mode === 'observe') return 'This project is being handled elsewhere. Its recorded history is available here.';
+    if (state.mode === 'blocked') return 'Execution is blocked for this project. Its recorded history is available here.';
+    if (state.mode !== 'execute') return 'Execution is unavailable for this project.';
+    if (!state.configured) return 'The Codex workspace runtime has not been connected.';
+    return 'Codex sign-in or runtime connection is unavailable.';
+  }
   const active = () => !!run && activeStates.has(run.status);
   const resetSignatures = () => {messagesSignature = permissionSignature = agentSignature = toolSignature = artifactSignature = '';};
 
   function resetContext(clearDraft = false) {
     epoch++; for (const controller of controllers) controller.abort(); controllers.clear();
     for (const url of downloadUrls) URL.revokeObjectURL(url); downloadUrls.clear(); downloads.clear();
-    conversationId = ''; messages = []; run = null; seq = 0; stream = ''; tools = []; agents = []; artifacts = []; permissions = [];
+    conversationId = ''; conversationProjectKey = ''; messages = []; run = null; seq = 0; stream = ''; tools = []; agents = []; artifacts = []; permissions = [];
     loading = sending = polling = stopBusy = catalogBusy = pendingEvents = false; feedback = ''; lastPoll = 0; pendingSend = null;
     permissionNotes.clear(); decisions.clear(); stopRequests.clear(); resetSignatures();
     if (clearDraft) $('chatInput').value = '';
@@ -90,10 +108,14 @@
     } finally { clearTimeout(timeout); controllers.delete(controller); }
   }
   function projectOptions() {
-    const list = Array.isArray(catalog?.projects) ? catalog.projects : [];
-    const select = $('codexProject'), markup = list.map(p => `<option value="${escape(p.key)}">${escape(p.label || p.key)}</option>`).join('');
+    const list = projectList();
+    const select = $('codexProject');
+    let markup = list.map(p => `<option value="${escape(p.key)}">${escape(p.label || p.key)}</option>`).join('');
+    if (conversationProjectKey) {
+      projectKey = conversationProjectKey;
+      if (!list.some(p => p.key === projectKey)) markup += `<option value="${escape(projectKey)}">Current project unavailable</option>`;
+    } else if (!list.some(p => p.key === projectKey)) projectKey = list.find(p => p.key === 'joeos')?.key || list[0]?.key || '';
     if (select.innerHTML !== markup) select.innerHTML = markup || '<option value="">No execution project connected</option>';
-    if (!list.some(p => p.key === projectKey)) projectKey = list.find(p => p.key === 'joeos')?.key || list[0]?.key || '';
     select.value = projectKey; select.disabled = sending || loading || active();
     const conversations = (catalog?.conversations || []).filter(c => c.project_key === projectKey);
     let options = '<option value="">New conversation</option>' + conversations.map(c => `<option value="${escape(c.id)}">${escape(c.title || 'Conversation')}</option>`).join('');
@@ -141,13 +163,15 @@
   function render() {
     if (!synchronizeIdentity()) return;
     projectOptions();
-    $('codexConnection').textContent = connected() ? 'Connected · agents selected automatically' : catalog?.configured ? 'Codex sign-in or runtime connection is unavailable.' : catalog ? 'The Codex workspace runtime has not been connected.' : 'Checking the Codex workspace…';
-    $('codexRoute').textContent = [run?.model || catalog?.model, run?.effort || catalog?.effort].filter(Boolean).join(' · ');
-    $('codexRunState').textContent = sending ? 'Sending…' : loading ? 'Loading conversation…' : labels[run?.status] || (run?.status ? 'Recorded state: '+run.status : 'Ready');
+    const state = projectState();
+    $('codexConnection').textContent = projectStatus(state);
+    $('codexRoute').textContent = [run?.model || (state.ready ? catalog?.model : ''),run?.effort || (state.ready ? catalog?.effort : ''),state.project?.repo].filter(Boolean).join(' · ');
+    const idleState = state.ready ? 'Ready' : state.mode === 'observe' ? 'Observed' : state.mode === 'blocked' ? 'Blocked' : state.configured ? 'Unavailable' : 'Not connected';
+    $('codexRunState').textContent = sending ? 'Sending…' : loading ? 'Loading conversation…' : labels[run?.status] || (run?.status ? 'Recorded state: '+run.status : idleState);
     $('codexFeedback').textContent = feedback;
-    progress.textContent = run ? `${labels[run.status] || run.status}${active() ? ' · updates appear here' : ''}` : sending ? 'Submitting your request…' : 'Choose an outcome; Codex handles the routing.';
+    progress.textContent = run ? `${labels[run.status] || run.status}${active() ? ' · updates appear here' : ''}` : sending ? 'Submitting your request…' : state.ready ? 'Choose an outcome; Codex handles the routing.' : 'Project status and recorded history are available here.';
     $('codexStop').hidden = !active(); $('codexStop').disabled = stopBusy || run?.status === 'stopping';
-    $('sendChat').disabled = !connected() || !projectKey || sending || loading || active();
+    $('sendChat').disabled = !state.ready || !projectKey || sending || loading || active() || (!!conversationId && conversationProjectKey !== projectKey);
     $('loadChat').textContent = 'Refresh conversation'; $('loadChat').disabled = loading;
     renderMessages(); renderPermissions(); renderEvidence();
   }
@@ -166,16 +190,18 @@
     finally { if (same(current,turn)) { catalogBusy = false; render(); } }
   }
   async function selectConversation(id) {
-    resetContext(); conversationId = id || ''; restored = true;
+    const selectedProject = projectKey;
+    resetContext(); conversationId = id || ''; conversationProjectKey = id ? selectedProject : ''; restored = true;
     if (!id) { render(); return; }
     loading = true; render(); const current = who(), turn = epoch;
     try {
       const data = await request('/api/codex-workspace/conversations/'+encodeURIComponent(id),undefined,current,turn); if (!data) return;
-      conversationId = data.conversation?.id || id; projectKey = data.conversation?.project_key || projectKey;
+      if (data.conversation?.id !== id || data.conversation?.project_key !== selectedProject) throw new Error('The conversation does not match the selected project. Select its history from the correct project.');
+      conversationId = id; conversationProjectKey = selectedProject;
       messages = (data.messages || []).map(m => ({id:m.id,role:m.role,text:text(m.text),run_id:m.run_id}));
       const runs = data.runs || []; run = [...runs].reverse().find(r => activeStates.has(r.status)) || runs[runs.length-1] || null;
       artifacts = data.artifacts || []; lastPoll = 0;
-    } catch (error) { if (same(current,turn)) feedback = 'Could not load conversation: '+error.message; }
+    } catch (error) { if (same(current,turn)) { conversationId = ''; conversationProjectKey = ''; feedback = 'Could not load conversation: '+error.message; } }
     finally { if (same(current,turn)) { loading = false; render(); void poll(true); } }
   }
   function acceptEvent(event) {
@@ -216,7 +242,9 @@
     const content = (textOverride || $('chatInput').value).trim();
     if (!content || sending || loading || active()) return;
     if (!catalog) await refreshCatalog(true);
-    if (!owner() || !connected() || !projectKey) { feedback = 'Connect the Codex workspace before sending work.'; render(); return; }
+    if (!owner() || sending || loading || active()) return;
+    if (!projectState().ready || !projectKey) { feedback = projectStatus(); render(); return; }
+    if (conversationId && conversationProjectKey !== projectKey) { feedback = 'Select a conversation belonging to this project before sending work.'; render(); return; }
     const draft = $('chatInput').value;
     if (!pendingSend || pendingSend.message !== content || pendingSend.conversation_id !== (conversationId || null) || pendingSend.project_key !== projectKey) pendingSend = {request_id:uuid(),conversation_id:conversationId || null,project_key:projectKey,message:content};
     sending = true; feedback = ''; render(); const current = who(), turn = epoch;
@@ -224,7 +252,7 @@
       const data = await request('/api/codex-workspace/message',pendingSend,current,turn); if (!data) return;
       if (!data.conversation_id || !data.run_id) throw new Error('The runtime did not return a conversation and run');
       if ($('chatInput').value === draft) $('chatInput').value = '';
-      pendingSend = null; conversationId = data.conversation_id; stream = ''; seq = 0; tools = []; agents = []; permissions = []; artifacts = [];
+      pendingSend = null; conversationId = data.conversation_id; conversationProjectKey = projectKey; stream = ''; seq = 0; tools = []; agents = []; permissions = []; artifacts = [];
       messages.push({id:'sent:'+data.run_id,role:'user',text:content,run_id:data.run_id}); run = {id:data.run_id,status:'queued',model:catalog.model,effort:catalog.effort}; lastPoll = 0; catalogAt = 0;
     } catch (error) { if (same(current,turn)) feedback = 'Submission could not be confirmed: '+error.message+'. Your draft is kept. Sending the same draft retries the same request.'; }
     finally { if (same(current,turn)) { sending = false; render(); void poll(true); } }
@@ -274,7 +302,11 @@
     const button = event.target.closest('[data-codex-decision]'); if (button) void decide(button.dataset.permissionId,button.dataset.codexDecision);
     const artifact = event.target.closest('[data-codex-download]'); if (artifact) void download(artifact.dataset.codexDownload);
   });
-  $('codexProject').addEventListener('change', () => { projectKey = $('codexProject').value; void selectConversation(''); });
+  $('codexProject').addEventListener('change', () => {
+    const key = $('codexProject').value;
+    if (sending || loading || active() || !projectList().some(project => project.key === key)) { render(); return; }
+    projectKey = key; void selectConversation('');
+  });
   $('codexConversation').addEventListener('change', () => void selectConversation($('codexConversation').value));
   $('codexNewConversation').addEventListener('click', () => { void selectConversation(''); $('chatInput').focus(); });
   $('codexRefresh').addEventListener('click', () => { void refreshCatalog(true); void poll(true); });
