@@ -3,7 +3,7 @@
 Implements the approved space-themed command-center direction in the existing application. This is executable UI, not a screenshot overlay or a separate demo.
 
 ## Scope
-Earth hero, original inline vector icons, embossed dark cards, responsive metrics, agent graph, execution evidence, organization, work, review ledger, memories, and portfolio progress. The five-primary dock is paired with an accessible all-workspaces dialog so Kanban, Models, Team, Terminal, Activity, Work Next, and Help remain reachable.
+Nebula hero, original inline vector icons, embossed dark cards, responsive metrics, agent graph, execution evidence, organization, work, review ledger, memories, and portfolio progress. The five-primary dock is paired with an accessible all-workspaces dialog so Kanban, Models, Team, Terminal, Activity, Work Next, and Help remain reachable.
 
 Owner/priority/status scopes compose instead of resetting one another. A selected person with no tasks produces an empty result, not a fallback to all tasks. The due-soon tile uses the same date calculation as the filters. Running and queued counts are distinguished. Personal startup-view settings remain authoritative.
 
@@ -19,8 +19,8 @@ The upper-right Home music player uses Spotify for the owner's Saxon Shore catal
 
 No application database/schema/auth changes, no live task seeding, no bridge start/stop, no owner-hold removal, and no Funnel changes. Status and counts come from existing APIs. The design mockup's example people, completion percentages, and online statuses are not seeded into production. PRFKT_PROJECT review decisions remain non-merging.
 
-## Earth asset
-Source: NASA Earth Observatory, Blue Marble 2002, https://science.nasa.gov/resource/blue-marble-2002/ . Download: https://assets.science.nasa.gov/dynamicimage/assets/science/psd/solar/2023/09/1/1-bluemarble_west-1.jpg?crop=faces%2Cfocalpoint&fit=clip&h=800&w=800 . Re-encoded as a 640-pixel WebP (45,338 bytes), embedded in Home CSS to avoid runtime external requests. Attribution is visible on Home. No NASA endorsement is implied. Usage guidance: https://www.nasa.gov/nasa-brand-center/images-and-media/ .
+## Background asset
+The Earth artwork and external astronomy photographs have been removed. The original generated nebula is embedded locally with no stock-image request or attribution label. Generation prompt and asset hashes are recorded in [Nebula provenance](assets/NEBULA_PROVENANCE.md).
 
 ## Focused workspaces and live crawl
 The legacy global metrics are retained as hidden internal DOM targets, not shown on any workspace; the Home KPI cards are the executive overview. Existing filter elements now live in an on-demand native dialog so identities, saved views and filter handlers are preserved. Every non-Home view shows its own title immediately. Chat puts its composer before the collapsible optional routing controls; routine refresh preserves selected project, agent, model and terminal run.
@@ -33,4 +33,4 @@ The focused browser regression suite verifies all eleven non-Home workspaces hav
 
 The six Home counters open exact matching records with existing task, board and run actions. Project Lead filtering supports named and unassigned leads while preserving the other scopes. The Home layout remains intact; the duplicate chat composer and AI CHAT status badge are removed.
 
-The embedded Webb Carina Nebula background follows bounded phone orientation when supported and permitted. Reduced motion disables movement, and the old embossed/motion toggles are removed. See [Conversation UI](CONVERSATION_UI.md) for the source attribution, mobile remote layout, optional message popups and browser acceptance. Native execution permissions are connected separately from read-only historical traces.
+The embedded original nebula background follows bounded phone orientation when supported and permitted. Reduced motion disables movement, and the old embossed/motion toggles are removed. See [Conversation UI](CONVERSATION_UI.md) for the mobile remote layout, optional message popups and browser acceptance. Native execution permissions are connected separately from read-only historical traces.

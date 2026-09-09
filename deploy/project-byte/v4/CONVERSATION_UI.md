@@ -12,7 +12,7 @@ Home keeps its layout. Each of the six counters opens the exact matching records
 
 Reviewed Soarcer/synapse public-launch commit f7020f404829b8902650c72418029aae5abfdc8a and the static contents of @synapse-ai/cli 0.1.3 (registry SHA-1 4ab1acd109a92e9529473fdbe2b727c1838c6648). Its public repository contains documentation and screenshots, while the package contains the shipped implementation. No package code was executed or copied. Shared selection, compact tools, readable inspectors and mobile response sheets informed an original adaptation to this dashboard's existing authenticated runner.
 
-The background is Webb's Carina Nebula image, credited visibly to NASA, ESA, CSA, and STScI. Source: https://esawebb.org/images/weic2205a/ ; usage: https://esawebb.org/copyright/ (CC BY 4.0). A resized WebP is embedded locally. No image fetch or device-orientation telemetry is sent to third parties.
+The background uses original generated PRFKT nebula artwork embedded in the application. Earth and external astronomy-photo credits are removed. Phone-orientation parallax, permission handling and reduced-motion behavior are preserved. See assets/NEBULA_PROVENANCE.md.
 
 The backdrop follows bounded changes in device orientation when supported, signed in and visible. Reduced-motion preferences disable movement. Browsers requiring a sensor permission expose an explicit Allow orientation access action in Settings. Physical iPhone sensor behavior requires device acceptance; synthetic browser tests cover permission, bounds and reduced-motion behavior.
 
