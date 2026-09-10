@@ -90,6 +90,8 @@ try {
   append(run,'tool_completed',{tool_id:'tool-a',agent_id:'coordinator',name:'workspace_read',success:true,duration_ms:42,result:{text:'Result A',bytes:8,truncated:true,format:'text'}});
   for(const count of [12,12,18]) append(run,'token_usage',{agent_id:'coordinator',native:{thread_id:'native-thread'},source:'native_codex',total:{total_tokens:count},last:{total_tokens:6}});
   await page.goto(base+'/#ai');
+  await page.waitForFunction(()=>document.querySelector('#cwWorkTabs button'));
+  await page.evaluate(id=>window.PRFKT_CODEX.openConversation(id),'trace-conversation');
   await page.locator('[data-cw-view=graph]').click();
   await page.waitForFunction(()=>document.querySelector('[data-trace-node="tool:tool-a"][data-status="completed"]'));
   assert.ok(eventsAfter.some(after=>after>=200),'all event pages drained');
@@ -165,6 +167,7 @@ try {
   await openDock(page);await page.locator('.home-nav [data-home-go="ai"]').click();
   run.status='completed';run.permissions=[];
   await page.waitForFunction(()=>document.getElementById('codexRunState').textContent==='Completed');
+  await page.locator('#cwNewWork').click();
   await page.locator('#codexProject').selectOption('memory');
   assert.equal(await page.locator('#codexTraceStudio').isVisible(),false);
   assert.equal(await page.locator('#codexTraceInspector').innerText(),'');

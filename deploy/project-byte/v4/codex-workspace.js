@@ -293,6 +293,8 @@
     $('codexConversation').value = conversationId; $('codexConversation').disabled = sending || loading;
     $('codexNewConversation').disabled = sending || loading;
   }
+  function workUserText(m){const value=text(m.text),prefix='Work context (reference data; execution permissions remain unchanged):\n',marker='\n\nUser request:\n',suffix='\n\nWorkspace reference context (execution permissions unchanged):\n';if(m.role!=='user')return value;const at=value.indexOf(marker);if(value.startsWith(prefix)&&at>=prefix.length)return value.slice(at+marker.length);const end=value.lastIndexOf(suffix);if(end>=0){try{const c=JSON.parse(value.slice(end+suffix.length));if(c&&typeof c.project==='string'&&typeof c.kind==='string')return value.slice(0,end);}catch{}}return value;}
+
   function renderMessages() {
     const native = [...nativeMessages.values()];
     const final = run?.status==='completed' && messages.some(m=>m.run_id===run?.id && m.role==='assistant');
@@ -300,7 +302,7 @@
     const signature = JSON.stringify([messages,visibleNative,agents.map(a=>[a.id,a.role]),native.length?null:stream]); if (signature === messagesSignature) return;
     messagesSignature = signature;
     const log = $('chatlog'), nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
-    const item = (m,label) => `<article class="msg ${m.role==='user'?'user':'assistant'}"${m.id?` data-message-id="${escape(m.id)}"`:''}><div class="cw-message-author">${escape(label || (m.role==='user'?'You':'AI_BYTE'))}</div><div class="cw-message-body">${messageMarkup(m.text)}</div></article>`;
+    const item = (m,label) => `<article class="msg ${m.role==='user'?'user':'assistant'}"${m.id?` data-message-id="${escape(m.id)}"`:''}><div class="cw-message-author">${escape(label || (m.role==='user'?'You':'AI_BYTE'))}</div><div class="cw-message-body">${messageMarkup(workUserText(m))}</div></article>`;
     const nativeHtml=visibleNative.map(m=>item(m,m.coordinator?'AI_BYTE · '+(m.phase==='commentary'?'Update':'Response'):(agents.find(a=>a.id===m.agent_id)?.role || 'Agent'))).join('');
     let inserted=false;const html=messages.map((m,i)=>{let result='';if(m.run_id===run?.id && m.role==='assistant' && !inserted){result=nativeHtml;inserted=true;}result+=item(m);if(m.run_id===run?.id && messages[i+1]?.run_id!==run?.id && !inserted){result+=nativeHtml;inserted=true;}return result;}).join('');
     log.innerHTML = html + (!inserted?nativeHtml:'') + (!native.length && stream ? item({text:stream},'AI_BYTE') : '');
@@ -384,7 +386,7 @@
   function acceptEvent(event) {
     traceAccept(event);
     const data = event.data || {};
-    if(window.PRFKT_LIVE_UPDATES && ['tool_started','tool_completed'].includes(event.type) && event.ts>=Math.max(presentationStarted,notificationAfter))window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'tool:'+run?.id+':'+event.seq,ts:event.ts,title:(data.name || 'Tool')+' · '+(event.type==='tool_started'?'started':data.success===false?'failed':'finished'),message:data.summary || 'Open the workspace terminal for recorded output.',source:'Agent',project:projectKey,link:'#ai'}}));
+    if(window.PRFKT_LIVE_UPDATES && ['tool_started','tool_completed'].includes(event.type) && event.ts>=Math.max(presentationStarted,notificationAfter))window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'tool:'+run?.id+':'+event.seq,ts:event.ts,title:(data.name || 'Tool')+' · '+(event.type==='tool_started'?'started':data.success===false?'failed':'finished'),message:data.summary || 'Open the workspace terminal for recorded output.',source:'Agent',project:projectKey,conversationId,link:'#ai'}}));
     if (event.type==='agent_message' || event.type==='message_delta' || data.output_kind==='agent_delta') {
       const id=data.message_id || 'stream:'+data.agent_id, previous=nativeMessages.get(id);
       const coordinator=event.type==='message_delta' || agents.find(a=>a.id===data.agent_id)?.role==='coordinator' || traceNodes.get(nodeKey('agent',data.agent_id))?.label==='coordinator' || previous?.coordinator;
@@ -571,7 +573,7 @@
     flush();if(buf.length)out.push('<pre><code>'+escape(buf.join('\n'))+'</code></pre>');return out.join('');
   }
   function notifyAgent(message) {
-    if(window.PRFKT_LIVE_UPDATES && owner()){window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'agent:'+run?.id+':'+message.id,title:message.coordinator?'AI_BYTE':agents.find(a=>a.id===message.agent_id)?.role || 'Agent',message:message.text,source:'Agent',project:projectKey,link:'#ai'}}));return;}
+    if(window.PRFKT_LIVE_UPDATES && owner()){window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'agent:'+run?.id+':'+message.id,title:message.coordinator?'AI_BYTE':agents.find(a=>a.id===message.agent_id)?.role || 'Agent',message:message.text,source:'Agent',project:projectKey,conversationId,link:'#ai'}}));return;}
     if(!popups || !owner() || !visible() || popupSeen.has(message.id))return;
     popupSeen.add(message.id);popupMessage={...message,conversationId};
     $('cwPopupTitle').textContent=message.coordinator?'AI_BYTE':agents.find(a=>a.id===message.agent_id)?.role || 'Agent';
@@ -606,7 +608,7 @@
     $('agents')?.classList.toggle('cw-agents-remote',enabled && remote);
     remoteFeed.hidden=!enabled || !remote;
     $('cwRemoteState').textContent=enabled ? [projectState().project?.label,run?labels[run.status]:'Choose a conversation in Chat'].filter(Boolean).join(' · ') : '';
-    const recent=[...nativeMessages.values()].filter(m=>m.text).slice(-3);const feed=recent.map(m=>`<article class="cw-remote-message"><b>${escape(m.coordinator?'AI_BYTE':agents.find(a=>a.id===m.agent_id)?.role || 'Agent')}</b><div>${messageMarkup(m.text)}</div></article>`).join('') || (enabled?'<p class="small">Recorded agent messages appear here for the selected conversation.</p>':'');
+    const recent=[...nativeMessages.values()].filter(m=>m.text).slice(-3);const feed=recent.map(m=>`<article class="cw-remote-message"><b>${escape(m.coordinator?'AI_BYTE':agents.find(a=>a.id===m.agent_id)?.role || 'Agent')}</b><div>${messageMarkup(workUserText(m))}</div></article>`).join('') || (enabled?'<p class="small">Recorded agent messages appear here for the selected conversation.</p>':'');
     if($('cwRemoteMessages').innerHTML!==feed)$('cwRemoteMessages').innerHTML=feed;
     toolbar.hidden=!enabled;terminal.hidden=!enabled || workspaceView!=='terminal';
     $('chatlog').hidden=enabled && workspaceView!=='chat';studio.hidden=!enabled || workspaceView!=='graph' || !run;
@@ -633,7 +635,148 @@
     #cwRemoteFeed[hidden]{display:none!important}#cwRemoteFeed{margin-bottom:14px}#cwRemoteFeed h2{font-size:16px}.cw-remote-message{padding:16px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.65;overflow-wrap:anywhere}.cw-remote-message>b{font-size:11px;color:#9ac8ed}.cw-remote-message pre{white-space:pre-wrap;overflow-wrap:anywhere}.cw-remote-message p{margin:8px 0}#agents.cw-agents-remote:not(.cw-show-history) #pbObservatory>:not(.obs-header):not(#codexPermissionInbox){display:none!important}#agents.cw-agents-remote:not(.cw-show-history) .obs-header>div:last-child{display:none}#agents.cw-agents-remote:not(.cw-show-history) .obs-roles{display:none}#agents.cw-agents-remote #codexPermissionInbox{font-size:13px}#agents.cw-agents-remote .cw-inbox-history{font-size:12px}
     #homeAIState{display:none!important}
   `;document.head.append(conversationStyle);
-  window.PRFKT_CODEX = Object.freeze({open,send});
+  // Scoped work windows own their drafts, requests and background observation.
+  const workRooms=new Map(), roomControllers=new Set();
+  let selectedRoom='',roomIdentity='',roomGeneration=0,roomReady=false,roomBusy=false,roomNext=0,roomSwitch=0,roomStoreKey=null,roomStoreName='',roomSave=Promise.resolve(),roomStorageOK=true;
+  let roomRenderSignature='',roomScopeSignature='',roomDraftTimer=0,renderedRoom='';
+  const roomUI=document.createElement('section');roomUI.id='cwWorkWindows';
+  roomUI.innerHTML='<div class="cw-work-head"><div><b>Work chats</b><p>Separate context. Work stays attached when you move elsewhere.</p></div><button type="button" class="mini" id="cwNewWork">+ New chat</button></div><div id="cwWorkTabs" role="tablist" aria-label="Work conversations"></div><div id="cwWorkScope"></div><p id="cwWorkState" role="status"></p><div class="cw-work-buttons"><button type="button" class="mini" id="cwCancelQueued" hidden>Cancel waiting message</button><button type="button" class="mini" id="cwRetryQueued" hidden>Retry same request</button><button type="button" class="mini" id="cwCloseWork" hidden>Close window</button></div>';
+  box.prepend(roomUI);
+  const roomCSS=document.createElement('style');roomCSS.textContent=`
+    #cwWorkWindows{padding:12px 14px;margin-bottom:0;max-height:42%;overflow:auto;flex-shrink:0;border-bottom:1px solid #304357;padding-bottom:14px}#cwWorkWindows[hidden]{display:none!important}.cw-work-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.cw-work-head b{font-size:17px}.cw-work-head p{color:#9dafc0;font-size:12px;margin:5px 0 10px}.cw-work-head button{white-space:nowrap}
+    #cwWorkTabs{display:flex;gap:8px;overflow:auto;padding:4px 0 12px;scrollbar-width:thin}#cwWorkTabs button{flex:0 0 auto;max-width:240px;display:grid;gap:5px;text-align:left;padding:10px 14px;border:1px solid #334e66;border-radius:12px;background:#0d1c2d;color:#b6c9da;font:inherit;min-height:54px}#cwWorkTabs button[aria-selected=true]{border-color:#72caff;background:#15324b;color:#eef8ff}#cwWorkTabs b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}#cwWorkTabs small{font-size:11px}#cwWorkScope{color:#c9dcea;font-size:13px;line-height:1.6;overflow-wrap:anywhere}#cwWorkScope details{margin-top:5px}#cwWorkScope #cwCloseWork{margin-top:8px;min-height:44px}#cwWorkScope summary{cursor:pointer;min-height:32px;color:#98b8d0}#cwWorkScope p{margin:6px 0;white-space:pre-wrap}#cwWorkState:empty{display:none}#cwWorkState{font-size:12px;color:#afc7db;white-space:pre-wrap;margin:8px 0}.cw-work-buttons{display:flex;gap:8px;flex-wrap:wrap}.cw-work-buttons button[hidden]{display:none!important}
+    #ai.cw-enabled.cw-work-rooms #loadChat,#ai.cw-enabled.cw-work-rooms #codexNewConversation{display:none!important}#ai.cw-work-rooms .cw-work-buttons button,#cwNewWork{min-height:44px}#ai.cw-work-rooms .composer textarea{min-height:58px}#ai.cw-work-rooms #codexConversation{font-size:14px}
+    #ai.cw-enabled.cw-work-rooms .chatbox{height:var(--cw-work-height,calc(100dvh - 180px));min-height:350px;display:flex;flex-direction:column}#ai.cw-work-rooms .chatbox>.between{display:none!important}#ai.cw-work-rooms #chatlog,#ai.cw-work-rooms #cwTerminal{flex:1;min-height:55px;height:auto;overflow:auto}#ai.cw-work-rooms #cwTerminalLog{height:100%;min-height:55px}#ai.cw-work-rooms .composer,#ai.cw-work-rooms .cw-statusbar,#ai.cw-work-rooms .cw-workspace-bar{flex-shrink:0}
+    #ai.cw-enabled.cw-work-rooms #codexRefresh{display:inline-flex!important}
+    #cwWorkJump{min-height:44px;background:#112536;border:1px solid #365673;border-radius:12px;color:#bcd6e9;font-size:11px;padding:7px 10px}#cwWorkJump[hidden]{display:none!important}
+    @media(max-width:650px){.cw-work-head{align-items:flex-start}.cw-work-head p{display:none}.cw-work-head{margin-bottom:10px}#cwWorkTabs button{max-width:200px;padding:9px 12px}#cwWorkWindows{margin-bottom:10px}#cwWorkJump{font-size:0;width:38px;padding:5px}#cwWorkJump:after{content:'Chats';font-size:9px}#prfktNavDock>#cwWorkJump{position:absolute;top:0;right:10px}#ai.cw-work-rooms .composer textarea{min-height:58px;font-size:16px}}
+  `;document.head.append(roomCSS);
+  const roomJump=document.createElement('button');roomJump.id='cwWorkJump';roomJump.type='button';roomJump.hidden=true;document.querySelector('body > header .top')?.append(roomJump);roomJump.onclick=()=>open();
+  const roomActor=()=>owner()?who():'';
+  const roomCurrent=()=>workRooms.get(selectedRoom);
+  function roomClear(){roomGeneration++;for(const c of roomControllers)c.abort();roomControllers.clear();workRooms.clear();selectedRoom='';renderedRoom='';roomReady=false;roomBusy=false;roomNext=0;roomSwitch++;roomStoreKey=null;roomStoreName='';roomRenderSignature='';roomScopeSignature='';clearTimeout(roomDraftTimer);$('cwWorkTabs').replaceChildren();const close=$('cwCloseWork');if(close)roomUI.querySelector('.cw-work-buttons').append(close);$('cwWorkScope').replaceChildren();$('cwWorkState').textContent='';roomJump.hidden=true;$('chatInput').readOnly=false;}
+  async function roomUnlock(id,gen){
+    try{const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('prfkt-work-chats-v1\0'+id));const key=await crypto.subtle.importKey('raw',bytes,'AES-GCM',false,['encrypt','decrypt']);const name='prfkt.work-chats.'+Array.from(new Uint8Array(bytes)).map(v=>v.toString(16).padStart(2,'0')).join('');let data=null;const raw=localStorage.getItem(name);
+      if(raw){const p=JSON.parse(raw),decode=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));data=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:decode(p.iv)},key,decode(p.data))));}
+      if(gen!==roomGeneration)return;roomStoreKey=key;roomStoreName=name;
+      for(const row of (data?.rooms||[]).slice(0,40))if(row&&typeof row.id==='string'&&typeof row.projectKey==='string'){if(row.pending){const uncertain=['sending','uncertain'].includes(row.pending.phase);row.pending.phase=uncertain?'uncertain':'paused';row.note=uncertain?'Submission was interrupted. Retry the same request to check its result.':'Waiting message restored. Review it, then resume explicitly.';}workRooms.set(row.id,row);}
+      selectedRoom=workRooms.has(data?.selected)?data.selected:'';
+    }catch{if(gen===roomGeneration)roomStorageOK=false;}
+    if(gen!==roomGeneration)return;roomReady=true;roomRender();if(selectedRoom)void roomSelect(selectedRoom);else if(catalog)void roomNew({projectKey:projectList().some(p=>p.key==='joeos')?'joeos':'',title:'General chat',kind:'general'},false);
+  }
+  function roomSync(){const id=roomActor();if(id!==roomIdentity){roomClear();roomIdentity=id;roomStorageOK=true;restored=true;if(id)void roomUnlock(id,roomGeneration);}roomUI.hidden=!id;host.classList.toggle('cw-work-rooms',!!id);return !!id;}
+  function roomPersist(){if(!roomStoreKey||!roomStoreName)return;const payload=JSON.stringify({selected:selectedRoom,rooms:[...workRooms.values()]}),key=roomStoreKey,name=roomStoreName,gen=roomGeneration;roomSave=roomSave.catch(()=>{}).then(async()=>{try{const iv=crypto.getRandomValues(new Uint8Array(12)),b=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(payload)));if(gen!==roomGeneration)return;const enc=v=>btoa(Array.from(v,n=>String.fromCharCode(n)).join(''));localStorage.setItem(name,JSON.stringify({iv:enc(iv),data:enc(b)}));}catch{if(gen===roomGeneration){roomStorageOK=false;roomRender();}}});}
+  function roomRemember(){const r=roomCurrent();if(!r||renderedRoom!==r.id)return;r.draft=$('chatInput').value;if(conversationId&&conversationId===r.conversationId&&conversationProjectKey===r.projectKey){r.conversationId=conversationId;r.runId=run?.id||r.runId;r.status=run?.status||r.status;r.seq=seq;}roomPersist();}
+  async function roomRequest(path,body,gen){if(gen!==roomGeneration||roomActor()!==roomIdentity)return null;const c=new AbortController();roomControllers.add(c);const timer=setTimeout(()=>c.abort(),15000);try{const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:{'X-Access-Key':accessKey,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:c.signal,cache:'no-store'});let data={};try{data=await response.json();}catch{}if(gen!==roomGeneration||roomActor()!==roomIdentity)return null;if(!response.ok){const e=new Error(data.error||'HTTP '+response.status);e.status=response.status;throw e;}return data;}finally{clearTimeout(timer);roomControllers.delete(c);}}
+  function roomScope(r){const t=tasks.find(t=>t.id===r.taskId);return {project:r.projectName||projectList().find(p=>p.key===r.projectKey)?.label||r.projectKey,repository:projectList().find(p=>p.key===r.projectKey)?.repo||'',task:t||r.taskSnapshot||null,kind:r.kind||'general'};}
+  function roomStatus(r){if(r.pending)return r.pending.phase==='sending'?'Submitting…':r.pending.phase==='uncertain'?'Check submission':r.pending.phase==='paused'?'Waiting · resume needed':r.note||'Waiting for runner';return labels[r.status]||'Draft';}
+  function roomRender(){
+    if(!roomSync())return;if(!roomReady)return;const r=roomCurrent();const main=document.querySelector('body > main.wrap');if(main&&host.classList.contains('active')){const h=Math.max(350,Math.floor(main.clientHeight-(host.getBoundingClientRect().top-main.getBoundingClientRect().top+main.scrollTop)-20))+'px';if(box.style.getPropertyValue('--cw-work-height')!==h)box.style.setProperty('--cw-work-height',h);}
+    if(r&&renderedRoom===r.id&&run&&conversationId===r.conversationId){r.status=run.status;r.runId=run.id;r.seq=seq;}
+    if(!r&&catalog){void roomNew({projectKey:projectList().some(p=>p.key==='joeos')?'joeos':'',title:'General chat',kind:'general'},false);return;}
+    const sig=JSON.stringify([...workRooms.values()].map(x=>[x.id,x.title,x.projectKey,x.status,x.pending?.phase,x.note,x.unread]));
+    if(roomRenderSignature!==sig+'|'+selectedRoom){roomRenderSignature=sig+'|'+selectedRoom;const focused=document.activeElement?.dataset?.workRoom;const tabs=$('cwWorkTabs');tabs.replaceChildren();for(const w of workRooms.values()){const b=document.createElement('button');b.type='button';b.role='tab';b.dataset.workRoom=w.id;b.setAttribute('aria-selected',String(w.id===selectedRoom));const title=document.createElement('b'),status=document.createElement('small');title.textContent=w.title;status.textContent=(w.unread?'● ':'')+roomStatus(w);b.append(title,status);b.onclick=()=>void roomSelect(w.id);tabs.append(b);if(focused===w.id)b.focus({preventScroll:true});}}
+    const jumpParent=matchMedia('(max-width:650px)').matches?$('prfktNavDock'):document.querySelector('body > header .top');if(jumpParent&&roomJump.parentElement!==jumpParent)jumpParent.append(roomJump);
+    const activeCount=[...workRooms.values()].filter(w=>w.pending||activeStates.has(w.status)).length;roomJump.hidden=host.classList.contains('active')||!workRooms.size;roomJump.textContent='Chats'+(activeCount?' · '+activeCount:'');roomJump.title=activeCount+' active or waiting work chats';
+    if(!r)return;projectKey=r.projectKey;if(!projectKey){if(!$('codexProject').querySelector('option[value=""]'))$('codexProject').prepend(new Option('Choose workspace project',''));$('codexProject').value='';}const context=roomScope(r),dep=context.task?.depends_on?tasks.find(t=>t.id===context.task.depends_on):null;
+    const scopeMarkup='<details><summary>'+escape(r.title)+(context.project&&context.project!==r.title&&!r.title.endsWith(' · '+context.project)?' · '+escape(context.project):'')+' · Context</summary><p>'+escape(context.repository||'Choose a connected project in Context before sending.')+'</p>'+(context.task?'<p>'+escape(context.task.title)+' · '+escape(context.task.status)+'\nDependency: '+escape(dep?dep.title+' · '+dep.status:context.task.depends_on?'Unavailable — cannot execute until verified':'None')+'</p>':'')+'</details>';
+    if(roomScopeSignature!==r.id+'|'+scopeMarkup){roomScopeSignature=r.id+'|'+scopeMarkup;const close=$('cwCloseWork');$('cwWorkScope').innerHTML=scopeMarkup;$('cwWorkScope').querySelector('details').append(close);}
+    $('cwWorkState').textContent=(r.pending?roomStatus(r)+' · Waiting messages submit while this browser tab is open and visible.':r.note||'')+(!roomStorageOK?' Draft storage unavailable; keep this tab open.':'');
+    $('cwCancelQueued').hidden=!r.pending||r.pending.phase==='sending'||r.pending.phase==='uncertain';$('cwRetryQueued').hidden=!r.pending||!['paused','uncertain','blocked'].includes(r.pending.phase);$('cwRetryQueued').textContent=r.pending?.phase==='uncertain'?'Retry same request':'Resume waiting message';$('cwCloseWork').hidden=!!r.pending||activeStates.has(r.status);
+    $('sendChat').disabled=!r.projectKey||!!r.pending||loading||!projectState().ready;$('sendChat').textContent=activeCount?'Queue message':'Send';$('chatInput').readOnly=!!r.pending;
+    $('codexProject').disabled=!!r.conversationId||!!r.pending;$('codexConversation').disabled=false;
+    document.querySelectorAll('[data-ai-project]').forEach(b=>b.textContent='Open project chat');if($('queueTask'))$('queueTask').textContent='Open work chat';
+  }
+  const originalRoomRender=render;render=function(){originalRoomRender();roomRender();};
+  async function roomSelect(id,remember=true){
+    if(!roomSync()||!roomReady)return;const r=workRooms.get(id);if(!r)return;
+    if(remember)roomRemember();const ticket=++roomSwitch;selectedRoom=id;renderedRoom='';r.unread=false;projectKey=r.projectKey;restored=true;
+    await selectConversation(r.conversationId||'');if(ticket!==roomSwitch||!owner())return;
+    projectKey=r.projectKey;renderedRoom=r.id;$('chatInput').value=r.draft||'';if(r.pending)feedback='';roomPersist();render();const tabs=$('cwWorkTabs'),tab=tabs.querySelector('[aria-selected="true"]');if(tab)tabs.scrollLeft+=tab.getBoundingClientRect().left-tabs.getBoundingClientRect().left;
+  }
+  async function roomNew(scope={},navigate=true){
+    if(!roomSync())return;if(!roomReady){await new Promise(resolve=>setTimeout(resolve,100));if(!roomReady)return roomNew(scope,navigate);}
+    if(workRooms.size>=40){$('cwWorkState').textContent='Close an idle window before opening another (40-window limit).';open();return;}
+    roomRemember();const r={id:uuid(),title:scope.title||'New chat',projectKey:scope.projectKey??projectKey??'',projectName:scope.projectName||'',taskId:scope.taskId||'',taskSnapshot:scope.taskSnapshot||null,kind:scope.kind||'general',scopeKey:scope.scopeKey||'',conversationId:scope.conversationId||'',runId:'',status:'',seq:0,draft:scope.draft||'',pending:null,note:'',unread:false};workRooms.set(r.id,r);await roomSelect(r.id);if(navigate)open();return r;
+  }
+  const repoName=v=>String(v||'').replace(/^https?:\/\/github.com\//,'').replace(/\.git$/,'').replace(/\/$/,'').toLowerCase();
+  function roomProject(name){const p=projects.find(x=>x.name===name),repo=repoName(p?.repo);const matches=projectList().filter(x=>(repo&&repoName(x.repo)===repo)||x.key===name||x.label===name);return matches.length===1?matches[0].key:'';}
+  async function roomOpenWork(scope){
+    if(!owner()){open();return;}await refreshCatalog();
+    const t=scope.taskId?tasks.find(t=>t.id===scope.taskId):null,name=t?.project||scope.projectName||'',kind=scope.kind||'project';
+    const scopeKey=kind+':'+(t?.id||name||'general');const old=[...workRooms.values()].find(r=>r.scopeKey===scopeKey);
+    if(old){await roomSelect(old.id);open();return old;}
+    const draft=scope.draft??(t?.ai_prompt||'');return roomNew({scopeKey,projectKey:name?roomProject(name):projectKey,projectName:name,taskId:t?.id,taskSnapshot:t||null,title:(kind==='help'?'Help · ':kind==='planning'?'Plan · ':'')+(t?.title||name||'General chat'),kind,draft});
+  }
+  async function roomOpenConversation(id){
+    if(!owner()||!id)return;await refreshCatalog(true);const c=catalog?.conversations?.find(c=>c.id===id);if(!c){feedback='Conversation is not available in your workspace.';open();return;}
+    const old=[...workRooms.values()].find(r=>r.conversationId===id);if(old){await roomSelect(old.id);open();return;}await roomNew({projectKey:c.project_key,title:c.title||'Recorded conversation',conversationId:id});
+  }
+  const originalSelectConversation=selectConversation;
+  // Internal selection continues to use the existing trace and permission renderer.
+  selectConversation=async function(id,preferredRun=null){await originalSelectConversation(id,preferredRun);const r=roomCurrent();if(r&&r.conversationId===id&&conversationId===id&&r.projectKey===conversationProjectKey){r.runId=run?.id||'';r.status=run?.status||'';r.seq=seq;roomPersist();}};
+  send=async function(override=''){
+    if(!roomSync())return legacy.send?.(override);const r=roomCurrent();if(!r||r.pending||loading)return;const message=(override||$('chatInput').value).trim();if(!message)return;
+    if(!r.projectKey||!projectState().ready){r.note='Choose a connected workspace project in Context before sending.';roomRender();return;}
+    const context=roomScope(r);const bound=message+'\n\nWorkspace reference context (execution permissions unchanged):\n'+JSON.stringify(context);
+    if(new TextEncoder().encode(bound).length>24000){r.note='Message and context exceed 24 KB. Shorten the message before sending.';roomRender();return;}
+    if(r.title==='New chat'||r.title==='General chat')r.title=message.split('\n')[0].slice(0,60);r.draft=message;r.pending={phase:'waiting',created:Date.now(),body:{request_id:uuid(),conversation_id:r.conversationId||null,project_key:r.projectKey,message:bound}};r.note='Waiting for runner';roomPersist();roomRender();roomNext=0;void roomPump();
+  };
+  async function roomPump(){
+    if(!roomSync()||!roomReady||roomBusy||document.hidden||Date.now()<roomNext)return;roomBusy=true;const gen=roomGeneration;
+    try{
+      // Observe each known work window independently. Never stop a run on navigation.
+      for(const r of workRooms.values()){
+        if(gen!==roomGeneration)return;
+        if(!r.runId||(!activeStates.has(r.status)&&!r.catchingUp)||r.id===selectedRoom)continue;
+        try{const data=await roomRequest('/api/codex-workspace/runs/'+encodeURIComponent(r.runId)+'/events?after='+(r.seq||0),undefined,gen);if(!data)return;if(data.run?.id!==r.runId)throw new Error('Run identity mismatch');
+          for(const event of data.events||[]){r.seq=Math.max(r.seq||0,event.seq||0);if(event.type==='agent_message'&&event.data?.text){r.unread=true;window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'agent:'+r.runId+':'+(event.data.message_id||event.seq),ts:event.ts,title:r.title,message:event.data.text,source:'Agent',project:r.projectName||r.projectKey,conversationId:r.conversationId,link:'#ai'}}));}}
+          r.status=data.run?.status||r.status;r.catchingUp=(data.events||[]).length===200;r.note='';
+        }catch{r.note='Updates interrupted · reconnecting';}
+      }
+      if(gen!==roomGeneration)return;
+      const current=roomCurrent();if(current&&renderedRoom===current.id&&run&&conversationId===current.conversationId){current.status=run.status;current.runId=run.id;current.seq=seq;}
+      if([...workRooms.values()].some(r=>activeStates.has(r.status)))return;
+      const waiting=[...workRooms.values()].filter(r=>r.pending?.phase==='waiting').sort((a,b)=>a.pending.created-b.pending.created);
+      if(!waiting.length)return;let r=null,taskRows=null;
+      if(waiting.some(w=>w.taskId)){const data=await roomRequest('/api/tasks',undefined,gen);if(!data)return;taskRows=data.tasks||[];}
+      for(const candidate of waiting){
+        if(candidate.taskId){const task=taskRows.find(t=>t.id===candidate.taskId);
+          if(!task){candidate.pending.phase='blocked';candidate.note='Task no longer exists. Cancel this waiting message and review its scope.';continue;}
+          if(task.project!==candidate.projectName){candidate.pending.phase='blocked';candidate.note='Task moved projects. Cancel and open a new work chat from its current project.';continue;}
+          if(task.depends_on){const dependency=taskRows.find(t=>t.id===task.depends_on);if(!dependency||dependency.status!=='Done'){candidate.note='Waiting on '+(dependency?.title||'unavailable task dependency');continue;}}
+        }
+        r=candidate;break;
+      }
+      if(!r||gen!==roomGeneration)return;
+      const pending=r.pending;pending.phase='sending';r.note='Submitting to '+r.projectKey;roomPersist();roomRender();
+      try{const data=await roomRequest('/api/codex-workspace/message',pending.body,gen);if(!data)return;if(!data.conversation_id||!data.run_id||data.project_key&&data.project_key!==r.projectKey)throw new Error('Runtime returned mismatched work identifiers');
+        r.conversationId=data.conversation_id;r.runId=data.run_id;r.status='queued';r.seq=0;r.pending=null;r.draft='';r.note='';r.unread=r.id!==selectedRoom;catalogAt=0;
+        if(r.id===selectedRoom){$('chatInput').value='';await roomSelect(r.id,false);}
+      }catch(error){if(gen!==roomGeneration)return;if(error.status===409&&/task is active/i.test(error.message)){pending.phase='waiting';r.note='Waiting for the other Codex task to finish';}else if(error.status&&error.status<500){pending.phase='blocked';r.note=error.message;}else{pending.phase='uncertain';r.note='Submission could not be confirmed. Retry uses the same request ID; your draft is preserved.';}}
+    }finally{if(gen===roomGeneration){roomBusy=false;roomNext=Date.now()+2500;roomPersist();roomRender();}}
+  }
+  $('chatInput').addEventListener('input',()=>{const r=roomCurrent();if(!r||r.pending)return;r.draft=$('chatInput').value;clearTimeout(roomDraftTimer);roomDraftTimer=setTimeout(roomPersist,200);});
+  $('cwNewWork').onclick=()=>void roomNew({projectKey:roomCurrent()?.projectKey||projectKey,title:'New chat'});
+  $('cwCancelQueued').onclick=()=>{const r=roomCurrent();if(!r?.pending||['sending','uncertain'].includes(r.pending.phase))return;r.pending=null;r.note='Waiting message cancelled. Draft kept.';roomPersist();roomRender();};
+  $('cwRetryQueued').onclick=()=>{const r=roomCurrent();if(!r?.pending||!['uncertain','paused','blocked'].includes(r.pending.phase))return;r.pending.phase='waiting';r.note='Waiting for runner';roomNext=0;roomPersist();void roomPump();};
+  $('cwCloseWork').onclick=()=>{const r=roomCurrent();if(!r||r.pending||activeStates.has(r.status))return;if(r.draft&&!confirm('Close this window and discard its unsent draft? Recorded conversation history stays available.'))return;workRooms.delete(r.id);selectedRoom='';const next=workRooms.keys().next().value;if(next)void roomSelect(next);else void roomNew({projectKey:r.projectKey,title:'New chat'});roomPersist();};
+  document.addEventListener('change',event=>{if(!owner())return;if(event.target.id==='codexProject'){event.stopImmediatePropagation();const r=roomCurrent();if(r&&!r.conversationId&&!r.pending){r.projectKey=event.target.value;projectKey=r.projectKey;r.note='';roomPersist();render();}else render();}else if(event.target.id==='codexConversation'){event.stopImmediatePropagation();if(event.target.value)void roomOpenConversation(event.target.value);else void roomNew({projectKey,title:'New chat'});}},true);
+  document.addEventListener('click',event=>{
+    if(!owner())return;const b=event.target.closest('[data-ai-project],#queueTask,#queueSelected,#draftPrompt,#askHelp,[data-home-action="ask"],#codexNewConversation');if(!b)return;
+    event.preventDefault();event.stopImmediatePropagation();
+    if(b.dataset.aiProject){void roomOpenWork({projectName:b.dataset.aiProject});return;}
+    if(b.id==='queueTask'){const taskId=$('taskId').value,draft=$('taskPrompt').value;closeModal('taskModal');void roomOpenWork({taskId,kind:'task',draft});return;}
+    if(b.id==='queueSelected'){void roomOpenWork({taskId:$('aiTask').value,projectName:$('aiProject').value,kind:'task'});return;}
+    if(b.id==='codexNewConversation'){void roomNew({projectKey,title:'New chat'});return;}
+    void roomOpenWork({taskId:roomCurrent()?.taskId||'',projectName:roomCurrent()?.projectName||'',kind:b.id==='askHelp'?'help':b.id==='draftPrompt'?'planning':'general',draft:b.id==='askHelp'?'Help me with this workspace and its current context.':b.id==='draftPrompt'?'Plan this task with dependencies, acceptance criteria and tests. Do not execute the plan yet.':''});
+  },true);
+  const legacyQueue=typeof queue==='function'?queue:null;if(legacyQueue)queue=(id,prompt='')=>owner()?roomOpenWork({taskId:id,kind:'task',draft:prompt}):legacyQueue(id,prompt);
+  window.addEventListener('pagehide',roomRemember);document.addEventListener('visibilitychange',()=>{if(!document.hidden){roomNext=0;void roomPump();}});
+  document.addEventListener('click',event=>{if(event.target.closest('#login,#logoutAllLocal')){roomClear();roomIdentity='';}},true);
+  setInterval(()=>{if(roomSync()){roomRender();void roomPump();}},1000);
+
+  window.PRFKT_CODEX = Object.freeze({open,send,openWork:roomOpenWork,openConversation:roomOpenConversation});
   tick();
 })();
 
@@ -730,7 +873,7 @@
     busy=true;const gen=generation;
     try {const data=await request('/api/codex-workspace',undefined,id,gen);if(!data)return;snapshot=data;if(data.execution_permissions?.capable===true)mount();
       window.dispatchEvent(new CustomEvent('prfkt-permission-snapshot',{detail:{ids:(data.execution_permissions?.requests || []).filter(r=>r.can_decide).map(r=>r.id)}}));
-      for(const row of data.execution_permissions?.requests || [])if(row.can_decide)window.dispatchEvent(new CustomEvent('prfkt-permission-prompt',{detail:{id:row.id,title:row.repository || row.project_key,text:row.summary}}));
+      for(const row of data.execution_permissions?.requests || [])if(row.can_decide)window.dispatchEvent(new CustomEvent('prfkt-permission-prompt',{detail:{id:row.id,title:row.repository || row.project_key,text:row.summary,conversationId:row.conversation_id}}));
       const time=data.execution_permissions?.server_time;if(typeof time==='number' && Number.isFinite(time))clock={time,at:performance.now()};
       feedback='';
     }catch(error){if(valid(id,gen)){snapshot=null;feedback='Could not verify live permission requests: '+error.message;}}

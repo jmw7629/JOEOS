@@ -11,7 +11,7 @@ export async function verifyFocusedWorkspaces({page,api,base,out}){
     assert.equal(await page.locator('#search').isVisible(),false,`${view}: full filters must be collapsed`);
     assert.ok(await page.locator('#pbWorkspaceTitle').isVisible(),`${view}: visible workspace name`);
     const box=await page.locator(`#${view}`).boundingBox();assert.ok(box.y<220,`${view}: actual content starts on first screen, y=${box.y}`);
-    if(view==='ai'){const composer=await page.locator('#chatInput').boundingBox();assert.ok(composer.y+composer.height<730,'Chat composer visible above dock');assert.equal(await page.locator('#pbChatContext').evaluate(e=>e.open),false);}
+    if(view==='ai'){const composer=await page.locator('#chatInput').boundingBox();const dock=await page.locator('#prfktNavDock').boundingBox();assert.ok(composer.y+composer.height<=dock.y+1,`Chat composer visible above reserved dock: ${JSON.stringify({composer,dock})}`);assert.equal(await page.locator('#pbChatContext').evaluate(e=>e.open),false);}
     if(view==='ai')await page.screenshot({path:path.join(out,'chat-focused-390.png'),fullPage:false});
   }
   await go('ai');

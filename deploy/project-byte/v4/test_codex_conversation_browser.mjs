@@ -105,6 +105,8 @@ try {
   append(run,'agent_message',native('s','specialist','Specialist finding '+attack,'final_answer'));
   await page.addInitScript(()=>localStorage.setItem('prfkt.updates.popups','off'));
   await page.goto(base+'/#ai');
+  await page.waitForFunction(()=>document.querySelector('#cwWorkTabs button'));
+  await page.evaluate(id=>window.PRFKT_CODEX.openConversation(id),'conversation-fixture');
   await page.waitForFunction(()=>document.querySelector('#chatlog')?.textContent.includes('Specialist finding'));
   assert.equal(await page.locator('[data-cw-view="chat"]').getAttribute('aria-pressed'),'true','Chat is the default mode');
   assert.equal(await page.locator('#chatlog').isVisible(),true);
@@ -330,14 +332,15 @@ try {
   append(replay,'agent_message',native('replay-message','specialist','RECORDED_HISTORY_NO_POPUP'));
   runs.set(replay.id,replay);
   conversations.set('replay-conversation',{id:'replay-conversation',title:'Recorded replay fixture',project_key:'joeos',messages:[],run_ids:[replay.id]});
-  await page.locator('#loadChat').click();
+  if(await page.locator('#cwContextToggle').isVisible()&&!await page.locator('#codexWorkspacePanel').isVisible())await page.locator('#cwContextToggle').click();
+  await page.locator('#codexRefresh').click();
   await page.waitForFunction(()=>[...document.querySelector('#codexConversation').options].some(o=>o.value==='replay-conversation'),{timeout:20000});
   await page.locator('#codexConversation').selectOption('replay-conversation');
   await page.waitForFunction(()=>document.querySelector('#chatlog')?.textContent.includes('RECORDED_HISTORY_NO_POPUP'));
   assert.equal(await page.locator('.prfkt-update-card').first().isVisible(),false);
 
   await page.locator('[data-cw-view="graph"]').click();
-  await page.locator('#codexNewConversation').click();
+  await page.locator('#cwNewWork').click();
   assert.equal(await page.locator('[data-cw-view="chat"]').getAttribute('aria-pressed'),'true','blank conversation returns to Chat');
   assert.equal(await page.locator('#chatlog').isVisible(),true);
   await page.locator('#codexConversation').selectOption('conversation-fixture');

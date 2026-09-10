@@ -127,11 +127,11 @@ try {
   first.status='stopped'; append(first,'status',{status:'stopped'});
   await page.waitForFunction(() => document.querySelector('#codexRunState').textContent==='Stopped'); assert.equal(await page.locator('#codexStop').isVisible(),false);
   await page.waitForFunction(() => document.querySelector('#codexTools').textContent.includes('FINAL_EVENT_AFTER_TERMINAL_PAGE'));
-  await page.locator('#codexNewConversation').click(); failNextMessage=true;
+  await page.locator('#cwNewWork').click(); failNextMessage=true;
   await page.locator('#chatInput').fill('Retry without duplicating work'); await page.locator('#sendChat').click();
-  await page.waitForFunction(() => document.querySelector('#codexFeedback').textContent.includes('Submission could not be confirmed'));
+  await page.waitForFunction(() => document.querySelector('#cwWorkState').textContent.includes('Check submission'));
   assert.equal(await page.locator('#chatInput').inputValue(),'Retry without duplicating work');
-  await page.locator('#sendChat').click(); await page.waitForFunction(() => document.querySelector('#codexRunState').textContent==='Working');
+  await page.locator('#cwRetryQueued').click(); await page.waitForFunction(() => document.querySelector('#codexRunState').textContent==='Working');
   const submissions=requests.filter(r=>r.path.endsWith('/message')); assert.equal(submissions[1].body.request_id,submissions[2].body.request_id,'uncertain submission retry keeps its idempotency key'); assert.equal(runs.size,2);
   failNextPoll=true;
   await page.waitForFunction(() => document.querySelector('#codexFeedback').textContent.includes('Updates interrupted'));
@@ -141,7 +141,7 @@ try {
   conversations.get('conversation-2').messages.push({id:'final-second',role:'assistant',text:'PERSISTED_FIXTURE_RESULT',run_id:currentRun().id});
   await page.waitForFunction(() => document.querySelector('#codexRunState').textContent==='Completed');
   await page.reload({waitUntil:'networkidle'}); await page.waitForFunction(() => document.querySelector('#chatlog').textContent.includes('PERSISTED_FIXTURE_RESULT'));
-  assert.equal(await page.locator('#codexConversation').inputValue(),'conversation-2','latest server conversation restores without browser conversation storage');
+  assert.equal(await page.locator('#codexConversation').inputValue(),'conversation-2','selected work window restores its server conversation');
   assert.equal(await page.evaluate(() => [...Object.values(localStorage),...Object.values(sessionStorage)].some(value => /PERSISTED_FIXTURE_RESULT|conversation-2|REVIEW_FIXTURE_ONLY/.test(value))),false);
   // Per-project readiness overrides the legacy aggregate without inventing a
   // connected worker for externally owned or blocked projects.
@@ -157,7 +157,8 @@ try {
     ['external-history','stickdeath','EXTERNAL_PROJECT_RECORDED_HISTORY',undefined],
     ['mismatched-history','vitros','WRONG_PROJECT_HISTORY_MUST_NOT_RENDER','memory']
   ]) conversations.set(id,{id,title:id,project_key,responseProjectKey,messages:[{id:'message-'+id,role:'assistant',text:body}],run_ids:[]});
-  await page.locator('#loadChat').click(); await page.waitForFunction(() => document.querySelector('#codexProject option[value="memory"]'));
+  await page.locator('#codexRefresh').click(); await page.waitForFunction(() => document.querySelector('#codexProject option[value="memory"]'));
+  await page.locator('#cwNewWork').click();
   await page.locator('#codexProject').selectOption('memory');
   assert.equal(await page.locator('#sendChat').isEnabled(),true,'available selected project overrides unavailable aggregate');
   assert.match(await page.locator('#codexConnection').textContent(),/Connected/);
@@ -170,10 +171,10 @@ try {
   const memoryRun=currentRun(); memoryRun.status='completed'; append(memoryRun,'message',{role:'assistant',text:'MEMORY_PROJECT_RESULT'});
   [...conversations.values()].find(c=>c.run_ids.includes(memoryRun.id)).messages.push({id:'memory-result',role:'assistant',text:'MEMORY_PROJECT_RESULT',run_id:memoryRun.id});
   await page.waitForFunction(() => document.querySelector('#codexRunState').textContent==='Completed');
-  await page.reload({waitUntil:'networkidle'}); await page.waitForFunction(() => document.querySelector('#chatlog').textContent.includes('PERSISTED_FIXTURE_RESULT'));
-  assert.equal(await page.locator('#codexProject').inputValue(),'joeos','legacy JO EOS remains the default among multiple projects');
-  assert.equal(await page.locator('#codexConversation').inputValue(),'conversation-2','newer other-project conversations cannot replace JO EOS history');
-  catalogConfigured=true; catalogConnected=true; await page.locator('#loadChat').click();
+  await page.reload({waitUntil:'networkidle'});await page.waitForFunction(()=>document.querySelector('#chatlog').textContent.includes('MEMORY_PROJECT_RESULT'));
+  assert.equal(await page.locator('#codexProject').inputValue(),'memory','reload preserves selected workspace');
+  await page.evaluate(()=>window.PRFKT_CODEX.openConversation('conversation-2'));await page.waitForFunction(()=>document.querySelector('#chatlog').textContent.includes('PERSISTED_FIXTURE_RESULT'));
+  catalogConfigured=true; catalogConnected=true; await page.locator('#codexRefresh').click();
   await page.waitForFunction(() => !document.querySelector('#sendChat').disabled);
   const beforeUnavailable=requests.filter(r=>r.path.endsWith('/message')).length;
   for (const [key,history,expected] of [
@@ -181,7 +182,7 @@ try {
     ['stickdeath','external-history','EXTERNAL_PROJECT_RECORDED_HISTORY'],
     ['kalshi',null,null]
   ]) {
-    await page.locator('#codexProject').selectOption(key);
+    await page.locator('#cwNewWork').click();await page.locator('#codexProject').selectOption(key);
     assert.equal(await page.locator('#sendChat').isDisabled(),true,key+' cannot submit');
     assert.equal(await page.locator('#codexRunState').textContent(),{vitros:'Blocked',stickdeath:'Observed',kalshi:'Not connected'}[key],'idle status must not claim execution is ready');
     assert.equal(await page.locator('#codexConnection').textContent(),projects.find(p=>p.key===key).detail);
@@ -197,7 +198,7 @@ try {
     }
   }
   assert.equal(await page.locator('#sendChat').isDisabled(),true,'project false overrides true aggregate readiness');
-  await page.locator('#codexProject').selectOption('vitros');
+  await page.locator('#cwNewWork').click();await page.locator('#codexProject').selectOption('vitros');
   for (const width of [320,390,768,1440]) {
     await page.setViewportSize({width,height:900});
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),'project status fits '+width);
@@ -210,19 +211,19 @@ try {
   assert.equal(await page.locator('#codexConversation').inputValue(),'');
   assert.ok(!(await page.locator('#chatlog').textContent()).includes('WRONG_PROJECT_HISTORY_MUST_NOT_RENDER'));
   assert.equal(requests.filter(r=>r.path.endsWith('/message')).length,beforeUnavailable);
-  await page.locator('#codexProject').selectOption('joeos'); await page.locator('#codexConversation').selectOption('conversation-2');
+  await page.locator('#cwNewWork').click();await page.locator('#codexProject').selectOption('joeos'); await page.locator('#codexConversation').selectOption('conversation-2');
   await page.waitForFunction(() => document.querySelector('#chatlog').textContent.includes('PERSISTED_FIXTURE_RESULT'));
   assert.equal(await page.locator('#sendChat').isEnabled(),true,'legacy per-project field defaults remain usable');
   const allProjects=projects; projects=projects.filter(project=>project.key!=='joeos');
-  await page.locator('#loadChat').click();
+  await page.locator('#codexRefresh').click();
   await page.waitForFunction(() => document.querySelector('#codexConnection').textContent.includes('no longer available'));
   assert.equal(await page.locator('#codexProject').inputValue(),'joeos','catalog removal cannot silently retarget existing history');
   assert.equal(await page.locator('#codexConversation').inputValue(),'conversation-2');
   assert.equal(await page.locator('#sendChat').isDisabled(),true);
-  projects=allProjects; await page.locator('#loadChat').click();
+  projects=allProjects; await page.locator('#codexRefresh').click();
   await page.waitForFunction(() => !document.querySelector('#sendChat').disabled);
   await page.setViewportSize({width:390,height:844});
-  runs.get('run-2').status='working'; await page.locator('#loadChat').click(); await page.waitForFunction(() => document.querySelector('#codexRunState').textContent==='Working');
+  runs.get('run-2').status='working'; await page.evaluate(()=>window.PRFKT_CODEX.openConversation('conversation-2')); await page.waitForFunction(() => document.querySelector('#codexRunState').textContent==='Working');
   let release,arrived; const requested=new Promise(resolve=>arrived=resolve);
   await page.route('**/api/codex-workspace/runs/*/events?after=*',async route => { arrived();await new Promise(resolve=>release=resolve);try { await route.fulfill({contentType:'application/json',body:JSON.stringify({run:{id:'run-2',status:'working'},events:[{seq:999,type:'message_delta',data:{text:'LATE_PRIVATE_FIXTURE'}}],permissions:[{id:'private',tool:'PRIVATE_TOOL',summary:'PRIVATE_PERMISSION',state:'pending',review_token:'PRIVATE_TOKEN',expires_at:Date.now()/1000+120}],agents:[],artifacts:[]})}); } catch(error) { if (!/closed|cancel|abort|invalid interception/i.test(error.message)) throw error; } });
   await requested; await page.evaluate(() => document.querySelector('#login').click()); await page.waitForFunction(() => session.level===0&&!accessKey); release(); await page.waitForTimeout(250);
