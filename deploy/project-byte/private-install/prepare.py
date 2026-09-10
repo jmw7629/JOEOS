@@ -55,7 +55,7 @@ def write_private(path: Path, data: bytes):
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'wb') as stream: stream.write(data)
 
-def prepare(target: Path, name='PRFKT_PROJECT', owner='Owner', assistant='AI_BYTE', source=None):
+def prepare(target: Path, name='PRFKT_PROJECT', owner='Owner', assistant='AI_BYTE', source=None, hosted=False):
     target = new_target(target)
     for value in (name, owner, assistant):
         if not isinstance(value, str) or not value.strip() or len(value) > 48 or any(ord(c) < 32 for c in value):
@@ -77,6 +77,37 @@ def prepare(target: Path, name='PRFKT_PROJECT', owner='Owner', assistant='AI_BYT
     if home.count(old) != 1: raise ValueError('Unexpected Home bridge section')
     home = home.replace(old, "Object.entries(bridges).map(([key,value])=>bridgeNode(key,value.label||key)).join('')+")
     assets['home.js'] = home.encode()
+    if hosted:
+        # The owner-specific Saxon Shore player is not a default for new users.
+        hosted_home = assets['home.js'].decode()
+        hosted_home, removed = re.subn(r'// PRFKT_SPOTIFY_PLAYER_BEGIN[^\n]*\n.*?^\}\)\(\);(?:\n|$)', '', hosted_home, count=1, flags=re.S | re.M)
+        if removed != 1: raise ValueError('Owner music module boundary changed')
+        assets['home.js'] = hosted_home.encode()
+        ui = assets['codex-workspace.js'].decode()
+        replacements = {
+            "ready:mode === 'execute' && configured && connected": "ready:mode === 'chat' && configured && connected",
+            "if (state.ready) return 'Connected · agents selected automatically';": "if (state.ready) return 'Connected · private provider chat · execution tools not connected';",
+            "Describe the outcome. Codex chooses the agents and tools, and brings progress, permission requests and results here. Pull requests remain open for review; nothing merges automatically.": "Chat uses your connected AI account. Conversations are saved per project. Execution tools, device access and code publication require a separately connected runner.",
+            "'Codex run'": "'Provider conversation'",
+        }
+        for old, new in replacements.items():
+            if ui.count(old) != 1: raise ValueError('Hosted chat interface patch no longer matches')
+            ui = ui.replace(old, new)
+        # The general room in an empty install is independent of Joe's repo key.
+        ui = ui.replace("'joeos'", "'general'")
+        ui = ui.replace('Choose an outcome; Codex handles the routing.', 'Chat with your connected provider. Execution tools are not connected.')
+        ui = ui.replace('const visibleNative = native.filter(m=>m.text &&', 'const visibleNative = native.filter(m=>m.text && !messages.some(saved=>saved.id===m.id) &&')
+        assets['codex-workspace.js'] = ui.encode()
+        account = "\n(() => { const target=document.querySelector('#settings > .between'); if(target){const link=document.createElement('a');link.className='btn';link.href='/account';link.textContent='Sign-in & password';target.appendChild(link);} })();\n"
+        assets['home.js'] += account.encode()
+        assets['ai-connections.js'] = assets['ai-connections.js'].replace(
+            b'Private owner connections \xc2\xb7 use your existing Codex sign-in, connect a provider, or add your own model and agent.',
+            b'Connect your own AI API account or a public HTTPS model endpoint. Subscription runtimes and execution tools are not connected to this pilot.')
+        connections = assets['ai-connections.js'].decode()
+        connections, labels = re.subn(r'^    const label = codexConnected\(\).*$', "    const label = 'Your AI connections';", connections, flags=re.M)
+        connections, descriptions = re.subn(r'^    const description = codexConnected\(\).*$', "    const description = 'Use your own AI API account. Saved conversations stay in this private workspace. Execution tools and subscription runners are not connected.';", connections, flags=re.M)
+        if labels != 1 or descriptions != 1: raise ValueError('AI connection summary changed')
+        assets['ai-connections.js'] = connections.encode()
     for name_, data in assets.items():
         if name_.endswith('.py'): compile(data, name_, 'exec')
     profile = {'schema_version': 1, 'display_name': name.strip(), 'assistant_name': assistant.strip(), 'owner_shortcuts': []}
@@ -87,13 +118,19 @@ def prepare(target: Path, name='PRFKT_PROJECT', owner='Owner', assistant='AI_BYT
         for relative in ('app', 'state', 'state/uploads', 'private', 'private/home', 'private/config', 'private/cache', 'private/state', 'private/ai-credentials'):
             (target / relative).mkdir(mode=0o700)
         for filename, data in assets.items(): write_private(target / 'app' / filename, data)
-        for filename in ('runtime.py', 'recovery.py'):
+        launchers = ['runtime.py', 'recovery.py']
+        for filename in launchers:
             write_private(target / filename, (HERE / filename).read_bytes())
+        if hosted:
+            for filename in ('workspace', 'chat'):
+                output = 'enterprise_' + filename + '.py'
+                write_private(target / output, (HERE.parent / 'enterprise' / (filename + '.py')).read_bytes())
+                launchers.append(output)
         write_private(target / 'private' / 'owner.key', secrets.token_urlsafe(36).encode())
         manifest = {'schema_version': 1, 'installation_id': identifier, 'owner_name': owner.strip(),
                     'profile': profile, 'source_pins': {k: digest(v) for k, v in payload.items()},
                     'assets': {k: digest(v) for k, v in assets.items()},
-                    'launchers': {k: digest((target / k).read_bytes()) for k in ('runtime.py', 'recovery.py')}}
+                    'launchers': {k: digest((target / k).read_bytes()) for k in launchers}, 'hosted': bool(hosted)}
         write_private(target / 'installation.json', (json.dumps(manifest, indent=2) + '\n').encode())
     except BaseException:
         shutil.rmtree(target)
@@ -105,5 +142,6 @@ if __name__ == '__main__':
     parser.add_argument('target', type=Path)
     parser.add_argument('--name', default='PRFKT_PROJECT'); parser.add_argument('--owner', default='Owner')
     parser.add_argument('--assistant', default='AI_BYTE')
+    parser.add_argument('--hosted', action='store_true')
     args = parser.parse_args()
-    print(json.dumps(prepare(args.target, args.name, args.owner, args.assistant)))
+    print(json.dumps(prepare(args.target, args.name, args.owner, args.assistant, hosted=args.hosted)))
