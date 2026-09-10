@@ -1506,3 +1506,143 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   document.addEventListener('visibilitychange', () => { if (document.hidden) cancel(); });
   renderBoard();
 })();
+
+// PRFKT live updates: observed events, encrypted device history, no execution actions.
+(() => {
+  if(window.PRFKT_LIVE_UPDATES)return;
+  window.PRFKT_LIVE_UPDATES=true;
+  const el=id=>document.getElementById(id), text=v=>String(v??'');
+  let identity='', credential='', generation=0, controller=null, busy=false, next=0, failures=0, last=0, slowAt=0;
+  let records=[], known=new Set(), ready=Promise.resolve(), cryptoKey=null, storageName='', storageOK=true, saveChain=Promise.resolve();
+  let seeded=false, dirty=false, selected=null, blocked='', lastSignature='', slowSignature='', previousFocus=null;
+  const cards=new Map();
+  const style=document.createElement('style');style.textContent=`
+    #prfktUpdatesButton{display:inline-flex;gap:7px;align-items:center;min-height:44px;white-space:nowrap}
+    #prfktUpdatesButton[hidden],#prfktUpdateList[hidden],#prfktUpdateDetail[hidden]{display:none!important}
+    #prfktUpdatesButton svg{display:none;width:22px;height:22px}
+    #prfktUpdatesButton i{width:7px;height:7px;border-radius:50%;background:#e9bd7f}#prfktUpdatesButton[data-state=connected] i{background:#7bd8bb}
+    #prfktToastStack{position:fixed;right:max(16px,env(safe-area-inset-right));top:max(78px,env(safe-area-inset-top));width:min(350px,calc(100vw - 24px));z-index:1100;display:grid;gap:10px;pointer-events:none}
+    .prfkt-update-card{position:relative;background:linear-gradient(145deg,#132739f5,#07111df5);border:1px solid #5785a7;border-radius:18px;box-shadow:0 16px 44px #0009,inset 0 1px #d6ebff25;pointer-events:auto;animation:prfkt-arrive .25s ease-out;overflow:hidden}
+    .prfkt-update-card>button:first-child{display:grid;gap:6px;text-align:left;width:100%;background:none;color:#e5f0fa;border:0;padding:17px 52px 17px 17px;cursor:pointer;font:inherit;min-height:80px}
+    .prfkt-update-card span{font-size:13px;color:#b8cadd;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+    .prfkt-update-card .prfkt-dismiss{position:absolute;right:3px;top:3px;min-width:44px;min-height:44px;background:none;border:0;color:#b8cadd;font-size:22px;cursor:pointer}
+    .prfkt-update-card.leaving{opacity:0;transform:translateX(16px);transition:opacity .3s,transform .3s}
+    #prfktUpdates{color:#dfeaf5;background:#0b1725;border:1px solid #426381;border-radius:22px;margin:12px 12px 12px auto;width:min(470px,calc(100vw - 24px));height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);max-width:calc(100vw - 24px);padding:0;box-shadow:0 20px 80px #000b}
+    #prfktUpdates::backdrop{background:#02071188;backdrop-filter:blur(4px)}
+    #prfktUpdates header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:16px;border-bottom:1px solid #294258}
+    #prfktUpdates h2{margin:0;font-size:20px}#prfktUpdates button{min-height:44px}#prfktUpdates .prfkt-update-body{padding:16px;overflow:auto;height:calc(100% - 80px);box-sizing:border-box}
+    #prfktUpdateState,#prfktUpdateRetention{font-size:12px;color:#a7bfd0;line-height:1.5;margin:0 0 12px}
+    #prfktUpdateList{display:grid;gap:8px}#prfktUpdateList button{display:grid;gap:7px;text-align:left;padding:14px;background:#122439;border:1px solid #34526c;border-radius:14px;color:#deebf7;font:inherit;overflow-wrap:anywhere}
+    #prfktUpdateList button[data-unread=true]{border-left:3px solid #70c7ff}#prfktUpdateList span,#prfktUpdateList time{font-size:12px;color:#abc0d0}
+    #prfktUpdateDetail{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.65}#prfktUpdateDetail h3{font-size:20px;line-height:1.4}#prfktUpdateDetail p{white-space:pre-wrap}
+    #prfktUpdateOptions{display:flex;align-items:center;gap:10px;font-size:13px;margin:10px 0 16px}#prfktUpdateOptions input{width:22px;height:22px}
+    @keyframes prfkt-arrive{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+    @media(max-width:650px){#prfktUpdatesButton{position:relative;justify-content:center;width:44px;min-width:44px;padding:6px}#prfktUpdatesButton span{display:none}#prfktUpdatesButton svg{display:block}#prfktUpdatesButton i{position:absolute;top:5px;right:5px}body > header #refresh{display:none!important}#prfktToastStack{top:max(66px,env(safe-area-inset-top));right:12px}.prfkt-update-card:nth-child(n+2){display:none}#prfktUpdates{margin:8px;width:calc(100vw - 16px);max-width:calc(100vw - 16px);height:calc(100dvh - 16px);max-height:calc(100dvh - 16px)}#prfktUpdates .prfkt-update-body{padding-bottom:max(24px,env(safe-area-inset-bottom))}}
+    @media(prefers-reduced-motion:reduce){.prfkt-update-card{animation:none!important;transition:none!important}}
+    body.reduced-motion .prfkt-update-card{animation:none!important;transition:none!important}
+  `;document.head.append(style);
+  const stack=document.createElement('aside');stack.id='prfktToastStack';stack.setAttribute('aria-label','New workspace updates');stack.setAttribute('aria-live','polite');stack.setAttribute('aria-relevant','additions');document.body.append(stack);
+  const drawer=document.createElement('dialog');drawer.id='prfktUpdates';drawer.setAttribute('aria-labelledby','prfktUpdateTitle');
+  drawer.innerHTML='<header><h2 id="prfktUpdateTitle">Updates</h2><button class="mini" id="prfktUpdateClose" aria-label="Close updates">×</button></header><div class="prfkt-update-body"><p id="prfktUpdateState"></p><p id="prfktUpdateRetention"></p><label id="prfktUpdateOptions"><input type="checkbox" id="prfktUpdatePopups" checked>Show update popups on this device</label><button class="mini" id="prfktUpdateReadAll">Mark all read</button><button class="mini" id="prfktUpdateBack" hidden>← All updates</button><div id="prfktUpdateList"></div><article id="prfktUpdateDetail" hidden></article></div>';
+  document.body.append(drawer);
+  const button=document.createElement('button');button.type='button';button.className='mini';button.id='prfktUpdatesButton';button.innerHTML='<i aria-hidden="true"></i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9 21h6"/></svg><span>Updates</span>';button.onclick=()=>open();
+  // Reuse the existing bell, keeping one notification entry point.
+  const bell=el('notifyBtn');if(bell){bell.hidden=true;bell.style.setProperty('display','none','important');bell.after(button);}else{document.querySelector('.home-topbar')?.append(button);}
+  el('prfktUpdateClose').onclick=()=>drawer.close();drawer.addEventListener('close',()=>{selected=null;previousFocus?.isConnected&&previousFocus.focus();});
+  drawer.addEventListener('click',e=>{if(e.target===drawer){const b=drawer.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)drawer.close();}});
+  el('prfktUpdateBack').onclick=()=>{selected=null;renderHistory();el('prfktUpdateList').querySelector('button')?.focus();};
+  el('prfktUpdateReadAll').onclick=()=>{for(const row of records)row.read=true;persist();renderHistory();};
+  const popupPreference=()=>{try{return localStorage.getItem('prfkt.updates.popups')!=='off';}catch{return true;}};
+  el('prfktUpdatePopups').checked=popupPreference();el('prfktUpdatePopups').onchange=e=>{try{localStorage.setItem('prfkt.updates.popups',e.target.checked?'on':'off');}catch{}if(!e.target.checked)clearCards();};
+  function who(){return session.ok&&session.level>=1&&accessKey&&accessKey!==blocked?session.subject+'|'+session.level:'';}
+  function clearCards(){for(const c of cards.values())clearTimeout(c.timer);cards.clear();stack.replaceChildren();}
+  function reset(){generation++;controller?.abort();controller=null;busy=false;next=0;last=0;slowAt=0;failures=0;records=[];known.clear();cryptoKey=null;storageName='';storageOK=true;seeded=false;dirty=false;selected=null;lastSignature='';slowSignature='';clearCards();if(drawer.open)drawer.close();el('prfktUpdateList').replaceChildren();el('prfktUpdateDetail').replaceChildren();}
+  async function unlock(id,key,gen){
+    try{
+      const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('prfkt-updates-v1\0'+id+'\0'+key));
+      const name='prfkt.updates.v1.'+Array.from(new Uint8Array(bytes)).map(b=>b.toString(16).padStart(2,'0')).join('');
+      const aes=await crypto.subtle.importKey('raw',bytes,'AES-GCM',false,['encrypt','decrypt']);
+      let saved=[];const raw=localStorage.getItem(name);
+      if(raw){const box=JSON.parse(raw),decode=v=>Uint8Array.from(atob(v),c=>c.charCodeAt(0));saved=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:decode(box.iv)},aes,decode(box.data))));}
+      if(gen!==generation)return;
+      cryptoKey=aes;storageName=name;records=Array.isArray(saved)?saved.filter(r=>r&&typeof r.id==='string'&&Number.isFinite(r.ts)).slice(0,500):[];known=new Set(records.map(r=>r.id));
+    }catch{if(gen===generation)storageOK=false;}
+    if(gen===generation)renderHistory();
+  }
+  function identify(){const id=who();if(id!==identity||credential!==accessKey){reset();identity=id;credential=accessKey;ready=id?unlock(id,credential,generation):Promise.resolve();}button.hidden=!id;return id;}
+  function persist(){
+    if(!cryptoKey||!storageName)return;
+    const payload=JSON.stringify(records),key=cryptoKey,name=storageName,gen=generation;
+    saveChain=saveChain.catch(()=>{}).then(async()=>{try{const iv=crypto.getRandomValues(new Uint8Array(12));const encrypted=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(payload)));const encode=v=>btoa(Array.from(v,b=>String.fromCharCode(b)).join(''));if(gen!==generation)return;localStorage.setItem(name,JSON.stringify({iv:encode(iv),data:encode(encrypted)}));storageOK=true;}catch{if(gen===generation){storageOK=false;renderHistory();}}});
+  }
+  function ingest(list,announce=true){
+    const added=[];
+    for(const raw of list){if(!raw||typeof raw!=='object'||!raw.id||known.has(raw.id))continue;const row={id:text(raw.id),ts:Number(raw.ts)||Date.now()/1000,title:text(raw.title).slice(0,200),message:text(raw.message).slice(0,50000),project:text(raw.project).slice(0,100),link:/^#[a-zA-Z]+$/.test(raw.link||'')?raw.link:'',source:text(raw.source),read:false};known.add(row.id);records.push(row);added.push(row);}
+    if(!added.length)return;
+    records.sort((a,b)=>b.ts-a.ts);records=records.slice(0,500);if(known.size>4000)known=new Set(records.map(r=>r.id));persist();renderHistory();
+    if(announce&&seeded)for(const row of added.slice(-3))showCard(row);
+  }
+  function dismiss(id){const c=cards.get(id);if(!c)return;clearTimeout(c.timer);cards.delete(id);c.node.classList.add('leaving');setTimeout(()=>c.node.remove(),320);}
+  function showCard(row){
+    if(document.hidden||drawer.open||settings.notifications?.in_app===false||!popupPreference()||inQuietHours())return;
+    if((row.source==='Agent'||row.source==='Permission')&&el('cwPopupPreference')?.checked===false)return;
+    while(cards.size>=3)dismiss(cards.keys().next().value);
+    const node=document.createElement('section');node.className='prfkt-update-card';node.dataset.eventId=row.id;
+    const main=document.createElement('button');main.type='button';const title=document.createElement('b'),body=document.createElement('span');title.textContent=row.title;body.textContent=row.message.slice(0,220);main.append(title,body);main.onclick=()=>{dismiss(row.id);open(row.id);};
+    const close=document.createElement('button');close.type='button';close.className='prfkt-dismiss';close.setAttribute('aria-label','Dismiss update');close.textContent='×';close.onclick=()=>dismiss(row.id);node.append(main,close);stack.prepend(node);
+    const c={node,timer:0};cards.set(row.id,c);const schedule=()=>{clearTimeout(c.timer);c.timer=setTimeout(()=>{if(node.matches(':hover')||node.contains(document.activeElement)){schedule();return;}dismiss(row.id);},8000);};node.onpointerenter=()=>clearTimeout(c.timer);node.onpointerleave=schedule;node.onfocusin=()=>clearTimeout(c.timer);node.onfocusout=schedule;schedule();
+  }
+  function status(){
+    const offline=!navigator.onLine,age=last?Math.floor((Date.now()-last)/1000):null;
+    const label=offline?'Offline · reconnecting':document.hidden?'Paused while this tab is hidden':failures?'Updates interrupted · retrying':age===null?'Connecting to workspace…':age>8?'Updates delayed · reconnecting':`Refreshing every 2s · checked ${age}s ago${dirty?' · screen changes wait until editing finishes':''}`;
+    button.dataset.state=last&&!failures&&!offline&&age<9?'connected':'waiting';button.title=label;button.setAttribute('aria-label','Updates · '+records.filter(r=>!r.read).length+' unread');
+    button.querySelector('span').textContent='Updates'+(records.some(r=>!r.read)?' · '+records.filter(r=>!r.read).length:'');
+    el('prfktUpdateState').textContent=label;
+    el('prfktUpdateRetention').textContent=storageOK?'Latest 500 observed updates, encrypted and saved in this browser. Server notifications and activity are also recovered from their available history. Agent messages appear when their run is being followed.':'History is available in this tab only: browser storage is unavailable. Server activity remains available in Activity.';
+  }
+  function renderHistory(){
+    status();if(!drawer.open)return;
+    el('prfktUpdateList').hidden=!!selected;el('prfktUpdateDetail').hidden=!selected;el('prfktUpdateBack').hidden=!selected;
+    if(selected){const row=records.find(r=>r.id===selected);if(!row)return;const detail=el('prfktUpdateDetail');detail.replaceChildren();const h=document.createElement('h3'),meta=document.createElement('p'),body=document.createElement('p');h.textContent=row.title;meta.className='small';meta.textContent=new Date(row.ts*1000).toLocaleString()+' · '+row.source+(row.project?' · '+row.project:'');body.textContent=row.message;detail.append(h,meta,body);if(row.link){const go=document.createElement('button');go.className='btn';go.textContent=row.source==='Permission'?'Review current request':'Open workspace';go.onclick=()=>{drawer.close();document.querySelector('[data-home-go="'+row.link.slice(1)+'"],[data-view="'+row.link.slice(1)+'"]')?.click();location.hash=row.link;};detail.append(go);}return;}
+    const list=el('prfktUpdateList'),focus=document.activeElement?.dataset?.updateId;list.replaceChildren();
+    for(const row of records){const b=document.createElement('button');b.type='button';b.dataset.updateId=row.id;b.dataset.unread=String(!row.read);const t=document.createElement('b'),p=document.createElement('span'),date=document.createElement('time');t.textContent=row.title;p.textContent=row.message.slice(0,150);date.textContent=new Date(row.ts*1000).toLocaleString()+(row.project?' · '+row.project:'');b.append(t,p,date);b.onclick=()=>open(row.id);list.append(b);if(focus===row.id)b.focus({preventScroll:true});}
+    if(!records.length)list.textContent='No recorded updates yet. New workspace activity will appear here.';
+  }
+  function open(id=null){if(!identify())return;previousFocus=drawer.open?previousFocus:document.activeElement;selected=id;const row=records.find(r=>r.id===id);if(row){row.read=true;persist();}clearCards();if(!drawer.open)drawer.showModal();renderHistory();if(id)el('prfktUpdateBack').focus();}
+  async function request(path,key,signal){const r=await fetch(path,{headers:{'X-Access-Key':key},cache:'no-store',signal});if(!r.ok){const error=new Error('HTTP '+r.status);error.status=r.status;throw error;}return r.json();}
+  function redraw(){if(!dirty||userIsEditing()||drawer.open||workspaceRefreshBusy)return;dirty=false;
+    // Keep current context/filters instead of resetting chat and terminal selectors.
+    const choices=[...document.querySelectorAll('select')].map(n=>[n,n.value]);syncSelectors();for(const[n,value]of choices)if([...n.options].some(o=>o.value===value))n.value=value;renderAll();
+  }
+  async function poll(){
+    if(!identify()||busy||document.hidden||Date.now()<next||workspaceRefreshBusy)return;
+    const gen=generation,key=credential,id=identity;busy=true;controller=new AbortController();const requestController=controller,signal=requestController.signal,timeout=setTimeout(()=>requestController.abort(),12000);
+    try{
+      await ready;const ss=await request('/api/session',key,signal);if(gen!==generation)return;
+      if(!ss.ok||ss.subject+'|'+ss.level!==id){reset();blocked=key;identity='';button.hidden=true;return;}
+      const paths=['/api/tasks','/api/projects','/api/activity','/api/runs','/api/notifications','/api/intelligence'];
+      const data=await Promise.all(paths.map(p=>request(p,key,signal)));if(gen!==generation||who()!==id||accessKey!==key)return;
+      const [t,p,a,r,n,i]=data;
+      ingest([...(a.activity||[]).slice().reverse().map(x=>({id:'activity:'+x.id,ts:x.ts,title:text(x.action).replaceAll('_',' '),message:(x.actor?x.actor+' · ':'')+text(x.detail),project:x.project,source:'Activity',link:'#activity'})),...(n.notifications||[]).slice().reverse().map(x=>({...x,id:'notice:'+x.id,source:'Notification'}))]);seeded=true;
+      const signature=JSON.stringify([t,p,a,r,i]);if(signature!==lastSignature){lastSignature=signature;tasks=t.tasks||[];projects=p.projects||[];activity=a.activity||[];runs=r.runs||[];intel=i;dirty=true;}
+      notifications=n.notifications||[];renderNotifications();deliverBrowserNotifications();last=Date.now();failures=0;next=last+2000;
+      if(Date.now()-slowAt>30000){
+        const slowPaths=['/api/models','/api/agents','/api/settings',...(session.level>=3?['/api/team']:[]),...(session.level>=2?['/api/memory']:[])];
+        const values=await Promise.all(slowPaths.map(p=>request(p,key,signal)));if(gen!==generation||who()!==id||accessKey!==key)return;
+        const sig=JSON.stringify(values);if(sig!==slowSignature){slowSignature=sig;const v=Object.fromEntries(slowPaths.map((p,i)=>[p,values[i]]));models=v['/api/models'].models||[];agents=v['/api/agents'].agents||[];settings=v['/api/settings'].settings||settings;team=v['/api/team']?.team||[];memory=v['/api/memory']?.memory||[];applyAppearance();dirty=true;}slowAt=Date.now();
+      }
+      redraw();if(document.querySelector('#terminalView.active')&&!userIsEditing())void terminalLoad();
+    }catch(error){if(gen===generation){failures++;next=Date.now()+Math.min(30000,2000*2**Math.min(failures,4));if(error.status===401||error.status===403){reset();blocked=key;identity='';button.hidden=true;}}}
+    finally{clearTimeout(timeout);if(gen===generation){busy=false;controller=null;status();}}
+  }
+  // Replace the slower main loop; this remains polling, never a fabricated push stream.
+  refreshWorkspace=()=>{next=0;return poll();};setRefreshTimer=()=>{if(refreshTimer)clearInterval(refreshTimer);refreshTimer=null;};setRefreshTimer();
+  const oldSession=setSession;setSession=function(){oldSession();if(!session.ok)blocked='';identify();};
+  const oldAPI=api;api=async function(url,opt={}){const result=await oldAPI(url,opt);if(opt.method&&!['GET','HEAD'].includes(opt.method)){next=0;setTimeout(()=>void poll(),0);}return result;};
+  window.addEventListener('prfkt-live-event',event=>{const id=identify(),gen=generation;if(!id)return;void ready.then(()=>{if(gen===generation&&who()===id)ingest([event.detail]);});});
+  window.addEventListener('prfkt-permission-prompt',event=>{if(!identify())return;const d=event.detail,gen=generation;if(!d?.id)return;void ready.then(()=>{if(gen===generation)ingest([{id:'permission:'+d.id,title:'Review needed · '+text(d.title),message:text(d.text)+'\n\nOpen the current request to check whether it is still pending. This notice does not approve any action.',source:'Permission',link:'#agents'}]);});});
+  document.addEventListener('click',e=>{if(e.target.closest('#login,#logoutAllLocal')&&session.ok){blocked=accessKey;identify();}},true);
+  document.addEventListener('visibilitychange',()=>{clearCards();next=0;void poll();status();});window.addEventListener('online',()=>{next=0;void poll();});window.addEventListener('offline',status);
+  window.addEventListener('project-byte-home-render',()=>{identify();status();});
+  setInterval(()=>{identify();status();redraw();void poll();},500);void poll();
+})();

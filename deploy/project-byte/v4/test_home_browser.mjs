@@ -1,3 +1,4 @@
+import {verifyLiveUpdates} from './test_live_updates_browser.mjs';
 import {verifyDirectInteraction} from './test_direct_interaction_browser.mjs';
 import {verifySpotify} from './test_spotify_browser.mjs';
 // Executable browser acceptance for the actual reconstructed PROJECT_BYTE app.
@@ -48,6 +49,7 @@ try{
   const mike=await api('/api/tasks','POST',{title:'Mike integration — browser fixture',project:'Orbital QA',owner:'Mike',status:'Blocked',priority:'Critical',note:'TEST DATA ONLY'});
   browser=await chromium.launch({headless:true,...(process.env.PB_BROWSER_PATH?{executablePath:process.env.PB_BROWSER_PATH}:{})});
   const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});
+  await context.addInitScript(()=>localStorage.setItem('prfkt.updates.popups','off')); // Popup behavior has its own isolated acceptance below.
   const page=await context.newPage(),errors=[],external=[];
   page.on('pageerror',e=>errors.push(e.message));
   page.on('request',r=>{if(!r.url().startsWith(base)&&!r.url().startsWith('data:'))external.push(r.url());});
@@ -118,6 +120,7 @@ try{
   assert.equal(external.length,0,'no external assets or trackers: '+external.join('; '));
   await verifySpotify({browser,base,out,key});
   await verifyDirectInteraction({browser,api,base,out,key});
+  await verifyLiveUpdates({browser,api,base,out,key});
   console.log('BROWSER_HOME_LAYOUT_320_390_768_1440=PASS');console.log('MOBILE_NAV_ALL_12_WORKSPACES=PASS');
   console.log('COMPOSABLE_OWNER_PRIORITY_STATUS_FILTERS=PASS');console.log('LIVE_INSPECTOR_REFRESH=PASS');console.log('TASK_CREATE_PERSISTENCE_AND_MODAL_ESCAPE=PASS');console.log('DEFAULT_VIEW_PREFERENCE=PASS');console.log('NO_EXTERNAL_ASSET_REQUESTS=PASS');console.log('SCREENSHOTS='+out);
 } catch(error){console.error('BROWSER_ACCEPTANCE_FAILED',error);console.error(serverLog);process.exitCode=1;

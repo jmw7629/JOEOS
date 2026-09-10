@@ -103,13 +103,14 @@ try {
   append(run,'tool_output',{...native('s','specialist','finding '+attack),output_kind:'agent_delta'});
   append(run,'agent_message',native('c','coordinator','Coordinator commentary '+attack));
   append(run,'agent_message',native('s','specialist','Specialist finding '+attack,'final_answer'));
+  await page.addInitScript(()=>localStorage.setItem('prfkt.updates.popups','off'));
   await page.goto(base+'/#ai');
   await page.waitForFunction(()=>document.querySelector('#chatlog')?.textContent.includes('Specialist finding'));
   assert.equal(await page.locator('[data-cw-view="chat"]').getAttribute('aria-pressed'),'true','Chat is the default mode');
   assert.equal(await page.locator('#chatlog').isVisible(),true);
   assert.equal(await page.locator('#cwTerminal').isVisible(),false);
   assert.equal(await page.locator('#codexTraceStudio').isVisible(),false);
-  assert.equal(await page.locator('#cwAgentPopup').isVisible(),false,'initial history does not trigger a popup');
+  assert.equal(await page.locator('.prfkt-update-card').first().isVisible(),false,'initial history does not trigger a popup');
   assert.equal(await page.locator('#chatlog [data-message-id="c"]').count(),1);
   assert.equal(await page.locator('#chatlog [data-message-id="s"]').count(),1);
   assert.match(await page.locator('#chatlog [data-message-id="c"]').innerText(),/AI_BYTE/);
@@ -217,14 +218,16 @@ try {
   await page.locator('[data-cw-view="terminal"]').click();
   await page.screenshot({path:path.join(out,'conversation-terminal-390.png'),fullPage:false});
   await page.locator('[data-cw-view="chat"]').click();
+  await page.evaluate(()=>localStorage.setItem('prfkt.updates.popups','on'));
   run.status='waiting_approval';
   run.permissions=[{id:'mobile-review',tool_id:'publication',tool:'publish_pull_request',summary:'Review exact mobile fixture',
     arguments:{command:attack},state:'pending',review_token:reviewToken,expires_at:Date.now()/1000+120}];
-  await page.locator('#cwAgentPopup').waitFor({state:'visible'});
-  assert.match(await page.locator('#cwPopupText').innerText(),/Review exact mobile fixture/);
+  await page.locator('.prfkt-update-card').filter({hasText:'Review exact mobile fixture'}).waitFor({state:'visible'});
+  assert.match(await page.locator('.prfkt-update-card').filter({hasText:'Review exact mobile fixture'}).innerText(),/Review exact mobile fixture/);
   assert.ok(await page.evaluate(()=>window.fixturePermissionIds.includes('mobile-review')),'popup came from the actual pending API request ID');
   const beforePopupDismiss=allPosts.length;
-  await page.locator('#cwPopupDismiss').click();
+  await page.evaluate(()=>document.querySelectorAll('.prfkt-update-card .prfkt-dismiss').forEach(b=>b.click()));
+  await page.waitForTimeout(350);
   assert.equal(allPosts.length,beforePopupDismiss,'dismissing a permission popup does not decide or launch anything');
   await page.locator('#cwReviewRequest').waitFor({state:'visible'});
   await page.locator('#cwReviewRequest').click();
@@ -268,28 +271,30 @@ try {
   assert.equal(await page.locator('#ai').evaluate(e=>e.classList.contains('cw-remote')),false);
   append(run,'agent_message',native('popup-off','specialist','POPUP_DISABLED_REAL_MESSAGE'));
   await page.waitForFunction(()=>document.querySelector('#chatlog')?.textContent.includes('POPUP_DISABLED_REAL_MESSAGE'));
-  assert.equal(await page.locator('#cwAgentPopup').isVisible(),false,'disabled popups preserve inline messages');
+  assert.equal(await page.locator('.prfkt-update-card').first().isVisible(),false,'disabled popups preserve inline messages');
   await page.locator('#cwOptions').click();
   await page.locator('#cwPopupPreference').check();
   await go('ai');
   append(run,'agent_message',native('popup-on','specialist','POPUP_ENABLED_REAL_MESSAGE'));
-  await page.locator('#cwAgentPopup').waitFor({state:'visible'});
-  assert.match(await page.locator('#cwPopupText').innerText(),/POPUP_ENABLED_REAL_MESSAGE/);
-  await page.locator('#cwPopupDismiss').click();
+  await page.locator('.prfkt-update-card').filter({hasText:'POPUP_ENABLED_REAL_MESSAGE'}).waitFor({state:'visible'});
+  assert.match(await page.locator('.prfkt-update-card').filter({hasText:'POPUP_ENABLED_REAL_MESSAGE'}).innerText(),/POPUP_ENABLED_REAL_MESSAGE/);
+  await page.evaluate(()=>document.querySelectorAll('.prfkt-update-card .prfkt-dismiss').forEach(b=>b.click()));
+  await page.waitForTimeout(350);
   await page.waitForTimeout(1100);
-  assert.equal(await page.locator('#cwAgentPopup').isVisible(),false,'dismissed completed messages do not reopen');
+  assert.equal(await page.locator('.prfkt-update-card').first().isVisible(),false,'dismissed completed messages do not reopen');
 
 
   await go('agents');
   run.permissions=[{id:'agents-popup',tool:'publish_pull_request',summary:'AGENTS_REAL_PENDING_REQUEST',state:'pending',
     arguments:{title:'Agents popup fixture'},review_token:reviewToken,expires_at:Date.now()/1000+120}];
-  await page.locator('#cwAgentPopup').waitFor({state:'visible'});
-  assert.match(await page.locator('#cwPopupText').innerText(),/AGENTS_REAL_PENDING_REQUEST/);
+  await page.locator('.prfkt-update-card').filter({hasText:'AGENTS_REAL_PENDING_REQUEST'}).waitFor({state:'visible'});
+  assert.match(await page.locator('.prfkt-update-card').filter({hasText:'AGENTS_REAL_PENDING_REQUEST'}).innerText(),/AGENTS_REAL_PENDING_REQUEST/);
   assert.ok(await page.evaluate(()=>window.fixturePermissionIds.includes('agents-popup')));
   assert.equal(await page.locator('[data-cw-inbox-id="agents-popup"]').count(),1,'popup request remains in the authoritative permission inbox');
-  assert.doesNotMatch(await page.locator('#cwAgentPopup').innerHTML(),new RegExp(reviewToken));
+  assert.doesNotMatch(await page.locator('.prfkt-update-card').first().innerHTML(),new RegExp(reviewToken));
   const beforeAgentsDismiss=allPosts.length;
-  await page.locator('#cwPopupDismiss').click();
+  await page.evaluate(()=>document.querySelectorAll('.prfkt-update-card .prfkt-dismiss').forEach(b=>b.click()));
+  await page.waitForTimeout(350);
   assert.equal(allPosts.length,beforeAgentsDismiss);
   assert.equal(await page.locator('[data-cw-inbox-id="agents-popup"]').count(),1,'dismissal preserves the pending request');
   run.permissions=[];
@@ -297,6 +302,13 @@ try {
   await page.waitForFunction(()=>document.querySelectorAll('[data-cw-inbox-id]').length===0);
   await go('ai');
   console.log('CONVERSATION_PERMISSION_POPUPS_AI_AND_AGENTS=PASS');
+  await go('home');
+  append(run,'agent_message',native('home-message','specialist','REAL_AGENT_MESSAGE_WHILE_ON_HOME'));
+  await page.locator('.prfkt-update-card').filter({hasText:'REAL_AGENT_MESSAGE_WHILE_ON_HOME'}).waitFor({state:'visible'});
+  assert.equal(await page.locator('#cwAgentPopup').isVisible(),false,'one shared popup surface');
+  await page.evaluate(()=>document.querySelectorAll('.prfkt-update-card .prfkt-dismiss').forEach(b=>b.click()));await page.waitForTimeout(350);
+  await go('ai');
+  console.log('CONVERSATION_NATIVE_OUTPUT_CONTINUES_ON_HOME=PASS');
 
   append(run,'message_delta',{...native('f','coordinator','FINAL_NATIVE_RESPONSE','final_answer'),output_kind:'agent_delta'});
   append(run,'agent_message',native('f','coordinator','FINAL_NATIVE_RESPONSE','final_answer'));
@@ -308,7 +320,8 @@ try {
   assert.equal(completeText.split('FINAL_NATIVE_RESPONSE').length-1,1,'persisted final replaces its native duplicate');
   assert.equal(completeText.split('Coordinator commentary').length-1,1,'commentary survives final native-message IDs');
   assert.equal(completeText.split('Specialist finding').length-1,1);
-  await page.locator('#cwPopupDismiss').click();
+  await page.evaluate(()=>document.querySelectorAll('.prfkt-update-card .prfkt-dismiss').forEach(b=>b.click()));
+  await page.waitForTimeout(350);
 
   console.log('CONVERSATION_SETTINGS_POPUPS_FINAL=PASS');
   // Reopening a newly recorded history after page load must not replay a popup.
@@ -321,7 +334,7 @@ try {
   await page.waitForFunction(()=>[...document.querySelector('#codexConversation').options].some(o=>o.value==='replay-conversation'),{timeout:20000});
   await page.locator('#codexConversation').selectOption('replay-conversation');
   await page.waitForFunction(()=>document.querySelector('#chatlog')?.textContent.includes('RECORDED_HISTORY_NO_POPUP'));
-  assert.equal(await page.locator('#cwAgentPopup').isVisible(),false);
+  assert.equal(await page.locator('.prfkt-update-card').first().isVisible(),false);
 
   await page.locator('[data-cw-view="graph"]').click();
   await page.locator('#codexNewConversation').click();
@@ -333,7 +346,7 @@ try {
   await page.waitForFunction(()=>document.querySelector('#cwTerminalLog')?.textContent.includes('BUILD_STDOUT_MARKER'));
   await page.locator('#login').click();
   await page.waitForFunction(()=>document.querySelector('#cwTerminalLog')?.textContent==='');
-  assert.equal(await page.locator('#cwAgentPopup').isVisible(),false);
+  assert.equal(await page.locator('.prfkt-update-card').first().isVisible(),false);
   assert.equal(await page.locator('.cw-workspace-bar').isVisible(),false,'owner toolbar remains hidden after logout');
   assert.equal(await page.locator('#cwTerminal').isVisible(),false);
   assert.equal(await page.locator('#codexTraceStudio').isVisible(),false);

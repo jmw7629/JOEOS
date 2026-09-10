@@ -384,6 +384,7 @@
   function acceptEvent(event) {
     traceAccept(event);
     const data = event.data || {};
+    if(window.PRFKT_LIVE_UPDATES && ['tool_started','tool_completed'].includes(event.type) && event.ts>=Math.max(presentationStarted,notificationAfter))window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'tool:'+run?.id+':'+event.seq,ts:event.ts,title:(data.name || 'Tool')+' · '+(event.type==='tool_started'?'started':data.success===false?'failed':'finished'),message:data.summary || 'Open the workspace terminal for recorded output.',source:'Agent',project:projectKey,link:'#ai'}}));
     if (event.type==='agent_message' || event.type==='message_delta' || data.output_kind==='agent_delta') {
       const id=data.message_id || 'stream:'+data.agent_id, previous=nativeMessages.get(id);
       const coordinator=event.type==='message_delta' || agents.find(a=>a.id===data.agent_id)?.role==='coordinator' || traceNodes.get(nodeKey('agent',data.agent_id))?.label==='coordinator' || previous?.coordinator;
@@ -403,7 +404,7 @@
     tools = tools.slice(-60);
   }
   async function poll(force = false) {
-    if (!synchronizeIdentity() || !visible() || polling || loading || !run || (!force && ((!active() && !pendingEvents) || Date.now()-lastPoll<750))) return;
+    if (!synchronizeIdentity() || (window.PRFKT_LIVE_UPDATES?document.hidden:!visible()) || polling || loading || !run || (!force && ((!active() && !pendingEvents) || Date.now()-lastPoll<750))) return;
     polling = true; lastPoll = Date.now(); const current = who(), turn = epoch, runId = run.id;
     try {
       const data = await request('/api/codex-workspace/runs/'+encodeURIComponent(runId)+'/events?after='+seq,undefined,current,turn); if (!data || run?.id !== runId) return;
@@ -509,7 +510,7 @@
     const sendButton = event.target.closest('#sendChat'), reloadButton = event.target.closest('#loadChat');
     if (owner() && (sendButton || reloadButton)) { event.preventDefault(); event.stopImmediatePropagation(); if (sendButton) void send(); else void refreshCatalog(true).then(()=>{if(owner() && conversationId)void selectConversation(conversationId);}); }
   },true);
-  function tick() { if (synchronizeIdentity()) { render(); if (visible()) { void refreshCatalog(); void poll(); } } }
+  function tick() { if (synchronizeIdentity()) { render(); if (visible()) void refreshCatalog(); if(visible() || window.PRFKT_LIVE_UPDATES) void poll(); } }
   window.addEventListener('project-byte-home-render',tick);
   window.addEventListener('hashchange',tick);
   document.addEventListener('visibilitychange',tick);
@@ -570,6 +571,7 @@
     flush();if(buf.length)out.push('<pre><code>'+escape(buf.join('\n'))+'</code></pre>');return out.join('');
   }
   function notifyAgent(message) {
+    if(window.PRFKT_LIVE_UPDATES && owner()){window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'agent:'+run?.id+':'+message.id,title:message.coordinator?'AI_BYTE':agents.find(a=>a.id===message.agent_id)?.role || 'Agent',message:message.text,source:'Agent',project:projectKey,link:'#ai'}}));return;}
     if(!popups || !owner() || !visible() || popupSeen.has(message.id))return;
     popupSeen.add(message.id);popupMessage={...message,conversationId};
     $('cwPopupTitle').textContent=message.coordinator?'AI_BYTE':agents.find(a=>a.id===message.agent_id)?.role || 'Agent';
@@ -577,6 +579,7 @@
     $('cwPopupOpen').textContent='Open chat';
   }
   window.addEventListener('prfkt-permission-prompt',event=>{
+    if(window.PRFKT_LIVE_UPDATES)return;
     const d=event.detail,key='permission:'+d?.id;if(!d?.id || !popups || !owner() || !visible() || popupSeen.has(key))return;
     popupSeen.add(key);popupMessage={kind:'permission',id:d.id};$('cwPopupTitle').textContent='Review needed · '+(d.title || 'Codex');$('cwPopupText').textContent=d.text || 'A tool is waiting for your decision.';$('cwPopupOpen').textContent='Review request';popup.hidden=false;
   });
@@ -723,7 +726,7 @@
   async function refresh(force=false){
     const id=who();if(identity!==id){clear();identity=id;if(blocked!==id)blocked=null;}
     if(!owner()){render();return;}
-    if(busy || (!force && (document.hidden || !(document.querySelector('#agents')?.classList.contains('active') || document.querySelector('#ai')?.classList.contains('active')) || Date.now()-last<3000))){render();return;}
+    if(busy || (!force && (document.hidden || (!window.PRFKT_LIVE_UPDATES && !(document.querySelector('#agents')?.classList.contains('active') || document.querySelector('#ai')?.classList.contains('active'))) || Date.now()-last<3000))){render();return;}
     busy=true;const gen=generation;
     try {const data=await request('/api/codex-workspace',undefined,id,gen);if(!data)return;snapshot=data;if(data.execution_permissions?.capable===true)mount();
       window.dispatchEvent(new CustomEvent('prfkt-permission-snapshot',{detail:{ids:(data.execution_permissions?.requests || []).filter(r=>r.can_decide).map(r=>r.id)}}));
