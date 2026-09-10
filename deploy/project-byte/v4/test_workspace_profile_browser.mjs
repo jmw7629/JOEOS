@@ -1,3 +1,4 @@
+import {openDock} from './test_navigation_helpers.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -30,7 +31,7 @@ export async function verifyWorkspaceProfile({page,api,root}){
       await page.setViewportSize({width,height:900});
       for(const view of ['home','ai','board']){
         if(view==='board'){await page.locator('#pbWorkspaceButton').click();await page.locator('#pbWorkspaces [data-home-go="board"]').click();}
-        else await page.locator(`.home-nav [data-home-go="${view}"]`).click();
+        else {await openDock(page);await page.locator(`.home-nav [data-home-go="${view}"]`).click();}
         if(view==='home'){
           await page.locator('#homeScopes [data-home-scope="all"]').click();
           await page.locator('#homeScopes [data-home-scope="person-0"]').click();
@@ -44,7 +45,7 @@ export async function verifyWorkspaceProfile({page,api,root}){
         }
       }
     }
-    await page.locator('.home-nav [data-home-go="home"]').click();
+    await openDock(page);await page.locator('.home-nav [data-home-go="home"]').click();
     await page.locator('#homeScopes [data-home-scope="all"]').click();
     await page.setViewportSize({width:320,height:900});
     await page.locator('#login').click();

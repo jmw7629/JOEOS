@@ -1,3 +1,4 @@
+import {verifyCollapsibleNavigation} from './test_collapsible_navigation_browser.mjs';
 import {verifyLiveUpdates} from './test_live_updates_browser.mjs';
 import {verifyDirectInteraction} from './test_direct_interaction_browser.mjs';
 import {verifySpotify} from './test_spotify_browser.mjs';
@@ -108,7 +109,7 @@ try{
     await page.setViewportSize({width,height});await page.evaluate(()=>renderAll());await sleep(200);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),`Home fits ${width}px`);
     assert.equal(await page.locator('.home-nav button').count(),5);
-    const b=await page.locator('.home-nav').boundingBox();assert.ok(b.x>=0&&b.x+b.width<=width+1,'dock fits viewport');
+    await page.locator('#prfktNavToggle').click();const b=await page.locator('.home-nav').boundingBox();assert.ok(b.x>=0&&b.x+b.width<=width+1,'dock fits viewport');await page.locator('#prfktNavToggle').click();
     await page.screenshot({path:path.join(out,`orbital-${width}.png`),fullPage:true});
   }
   await verifyWorkspaceProfile({page,api,root});
@@ -121,6 +122,7 @@ try{
   await verifySpotify({browser,base,out,key});
   await verifyDirectInteraction({browser,api,base,out,key});
   await verifyLiveUpdates({browser,api,base,out,key});
+  await verifyCollapsibleNavigation({browser,base,out,key});
   console.log('BROWSER_HOME_LAYOUT_320_390_768_1440=PASS');console.log('MOBILE_NAV_ALL_12_WORKSPACES=PASS');
   console.log('COMPOSABLE_OWNER_PRIORITY_STATUS_FILTERS=PASS');console.log('LIVE_INSPECTOR_REFRESH=PASS');console.log('TASK_CREATE_PERSISTENCE_AND_MODAL_ESCAPE=PASS');console.log('DEFAULT_VIEW_PREFERENCE=PASS');console.log('NO_EXTERNAL_ASSET_REQUESTS=PASS');console.log('SCREENSHOTS='+out);
 } catch(error){console.error('BROWSER_ACCEPTANCE_FAILED',error);console.error(serverLog);process.exitCode=1;

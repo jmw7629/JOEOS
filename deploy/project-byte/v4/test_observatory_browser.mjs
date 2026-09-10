@@ -1,3 +1,4 @@
+import {openDock} from './test_navigation_helpers.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -46,5 +47,5 @@ export async function verifyObservatory({page,api,base,out}){
   await page.locator('#obsSearch').fill('NOT_A_REAL_TOOL');assert.equal(await page.locator('.obs-node').count(),0,'search filters graph');await page.locator('#obsSearch').fill('');
   assert.equal(await page.locator('main.wrap>.metrics').isVisible(),false,'legacy wall remains removed');
   console.log('OBSERVATORY_AUTH_PAYLOAD_REDACTION_REAL_LOG_ADAPTER=PASS');console.log('OBSERVATORY_TREE_TREEMAP_SANKEY_TIMELINE=PASS');console.log('OBSERVATORY_CROSS_SELECTION_KEYBOARD_ZOOM=PASS');console.log('OBSERVATORY_TOOL_PILLS_SWIMLANES_FREQUENCY_MATRIX=PASS');console.log('OBSERVATORY_MOBILE_DESKTOP_NO_OVERFLOW=PASS');
-  await page.locator('.home-nav [data-home-go="home"]').click();
+  await openDock(page);await page.locator('.home-nav [data-home-go="home"]').click();
 }

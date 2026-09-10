@@ -1,3 +1,4 @@
+import {openDock} from './test_navigation_helpers.mjs';
 // Synthetic owner API fixtures only. No provider, sandbox, publisher, or live service is used.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -140,9 +141,9 @@ try {
   await page.setViewportSize({width:390,height:844});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Home fits mobile');
   await page.screenshot({path:path.join(out,'embossed-home-mobile.png'),fullPage:true});
-  await page.locator('.home-nav [data-home-go="ai"]').click();
+  await openDock(page);await page.locator('.home-nav [data-home-go="ai"]').click();
   run.permissions=['inbox-approve','inbox-deny'].map(id=>({id,tool:'publish_pull_request',summary:'Frozen publication review',state:'pending',review_token:reviewToken,expires_at:Date.now()/1000+45,arguments:{review_artifact:{id:'1'.repeat(32)}}}));
-  await page.locator('.home-nav [data-home-go="agents"]').click();
+  await openDock(page);await page.locator('.home-nav [data-home-go="agents"]').click();
   await page.waitForFunction(()=>document.getElementById('codexPermissionInbox')?.textContent.includes('Codex connected'));
   await page.waitForFunction(()=>document.querySelectorAll('[data-cw-inbox-id]').length===2);
   if(await page.locator('#cwAgentPopup').isVisible())await page.locator('#cwPopupDismiss').click();
@@ -161,7 +162,7 @@ try {
   await page.waitForFunction(()=>document.getElementById('codexPermissionInbox')?.textContent.includes('No pending permission requests'));
   assert.deepEqual(requests.filter(r=>r.path.includes('/permissions/inbox-')).map(r=>r.body.decision),['approve_once','deny']);
   await page.screenshot({path:path.join(out,'permission-inbox-mobile.png'),fullPage:true});
-  await page.locator('.home-nav [data-home-go="ai"]').click();
+  await openDock(page);await page.locator('.home-nav [data-home-go="ai"]').click();
   run.status='completed';run.permissions=[];
   await page.waitForFunction(()=>document.getElementById('codexRunState').textContent==='Completed');
   await page.locator('#codexProject').selectOption('memory');

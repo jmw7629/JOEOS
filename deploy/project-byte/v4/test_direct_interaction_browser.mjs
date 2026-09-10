@@ -1,3 +1,4 @@
+import {openDock} from './test_navigation_helpers.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 
@@ -9,6 +10,10 @@ export async function verifyDirectInteraction({browser,api,base,out,key}) {
   page.on('pageerror',e=>errors.push(e.message));
   page.on('request',r=>{if(!['GET','HEAD'].includes(r.method()))writes.push({url:r.url(),method:r.method(),body:r.postData()});});
   const task = () => page.locator('[data-task-id="'+id+'"]');
+  async function scrollToTask(){
+    // Live snapshots may replace an idle card between locator resolution and scrolling.
+    for(let attempt=0;attempt<3;attempt++){try{await task().scrollIntoViewIfNeeded();return;}catch(error){if(attempt===2||!error.message.includes('not attached'))throw error;await page.waitForTimeout(100);}}
+  }
   const column = status => page.locator('[data-drop-status="'+status+'"]');
   const current = async() => (await api('/api/tasks')).tasks.find(t=>t.id===id).status;
   async function ready() {
@@ -17,7 +22,7 @@ export async function verifyDirectInteraction({browser,api,base,out,key}) {
   }
   async function start() {
     await page.waitForFunction(()=>document.getElementById('boardGrid').getAttribute('aria-busy')!=='true');
-    await task().scrollIntoViewIfNeeded();const b=await task().locator('.task-grip').boundingBox();
+    await scrollToTask();const b=await task().locator('.task-grip').boundingBox();
     await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();
     await page.mouse.move(b.x+b.width/2+12,b.y+b.height/2+12,{steps:3});
     await page.locator('.prfkt-drag-ghost').waitFor();
@@ -72,14 +77,14 @@ export async function verifyDirectInteraction({browser,api,base,out,key}) {
     const head=await column('Backlog').locator('.colhead').boundingBox();
     await page.mouse.move(head.x+260,head.y+15);await page.mouse.down();await page.mouse.move(head.x+20,head.y+15,{steps:8});await page.mouse.up();
     assert.ok(await scroll.evaluate(e=>e.scrollLeft)>100,'empty board grabs pan horizontally');
-    await scroll.evaluate(e=>e.scrollLeft=0);await task().scrollIntoViewIfNeeded();
+    await scroll.evaluate(e=>e.scrollLeft=0);await scrollToTask();
     const cdp=await context.newCDPSession(page);
     const note=await task().locator('.tasknote').boundingBox();
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:note.x+30,y:note.y+10}]});
     await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:note.x+30,y:note.y-30}]});
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     assert.equal(await page.locator('.prfkt-drag-ghost').count(),0,'card body touch scroll does not start a move');
-    await task().scrollIntoViewIfNeeded();const grip=await task().locator('.task-grip').boundingBox();
+    await scrollToTask();const grip=await task().locator('.task-grip').boundingBox();
     const x=grip.x+20,y=grip.y+20;
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
     await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+10,y:y+15}]});
@@ -95,7 +100,7 @@ export async function verifyDirectInteraction({browser,api,base,out,key}) {
     const tabs=page.getByRole('navigation',{name:'Kanban columns'});
     await tabs.locator('[data-column="Done"]').click();
     await page.waitForFunction(()=>document.querySelector('[data-column="Done"]').getAttribute('aria-pressed')==='true');
-    await tabs.locator('[data-column="Active"]').click();await task().scrollIntoViewIfNeeded();
+    await tabs.locator('[data-column="Active"]').click();await scrollToTask();
     const mobileGrip=task().locator('.task-grip');const size=await mobileGrip.boundingBox();assert.ok(size.width>=44&&size.height>=44);
     await mobileGrip.tap();const sheet=page.locator('.prfkt-move-sheet[open]');await sheet.waitFor();
     assert.equal(await sheet.locator('[data-move-status="Active"]').isDisabled(),true);
@@ -108,7 +113,7 @@ export async function verifyDirectInteraction({browser,api,base,out,key}) {
       await page.setViewportSize({width,height:900});await page.screenshot({path:path.join(out,'kanban-grab-'+width+'.png')});
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'no page overflow at '+width);
       if(width<=650){
-        await task().scrollIntoViewIfNeeded();await task().locator('.task-grip').tap();await page.locator('.prfkt-move-sheet[open]').waitFor();
+        await scrollToTask();await task().locator('.task-grip').tap();await page.locator('.prfkt-move-sheet[open]').waitFor();
         const bounds=await page.locator('.prfkt-move-sheet').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width+1&&bounds.y>=0&&bounds.y+bounds.height<=901);
         await page.screenshot({path:path.join(out,'kanban-move-sheet-'+width+'.png')});await page.getByRole('button',{name:'Close move menu'}).tap();
       }
@@ -117,7 +122,7 @@ export async function verifyDirectInteraction({browser,api,base,out,key}) {
     await page.locator('.prfkt-move-sheet[open]').waitFor();const landscape=await page.locator('.prfkt-move-sheet').boundingBox();
     assert.ok(landscape.y>=0&&landscape.y+landscape.height<=391,'landscape sheet stays within viewport and scrolls');
     await page.screenshot({path:path.join(out,'kanban-move-sheet-landscape.png')});await page.getByRole('button',{name:'Close move menu'}).tap();
-    await page.setViewportSize({width:390,height:844});await page.locator('[data-home-go="home"]').first().click();
+    await page.setViewportSize({width:390,height:844});await openDock(page);await page.locator('.home-nav [data-home-go="home"]').click();
     const scopes=page.locator('#homeScopes');await scopes.scrollIntoViewIfNeeded();await scopes.evaluate(e=>e.scrollLeft=0);
     const scopeBefore=await page.evaluate(()=>filterCriteria());const strip=await scopes.boundingBox();
     await page.mouse.move(strip.x+strip.width-35,strip.y+20);await page.mouse.down();await page.mouse.move(strip.x+35,strip.y+20,{steps:10});await page.mouse.up();

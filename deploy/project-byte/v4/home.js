@@ -1435,8 +1435,10 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
       if (g.x > right-54) scroller.scrollLeft += 12;
       else if (g.x < left+54) scroller.scrollLeft -= 12;
     }
-    if (g.y > innerHeight-70) window.scrollBy(0,10);
-    else if (g.y < 70) window.scrollBy(0,-10);
+    const viewport=window.PRFKT_COLLAPSIBLE_NAV?document.querySelector('body > main.wrap'):null;
+    const limits=viewport?.getBoundingClientRect() || {top:0,bottom:innerHeight};
+    if (g.y > limits.bottom-70) (viewport || window).scrollBy(0,10);
+    else if (g.y < limits.top+70) (viewport || window).scrollBy(0,-10);
     hitTest(); frame = requestAnimationFrame(autoScroll);
   }
   document.addEventListener('pointerdown', e => {
@@ -1645,4 +1647,49 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   document.addEventListener('visibilitychange',()=>{clearCards();next=0;void poll();status();});window.addEventListener('online',()=>{next=0;void poll();});window.addEventListener('offline',status);
   window.addEventListener('project-byte-home-render',()=>{identify();status();});
   setInterval(()=>{identify();status();redraw();void poll();},500);void poll();
+})();
+
+// PRFKT collapsible navigation: reserved layout space, never an overlay.
+(() => {
+  if(window.PRFKT_COLLAPSIBLE_NAV)return;
+  const nav=document.querySelector('.home-nav'),main=document.querySelector('body > main.wrap');
+  if(!nav||!main)return;
+  window.PRFKT_COLLAPSIBLE_NAV=true;
+  let scrollingUntil=0;const wasEditing=userIsEditing;
+  main.addEventListener('scroll',()=>{scrollingUntil=performance.now()+250;},{passive:true});
+  userIsEditing=()=>wasEditing()||performance.now()<scrollingUntil;
+  const css=document.createElement('style');css.textContent=`
+    html{height:100%;overflow:hidden}
+    body{height:var(--prfkt-viewport,100dvh)!important;min-height:0!important;overflow:hidden!important;padding-bottom:0!important;display:flex!important;flex-direction:column}
+    body > header{flex:none;min-width:0}
+    body > main.wrap{flex:1 1 0;min-height:0;width:100%;overflow:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable;scroll-padding-block:12px;box-sizing:border-box}
+    #prfktNavDock{flex:none;position:relative;z-index:40;display:flex;flex-direction:column;align-items:center;gap:0;padding:0 10px env(safe-area-inset-bottom);background:#07101be8;border-top:1px solid #7296b215}
+    #prfktNavToggle{display:flex;align-items:center;justify-content:center;gap:7px;min-width:100px;min-height:44px;padding:4px 12px;border:0;border-radius:14px;background:transparent;color:#9eb3c8;font:500 11px system-ui;cursor:pointer;touch-action:manipulation}
+    #prfktNavToggle svg{width:15px;height:15px;transition:transform .15s}#prfktNavToggle[aria-expanded=true] svg{transform:rotate(180deg)}
+    #prfktNavToggle:hover{color:#deedfb;background:#17304755}#prfktNavToggle:focus-visible{outline:2px solid #9dd7ff;outline-offset:-3px}
+    #prfktNavDock .home-nav{position:static!important;transform:none!important;left:auto!important;right:auto!important;bottom:auto!important;width:min(560px,100%)!important;max-width:100%;box-sizing:border-box;margin:0 0 8px!important;flex:none;box-shadow:inset 0 1px #effaff0f}
+    #prfktNavDock .home-nav[hidden]{display:none!important}
+    .prfkt-move-toast,.pb-home-toast{bottom:calc(var(--prfkt-nav-space,44px) + 12px)!important}
+    @media(prefers-reduced-motion:reduce){#prfktNavToggle svg{transition:none}}
+    body.reduced-motion #prfktNavToggle svg{transition:none}
+    @media print{html,body{height:auto!important;overflow:visible!important;display:block!important}body > main.wrap{overflow:visible!important}#prfktNavDock{display:none}}
+  `;document.head.append(css);
+  const dock=document.createElement('footer');dock.id='prfktNavDock';
+  const toggle=document.createElement('button');toggle.id='prfktNavToggle';toggle.type='button';toggle.setAttribute('aria-controls','prfktPrimaryNav');toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-label','Show navigation');
+  toggle.innerHTML='<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m5 12 5-5 5 5"/></svg><span>Navigation</span>';
+  nav.id='prfktPrimaryNav';nav.setAttribute('aria-label','Primary navigation');nav.hidden=true;nav.inert=true;
+  dock.append(toggle,nav);document.body.append(dock);
+  new ResizeObserver(()=>document.documentElement.style.setProperty('--prfkt-nav-space',dock.getBoundingClientRect().height+'px')).observe(dock);
+  function setOpen(open,focus=false){
+    const atBottom=main.scrollHeight-main.scrollTop-main.clientHeight<4;
+    nav.hidden=!open;nav.inert=!open;toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',open?'Hide navigation':'Show navigation');
+    if(focus)toggle.focus({preventScroll:true});
+    if(atBottom)requestAnimationFrame(()=>main.scrollTop=main.scrollHeight);
+  }
+  toggle.onclick=()=>setOpen(nav.hidden);
+  dock.addEventListener('keydown',event=>{if(event.key==='Escape'&&!nav.hidden){event.preventDefault();event.stopPropagation();setOpen(false,true);}});
+  nav.addEventListener('click',event=>{if(event.target.closest('[data-home-go]'))setOpen(false,true);});
+  document.addEventListener('click',event=>{if(event.target.closest('[data-home-go],[data-view]'))requestAnimationFrame(()=>main.scrollTo({top:0,behavior:'instant'}));});
+  const fitViewport=()=>{const viewport=window.visualViewport;if(!viewport||viewport.scale===1)document.documentElement.style.setProperty('--prfkt-viewport',(viewport?.height||innerHeight)+'px');};
+  window.visualViewport?.addEventListener('resize',fitViewport);window.addEventListener('resize',fitViewport);fitViewport();
 })();
