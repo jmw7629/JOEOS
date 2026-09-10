@@ -94,7 +94,7 @@ jobs:
           grep -q 'function renderMemory(scoped)' "$TMP/home.js"
           grep -Fq "chips.push(['self','My work',c.ownerFilter===selfName])" "$TMP/home.js"
           grep -q "a.agent_key!=='executive'" "$TMP/home.js"
-          grep -q 'No open work assigned to' "$TMP/home.js"
+          grep -q 'No matching work in this filter' "$TMP/home.js"
           grep -q 'data-home-agent="${key}"' "$TMP/home.js"
           grep -Fq "setHomeFilter(pair[0],control?.value===pair[1]?'':pair[1])" "$TMP/home.js"
           grep -q 'Verifying system health…' "$TMP/home.js"
