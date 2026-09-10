@@ -287,7 +287,7 @@ class GatewayTests(unittest.TestCase):
 
     def test_codex_exact_owner_routes_and_authenticated_asset(self):
         token=self.login();ident='a'*32;prefix='/api/codex-workspace'
-        routes=[('GET',prefix),('GET',prefix+'/conversations/'+ident),
+        routes=[('GET',prefix),('GET',prefix+'/conversations'),('GET',prefix+'/conversations?project=joeos&search=Saved&cursor=%5B10%2C%22'+ident+'%22%5D'),('GET',prefix+'/conversations/'+ident),
                 ('GET',prefix+'/runs/'+ident+'/events'),('GET',prefix+'/runs/'+ident+'/events?after=0'),
                 ('GET',prefix+'/runs/'+ident+'/events?after=197'),('GET',prefix+'/artifacts/'+ident),
                 ('POST',prefix+'/message'),('POST',prefix+'/runs/'+ident+'/stop'),
@@ -307,7 +307,7 @@ class GatewayTests(unittest.TestCase):
 
     def test_codex_cookie_nonce_owner_role_and_origin_are_all_required(self):
         owner=self.login();viewer=self.login(self.viewer);ident='a'*32;prefix='/api/codex-workspace'
-        routes=[('GET',prefix),('GET',prefix+'/conversations/'+ident),('GET',prefix+'/artifacts/'+ident),
+        routes=[('GET',prefix),('GET',prefix+'/conversations?project=joeos&search='),('GET',prefix+'/conversations/'+ident),('GET',prefix+'/artifacts/'+ident),
                 ('GET',prefix+'/runs/'+ident+'/events?after=0'),('POST',prefix+'/message'),
                 ('POST',prefix+'/runs/'+ident+'/stop'),('POST',prefix+'/permissions/'+ident+'/decision')]
         for method,route in routes:
@@ -326,6 +326,8 @@ class GatewayTests(unittest.TestCase):
     def test_codex_dynamic_paths_and_queries_are_canonical_and_bounded(self):
         token=self.login();ident='a'*32;prefix='/api/codex-workspace';events=prefix+'/runs/'+ident+'/events'
         invalid=[prefix+'/',prefix+'?url=http://elsewhere.example',prefix+'?',
+                 prefix+'/conversations?url=http://elsewhere.example',prefix+'/conversations?project=a&project=b',
+                 prefix+'/conversations?search='+('a'*201),prefix+'/conversations?cursor='+('a'*161),
                  prefix+'/conversations/'+ident+'?after=0',prefix+'/artifacts/'+ident+'?download=1',
                  prefix+'/artifacts/../admin.secret',prefix+'/runs/'+ident+'/events/extra',
                  events+'?after=-1',events+'?after=01',events+'?after=1.2',events+'?after=1&after=2',

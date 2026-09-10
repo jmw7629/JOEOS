@@ -33,7 +33,7 @@
 
 
   let homeApprovalState = [];
-  let homeApprovalRefreshBusy = false;
+  let homeApprovalRefreshBusy = false,homeApprovalAt=0,homeApprovalIdentity='';
   let homeExternalReviewState = {state:'unavailable',items:[],repositories:{}};
   let homeExternalReviewRefreshBusy = false;
   let homeExternalReviewUpdatedAt = 0;
@@ -204,7 +204,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
       <section class="home-lower">
         <article class="home-card"><div class="home-card-head"><h3>${icon("activity")}Current activity</h3><button type="button" data-home-go="activity" aria-label="Open Activity">›</button></div><div id="homeActivity" class="activity-feed"></div></article>
         <article class="home-card"><div class="home-card-head"><h3 id="homeWorkTitle">My work</h3><button type="button" data-home-go="board" aria-label="Open Kanban">›</button></div><div id="homeWork" class="work-list"></div></article>
-        <article class="home-card"><div class="home-card-head"><h3>${icon("review")}Ready for review</h3><button type="button" data-home-go="agents" aria-label="Open review queue">›</button></div><div id="homeApprovals" class="approval-list"></div></article>
+        <article class="home-card"><div class="home-card-head"><h3>${icon("review")}Ready for review</h3><button type="button" data-home-go="board" aria-label="Open review queue">›</button></div><div id="homeApprovals" class="approval-list"></div></article>
       </section>
       <section class="home-grid">
         <article class="home-card"><div class="home-card-head"><h3>${icon("memory")}Recent memories</h3><button type="button" data-home-go="agents" aria-label="Open memory">›</button></div><div id="homeMemory" class="memory-feed"></div></article>
@@ -389,10 +389,10 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     const selectedOwner=document.getElementById('ownerFilter')?.value||'';
     const targetOwner=selectedOwner||(authenticated?who:'');
     if(title)title.textContent=targetOwner?(targetOwner===who?'My work':`${targetOwner}’s work`):'Open work';
-    let items=targetOwner?scoped.filter(t=>t.status!=='Done'&&t.owner===targetOwner):scoped.filter(t=>t.status!=='Done');
+    let items=targetOwner?scoped.filter(t=>t.status!=='Done'&&(t.owner===targetOwner||(!selectedOwner&&targetOwner===who&&(projectFor(t).lead===who||session.level===4&&!t.owner)))):scoped.filter(t=>t.status!=='Done');
     const rank={Critical:0,High:1,Medium:2,Low:3};
     items=items.sort((a,b)=>(rank[a.priority]??9)-(rank[b.priority]??9)).slice(0,4);
-    const empty=targetOwner?`No open work assigned to ${escH(targetOwner)} in this scope.`:'No open work in this scope.';
+    const empty=targetOwner?`No matching work in this filter. Open All projects to see the full workspace.`:'No open work in this scope.';
     el.innerHTML=items.length?items.map(t=>`<button type="button" class="work-item" data-home-task="${escH(t.id)}"><div class="work-top"><b>${escH(t.title)}</b><span class="home-priority ${escH(t.priority)}">${escH(t.priority)}</span></div><span>${escH(t.project)}${t.due_date?' · due '+escH(t.due_date):''}${t.ai_state?' · AI '+escH(t.ai_state):''}</span></button>`).join(''):`<div class="small">${empty}</div>`;
   }
 
@@ -473,10 +473,11 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   }
 
   async function refreshHomeApprovals() {
-    if(homeApprovalRefreshBusy)return;
-    if(!(session?.level>=2)){homeApprovalState=[];renderApprovals(safeVisible());return;}
-    homeApprovalRefreshBusy=true;
-    try{const x=await api('/api/approvals');homeApprovalState=x.approvals||[];renderApprovals(safeVisible())}catch{homeApprovalState=[]}finally{homeApprovalRefreshBusy=false}
+    const id=JSON.stringify([accessKey,session?.subject,session?.level]);if(id!==homeApprovalIdentity){homeApprovalIdentity=id;homeApprovalAt=0;homeApprovalState=[];}
+    if(homeApprovalRefreshBusy||Date.now()-homeApprovalAt<30000)return;
+    if(!(session?.level>=2)){homeApprovalAt=0;homeApprovalState=[];renderApprovals(safeVisible());return;}
+    homeApprovalRefreshBusy=true;homeApprovalAt=Date.now();
+    try{const x=await api('/api/approvals');if(JSON.stringify([accessKey,session?.subject,session?.level])!==id)return;homeApprovalState=x.approvals||[];renderApprovals(safeVisible())}catch{if(homeApprovalIdentity===id)homeApprovalState=[]}finally{homeApprovalRefreshBusy=false}
   }
 
   async function decideHomeApproval(id,action) {
@@ -486,7 +487,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     try{
       await api('/api/approvals/'+encodeURIComponent(id)+'/decision',{method:'POST',body:JSON.stringify({action})});
       const status=document.getElementById('status');if(status)status.textContent=action==='approve'?'Review approved · PR remains unmerged':'Changes requested · PR remains unmodified';
-      await refreshHomeApprovals();
+      homeApprovalAt=0;await refreshHomeApprovals();
     }catch(error){const status=document.getElementById('status');if(status)status.textContent='Review decision failed: '+(error?.message||'unknown error')}
   }
 
@@ -504,7 +505,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     const el=document.getElementById('homePortfolio');if(!el)return;
     const filtered=typeof activeFilterCount==='function'?activeFilterCount()>0:scoped.length!==(tasks||[]).length;
     const names=new Set(scoped.map(t=>t.project));
-    const list=(projects||[]).filter(p=>!filtered||names.has(p.name)).slice(0,5);
+    const list=(projects||[]).filter(p=>!filtered||names.has(p.name)||projectMatches(p,scoped));
     el.innerHTML=list.map(p=>{
       const ts=scoped.filter(t=>t.project===p.name),done=ts.filter(t=>t.status==='Done').length,pct=ts.length?Math.round(done/ts.length*100):null;
       return `<button type="button" class="work-item" data-home-project="${escH(p.name)}"><div class="work-top"><b>${escH(p.name)}</b><span class="health" data-h="${escH(p.health)}">${escH(p.health)}</span></div><span>Lead ${escH(p.lead||'Unassigned')} · ${pct===null?'No tracked work':pct+'% complete · '+done+'/'+ts.length+' tasks'}</span><div class="pulse-progress" aria-hidden="true"><i style="width:${pct||0}%"></i></div></button>`;
@@ -567,6 +568,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     // Capture before the base handler opens the advanced panel inside a closed dialog.
     event.preventDefault();event.stopImmediatePropagation();
     const lead=button.getAttribute('data-lead')||'',control=document.getElementById('leadFilter');
+    if(window.PRFKT_OPEN_LEAD){window.PRFKT_OPEN_LEAD(lead);return;}
     if(!lead&&control&&![...control.options].some(o=>o.value===unassignedLead))control.add(new Option('Unassigned lead',unassignedLead));
     setHomeFilter('leadFilter',lead||unassignedLead);
     if(typeof renderAll==='function')renderAll();
@@ -712,7 +714,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   const crawlToggle=document.getElementById('pbCrawlToggle');
   crawlToggle.onclick=()=>{crawlPaused=!crawlPaused;crawlToggle.setAttribute('aria-pressed',String(crawlPaused));crawlToggle.setAttribute('aria-label',crawlPaused?'Resume activity crawl':'Pause activity crawl');crawlToggle.innerHTML=icon(crawlPaused?'active':'blocked');renderLiveCrawl();};
   document.addEventListener('visibilitychange',()=>{renderLiveCrawl();if(!document.hidden)void pollLiveCrawl();});
-  window.addEventListener('resize',sizeLiveCrawl);window.setInterval(pollLiveCrawl,15000);
+  window.addEventListener('resize',sizeLiveCrawl);window.addEventListener('project-byte-home-render',()=>{crawlSnapshot={tasks,activity,runs};crawlState='fresh';renderLiveCrawl();});
 
   document.body.dataset.pbView = location.hash.replace('#','') || 'home';
   window.addEventListener('project-byte-health',e=>{renderExecutionFabric(e.detail||null);renderLiveCrawl();});
@@ -1514,7 +1516,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   if(window.PRFKT_LIVE_UPDATES)return;
   window.PRFKT_LIVE_UPDATES=true;
   const el=id=>document.getElementById(id), text=v=>String(v??'');
-  let identity='', credential='', generation=0, controller=null, busy=false, next=0, failures=0, last=0, slowAt=0;
+  let identity='', credential='', generation=0, controller=null, busy=false, refreshQueued=false, next=0, failures=0, last=0, slowAt=0;
   let records=[], known=new Set(), ready=Promise.resolve(), cryptoKey=null, storageName='', storageOK=true, saveChain=Promise.resolve();
   let seeded=false, dirty=false, selected=null, blocked='', lastSignature='', slowSignature='', previousFocus=null;
   const cards=new Map();
@@ -1586,6 +1588,9 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   }
   function dismiss(id){const c=cards.get(id);if(!c)return;clearTimeout(c.timer);cards.delete(id);c.node.classList.add('leaving');setTimeout(()=>c.node.remove(),320);}
   function showCard(row){
+    const important=row.source==='Permission'||row.source==='Agent'||/error|failed|blocked|needs review|review needed|approval required/i.test(row.title+' '+row.message);
+    if(!important)return;
+    if(row.source==='Agent'&&!/error|failed|blocked/i.test(row.title)&&window.PRFKT_CODEX?.isViewingConversation?.(row.conversationId))return;
     if(document.hidden||drawer.open||settings.notifications?.in_app===false||!popupPreference()||inQuietHours())return;
     if((row.source==='Agent'||row.source==='Permission')&&el('cwPopupPreference')?.checked===false)return;
     while(cards.size>=3)dismiss(cards.keys().next().value);
@@ -1596,8 +1601,8 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   }
   function status(){
     const offline=!navigator.onLine,age=last?Math.floor((Date.now()-last)/1000):null;
-    const label=offline?'Offline · reconnecting':document.hidden?'Paused while this tab is hidden':failures?'Updates interrupted · retrying':age===null?'Connecting to workspace…':age>8?'Updates delayed · reconnecting':`Refreshing every 2s · checked ${age}s ago${dirty?' · screen changes wait until editing finishes':''}`;
-    button.dataset.state=last&&!failures&&!offline&&age<9?'connected':'waiting';button.title=label;button.setAttribute('aria-label','Updates · '+records.filter(r=>!r.read).length+' unread');
+    const label=offline?'Offline · reconnecting':document.hidden?'Paused while this tab is hidden':failures?'Updates interrupted · retrying':age===null?'Connecting to workspace…':`Checked ${age}s ago · refresh on navigation or request${dirty?' · screen changes wait until editing finishes':''}`;
+    button.dataset.state=last&&!failures&&!offline?'connected':'waiting';button.title=label;button.setAttribute('aria-label','Updates · '+records.filter(r=>!r.read).length+' unread');
     button.querySelector('span').textContent='Updates'+(records.some(r=>!r.read)?' · '+records.filter(r=>!r.read).length:'');
     el('prfktUpdateState').textContent=label;
     el('prfktUpdateRetention').textContent=storageOK?'Latest 500 observed updates, encrypted and saved in this browser. Server notifications and activity are also recovered from their available history. Agent messages appear when their run is being followed.':'History is available in this tab only: browser storage is unavailable. Server activity remains available in Activity.';
@@ -1627,7 +1632,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
       const [t,p,a,r,n,i]=data;
       ingest([...(a.activity||[]).slice().reverse().map(x=>({id:'activity:'+x.id,ts:x.ts,title:text(x.action).replaceAll('_',' '),message:(x.actor?x.actor+' · ':'')+text(x.detail),project:x.project,source:'Activity',link:'#activity'})),...(n.notifications||[]).slice().reverse().map(x=>({...x,id:'notice:'+x.id,source:'Notification'}))]);seeded=true;
       const signature=JSON.stringify([t,p,a,r,i]);if(signature!==lastSignature){lastSignature=signature;tasks=t.tasks||[];projects=p.projects||[];activity=a.activity||[];runs=r.runs||[];intel=i;dirty=true;}
-      notifications=n.notifications||[];renderNotifications();deliverBrowserNotifications();last=Date.now();failures=0;next=last+2000;
+      notifications=n.notifications||[];renderNotifications();deliverBrowserNotifications();last=Date.now();failures=0;next=Infinity;
       if(Date.now()-slowAt>30000){
         const slowPaths=['/api/models','/api/agents','/api/settings',...(session.level>=3?['/api/team']:[]),...(session.level>=2?['/api/memory']:[])];
         const values=await Promise.all(slowPaths.map(p=>request(p,key,signal)));if(gen!==generation||who()!==id||accessKey!==key)return;
@@ -1635,16 +1640,17 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
       }
       redraw();if(document.querySelector('#terminalView.active')&&!userIsEditing())void terminalLoad();
     }catch(error){if(gen===generation){failures++;next=Date.now()+Math.min(30000,2000*2**Math.min(failures,4));if(error.status===401||error.status===403){reset();blocked=key;identity='';button.hidden=true;}}}
-    finally{clearTimeout(timeout);if(gen===generation){busy=false;controller=null;status();}}
+    finally{clearTimeout(timeout);if(gen===generation){busy=false;controller=null;if(refreshQueued){refreshQueued=false;next=0;}status();}}
   }
   // Replace the slower main loop; this remains polling, never a fabricated push stream.
-  refreshWorkspace=()=>{next=0;return poll();};setRefreshTimer=()=>{if(refreshTimer)clearInterval(refreshTimer);refreshTimer=null;};setRefreshTimer();
+  refreshWorkspace=()=>{next=0;if(busy)refreshQueued=true;return poll();};setRefreshTimer=()=>{if(refreshTimer)clearInterval(refreshTimer);refreshTimer=null;};setRefreshTimer();
   const oldSession=setSession;setSession=function(){oldSession();if(!session.ok)blocked='';identify();};
-  const oldAPI=api;api=async function(url,opt={}){const result=await oldAPI(url,opt);if(opt.method&&!['GET','HEAD'].includes(opt.method)){next=0;setTimeout(()=>void poll(),0);}return result;};
+  const oldAPI=api;api=async function(url,opt={}){const result=await oldAPI(url,opt);if(opt.method&&!['GET','HEAD'].includes(opt.method)){setTimeout(()=>void refreshWorkspace(),0);}return result;};
   window.addEventListener('prfkt-live-event',event=>{const id=identify(),gen=generation;if(!id)return;void ready.then(()=>{if(gen===generation&&who()===id)ingest([event.detail]);});});
   window.addEventListener('prfkt-permission-prompt',event=>{if(!identify())return;const d=event.detail,gen=generation;if(!d?.id)return;void ready.then(()=>{if(gen===generation)ingest([{id:'permission:'+d.id,title:'Review needed · '+text(d.title),message:text(d.text)+'\n\nOpen the current request to check whether it is still pending. This notice does not approve any action.',source:'Permission',conversationId:d.conversationId,link:'#agents'}]);});});
   document.addEventListener('click',e=>{if(e.target.closest('#login,#logoutAllLocal')&&session.ok){blocked=accessKey;identify();}},true);
   document.addEventListener('visibilitychange',()=>{clearCards();next=0;void poll();status();});window.addEventListener('online',()=>{next=0;void poll();});window.addEventListener('offline',status);
+  document.addEventListener('click',e=>{if(e.target.closest('[data-home-go],[data-view],#prfktUpdatesButton')&&Date.now()-last>15000){next=0;void poll();}});
   window.addEventListener('project-byte-home-render',()=>{identify();status();});
   setInterval(()=>{identify();status();redraw();void poll();},500);void poll();
 })();
@@ -1692,4 +1698,25 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   document.addEventListener('click',event=>{if(event.target.closest('[data-home-go],[data-view]'))requestAnimationFrame(()=>main.scrollTo({top:0,behavior:'instant'}));});
   const fitViewport=()=>{const viewport=window.visualViewport;if(!viewport||viewport.scale===1)document.documentElement.style.setProperty('--prfkt-viewport',(viewport?.height||innerHeight)+'px');};
   window.visualViewport?.addEventListener('resize',fitViewport);window.addEventListener('resize',fitViewport);fitViewport();
+})();
+
+
+// Guided work: real permission requests and task status decisions have distinct effects.
+(() => {
+  const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const css=document.createElement('style');css.textContent=`#prfktBoardGuide{padding:14px;margin-bottom:12px;border:1px solid #37516a;border-radius:14px;background:#0b1725}#prfktBoardGuide p{font-size:13px;line-height:1.6;margin:6px 0}#prfktBoardGuide .flex{gap:8px}.prfkt-task-next{padding-top:10px;display:grid;gap:7px}.prfkt-task-next p{margin:0;font-size:12px;line-height:1.5;color:#b9ccdd}.prfkt-task-next button{min-height:44px}.task>details>summary{cursor:pointer;padding:10px;font-size:12px}.task>details .taskactions{display:flex}#prfktLeadDialog{background:#0e1a28;color:#e4edf6;border:1px solid #425e78;border-radius:18px;width:min(580px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto;padding:18px;box-sizing:border-box}#prfktLeadDialog header{display:flex;align-items:center;justify-content:space-between}#prfktLeadDialog button{min-height:44px}#prfktLeadContent{display:grid;gap:12px}#prfktLeadContent article{border-top:1px solid #304458;padding:12px 0}#prfktLeadContent p{font-size:13px;line-height:1.6}#prfktReviewDock{min-width:0}#prfktReviewDock #codexPermissionInbox{padding:10px;margin:8px 0;border:1px solid #59645c;border-radius:12px}#prfktReviewDock .cw-heading{flex-wrap:wrap}#prfktReviewDock pre{max-width:100%}`;document.head.append(css);
+  const guide=document.createElement('div');guide.id='prfktBoardGuide';guide.innerHTML='<b>Your work queue</b><p>Request → In progress → Ready for review → Done. You describe the outcome; Codex chooses the tools and roles. Blocked work needs a dependency or an answer.</p><p><b>Ready for review is your main stop.</b> Approve a result to mark a task done, or request changes. A live tool permission says exactly what Approve once will execute. Neither action merges code.</p><div class="flex"><button type="button" class="mini" id="prfktShowReview">Review decisions</button><button type="button" class="mini" id="prfktAllWork">All work</button><button type="button" class="mini" id="prfktRefreshWork">Refresh data</button></div>';$('boardGrid').before(guide);
+  $('prfktShowReview').onclick=()=>{const col=$('boardGrid').querySelector('[data-drop-status="Review"]');col?.scrollIntoView({block:'nearest',inline:'center'});col?.querySelector('button')?.focus({preventScroll:true});};
+  $('prfktAllWork').onclick=()=>{document.querySelector('[data-home-scope="all"]')?.click();renderAll();};$('prfktRefreshWork').onclick=()=>void refreshWorkspace();
+  function nextFor(t){const dependency=t.depends_on?tasks.find(x=>x.id===t.depends_on):null;if(t.status==='Review')return ['Review result','Inspect the output. Approve the result to mark this task done, or ask for changes.'];if(t.status==='Done')return ['View result','This task is complete. Its saved work chat remains available.'];if(t.depends_on&&dependency?.status!=='Done')return ['Review dependency','Waiting on '+(dependency?.title||'a missing dependency')+'. Resolve that first.'];if(t.status==='Blocked')return ['Ask to unblock','Explain the blocker and let Codex suggest the next step.'];if(t.status==='Active')return ['Open work chat','Follow progress, add context, or answer a question.'];return ['Start with AI','Open a task chat, review the request, and send it to start work.'];}
+  const oldCard=card;card=function(t){const element=oldCard(t),actions=element.querySelector('.taskactions');if(actions){const detail=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Manual status controls';detail.append(summary,actions);element.append(detail);}const next=document.createElement('div');next.className='prfkt-task-next';const [label,note]=nextFor(t);const p=document.createElement('p');p.textContent=note;const b=document.createElement('button');b.type='button';b.className='btn primary';b.textContent=label;b.onclick=()=>{if(t.depends_on&&tasks.find(x=>x.id===t.depends_on)?.status!=='Done'){openTask(tasks.some(x=>x.id===t.depends_on)?t.depends_on:t.id);return;}if(window.PRFKT_CODEX)void window.PRFKT_CODEX.openWork({taskId:t.id,kind:'task',draft:t.status==='Backlog'?'Execute this task: '+t.title+'\nAsk me if essential information is missing.':undefined});else openTask(t.id);};next.append(p,b);
+    if(t.status==='Review'&&session.level>=2){const approve=document.createElement('button'),deny=document.createElement('button');approve.type=deny.type='button';approve.className=deny.className='mini';approve.textContent='Approve result';deny.textContent='Request changes';approve.onclick=async()=>{if(!confirm('Mark this task Done? This approves the task result only; it does not approve a tool, publish, or merge code.'))return;approve.disabled=true;try{const data=await api('/api/tasks'),current=data.tasks?.find(x=>x.id===t.id);if(current?.status!=='Review')throw new Error('The task changed. Refresh before deciding.');await api('/api/tasks/'+encodeURIComponent(t.id),{method:'PATCH',body:JSON.stringify({status:'Done'})});await refreshWorkspace();}catch(e){p.textContent=e.message;}finally{approve.disabled=false;}};deny.onclick=()=>void window.PRFKT_CODEX?.openWork({taskId:t.id,kind:'task',draft:'Changes requested for '+t.title+':\n'});next.append(approve,deny);}element.append(next);return element;};
+  const dock=document.createElement('div');dock.id='prfktReviewDock';
+  const oldBoard=renderBoard;renderBoard=function(){const panel=$('codexPermissionInbox');if(panel&&$('board').classList.contains('active'))dock.append(panel);oldBoard();const columns=[...$('boardGrid').querySelectorAll('.col')];for(const col of columns){const label=col.querySelector('.colhead>span');if(label?.textContent==='Review'){label.textContent='Ready for review';col.insertBefore(dock,col.children[1]||null);}else if(label?.textContent==='Backlog')label.textContent='Requests';else if(label?.textContent==='Active')label.textContent='In progress';}if(!$('prfktReviewDock'))columns.find(c=>c.dataset.dropStatus==='Review')?.prepend(dock);};
+  function mountReview(){const panel=$('codexPermissionInbox');if($('board').classList.contains('active')){if(!dock.isConnected)renderBoard();if(panel&&panel.parentElement!==dock)dock.append(panel);}else{const obs=$('pbObservatory');if(panel&&obs&&panel.parentElement===dock)obs.insertBefore(panel,obs.children[1]||null);}}
+  window.addEventListener('prfkt-codex-catalog',mountReview);window.addEventListener('hashchange',mountReview);document.addEventListener('click',e=>{if(e.target.closest('[data-home-go],[data-view],[data-focus]'))requestAnimationFrame(mountReview);});
+  const leadDialog=document.createElement('dialog');leadDialog.id='prfktLeadDialog';leadDialog.innerHTML='<header><h2 id="prfktLeadTitle">Lead view</h2><button type="button" class="mini" id="prfktLeadClose">Close</button></header><div id="prfktLeadContent"></div>';document.body.append(leadDialog);$('prfktLeadClose').onclick=()=>leadDialog.close();
+  window.PRFKT_OPEN_LEAD=lead=>{const list=projects.filter(p=>(p.lead||'')===lead);$('prfktLeadTitle').textContent=lead?lead+' · Lead view':'Projects without a lead';$('prfktLeadContent').innerHTML='<p>'+list.length+' projects. Review their status, then open the work you want to move forward.</p>'+list.map(p=>{const items=tasks.filter(t=>t.project===p.name&&t.status!=='Done'),review=items.filter(t=>t.status==='Review').length,blocked=items.filter(t=>t.status==='Blocked').length;return '<article><b>'+esc(p.name)+'</b><p>'+esc(p.health||'Status not recorded')+' · '+items.length+' open · '+review+' ready for review · '+blocked+' blocked</p><p>'+esc(p.goal||'No goal recorded')+'</p><button type="button" class="mini" data-lead-board="'+esc(p.name)+'">Open work queue</button> <button type="button" class="mini" data-lead-chat="'+esc(p.name)+'">Project chat</button></article>';}).join('');leadDialog.showModal();};
+  leadDialog.onclick=e=>{const b=e.target.closest('[data-lead-board],[data-lead-chat]');if(!b)return;leadDialog.close();if(b.dataset.leadChat){void window.PRFKT_CODEX?.openWork({projectName:b.dataset.leadChat});return;}document.querySelector('[data-home-scope="all"]')?.click();$('projectFilter').value=b.dataset.leadBoard;renderAll();document.querySelector('[data-home-go="board"],[data-view="board"]')?.click();};
+  renderAll();
 })();

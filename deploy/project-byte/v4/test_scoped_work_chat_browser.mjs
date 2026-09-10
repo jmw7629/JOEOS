@@ -11,7 +11,7 @@ const credential = 'NATIVE_TRACE_OWNER_FIXTURE_ONLY', reviewToken = 'NATIVE_TRAC
 const attack = '<img src=x onerror="window.TRACE_XSS=true">';
 const errors = [], external = [], requests = [], eventsAfter = [], allPosts = [];
 const fileMap = new Map(), conversations = new Map(), runs = new Map(), permissionHistory = [];
-const submitted=new Map();let uncertainNext=false;
+const taskDecisions=[];const submitted=new Map();let uncertainNext=false;const getRequests=[];
 const taskRows=[{id:'task-a',title:'Alpha task',project:'Alpha',status:'Open',depends_on:''},{id:'dependency',title:'Prerequisite',project:'Alpha',status:'Open',depends_on:''},{id:'task-b',title:'Dependent task',project:'Beta',status:'Open',depends_on:'dependency'}];
 const dashboardProjects=[{name:'Alpha',repo:'fixture/joeos'},{name:'Beta',repo:'fixture/memory'},{name:'Unmapped',repo:'fixture/unknown'}];
 const projects = ['joeos','memory'].map(key => ({key,label:key.toUpperCase()+' · trace fixture',repo:'fixture/'+key,mode:'execute',configured:true,connected:true,publication:true}));
@@ -31,6 +31,7 @@ function snapshot(run,after=0) {
 const server = http.createServer(async (req,res) => {
   try {
     const url = new URL(req.url,'http://fixture.local');
+    if(req.method==='GET'&&url.pathname.startsWith('/api/'))getRequests.push(url.pathname);
     if (fileMap.has(url.pathname)) { const file=fileMap.get(url.pathname);res.writeHead(200,{'Content-Type':file.type});res.end(file.body);return; }
     let raw='';for await (const chunk of req) raw+=chunk;
     const body=raw?JSON.parse(raw):{}, owner=req.headers['x-access-key']===credential;
@@ -51,7 +52,12 @@ const server = http.createServer(async (req,res) => {
         const response={conversation_id:cid,run_id:rid,project_key:body.project_key};submitted.set(body.request_id,response);
         if(uncertainNext){uncertainNext=false;return send({error:'Temporary response failure after acceptance'},503);}return send(response,202);
       }
-      if (url.pathname==='/api/codex-workspace') return send({configured:true,connected:true,model:'gpt-6-astra',effort:'ultra',projects,execution_permissions:{runner:'codex',capable:true,server_time:Date.now()/1000,requests:[...runs.values()].flatMap(r=>r.permissions.map(p=>({...p,can_decide:true,run_id:r.id,conversation_id:'trace-conversation',conversation_title:'Review fixture',project_key:'memory',repository:'fixture/memory'}))),history:permissionHistory},conversations:[...conversations.values()].map(c=>({id:c.id,title:c.title,project_key:c.project_key,updated_at:1}))});
+      if (url.pathname==='/api/codex-workspace') return send({configured:true,connected:true,model:'gpt-6-astra',effort:'ultra',history_pagination:true,runtime_options:{per_message:true,models:[{id:'gpt-6-astra',efforts:['low','ultra']},{id:'gpt-5.6-sol',efforts:['low','high']}]},projects,execution_permissions:{runner:'codex',capable:true,server_time:Date.now()/1000,requests:[...runs.values()].flatMap(r=>r.permissions.map(p=>({...p,can_decide:true,run_id:r.id,conversation_id:'trace-conversation',conversation_title:'Review fixture',project_key:'memory',repository:'fixture/memory'}))),history:permissionHistory},conversations:[...conversations.values()].map(c=>({id:c.id,title:c.title,project_key:c.project_key,updated_at:1}))});
+      if(url.pathname==='/api/codex-workspace/conversations'){
+        const project=url.searchParams.get('project'),search=url.searchParams.get('search')||'',offset=Number(url.searchParams.get('cursor')||0);
+        const filtered=[...conversations.values()].filter(c=>(!project||c.project_key===project)&&c.title.toLowerCase().includes(search.toLowerCase())).map(c=>({id:c.id,title:c.title,project_key:c.project_key,updated_at:1}));
+        return send({conversations:filtered.slice(offset,offset+1),next_cursor:offset+1<filtered.length?String(offset+1):null});
+      }
       const conversationMatch=url.pathname.match(/^\/api\/codex-workspace\/conversations\/([^/]+)$/);
       if (conversationMatch) {
         const c=conversations.get(conversationMatch[1]);
@@ -72,6 +78,7 @@ const server = http.createServer(async (req,res) => {
       return send({error:'Unexpected trace fixture route'},404);
     }
     if(url.pathname==='/api/tasks')return send({tasks:taskRows});
+    if(req.method==='PATCH'&&url.pathname.startsWith('/api/tasks/')){const row=taskRows.find(t=>t.id===url.pathname.split('/').at(-1));if(!owner||!row)return send({error:'Not allowed'},403);taskDecisions.push({id:row.id,body});Object.assign(row,body);return send({ok:true});}
     if(url.pathname==='/api/projects')return send({projects:dashboardProjects});
     if (url.pathname==='/api/settings') return send({settings});
     if (url.pathname==='/api/models') return send({models:[{model_key:'fixture',display_name:'Fixture',enabled:true,provider:'ollama'}]});
@@ -105,7 +112,7 @@ try {
   await page.goto(base+'/#ai');
   await page.waitForFunction(()=>document.querySelector('#cwWorkTabs button')&&typeof tasks!=='undefined'&&tasks.length===3);
   const selected=()=>page.locator('#cwWorkTabs [aria-selected="true"]').getAttribute('data-work-room');
-  const switchTo=async id=>{await page.locator('[data-work-room="'+id+'"]').click();await page.waitForFunction(id=>document.querySelector('[data-work-room="'+id+'"]')?.getAttribute('aria-selected')==='true',id);await page.waitForTimeout(100);};
+  const switchTo=async id=>{if(!await page.locator('[data-work-room="'+id+'"]').isVisible())await page.locator('#cwWindowsMenu').click();await page.locator('[data-work-room="'+id+'"]').click();await page.waitForFunction(id=>document.querySelector('[data-work-room="'+id+'"]')?.getAttribute('aria-selected')==='true',id);await page.waitForTimeout(100);};
   const work=async scope=>{await page.evaluate(scope=>window.PRFKT_CODEX.openWork(scope),scope);return selected();};
   const submit=async message=>{await page.locator('#chatInput').fill(message);await page.locator('#sendChat').click();};
   const waitCount=async n=>{for(let i=0;i<120&&submitted.size<n;i++)await page.waitForTimeout(100);assert.equal(submitted.size,n);};
@@ -120,6 +127,7 @@ try {
   assert.equal(await page.locator('#cwWorkJump').isVisible(),true);
   const b=await work({projectName:'Beta'});assert.notEqual(a,b);assert.equal(await page.locator('#chatInput').inputValue(),'');
   await submit('BETA_REQUEST');await page.waitForTimeout(300);assert.equal(submitted.size,1,'second window waits for single runner');
+  append(runs.get('run-1'),'tool_completed',{tool_id:'failed-fixture-tool',name:'Fixture check',success:false});
   append(runs.get('run-1'),'agent_message',{message_id:'alpha-progress',agent_id:'coordinator',phase:'commentary',text:'ALPHA_BACKGROUND_OUTPUT'});
   await page.waitForFunction(()=>document.querySelector('#cwWorkTabs [aria-selected="false"]')?.parentElement.textContent.includes('●'));
   assert.doesNotMatch(await page.locator('#chatlog').innerText(),/ALPHA_BACKGROUND_OUTPUT|ALPHA_REQUEST/);
@@ -131,7 +139,9 @@ try {
   assert.doesNotMatch(await page.locator('#chatlog').innerText(),/BETA_REQUEST/);
   await switchTo(b);await page.waitForFunction(()=>document.querySelector('#chatlog')?.textContent.includes('BETA_REQUEST'));
   // Saved updates reopen the originating conversation, regardless of the selected chat.
-  await page.locator('#prfktUpdatesButton').click();await page.locator('#prfktUpdateList button').filter({hasText:'ALPHA_BACKGROUND_OUTPUT'}).click();
+  await page.locator('#prfktUpdatesButton').click();
+  assert.match(await page.locator('#prfktUpdateList').textContent(),/Fixture check failed/,'important background errors are retained');
+  await page.locator('#prfktUpdateList button').filter({hasText:'ALPHA_BACKGROUND_OUTPUT'}).click();
   await page.locator('#prfktUpdateDetail button').click();await page.waitForFunction(()=>document.querySelector('#chatlog')?.textContent.includes('ALPHA_BACKGROUND_OUTPUT'));
   assert.equal(await selected(),a);
   console.log('SCOPED_CONTEXT_BACKGROUND_DRAFT_AND_NOTIFICATION=PASS');
@@ -184,6 +194,59 @@ try {
   await page.evaluate(()=>{session={ok:false,level:0};accessKey='';});await page.waitForTimeout(1500);
   assert.equal(await page.locator('#cwWorkTabs button').count(),0);assert.equal(await page.locator('#cwWorkJump').isVisible(),false);
   await page.evaluate(key=>{accessKey=key;return load();},credential);await page.waitForFunction(()=>document.querySelector('#cwWorkTabs button'));assert.equal(await page.locator('#cwCloseWork').count(),1,'work controls survive sign-out and sign-in');
+  await go('portfolio');await page.locator('#projects [data-lead]').first().click();
+  await page.locator('#prfktLeadDialog[open]').waitFor();assert.equal(await page.locator('#prfktLeadContent article').count(),3);await page.locator('#prfktLeadClose').click();
+  await go('ai');await switchTo(a);await page.locator('#cwHistoryButton').click();await page.locator('#cwHistoryDialog[open]').waitFor();
+  assert.equal(await page.locator('#cwHistoryProject').inputValue(),'joeos');
+  await page.locator('#cwHistoryMore').waitFor({state:'visible'});
+  const historyCount=await page.locator('#cwHistoryList button').count();await page.locator('#cwHistoryMore').click();
+  await page.waitForFunction(n=>document.querySelectorAll('#cwHistoryList button').length>n,historyCount);
+  await page.locator('#cwHistoryProject').selectOption('memory');
+  await page.waitForFunction(()=>document.querySelector('#cwHistoryList')?.textContent.includes('MEMORY'));
+  assert.ok(await page.locator('#cwHistoryList button').count()>0,'other project history survives navigation and reload');
+  await page.locator('#cwHistoryDialog [data-close]').click();
+  await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>window.fixtureCopied=text}}));
+  await page.locator('.cw-copy-message').first().click();assert.match(await page.evaluate(()=>window.fixtureCopied),/ALPHA_REQUEST/);
+  await page.locator('#chatInput').fill('File review');
+  await page.locator('#cwInputTools input[type=file]').setInputFiles({name:'sample.csv',mimeType:'text/csv',buffer:Buffer.from('name,count\nAlpha,2')});
+  await page.waitForFunction(()=>document.querySelector('#chatInput').value.includes('Alpha,2'));
+  const fileDraft=await page.locator('#chatInput').inputValue();await switchTo(b);assert.doesNotMatch(await page.locator('#chatInput').inputValue(),/Alpha,2/);await switchTo(a);assert.equal(await page.locator('#chatInput').inputValue(),fileDraft);
+  await page.setViewportSize({width:390,height:430});await page.locator('#chatInput').focus();await page.waitForTimeout(1100);
+  const keyboard=await page.locator('#chatInput').boundingBox(),nav=await page.locator('#prfktNavDock').boundingBox();
+  assert.ok(keyboard.y>=0&&keyboard.y+keyboard.height<=nav.y,'composer fits keyboard-height viewport');
+  const keyboardLayout=await page.evaluate(()=>Object.fromEntries(['chatlog','chatInput','cwWorkWindows','cwWorkState','cwWorkspaceBar','cwInputTools'].map(id=>{const e=document.getElementById(id);return [id,e?{height:e.clientHeight,top:e.getBoundingClientRect().top,text:id==='cwWorkState'?e.textContent:undefined}:null]})));
+  await page.screenshot({path:path.join(out,'keyboard-current.png')});
+  assert.ok(keyboardLayout.chatlog.height>=140,'keyboard leaves readable conversation area: '+JSON.stringify(keyboardLayout));
+  await page.setViewportSize({width:390,height:844});await page.locator('#chatInput').blur();await page.waitForTimeout(1100);
+  await page.locator('[data-cw-view="terminal"]').click();await page.locator('#cwFollowOutput').click();await page.locator('#cwFollowOutput').click();
+  assert.equal(await page.locator('#cwFollowOutput').getAttribute('aria-pressed'),'true');
+  const terminalBounds=await page.locator('#cwTerminal').boundingBox(),logBounds=await page.locator('#cwTerminalLog').boundingBox();
+  assert.ok(logBounds.y+logBounds.height<=terminalBounds.y+terminalBounds.height+1,'output fits its scrolling container');
+  await page.waitForTimeout(3000);const idleStart=getRequests.length;await page.waitForTimeout(6500);
+  assert.equal(getRequests.slice(idleStart).filter(p=>p==='/api/tasks').length,0,'idle chat does not scan task data');
+  assert.ok(getRequests.slice(idleStart).filter(p=>p==='/api/codex-workspace').length<=1,'permission view shares cached catalog');
+  await page.locator('[data-cw-view="chat"]').click();await page.locator('#cwModelOptions').click();
+  await page.locator('#cwModelSelect').selectOption('gpt-5.6-sol');await page.locator('#cwEffortSelect').selectOption('low');await page.locator('#cwSaveModel').click();
+  const total=submitted.size;await page.locator('#chatInput').fill('MODEL_SELECTION_FIXTURE');await page.locator('#sendChat').click();await waitCount(total+1);
+  const selection=requests.filter(r=>r.path.endsWith('/message')).at(-1).body;
+  assert.equal(selection.model,'gpt-5.6-sol');assert.equal(selection.effort,'low');
+  const lastRun=runs.get('run-'+(total+1));lastRun.status='waiting_approval';
+  lastRun.permissions.push({id:'inbox-mobile',run_id:lastRun.id,state:'pending',tool:'publish_pull_request',summary:'Publish only the frozen fixture patch',arguments:{},expires_at:Date.now()/1000+300,review_token:reviewToken});
+  await go('board');await page.evaluate(()=>document.querySelector('#codexRefresh').click());
+  await page.locator('#prfktReviewDock [data-cw-inbox-decision="deny"]').waitFor({state:'visible'});
+  assert.match(await page.locator('#prfktReviewDock').textContent(),/frozen fixture patch/);
+  await page.locator('#prfktReviewDock [data-cw-inbox-decision="deny"]').click();
+  await page.waitForFunction(()=>document.querySelector('#prfktReviewDock')?.textContent.includes('denied'));
+  assert.equal(requests.filter(r=>r.path.endsWith('/permissions/inbox-mobile/decision')).at(-1).body.decision,'deny');
+  await finish(lastRun.id);
+  taskRows.push({id:'review-result',title:'Review result fixture',project:'Alpha',status:'Review'});
+  await page.evaluate(()=>refreshWorkspace());
+  await page.waitForFunction(()=>tasks.some(t=>t.id==='review-result'));
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'Approve result',exact:true}).click();
+  await page.waitForFunction(()=>tasks.find(t=>t.id==='review-result')?.status==='Done');
+  assert.deepEqual(taskDecisions,[{id:'review-result',body:{status:'Done'}}],'result approval changes only its task status');
+  console.log('MOBILE_HISTORY_COPY_FILE_SCOPE_KEYBOARD_TERMINAL_IDLE_TRAFFIC=PASS');
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
   console.log('SCOPED_MOBILE_ENTRY_POINTS_ENCRYPTED_DRAFTS_LOGOUT=PASS');
   console.log('SCOPED_WORK_CHAT_BROWSER=PASS');

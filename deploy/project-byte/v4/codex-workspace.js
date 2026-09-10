@@ -302,7 +302,7 @@
     const signature = JSON.stringify([messages,visibleNative,agents.map(a=>[a.id,a.role]),native.length?null:stream]); if (signature === messagesSignature) return;
     messagesSignature = signature;
     const log = $('chatlog'), nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
-    const item = (m,label) => `<article class="msg ${m.role==='user'?'user':'assistant'}"${m.id?` data-message-id="${escape(m.id)}"`:''}><div class="cw-message-author">${escape(label || (m.role==='user'?'You':'AI_BYTE'))}</div><div class="cw-message-body">${messageMarkup(workUserText(m))}</div></article>`;
+    const item = (m,label) => `<article class="msg ${m.role==='user'?'user':'assistant'}"${m.id?` data-message-id="${escape(m.id)}"`:''}><div class="cw-message-author">${escape(label || (m.role==='user'?'You':'AI_BYTE'))}</div><div class="cw-message-body">${messageMarkup(workUserText(m))}</div><button type="button" class="cw-copy-message mini" aria-label="Copy message">Copy</button></article>`;
     const nativeHtml=visibleNative.map(m=>item(m,m.coordinator?'AI_BYTE · '+(m.phase==='commentary'?'Update':'Response'):(agents.find(a=>a.id===m.agent_id)?.role || 'Agent'))).join('');
     let inserted=false;const html=messages.map((m,i)=>{let result='';if(m.run_id===run?.id && m.role==='assistant' && !inserted){result=nativeHtml;inserted=true;}result+=item(m);if(m.run_id===run?.id && messages[i+1]?.run_id!==run?.id && !inserted){result+=nativeHtml;inserted=true;}return result;}).join('');
     log.innerHTML = html + (!inserted?nativeHtml:'') + (!native.length && stream ? item({text:stream},'AI_BYTE') : '');
@@ -354,11 +354,11 @@
     renderMessages(); renderPermissions(); renderEvidence(); renderTrace(); renderWorkspace();
   }
   async function refreshCatalog(force = false) {
-    if (!synchronizeIdentity() || catalogBusy || (!force && Date.now()-catalogAt<15000)) return;
+    if (!synchronizeIdentity() || catalogBusy || (!force && Date.now()-catalogAt<(active()?15000:60000))) return;
     catalogBusy = true; const current = who(), turn = epoch;
     try {
       const data = await request('/api/codex-workspace',undefined,current,turn); if (!data) return;
-      catalog = data; catalogAt = Date.now(); render();
+      catalog = data; catalogAt = Date.now(); window.dispatchEvent(new CustomEvent('prfkt-codex-catalog',{detail:data})); render();
       if (!restored && !conversationId && !sending) {
         restored = true;
         const latest = (catalog.conversations || []).find(c => c.project_key === projectKey);
@@ -386,7 +386,7 @@
   function acceptEvent(event) {
     traceAccept(event);
     const data = event.data || {};
-    if(window.PRFKT_LIVE_UPDATES && ['tool_started','tool_completed'].includes(event.type) && event.ts>=Math.max(presentationStarted,notificationAfter))window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'tool:'+run?.id+':'+event.seq,ts:event.ts,title:(data.name || 'Tool')+' · '+(event.type==='tool_started'?'started':data.success===false?'failed':'finished'),message:data.summary || 'Open the workspace terminal for recorded output.',source:'Agent',project:projectKey,conversationId,link:'#ai'}}));
+    if(window.PRFKT_LIVE_UPDATES && event.type==='tool_completed' && data.success===false && event.ts>=Math.max(presentationStarted,notificationAfter))window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'tool:'+run?.id+':'+event.seq,ts:event.ts,title:(data.name || 'Tool')+' · '+(event.type==='tool_started'?'started':data.success===false?'failed':'finished'),message:data.summary || 'Open the workspace terminal for recorded output.',source:'Agent',project:projectKey,conversationId,link:'#ai'}}));
     if (event.type==='agent_message' || event.type==='message_delta' || data.output_kind==='agent_delta') {
       const id=data.message_id || 'stream:'+data.agent_id, previous=nativeMessages.get(id);
       const coordinator=event.type==='message_delta' || agents.find(a=>a.id===data.agent_id)?.role==='coordinator' || traceNodes.get(nodeKey('agent',data.agent_id))?.label==='coordinator' || previous?.coordinator;
@@ -406,12 +406,13 @@
     tools = tools.slice(-60);
   }
   async function poll(force = false) {
-    if (!synchronizeIdentity() || (window.PRFKT_LIVE_UPDATES?document.hidden:!visible()) || polling || loading || !run || (!force && ((!active() && !pendingEvents) || Date.now()-lastPoll<750))) return;
+    if (!synchronizeIdentity() || (window.PRFKT_LIVE_UPDATES?document.hidden:!visible()) || polling || loading || !run || (!force && ((!active() && !pendingEvents) || Date.now()-lastPoll<(pendingEvents?750:visible()?2000:5000)))) return;
     polling = true; lastPoll = Date.now(); const current = who(), turn = epoch, runId = run.id;
     try {
       const data = await request('/api/codex-workspace/runs/'+encodeURIComponent(runId)+'/events?after='+seq,undefined,current,turn); if (!data || run?.id !== runId) return;
       syncClock(data.server_time);
       const previous = seq;
+      for(const event of data.events||[])if(event.seq>seq&&event.type==='status')notifyRunFailure(event,{runId,conversationId,projectKey});
       for (const event of (data.events || []).filter(e => Number.isSafeInteger(e.seq) && e.seq > seq).sort((a,b) => a.seq-b.seq)) { if (event.seq <= seq) continue; acceptEvent(event); seq = event.seq; }
       pendingEvents = (data.events || []).length >= 200 && seq > previous;
       if (data.run) run = data.run;
@@ -487,7 +488,7 @@
   function open() {
     document.querySelector('[data-view="ai"]')?.click();
     if (!host.classList.contains('active')) document.querySelector('[data-home-go="ai"]')?.click();
-    $('chatInput').focus(); void refreshCatalog(); return owner();
+    if(!phone.matches)$('chatInput').focus({preventScroll:true}); void refreshCatalog(); return owner();
   }
   panel.addEventListener('input', event => { if (event.target.dataset.codexNote) permissionNotes.set(event.target.dataset.codexNote,event.target.value); });
   panel.addEventListener('click', event => {
@@ -512,7 +513,7 @@
     const sendButton = event.target.closest('#sendChat'), reloadButton = event.target.closest('#loadChat');
     if (owner() && (sendButton || reloadButton)) { event.preventDefault(); event.stopImmediatePropagation(); if (sendButton) void send(); else void refreshCatalog(true).then(()=>{if(owner() && conversationId)void selectConversation(conversationId);}); }
   },true);
-  function tick() { if (synchronizeIdentity()) { render(); if (visible()) void refreshCatalog(); if(visible() || window.PRFKT_LIVE_UPDATES) void poll(); } }
+  function tick() { if (synchronizeIdentity()) { render(); if (!document.hidden) void refreshCatalog(); if(visible() || window.PRFKT_LIVE_UPDATES) void poll(); } }
   window.addEventListener('project-byte-home-render',tick);
   window.addEventListener('hashchange',tick);
   document.addEventListener('visibilitychange',tick);
@@ -554,7 +555,7 @@
   $('cwOptions').onclick=()=>{document.querySelector('[data-view="settings"]')?.click();prefs.scrollIntoView({block:'center'});$('cwLayoutPreference').focus();};
   $('cwContextToggle').onclick=()=>{contextOpen=!contextOpen;renderWorkspace();};
   toolbar.onclick=e=>{const b=e.target.closest('[data-cw-view]');if(b){workspaceView=b.dataset.cwView;renderWorkspace();}};
-  $('cwFollowOutput').onclick=()=>{followOutput=!followOutput;$('cwFollowOutput').setAttribute('aria-pressed',String(followOutput));if(followOutput)$('cwTerminalLog').scrollTop=$('cwTerminalLog').scrollHeight;};
+  $('cwFollowOutput').onclick=()=>{followOutput=!followOutput;$('cwFollowOutput').setAttribute('aria-pressed',String(followOutput));$('cwFollowOutput').textContent=followOutput?'Following output':'Follow output';if(followOutput)$('cwTerminalLog').scrollTop=$('cwTerminalLog').scrollHeight;};
   phone.addEventListener('change',()=>renderWorkspace());
   function messageMarkup(value) {
     // Small, escaped Markdown subset. Model HTML is always text.
@@ -572,7 +573,20 @@
     }
     flush();if(buf.length)out.push('<pre><code>'+escape(buf.join('\n'))+'</code></pre>');return out.join('');
   }
+  function notifyRunFailure(event,scope){
+    if(event.ts<presentationStarted||!owner())return;
+    const failed=event.type==='status'&&event.data?.status==='failed';
+    const toolFailed=event.type==='tool_completed'&&event.data?.success===false;
+    if(!failed&&!toolFailed)return;
+    window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{
+      id:'failure:'+scope.runId+':'+event.seq,ts:event.ts,source:'Agent',
+      title:failed?'Run failed':(event.data.name||'Tool')+' failed',
+      message:'Open the work chat and terminal to review the recorded error and choose the next step.',
+      conversationId:scope.conversationId,project:scope.projectKey,link:'#ai'
+    }}));
+  }
   function notifyAgent(message) {
+    if(visible() && workspaceView==='chat')return;
     if(window.PRFKT_LIVE_UPDATES && owner()){window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'agent:'+run?.id+':'+message.id,title:message.coordinator?'AI_BYTE':agents.find(a=>a.id===message.agent_id)?.role || 'Agent',message:message.text,source:'Agent',project:projectKey,conversationId,link:'#ai'}}));return;}
     if(!popups || !owner() || !visible() || popupSeen.has(message.id))return;
     popupSeen.add(message.id);popupMessage={...message,conversationId};
@@ -600,7 +614,7 @@
       const streamed=n.streams?.map(s=>`<pre${s.stream==='stderr'?' class="cw-terminal-error"':''}>${escape(clean(s.text))}</pre>`).join('');
       return `<article class="cw-terminal-entry" data-tool-id="${escape(n.id)}"><div><span class="cw-terminal-time">${escape(time)}</span> <b>${escape(n.label)}</b> <span class="cw-terminal-${failed?'error':'state'}">${escape(n.status || 'recorded')}${exit}${timedOut}${metricNumber(n.duration_ms)?' · '+n.duration_ms.toLocaleString()+' ms':''}</span></div>${command?`<pre class="cw-terminal-command">${escape(clean(command))}</pre>`:''}${streamed || (output?`<pre>${escape(clean(output))}</pre>`:'')}${n.output && n.error?.text?`<pre class="cw-terminal-error">${escape(clean(n.error.text))}</pre>`:''}${n.truncated || n.result?.truncated?'<p class="small">Recorded output was truncated.</p>':''}</article>`;
     }).join('') || '<p class="cw-terminal-empty">Commands and their recorded output appear here when an agent uses a tool.</p>';
-    if(followOutput && nearBottom)log.scrollTop=log.scrollHeight;else log.scrollTop=scrollTop;
+    if(followOutput)log.scrollTop=log.scrollHeight;else log.scrollTop=scrollTop;
   }
   function renderWorkspace() {
     const enabled=owner(),remote=mobileMode==='mobile' || (mobileMode==='auto' && phone.matches);
@@ -644,9 +658,9 @@
   box.prepend(roomUI);
   const roomCSS=document.createElement('style');roomCSS.textContent=`
     #cwWorkWindows{padding:12px 14px;margin-bottom:0;max-height:42%;overflow:auto;flex-shrink:0;border-bottom:1px solid #304357;padding-bottom:14px}#cwWorkWindows[hidden]{display:none!important}.cw-work-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.cw-work-head b{font-size:17px}.cw-work-head p{color:#9dafc0;font-size:12px;margin:5px 0 10px}.cw-work-head button{white-space:nowrap}
-    #cwWorkTabs{display:flex;gap:8px;overflow:auto;padding:4px 0 12px;scrollbar-width:thin}#cwWorkTabs button{flex:0 0 auto;max-width:240px;display:grid;gap:5px;text-align:left;padding:10px 14px;border:1px solid #334e66;border-radius:12px;background:#0d1c2d;color:#b6c9da;font:inherit;min-height:54px}#cwWorkTabs button[aria-selected=true]{border-color:#72caff;background:#15324b;color:#eef8ff}#cwWorkTabs b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}#cwWorkTabs small{font-size:11px}#cwWorkScope{color:#c9dcea;font-size:13px;line-height:1.6;overflow-wrap:anywhere}#cwWorkScope details{margin-top:5px}#cwWorkScope #cwCloseWork{margin-top:8px;min-height:44px}#cwWorkScope summary{cursor:pointer;min-height:32px;color:#98b8d0}#cwWorkScope p{margin:6px 0;white-space:pre-wrap}#cwWorkState:empty{display:none}#cwWorkState{font-size:12px;color:#afc7db;white-space:pre-wrap;margin:8px 0}.cw-work-buttons{display:flex;gap:8px;flex-wrap:wrap}.cw-work-buttons button[hidden]{display:none!important}
+    #cwWorkTabs{display:none;gap:8px;overflow:auto;padding:4px 0 12px;scrollbar-width:thin}#cwWorkTabs button{flex:0 0 auto;max-width:240px;display:grid;gap:5px;text-align:left;padding:10px 14px;border:1px solid #334e66;border-radius:12px;background:#0d1c2d;color:#b6c9da;font:inherit;min-height:54px}#cwWorkTabs button[aria-selected=true]{border-color:#72caff;background:#15324b;color:#eef8ff}#cwWorkTabs b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}#cwWorkTabs small{font-size:11px}#cwWorkScope{color:#c9dcea;font-size:13px;line-height:1.6;overflow-wrap:anywhere}#cwWorkScope details{margin-top:5px}#cwWorkScope #cwCloseWork{margin-top:8px;min-height:44px}#cwWorkScope summary{cursor:pointer;min-height:32px;color:#98b8d0}#cwWorkScope p{margin:6px 0;white-space:pre-wrap}#cwWorkState:empty{display:none}#cwWorkState{font-size:12px;color:#afc7db;white-space:pre-wrap;margin:8px 0}.cw-work-buttons{display:flex;gap:8px;flex-wrap:wrap}.cw-work-buttons button[hidden]{display:none!important}
     #ai.cw-enabled.cw-work-rooms #loadChat,#ai.cw-enabled.cw-work-rooms #codexNewConversation{display:none!important}#ai.cw-work-rooms .cw-work-buttons button,#cwNewWork{min-height:44px}#ai.cw-work-rooms .composer textarea{min-height:58px}#ai.cw-work-rooms #codexConversation{font-size:14px}
-    #ai.cw-enabled.cw-work-rooms .chatbox{height:var(--cw-work-height,calc(100dvh - 180px));min-height:350px;display:flex;flex-direction:column}#ai.cw-work-rooms .chatbox>.between{display:none!important}#ai.cw-work-rooms #chatlog,#ai.cw-work-rooms #cwTerminal{flex:1;min-height:55px;height:auto;overflow:auto}#ai.cw-work-rooms #cwTerminalLog{height:100%;min-height:55px}#ai.cw-work-rooms .composer,#ai.cw-work-rooms .cw-statusbar,#ai.cw-work-rooms .cw-workspace-bar{flex-shrink:0}
+    #ai.cw-enabled.cw-work-rooms .chatbox{height:var(--cw-work-height,calc(100dvh - 180px));min-height:180px;display:flex;flex-direction:column}#ai.cw-work-rooms .chatbox>.between{display:none!important}#ai.cw-work-rooms #chatlog,#ai.cw-work-rooms #cwTerminal{flex:1;min-height:55px;height:auto;overflow:auto}#ai.cw-work-rooms #cwTerminalLog{height:100%;min-height:55px}#ai.cw-work-rooms .composer,#ai.cw-work-rooms .cw-statusbar,#ai.cw-work-rooms .cw-workspace-bar{flex-shrink:0}
     #ai.cw-enabled.cw-work-rooms #codexRefresh{display:inline-flex!important}
     #cwWorkJump{min-height:44px;background:#112536;border:1px solid #365673;border-radius:12px;color:#bcd6e9;font-size:11px;padding:7px 10px}#cwWorkJump[hidden]{display:none!important}
     @media(max-width:650px){.cw-work-head{align-items:flex-start}.cw-work-head p{display:none}.cw-work-head{margin-bottom:10px}#cwWorkTabs button{max-width:200px;padding:9px 12px}#cwWorkWindows{margin-bottom:10px}#cwWorkJump{font-size:0;width:38px;padding:5px}#cwWorkJump:after{content:'Chats';font-size:9px}#prfktNavDock>#cwWorkJump{position:absolute;top:0;right:10px}#ai.cw-work-rooms .composer textarea{min-height:58px;font-size:16px}}
@@ -671,7 +685,7 @@
   function roomScope(r){const t=tasks.find(t=>t.id===r.taskId);return {project:r.projectName||projectList().find(p=>p.key===r.projectKey)?.label||r.projectKey,repository:projectList().find(p=>p.key===r.projectKey)?.repo||'',task:t||r.taskSnapshot||null,kind:r.kind||'general'};}
   function roomStatus(r){if(r.pending)return r.pending.phase==='sending'?'Submitting…':r.pending.phase==='uncertain'?'Check submission':r.pending.phase==='paused'?'Waiting · resume needed':r.note||'Waiting for runner';return labels[r.status]||'Draft';}
   function roomRender(){
-    if(!roomSync())return;if(!roomReady)return;const r=roomCurrent();const main=document.querySelector('body > main.wrap');if(main&&host.classList.contains('active')){const h=Math.max(350,Math.floor(main.clientHeight-(host.getBoundingClientRect().top-main.getBoundingClientRect().top+main.scrollTop)-20))+'px';if(box.style.getPropertyValue('--cw-work-height')!==h)box.style.setProperty('--cw-work-height',h);}
+    if(!roomSync())return;if(!roomReady)return;const r=roomCurrent();const main=document.querySelector('body > main.wrap');if(main&&host.classList.contains('active')){const h=Math.max(180,Math.floor(main.clientHeight-(host.getBoundingClientRect().top-main.getBoundingClientRect().top+main.scrollTop)-20))+'px';if(box.style.getPropertyValue('--cw-work-height')!==h)box.style.setProperty('--cw-work-height',h);}
     if(r&&renderedRoom===r.id&&run&&conversationId===r.conversationId){r.status=run.status;r.runId=run.id;r.seq=seq;}
     if(!r&&catalog){void roomNew({projectKey:projectList().some(p=>p.key==='joeos')?'joeos':'',title:'General chat',kind:'general'},false);return;}
     const sig=JSON.stringify([...workRooms.values()].map(x=>[x.id,x.title,x.projectKey,x.status,x.pending?.phase,x.note,x.unread]));
@@ -720,7 +734,7 @@
     if(!r.projectKey||!projectState().ready){r.note='Choose a connected workspace project in Context before sending.';roomRender();return;}
     const context=roomScope(r);const bound=message+'\n\nWorkspace reference context (execution permissions unchanged):\n'+JSON.stringify(context);
     if(new TextEncoder().encode(bound).length>24000){r.note='Message and context exceed 24 KB. Shorten the message before sending.';roomRender();return;}
-    if(r.title==='New chat'||r.title==='General chat')r.title=message.split('\n')[0].slice(0,60);r.draft=message;r.pending={phase:'waiting',created:Date.now(),body:{request_id:uuid(),conversation_id:r.conversationId||null,project_key:r.projectKey,message:bound}};r.note='Waiting for runner';roomPersist();roomRender();roomNext=0;void roomPump();
+    if(r.title==='New chat'||r.title==='General chat')r.title=message.split('\n')[0].slice(0,60);r.draft=message;r.pending={phase:'waiting',created:Date.now(),body:{request_id:uuid(),conversation_id:r.conversationId||null,project_key:r.projectKey,message:bound,...(catalog?.runtime_options?.per_message?{model:r.model||catalog.model,effort:r.effort||catalog.effort}:{})}};r.note='Waiting for runner';roomPersist();roomRender();roomNext=0;void roomPump();
   };
   async function roomPump(){
     if(!roomSync()||!roomReady||roomBusy||document.hidden||Date.now()<roomNext)return;roomBusy=true;const gen=roomGeneration;
@@ -730,7 +744,7 @@
         if(gen!==roomGeneration)return;
         if(!r.runId||(!activeStates.has(r.status)&&!r.catchingUp)||r.id===selectedRoom)continue;
         try{const data=await roomRequest('/api/codex-workspace/runs/'+encodeURIComponent(r.runId)+'/events?after='+(r.seq||0),undefined,gen);if(!data)return;if(data.run?.id!==r.runId)throw new Error('Run identity mismatch');
-          for(const event of data.events||[]){r.seq=Math.max(r.seq||0,event.seq||0);if(event.type==='agent_message'&&event.data?.text){r.unread=true;window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'agent:'+r.runId+':'+(event.data.message_id||event.seq),ts:event.ts,title:r.title,message:event.data.text,source:'Agent',project:r.projectName||r.projectKey,conversationId:r.conversationId,link:'#ai'}}));}}
+          for(const event of data.events||[]){notifyRunFailure(event,r);r.seq=Math.max(r.seq||0,event.seq||0);if(event.type==='agent_message'&&event.data?.text){r.unread=true;window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'agent:'+r.runId+':'+(event.data.message_id||event.seq),ts:event.ts,title:r.title,message:event.data.text,source:'Agent',project:r.projectName||r.projectKey,conversationId:r.conversationId,link:'#ai'}}));}}
           r.status=data.run?.status||r.status;r.catchingUp=(data.events||[]).length===200;r.note='';
         }catch{r.note='Updates interrupted · reconnecting';}
       }
@@ -776,7 +790,91 @@
   document.addEventListener('click',event=>{if(event.target.closest('#login,#logoutAllLocal')){roomClear();roomIdentity='';}},true);
   setInterval(()=>{if(roomSync()){roomRender();void roomPump();}},1000);
 
-  window.PRFKT_CODEX = Object.freeze({open,send,openWork:roomOpenWork,openConversation:roomOpenConversation});
+  // Mobile work surface: compact navigation, durable server history and honest input capabilities.
+  const mobileCSS=document.createElement('style');mobileCSS.textContent=`
+    #ai.cw-work-rooms #cwWorkWindows{max-height:none;padding:8px 12px;margin:0;overflow:visible;position:relative}
+    #cwWorkWindows .cw-work-head{margin:0;align-items:center}#cwWorkWindows .cw-work-head p,#cwWorkScope{display:none}#cwWorkWindows .cw-work-head b{font-size:14px}#cwWorkWindows .cw-work-head{gap:6px}#cwWorkWindows .cw-work-head button{padding:5px 9px;font-size:12px}
+    #cwWorkTabs.cw-tabs-open{display:flex;position:absolute;top:100%;left:0;right:0;max-height:210px;overflow:auto;z-index:50;padding:10px;background:#161a20;border:1px solid #455161;border-radius:12px;box-shadow:0 12px 40px #0008}
+    #ai.cw-work-rooms #cwWorkScope{display:none}#ai.cw-context-open #cwWorkScope{display:block}#cwWorkState{max-height:65px;overflow:auto}
+    #ai.cw-work-rooms #cwTerminal:not([hidden]){display:flex;flex-direction:column;overflow:hidden;min-height:0}
+    #ai.cw-work-rooms #cwTerminalLog{flex:1;min-height:0;height:auto;overflow:auto;overscroll-behavior:contain}
+    #ai.cw-work-rooms #codexTraceStudio:not([hidden]){flex:1;min-height:0;height:auto;overflow:auto;overscroll-behavior:contain}
+    #ai.cw-work-rooms .cw-trace-canvas{height:260px;min-height:180px}#ai.cw-work-rooms .cw-trace-head{padding:10px}.cw-trace-head p{display:none}
+    #ai.cw-work-rooms .composer{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;padding:9px;margin:4px 10px 10px;gap:5px}
+    #ai.cw-work-rooms #chatInput{grid-column:1/-1;width:100%;box-sizing:border-box;min-height:90px;height:90px;max-height:160px;resize:none;padding:8px;font-size:16px}
+    #cwInputTools{display:flex;align-items:center;gap:2px;min-width:0;overflow:auto}#cwInputTools button{background:none;border:0;color:#c2c8d1;padding:5px 8px;min-height:38px;white-space:nowrap;font-size:12px;box-shadow:none}
+    #ai.cw-work-rooms #sendChat{grid-column:2;grid-row:2;width:38px;height:38px;min-width:38px;min-height:38px}
+    #ai.cw-work-rooms .cw-statusbar{padding:4px 14px;min-height:24px}.cw-copy-message{margin-top:8px;color:#a7afb9;background:none!important;border:0!important;min-height:38px!important;font-size:11px}
+    .cw-mobile-dialog{background:#15191f;color:#e7e9ec;border:1px solid #465264;border-radius:18px;width:min(500px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:calc(var(--prfkt-viewport,100dvh) - 24px);padding:18px;box-sizing:border-box;overflow:auto}
+    .cw-mobile-dialog::backdrop{background:#02050bc9}.cw-mobile-dialog header{display:flex;justify-content:space-between;align-items:center;gap:8px}.cw-mobile-dialog h2{font-size:18px;margin:0}.cw-mobile-dialog button{min-height:44px}.cw-mobile-dialog label{display:grid;gap:6px;margin:12px 0}.cw-mobile-dialog input,.cw-mobile-dialog select{width:100%;box-sizing:border-box;font-size:16px}
+    #cwHistoryList{display:grid;gap:8px;margin-top:12px}#cwHistoryList button{display:grid;gap:7px;text-align:left;background:#222932;color:#e3e7ed;border:1px solid #3a495b;border-radius:10px;padding:12px;overflow-wrap:anywhere}#cwHistoryList small{color:#aeb9c7}
+    body.cw-keyboard #ai .cw-work-head{display:none}body.cw-keyboard #ai .cw-workspace-bar{padding:0 6px}body.cw-keyboard #ai .cw-workspace-tabs button{min-height:34px;padding:3px 10px}body.cw-keyboard #ai #cwWorkWindows{padding:3px 8px}body.cw-keyboard #ai .cw-work-head button{min-height:34px}body.cw-keyboard #ai #cwWorkState{max-height:30px}
+    body.cw-keyboard #ai #chatInput{min-height:62px;height:62px;max-height:95px}body.cw-keyboard #ai .cw-statusbar{display:none}body.cw-keyboard #ai #cwInputTools button{min-height:32px}body.cw-keyboard #ai .composer{margin-bottom:5px;padding:5px}
+    @media(max-width:650px){body.cw-chat-page>main.wrap{padding:6px 8px 0}body.cw-chat-page #pbContextBar,body.cw-chat-page #pbLiveCrawl,body.cw-chat-page #status{display:none!important}body.cw-keyboard>header{display:none!important}#ai.cw-work-rooms #chatlog{padding:16px;gap:18px}#ai.cw-work-rooms .cw-workspace-bar{flex-wrap:nowrap;padding:4px 8px}.cw-workspace-actions #cwOptions{display:none}}
+  `;document.head.append(mobileCSS);
+  const roomHeading=roomUI.querySelector('.cw-work-head');const windows=document.createElement('button');windows.type='button';windows.id='cwWindowsMenu';windows.className='mini';windows.textContent='Chats ▾';windows.setAttribute('aria-expanded','false');roomHeading.firstElementChild.replaceWith(windows);
+  windows.onclick=()=>{const expanded=$('cwWorkTabs').classList.toggle('cw-tabs-open');windows.setAttribute('aria-expanded',String(expanded));};
+  $('cwWorkTabs').addEventListener('click',()=>{$('cwWorkTabs').classList.remove('cw-tabs-open');windows.setAttribute('aria-expanded','false');});
+  const historyButton=document.createElement('button');historyButton.type='button';historyButton.className='mini';historyButton.id='cwHistoryButton';historyButton.textContent='History';roomHeading.insertBefore(historyButton,$('cwNewWork'));
+  const historyDialog=document.createElement('dialog');historyDialog.id='cwHistoryDialog';historyDialog.className='cw-mobile-dialog';historyDialog.innerHTML='<header><h2>Project chat history</h2><button type="button" class="mini" data-close>Close</button></header><label>Project<select id="cwHistoryProject" class="field"></select></label><label>Find a conversation<input id="cwHistorySearch" class="field" type="search" placeholder="Search titles"></label><p class="small">Saved conversations stay on your private server. Closing a chat window does not delete its history.</p><div id="cwHistoryList"></div>';
+  document.body.append(historyDialog);historyDialog.querySelector('[data-close]').onclick=()=>historyDialog.close();
+  let historyRows=[],historyCursor=null,historySerial=0,historySearchTimer;
+  const historyStatus=document.createElement('p'),historyMore=document.createElement('button');
+  historyStatus.className='small';historyStatus.setAttribute('role','status');historyMore.id='cwHistoryMore';
+  historyMore.type='button';historyMore.className='mini';historyMore.textContent='Load older conversations';historyMore.hidden=true;
+  historyDialog.append(historyStatus,historyMore);
+  function renderHistoryChoices(){
+    const list=$('cwHistoryList'),key=$('cwHistoryProject').value,q=$('cwHistorySearch').value.toLowerCase();list.replaceChildren();
+    for(const c of historyRows){
+      if(key&&c.project_key!==key||q&&!String(c.title).toLowerCase().includes(q))continue;
+      const b=document.createElement('button');b.type='button';const title=document.createElement('b'),meta=document.createElement('small');
+      title.textContent=c.title||'Untitled conversation';meta.textContent=(projectList().find(p=>p.key===c.project_key)?.label||c.project_key)+' · '+new Date(c.updated_at*1000).toLocaleString();
+      b.append(title,meta);b.onclick=()=>{historyDialog.close();void roomOpenConversation(c.id);};list.append(b);
+    }
+    if(!list.children.length)list.textContent='No saved conversations match this project and search.';
+    historyMore.hidden=!historyCursor;
+  }
+  async function loadHistory(more=false){
+    const serial=++historySerial,gen=roomGeneration;
+    if(!catalog?.history_pagination){historyRows=catalog?.conversations||[];historyCursor=null;historyStatus.textContent='Showing the latest server catalog. Older history needs the history-service update.';renderHistoryChoices();return;}
+    const query=new URLSearchParams({project:$('cwHistoryProject').value,search:$('cwHistorySearch').value});
+    if(more&&historyCursor)query.set('cursor',historyCursor);
+    historyMore.disabled=true;historyStatus.textContent='Loading saved conversations…';
+    try{
+      const data=await roomRequest('/api/codex-workspace/conversations?'+query,undefined,gen);
+      if(!data||serial!==historySerial||!historyDialog.open)return;
+      historyRows=more?[...historyRows,...data.conversations]:data.conversations;historyCursor=data.next_cursor;
+      historyStatus.textContent=historyRows.length+' saved conversations shown'+(historyCursor?' · older conversations available':'.');renderHistoryChoices();
+    }catch(e){if(serial===historySerial)historyStatus.textContent='History could not load: '+e.message;}
+    finally{if(serial===historySerial)historyMore.disabled=false;}
+  }
+  historyMore.onclick=()=>void loadHistory(true);
+  historyButton.onclick=async()=>{
+    await refreshCatalog(true);if(!owner())return;const select=$('cwHistoryProject');select.replaceChildren(new Option('All projects',''));
+    for(const key of new Set([...projectList().map(p=>p.key),...(catalog?.conversations||[]).map(c=>c.project_key)]))select.add(new Option(projectList().find(p=>p.key===key)?.label||key,key));
+    select.value=projectKey;$('cwHistorySearch').value='';historyRows=catalog?.conversations||[];historyCursor=null;renderHistoryChoices();historyDialog.showModal();void loadHistory();
+  };
+  $('cwHistoryProject').onchange=()=>{clearTimeout(historySearchTimer);historyCursor=null;void loadHistory();};
+  $('cwHistorySearch').maxLength=200;$('cwHistorySearch').oninput=()=>{clearTimeout(historySearchTimer);historySerial++;historySearchTimer=setTimeout(()=>void loadHistory(),300);};
+  historyDialog.addEventListener('close',()=>{historySerial++;clearTimeout(historySearchTimer);});
+  $('chatlog').addEventListener('click',async e=>{const b=e.target.closest('.cw-copy-message');if(!b)return;const body=b.closest('.msg').querySelector('.cw-message-body');try{await navigator.clipboard.writeText(body.innerText);b.textContent='Copied';}catch{const selection=getSelection(),range=document.createRange();range.selectNodeContents(body);selection.removeAllRanges();selection.addRange(range);b.textContent='Selected · copy from menu';}});
+  const inputTools=document.createElement('div');inputTools.id='cwInputTools';inputTools.innerHTML='<button type="button" id="cwAttach" aria-label="Add text or CSV file">＋ Add</button><button type="button" id="cwDictate" aria-label="Dictate message">Mic</button><button type="button" id="cwModelOptions" aria-label="Model and reasoning settings">Model</button>';$('sendChat').before(inputTools);
+  const attachment=document.createElement('input');attachment.type='file';attachment.accept='.txt,.md,.csv,.json,.log';attachment.hidden=true;inputTools.append(attachment);
+  $('cwAttach').onclick=()=>attachment.click();attachment.onchange=async()=>{const file=attachment.files?.[0],r=roomCurrent(),id=r?.id;if(!file||!r)return;try{if(!/\.(txt|md|csv|json|log)$/i.test(file.name)||file.size>16000)throw new Error('Choose a text, Markdown, CSV, JSON or log file up to 16 KB. Images, camera, PDF, Word and Excel uploads need the attachment service.');const content=await file.text();if(roomCurrent()?.id!==id)throw new Error('Chat changed. Select the file again in the intended chat.');if(r.pending)throw new Error('Wait for this pending message or open a new chat.');$('chatInput').value+=(r.draft?'\n\n':'')+'Attached reference file: '+file.name.replace(/[\r\n]/g,' ')+'\n```\n'+content+'\n```';$('chatInput').dispatchEvent(new Event('input',{bubbles:true}));r.note='File added to this draft. Review it before sending.';}catch(e){r.note=e.message;}attachment.value='';roomRender();};
+  let recognition=null;const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;
+  $('cwDictate').onclick=()=>{const r=roomCurrent();if(!r||r.pending)return;if(!Speech){r.note='Use the microphone on your phone keyboard for dictation. This browser does not expose speech recognition.';roomRender();$('chatInput').focus();return;}if(recognition){recognition.stop();return;}const current=r.id,rec=new Speech();recognition=rec;rec.continuous=false;rec.interimResults=false;rec.lang=navigator.language||'en-US';rec.onresult=e=>{if(roomCurrent()?.id!==current||roomCurrent()?.pending)return;$('chatInput').value+=Array.from(e.results).map(v=>v[0].transcript).join(' ');$('chatInput').dispatchEvent(new Event('input',{bubbles:true}));};rec.onerror=()=>{r.note='Dictation unavailable. Check microphone permission or use keyboard dictation.';roomRender();};rec.onend=()=>{recognition=null;$('cwDictate').textContent='Mic';};$('cwDictate').textContent='Stop mic';try{rec.start();}catch{recognition=null;$('cwDictate').textContent='Mic';r.note='Microphone could not start. Use your keyboard dictation or check browser permission.';roomRender();}};
+  const modelDialog=document.createElement('dialog');modelDialog.id='cwModelDialog';modelDialog.className='cw-mobile-dialog';modelDialog.innerHTML='<header><h2>Model & reasoning</h2><button type="button" class="mini" data-close>Close</button></header><p class="small">Codex chooses tools and specialist roles. These optional settings apply to your next message.</p><label>Model<select id="cwModelSelect" class="field"></select></label><label>Reasoning<select id="cwEffortSelect" class="field"></select></label><p class="small">Lower reasoning usually responds sooner. This is not a guaranteed speed or a priority-service setting.</p><p id="cwModelAvailability" class="small"></p><button type="button" class="btn primary" id="cwSaveModel">Use for this chat</button>';document.body.append(modelDialog);modelDialog.querySelector('[data-close]').onclick=()=>modelDialog.close();
+  function effortOptions(){const option=catalog?.runtime_options?.models?.find(m=>m.id===$('cwModelSelect').value);$('cwEffortSelect').replaceChildren(...(option?.efforts||[catalog?.effort||'ultra']).map(e=>new Option(e,e)));$('cwEffortSelect').value=roomCurrent()?.effort||catalog?.effort||'ultra';if(!$('cwEffortSelect').value)$('cwEffortSelect').selectedIndex=0;}
+  $('cwModelOptions').onclick=()=>{const available=catalog?.runtime_options?.models?.length?catalog.runtime_options.models:[{id:catalog?.model||'gpt-6-astra',name:catalog?.model||'gpt-6-astra'}];$('cwModelSelect').replaceChildren(...available.map(m=>new Option(m.name||m.id,m.id)));$('cwModelSelect').value=roomCurrent()?.model||catalog?.model;effortOptions();const supported=!!catalog?.runtime_options?.per_message;$('cwSaveModel').disabled=!supported;$('cwModelSelect').disabled=!supported;$('cwEffortSelect').disabled=!supported;$('cwModelAvailability').textContent=supported?'Only models advertised by this connected runtime are listed.':'This running server pins Astra / ultra. Per-chat model selection becomes available with the reviewed backend update.';modelDialog.showModal();};$('cwModelSelect').onchange=effortOptions;
+  $('cwSaveModel').onclick=()=>{const r=roomCurrent();if(!r||r.pending||!catalog?.runtime_options?.per_message)return;r.model=$('cwModelSelect').value;r.effort=$('cwEffortSelect').value;roomPersist();modelDialog.close();};
+  function fitMobile(){const inChat=host.classList.contains('active')&&owner();document.body.classList.toggle('cw-chat-page',inChat);const editing=$('chatInput')===document.activeElement;document.body.classList.toggle('cw-keyboard',inChat&&phone.matches&&editing&&(window.visualViewport?.height||innerHeight)<600);if(inChat)requestAnimationFrame(()=>{const main=document.querySelector('body > main.wrap');main.scrollTop=0;const h=Math.max(180,Math.floor(main.clientHeight-(host.getBoundingClientRect().top-main.getBoundingClientRect().top)-12))+'px';if(box.style.getPropertyValue('--cw-work-height')!==h)box.style.setProperty('--cw-work-height',h);});}
+  window.visualViewport?.addEventListener('resize',fitMobile);window.visualViewport?.addEventListener('scroll',fitMobile);window.addEventListener('resize',fitMobile);window.addEventListener('hashchange',fitMobile);document.addEventListener('focusin',fitMobile);document.addEventListener('focusout',()=>setTimeout(fitMobile,0));
+  document.addEventListener('click',e=>{if(e.target.closest('[data-home-go],[data-view],[data-cw-view],#cwWorkJump'))requestAnimationFrame(fitMobile);});
+  new MutationObserver(fitMobile).observe(host,{attributes:true,attributeFilter:['class']});
+  $('cwTerminalLog').addEventListener('wheel',()=>{if($('cwTerminalLog').scrollHeight-$('cwTerminalLog').scrollTop-$('cwTerminalLog').clientHeight>80){followOutput=false;$('cwFollowOutput').textContent='Follow output';$('cwFollowOutput').setAttribute('aria-pressed','false');}},{passive:true});
+  const beforeRoomClear=roomClear;roomClear=function(){recognition?.abort();recognition=null;historyDialog.close();modelDialog.close();beforeRoomClear();};
+
+  window.PRFKT_CODEX = Object.freeze({open,send,openWork:roomOpenWork,openConversation:roomOpenConversation,isViewingConversation:id=>!!id&&id===conversationId&&visible()&&workspaceView==='chat'});
   tick();
 })();
 
@@ -869,7 +967,7 @@
   async function refresh(force=false){
     const id=who();if(identity!==id){clear();identity=id;if(blocked!==id)blocked=null;}
     if(!owner()){render();return;}
-    if(busy || (!force && (document.hidden || (!window.PRFKT_LIVE_UPDATES && !(document.querySelector('#agents')?.classList.contains('active') || document.querySelector('#ai')?.classList.contains('active'))) || Date.now()-last<3000))){render();return;}
+    if(busy || (!force && (document.hidden || (!window.PRFKT_LIVE_UPDATES && !(document.querySelector('#agents')?.classList.contains('active') || document.querySelector('#ai')?.classList.contains('active'))) || Date.now()-last<60000))){render();return;}
     busy=true;const gen=generation;
     try {const data=await request('/api/codex-workspace',undefined,id,gen);if(!data)return;snapshot=data;if(data.execution_permissions?.capable===true)mount();
       window.dispatchEvent(new CustomEvent('prfkt-permission-snapshot',{detail:{ids:(data.execution_permissions?.requests || []).filter(r=>r.can_decide).map(r=>r.id)}}));
@@ -905,7 +1003,8 @@
   });
   document.addEventListener('click',e=>{if(e.target.closest('#login,#logoutAllLocal') && owner()){blocked=who();clear();render();}else if(e.target.closest('[data-view],[data-home-go],[data-home-action]'))setTimeout(()=>void refresh(),0);},true);
   window.addEventListener('hashchange',()=>void refresh());window.addEventListener('project-byte-home-render',()=>void refresh());document.addEventListener('visibilitychange',()=>void refresh());
-  setInterval(()=>void refresh(),750);render();
+  window.addEventListener('prfkt-codex-catalog',e=>{const id=who();if(identity!==id){clear();identity=id;}if(!owner())return;snapshot=e.detail;last=Date.now();const time=snapshot.execution_permissions?.server_time;if(Number.isFinite(time))clock={time,at:performance.now()};if(snapshot.execution_permissions?.capable)mount();render();window.dispatchEvent(new CustomEvent('prfkt-permission-snapshot',{detail:{ids:(snapshot.execution_permissions?.requests||[]).filter(r=>r.can_decide).map(r=>r.id)}}));for(const row of snapshot.execution_permissions?.requests||[])if(row.can_decide)window.dispatchEvent(new CustomEvent('prfkt-permission-prompt',{detail:{id:row.id,title:row.repository||row.project_key,text:row.summary,conversationId:row.conversation_id}}));});
+  setInterval(()=>{if(owner())render();},1000);render();
 })();
 
 // Original generated PRFKT nebula. See assets/NEBULA_PROVENANCE.md. Embedded with no external image requests.

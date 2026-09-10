@@ -9,7 +9,10 @@ export async function verifyLiveUpdates({browser,api,base,out,key}){
  assert.equal(await page.locator('.prfkt-update-card').count(),0,'no historical popup flood at sign-in');
  await page.evaluate(()=>{openTask();document.querySelector('#taskTitle').value='Keep my unsaved draft';document.querySelector('#taskTitle').focus();});
  const created=await api('/api/tasks','POST',{title:'Incoming real-time fixture',project:'Live QA',status:'Backlog',owner:'Joe'});
+ await page.evaluate(()=>refreshWorkspace());
  await page.waitForFunction(()=>tasks.some(t=>t.title==='Incoming real-time fixture'));
+ await page.waitForTimeout(200);assert.equal(await page.locator('.prfkt-update-card').count(),0,'routine task creation does not interrupt');
+ await page.evaluate(()=>window.dispatchEvent(new CustomEvent('prfkt-live-event',{detail:{id:'fixture:important',title:'Error requires attention',message:'Incoming real-time fixture',source:'Notification'}})));
  await page.waitForSelector('.prfkt-update-card');
  assert.equal(await page.locator('#taskTitle').inputValue(),'Keep my unsaved draft','updates do not overwrite active form');
  await page.evaluate(()=>closeModal('taskModal'));
@@ -27,7 +30,7 @@ export async function verifyLiveUpdates({browser,api,base,out,key}){
  await page.locator('#prfktUpdatesButton').click();await page.locator('[data-update-id="fixture:agent"]').click();
  assert.match(await page.locator('#prfktUpdateDetail').textContent(),/Building safely <img/,'missed popup survives reload');
  await page.locator('#prfktUpdateClose').click();
- await page.route('**/api/tasks',route=>route.abort());
+ await page.route('**/api/tasks',route=>route.abort());await page.evaluate(()=>refreshWorkspace());
  await page.waitForFunction(()=>document.querySelector('#prfktUpdatesButton').title.includes('interrupted'));
  await page.unroute('**/api/tasks');await page.evaluate(()=>window.dispatchEvent(new Event('online')));
  await page.waitForFunction(()=>document.querySelector('#prfktUpdatesButton').dataset.state==='connected');

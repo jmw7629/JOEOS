@@ -4,6 +4,8 @@ Project and task AI actions now open a named work window. Each window owns its p
 
 The original defect was a mismatch between legacy `aiProject`/`aiTask` selectors and the native controller's single `projectKey`/`conversationId`. All owner AI action entry points now use one scoped controller. Task AI buttons no longer PATCH executor/model fields as a side effect of opening a chat. Existing server conversations cannot be rebound to a different project. Unmapped or ambiguous projects require an explicit connection selection.
 
+The mobile audit update adds a compact Chats menu, a project-filtered History dialog with explicit pagination, message copy, a larger composer and per-message model settings. See MOBILE_WORKFLOW_AUDIT.md for local validation and the remaining capability gaps. The live hashes at the end of this document describe the preceding scoped-chat release, not deployment of the mobile audit update.
+
 ## Work lifecycle
 
 1. Open a project chat, task chat, planning/help window, or independent New chat.

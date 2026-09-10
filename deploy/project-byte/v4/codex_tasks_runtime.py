@@ -3,7 +3,7 @@ import os
 import re
 import threading
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
 
 from codex_tasks import Controller, TaskError, require_owner
 
@@ -106,6 +106,14 @@ def install(app, BaseHandler, public_files, controller=None):
                 match = re.fullmatch(ROOT + '/runs/' + CID + r'/events(?:\?after=(0|[1-9][0-9]{0,18}))?', self.path)
                 if match:
                     return self.sendj(manager().events(actor, match[1], int(match[2] or 0)))
+                if parsed.path == ROOT + '/conversations':
+                    try:
+                        query = parse_qs(parsed.query, keep_blank_values=True, strict_parsing=True, max_num_fields=3) if parsed.query else {}
+                    except ValueError:
+                        raise TaskError('Invalid conversation query') from None
+                    if set(query) - {'project', 'search', 'cursor'} or any(len(v) != 1 for v in query.values()):
+                        raise TaskError('Invalid conversation query')
+                    return self.sendj(manager().conversation_history(actor, **{k: v[0] for k, v in query.items()}))
                 match = re.fullmatch(ROOT + '/conversations/' + CID, self.path)
                 if match:
                     return self.sendj(manager().conversation(actor, match[1]))

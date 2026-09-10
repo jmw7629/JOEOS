@@ -152,7 +152,9 @@
     if (typeof renderModels === 'function') renderModels();
     if (typeof setRefreshTimer === 'function') setRefreshTimer();
     poll();
-    window.setInterval(poll, 15000);
+    window.setInterval(() => {
+      if (!document.hidden && document.querySelector('#home.active,#agents.active,#settings.active')) void poll();
+    }, 60000);
   };
 
   window.__PROJECT_BYTE_HEALTH_REAPPLY__ = () => { if (lastHealth) render(lastHealth); };

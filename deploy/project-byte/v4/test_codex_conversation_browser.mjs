@@ -254,19 +254,19 @@ try {
   await page.locator('#cwContextToggle').click();
 
   console.log('CONVERSATION_MOBILE_REVIEW=PASS');
-  await page.locator('#cwOptions').click();
+  await go('settings');
   await page.waitForSelector('#settings.active');
   await page.screenshot({path:path.join(out,'conversation-settings-390.png'),fullPage:true});
   await page.locator('#cwLayoutPreference').selectOption('desktop');
   await go('ai');
   assert.equal(await page.locator('#ai').evaluate(e=>e.classList.contains('cw-remote')),false);
   assert.equal(await page.locator('#cwContextToggle').isVisible(),false);
-  await page.locator('#cwOptions').click();
+  await go('settings');
   await page.locator('#cwLayoutPreference').selectOption('mobile');
   await page.setViewportSize({width:1440,height:1000});
   await go('ai');
   assert.equal(await page.locator('#ai').evaluate(e=>e.classList.contains('cw-remote')),true,'explicit mobile mode also works at desktop width');
-  await page.locator('#cwOptions').click();
+  await go('settings');
   await page.locator('#cwLayoutPreference').selectOption('auto');
   await page.locator('#cwPopupPreference').uncheck();
   await go('ai');
@@ -274,9 +274,13 @@ try {
   append(run,'agent_message',native('popup-off','specialist','POPUP_DISABLED_REAL_MESSAGE'));
   await page.waitForFunction(()=>document.querySelector('#chatlog')?.textContent.includes('POPUP_DISABLED_REAL_MESSAGE'));
   assert.equal(await page.locator('.prfkt-update-card').first().isVisible(),false,'disabled popups preserve inline messages');
-  await page.locator('#cwOptions').click();
+  await go('settings');
   await page.locator('#cwPopupPreference').check();
   await go('ai');
+  append(run,'agent_message',native('popup-visible','specialist','MESSAGE_ALREADY_VISIBLE'));
+  await page.waitForFunction(()=>document.querySelector('#chatlog')?.textContent.includes('MESSAGE_ALREADY_VISIBLE'));
+  assert.equal(await page.locator('.prfkt-update-card').filter({hasText:'MESSAGE_ALREADY_VISIBLE'}).count(),0,'visible conversation messages do not interrupt with popups');
+  await go('home');
   append(run,'agent_message',native('popup-on','specialist','POPUP_ENABLED_REAL_MESSAGE'));
   await page.locator('.prfkt-update-card').filter({hasText:'POPUP_ENABLED_REAL_MESSAGE'}).waitFor({state:'visible'});
   assert.match(await page.locator('.prfkt-update-card').filter({hasText:'POPUP_ENABLED_REAL_MESSAGE'}).innerText(),/POPUP_ENABLED_REAL_MESSAGE/);

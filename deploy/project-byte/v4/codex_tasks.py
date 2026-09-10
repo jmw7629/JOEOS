@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -17,7 +18,7 @@ import time
 from types import MappingProxyType
 import uuid
 
-from codex_connection import Connection
+from codex_connection import Connection, CHAT_MODELS
 from codex_task_rpc import NativeTaskSession
 from codex_sandbox import SandboxWorkspace, SandboxError
 from codex_publisher import PublisherError
@@ -197,6 +198,23 @@ class Controller:
         self.publisher = publishers.get('joeos')
         self.live, self.workspaces = {}, {}
         self.condition = threading.Condition(self.lock)
+        self._models_at, self._models = float('-inf'), []
+        self._models_lock = threading.Lock()
+
+    def runtime_options(self):
+        # Account metadata, never a model generation. Do not hold the run/permission lock during RPC.
+        with self._models_lock:
+            if time.monotonic() - self._models_at > 600:
+                self._models_at = time.monotonic()
+                try:
+                    rows = self.connection.models()
+                    self._models = [{'id': row['id'], 'name': row.get('name', row['id']),
+                                     'efforts': [e for e in row.get('efforts', [])
+                                                 if e in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')]}
+                                    for row in rows if row.get('id') in CHAT_MODELS and row.get('efforts')]
+                except Exception:
+                    self._models = []
+            return {'per_message': bool(self._models), 'models': list(self._models)}
 
     def _project(self, key, *, execute=False):
         if not isinstance(key, str) or key not in self.projects:
@@ -304,8 +322,41 @@ class Controller:
             rows = [dict(r) for r in self.db.execute('SELECT id,title,project_key,updated_at FROM conversations WHERE owner=? ORDER BY updated_at DESC LIMIT 100', (owner,))]
         return {'configured': bool(ready), 'connected': bool(status.get('connected')), 'model': MODEL, 'effort': EFFORT,
                 'detail': 'Codex task workspace is connected' if ready and status.get('connected') else 'The Codex task workspace is unavailable',
-                'projects': projects, 'conversations': rows,
+                'projects': projects, 'conversations': rows, 'history_pagination': True,
+                'runtime_options': self.runtime_options(),
                 'execution_permissions': self.permission_snapshot(actor)}
+
+    def conversation_history(self, actor, project='', search='', cursor=''):
+        owner = require_owner(actor)
+        if not isinstance(project, str) or len(project) > 128 or not isinstance(search, str) or len(search) > 200:
+            raise TaskError('Invalid conversation filter')
+        where, values = ['owner=?'], [owner]
+        if project:
+            # Deleted/unregistered projects retain their owner-readable history.
+            where.append('project_key=?')
+            values.append(project)
+        if search:
+            where.append('instr(lower(title),lower(?))>0')
+            values.append(search)
+        if cursor:
+            try:
+                if not isinstance(cursor, str) or len(cursor) > 160:
+                    raise ValueError()
+                stamp, last_id = json.loads(cursor)
+                if (isinstance(stamp, bool) or not isinstance(stamp, (int, float)) or not math.isfinite(stamp)
+                        or not isinstance(last_id, str) or not ID.fullmatch(last_id)):
+                    raise ValueError()
+            except (ValueError, TypeError):
+                raise TaskError('Invalid conversation cursor') from None
+            where.append('(updated_at<? OR (updated_at=? AND id<?))')
+            values.extend([stamp, stamp, last_id])
+        with self.lock:
+            rows = [dict(row) for row in self.db.execute(
+                'SELECT id,title,project_key,updated_at FROM conversations WHERE ' + ' AND '.join(where)
+                + ' ORDER BY updated_at DESC,id DESC LIMIT 101', values)]
+        more = len(rows) > 100
+        rows = rows[:100]
+        return {'conversations': rows, 'next_cursor': encoded([rows[-1]['updated_at'], rows[-1]['id']]) if more else None}
 
     def permission_snapshot(self, actor):
         """Owner-wide view of real requests; authority stays in decide()."""
@@ -360,7 +411,8 @@ class Controller:
 
     def message(self, actor, body):
         owner = require_owner(actor)
-        if not isinstance(body, dict) or set(body) != {'request_id', 'conversation_id', 'project_key', 'message'}:
+        required = {'request_id', 'conversation_id', 'project_key', 'message'}
+        if not isinstance(body, dict) or not required <= set(body) or set(body) - required - {'model', 'effort'}:
             raise TaskError('Select a registered workspace project')
         project = self._project(body['project_key'], execute=True)
         key = request_id(body['request_id'])
@@ -373,6 +425,13 @@ class Controller:
             if duplicate:
                 return duplicate
         status = self.catalog(actor)
+        model, effort = body.get('model', MODEL), body.get('effort', EFFORT)
+        if not isinstance(model, str) or not isinstance(effort, str):
+            raise TaskError('Select an available model and reasoning effort')
+        if (model, effort) != (MODEL, EFFORT):
+            choice = next((row for row in status['runtime_options']['models'] if row['id'] == model), None)
+            if not choice or effort not in choice['efforts']:
+                raise TaskError('This model and reasoning effort are not advertised by the connected runtime')
         selected = next(item for item in status['projects'] if item['key'] == project.key)
         if not selected['configured'] or not selected['connected']:
             raise TaskError(self.project_errors.get(project.key, 'This project\'s Codex task connection or hard sandbox is unavailable'), 503)
@@ -392,7 +451,7 @@ class Controller:
                 self.db.execute('INSERT INTO conversation_projects VALUES(?,?,?)', (cid, project.key, project.fingerprint))
             run = uuid.uuid4().hex
             generation = secrets.token_hex(24)
-            self.db.execute('INSERT INTO runs VALUES(?,?,?,?,?,?,?,?)', (run, cid, owner, 'queued', MODEL, EFFORT, generation, time.time()))
+            self.db.execute('INSERT INTO runs VALUES(?,?,?,?,?,?,?,?)', (run, cid, owner, 'queued', model, effort, generation, time.time()))
             mid, created = uuid.uuid4().hex, time.time()
             self.db.execute('INSERT INTO messages VALUES(?,?,?,?,?,?)', (mid, cid, run, 'user', prompt, created))
             self._event(run, 'prompt', {'id': mid, 'message_id': mid, 'role': 'user', 'text': prompt, 'run_id': run, 'conversation_id': cid, 'created_at': created})
@@ -402,6 +461,7 @@ class Controller:
             self._remember(owner, key, 'message', fingerprint, result)
             context = {'stop': threading.Event(), 'finished': threading.Event(), 'closing': False, 'inflight': 0, 'sessions': [], 'generation': generation, 'conversation': cid, 'tool_count': 0, 'agents': 0, 'deadline': time.monotonic() + 1800}
             context.update(project=project, project_fingerprint=project.fingerprint,
+                           model=model, effort=effort,
                            sandbox=self.project_sandboxes.get(project.key), publisher=self.project_publishers.get(project.key))
             self.live[run] = context
             self.db.commit()
@@ -553,13 +613,14 @@ class Controller:
 
     def _session(self, run, context, role='coordinator', parent=None):
         aid = uuid.uuid4().hex
+        model, effort = context.get('model', MODEL), context.get('effort', EFFORT)
         with self.lock:
             record = self.db.execute('SELECT status FROM runs WHERE id=?', (run,)).fetchone()
             if not record or record['status'] not in ACTIVE or context.get('closing') or context['stop'].is_set() or context['finished'].is_set():
                 raise TaskError('Task is stopping', 409)
-            self.db.execute('INSERT INTO agents VALUES(?,?,?,?,?,?,?)', (aid, run, role, MODEL, EFFORT, 'working', parent))
+            self.db.execute('INSERT INTO agents VALUES(?,?,?,?,?,?,?)', (aid, run, role, model, effort, 'working', parent))
             context.setdefault('agent_clocks', {})[aid] = time.monotonic()
-            self._event(run, 'agent_started', {'id': aid, 'role': role, 'model': MODEL, 'effort': EFFORT, 'status': 'working', 'parent_id': parent, 'started_at': time.time(), 'run_id': run})
+            self._event(run, 'agent_started', {'id': aid, 'role': role, 'model': model, 'effort': effort, 'status': 'working', 'parent_id': parent, 'started_at': time.time(), 'run_id': run})
             self.db.commit()
         def event(message):
             method, params = message.get('method', ''), message.get('params') or {}
@@ -586,7 +647,7 @@ class Controller:
                     self.event(run, 'token_usage', data)
         try:
             session = self.session_factory(binary=self.connection.binary, auth_home=self.connection.home,
-                workspace=self.connection.workspace, model=MODEL, effort=EFFORT,
+                workspace=self.connection.workspace, model=model, effort=effort,
                 tools=TOOLS if role == 'coordinator' else [t for t in TOOLS if t['name'] in ('workspace_list', 'workspace_read')],
                 on_event=event, on_tool=lambda call: self._tool(run, context, call, aid, role))
         except Exception:

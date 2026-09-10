@@ -385,6 +385,8 @@ class Connection:
                     name = model.get('model') or model.get('id')
                     if isinstance(name, str) and name in CHAT_MODELS:
                         models.append({'id': name, 'name': str(model.get('displayName') or name)[:100],
+                                       'efforts': [e.get('reasoningEffort') for e in model.get('supportedReasoningEfforts', [])
+                                                   if isinstance(e, dict) and e.get('reasoningEffort') in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')],
                                        'is_default': bool(model.get('isDefault')), 'description': str(model.get('description') or '')[:300]})
                 cursor = response.get('nextCursor')
                 if not cursor:

@@ -19,7 +19,7 @@ import sqlite3
 import stat
 import threading
 import time
-from urllib.parse import quote, unquote, urlsplit
+from urllib.parse import quote, unquote, urlsplit, parse_qs
 
 # No account credentials or workspace data are rendered by this public OAuth return page.
 SPOTIFY_CALLBACK_HTML = b'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Returning to PRFKT_PROJECT</title></head><body><p id="message">Returning to your workspace\xe2\x80\xa6</p><script>\ntry {\n const q=new URLSearchParams(location.search);\n const result={code:q.get(\'code\'),state:q.get(\'state\'),error:q.get(\'error\')};\n history.replaceState(null,\'\',\'/spotify-callback\');\n if(typeof result.state===\'string\' && result.state.length<=128 && (result.code===null || result.code.length<=2048) && (result.error===null || result.error.length<=128))sessionStorage.setItem(\'prfkt.spotify.callback\',JSON.stringify(result));\n location.replace(\'/#home\');\n} catch { document.getElementById(\'message\').textContent=\'Allow session storage, then reconnect Spotify from Home.\'; }\n</script></body></html>'
@@ -54,6 +54,14 @@ def codex_api(path):
 def api_allowed(method,path,query=''):
     if codex_api(path):
         if method == 'GET':
+            if path == CODEX_PREFIX+'/conversations':
+                try:
+                    filters = parse_qs(query, keep_blank_values=True, strict_parsing=True, max_num_fields=3) if query else {}
+                except ValueError:
+                    return False
+                bounds = {'project': 128, 'search': 200, 'cursor': 160}
+                return (len(query) <= 8192 and not set(filters)-set(bounds)
+                        and all(len(v) == 1 and len(v[0]) <= bounds[k] for k,v in filters.items()))
             if CODEX_EVENTS.fullmatch(path):
                 return not query or bool(re.fullmatch(r'after=(?:0|[1-9][0-9]{0,18})',query))
             return not query and (path == CODEX_PREFIX or bool(re.fullmatch(

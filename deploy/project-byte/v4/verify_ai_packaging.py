@@ -68,7 +68,7 @@ routes = runpy.run_path(str(gateway_path))
 assert '/codex-workspace.js' in routes['ASSETS']
 prefix, identifier = '/api/codex-workspace', 'a'*32
 for method, path, query in (
-    ('GET',prefix,''), ('GET',prefix+'/conversations/'+identifier,''),
+    ('GET',prefix,''), ('GET',prefix+'/conversations','project=joeos&search='), ('GET',prefix+'/conversations/'+identifier,''),
     ('GET',prefix+'/runs/'+identifier+'/events','after=0'), ('GET',prefix+'/artifacts/'+identifier,''),
     ('POST',prefix+'/message',''), ('POST',prefix+'/runs/'+identifier+'/stop',''),
     ('POST',prefix+'/permissions/'+identifier+'/decision',''),

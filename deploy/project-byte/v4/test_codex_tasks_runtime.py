@@ -16,6 +16,7 @@ import types
 import unittest
 from unittest.mock import Mock, patch
 import uuid
+from urllib.parse import urlencode
 
 import codex_tasks_runtime as overlay
 from codex_projects import Project, default_project
@@ -115,6 +116,33 @@ class CodexWorkspaceHTTPTests(unittest.TestCase):
         self.assertEqual(catalog['projects'][0]['key'], 'joeos'); self.assertEqual(self.factory.instances, [])
         self.assertIn('/codex-workspace.js', self.public_files)
         self.assertEqual(self.request('/api/ai-connections')[0], 200)
+
+    def test_project_history_paginates_without_model_calls_and_is_owner_only(self):
+        with self.controller.lock:
+            rows = [(f'{n:032x}', 'owner', 'Saved chat ' + str(n), 'joeos', 10) for n in range(105)]
+            rows += [('f' * 32, 'someone-else', 'PRIVATE OTHER OWNER', 'joeos', 20),
+                     ('e' * 32, 'owner', 'Older project', 'archived-project', 5)]
+            self.controller.db.executemany('INSERT INTO conversations VALUES(?,?,?,?,?)', rows)
+            self.controller.db.commit()
+        self.assertEqual(self.request(ROOT + '/conversations')[0], 200)
+        route = ROOT + '/conversations?project=joeos'
+        code, first = self.request(route)
+        self.assertEqual(code, 200)
+        self.assertEqual(len(first['conversations']), 100)
+        code, second = self.request(route + '&' + urlencode({'cursor': first['next_cursor']}))
+        self.assertEqual(code, 200)
+        self.assertEqual(len(second['conversations']), 5)
+        self.assertIsNone(second['next_cursor'])
+        ids = [r['id'] for r in first['conversations'] + second['conversations']]
+        self.assertEqual(len(set(ids)), 105, 'equal timestamps never duplicate or omit a page boundary')
+        self.assertNotIn('PRIVATE OTHER OWNER', json.dumps(first))
+        code, filtered = self.request(ROOT + '/conversations?' + urlencode({'project': 'archived-project', 'search': 'Older'}))
+        self.assertEqual(code, 200)
+        self.assertEqual(filtered['conversations'][0]['title'], 'Older project')
+        self.assertEqual(self.request(route, role='viewer')[0], 403)
+        for query in ['cursor=nope', 'cursor=%5BNaN,%22' + 'a' * 32 + '%22%5D', 'project=a&project=b', 'unexpected=x']:
+            self.assertEqual(self.request(ROOT + '/conversations?' + query)[0], 400)
+        self.assertEqual(self.factory.instances, [], 'history reads never start a model session')
 
     def test_install_and_injected_controller_do_not_eagerly_open_an_app_connection(self):
         self.assertFalse(hasattr(self.app, '_codex_workspace_wal_anchor'))

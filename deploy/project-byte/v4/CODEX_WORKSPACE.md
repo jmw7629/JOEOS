@@ -6,7 +6,7 @@ specialist selection, isolated file edits and tests, Stop, review cards, patches
 and pull requests all stay in the same workflow. This is an integration with
 Codex's engine, not an embedded copy of the Codex desktop application.
 
-All sessions select `gpt-6-astra` with `ultra` effort. They use the private
+Sessions default to `gpt-6-astra` with `ultra` effort. An owner can optionally select a per-chat model and reasoning effort from the reviewed models advertised by the connected runtime. Each accepted message persists its selection, including for specialist roles; request retries retain that original selection. They use the private
 workspace's existing Codex ChatGPT sign-in, with no API-key fallback. The runtime
 must advertise the selected model and effort. Unavailable connections fail
 explicitly. Separate installs configure their own account and private storage.

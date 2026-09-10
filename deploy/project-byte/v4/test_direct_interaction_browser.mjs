@@ -22,7 +22,14 @@ export async function verifyDirectInteraction({browser,api,base,out,key}) {
   }
   async function start() {
     await page.waitForFunction(()=>document.getElementById('boardGrid').getAttribute('aria-busy')!=='true');
-    await scrollToTask();const b=await task().locator('.task-grip').boundingBox();
+    // A completed refresh can replace the card between scrolling and measuring.
+    // Resolve the current handle again before starting a real pointer gesture.
+    let b;
+    for(let attempt=0;attempt<4&&!b;attempt++){
+      await task().locator('.task-grip').waitFor({state:'visible'});
+      await scrollToTask();b=await task().locator('.task-grip').boundingBox();
+    }
+    assert.ok(b,'current task grip is visible before pointer input');
     await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();
     await page.mouse.move(b.x+b.width/2+12,b.y+b.height/2+12,{steps:3});
     await page.locator('.prfkt-drag-ghost').waitFor();

@@ -9,7 +9,7 @@ export async function verifyFocusedWorkspaces({page,api,base,out}){
     await go(view);
     assert.equal(await page.locator('main.wrap > .metrics').isVisible(),false,`${view}: legacy metric wall must never precede content`);
     assert.equal(await page.locator('#search').isVisible(),false,`${view}: full filters must be collapsed`);
-    assert.ok(await page.locator('#pbWorkspaceTitle').isVisible(),`${view}: visible workspace name`);
+    assert.ok(await page.locator(view==='ai'?'#cwWindowsMenu':'#pbWorkspaceTitle').isVisible(),`${view}: visible workspace navigation`);
     const box=await page.locator(`#${view}`).boundingBox();assert.ok(box.y<220,`${view}: actual content starts on first screen, y=${box.y}`);
     if(view==='ai'){const composer=await page.locator('#chatInput').boundingBox();const dock=await page.locator('#prfktNavDock').boundingBox();assert.ok(composer.y+composer.height<=dock.y+1,`Chat composer visible above reserved dock: ${JSON.stringify({composer,dock})}`);assert.equal(await page.locator('#pbChatContext').evaluate(e=>e.open),false);}
     if(view==='ai')await page.screenshot({path:path.join(out,'chat-focused-390.png'),fullPage:false});
@@ -68,6 +68,7 @@ export async function verifyFocusedWorkspaces({page,api,base,out}){
   await go('ai');await page.locator('#chatInput').fill('Do not erase this unsent draft');await go('home');
   const title='Crawl update <img src=x onerror=alert(1)>';
   await api('/api/tasks','POST',{title,project:'Orbital QA',owner:'Mike',status:'Blocked',priority:'High'});
+  await page.evaluate(()=>refreshWorkspace());
   await page.waitForFunction(text=>document.querySelector('.pb-crawl-group').textContent.includes(text),title,{timeout:22000});
   assert.equal(await page.locator('#chatInput').inputValue(),'Do not erase this unsent draft','independent live polling cannot reset a focused draft');
   assert.equal(await page.locator('#pbLiveCrawl img').count(),0,'event text must be escaped, never HTML');

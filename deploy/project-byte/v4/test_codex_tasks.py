@@ -37,6 +37,10 @@ class FixtureConnection:
     def status(self):
         return {'available': True, 'connected': True, 'auth_mode': 'chatgpt'}
 
+    def models(self):
+        return [{'id': 'gpt-6-astra', 'efforts': ['low', 'ultra']},
+                {'id': 'gpt-5.6-sol', 'efforts': ['low', 'high']}]
+
 
 class FixtureWorkspace:
     def __init__(self):
@@ -128,6 +132,22 @@ class FixturePublisher:
 
 
 class ControllerTests(unittest.TestCase):
+    def test_per_message_model_is_validated_persisted_and_used_by_native_session(self):
+        body = {'request_id': str(uuid.uuid4()), 'conversation_id': None,
+                'project_key': 'joeos', 'message': 'Model selection fixture',
+                'model': 'gpt-5.6-sol', 'effort': 'low'}
+        result = self.controller.message(OWNER, body)
+        self.wait(lambda: not self.controller.live)
+        with self.controller.lock:
+            run = self.controller.db.execute('SELECT model,effort FROM runs WHERE id=?', (result['run_id'],)).fetchone()
+        self.assertEqual(tuple(run), ('gpt-5.6-sol', 'low'))
+        self.assertEqual(self.factory.instances[0].kwargs['model'], 'gpt-5.6-sol')
+        self.assertEqual(self.factory.instances[0].kwargs['effort'], 'low')
+        self.assertEqual(self.controller.message(OWNER, body), result)
+        for model, effort in [('invented', 'low'), ('gpt-5.6-sol', 'ultra'), ([], 'low')]:
+            with self.assertRaises(tasks.TaskError):
+                self.controller.message(OWNER, {**body, 'request_id': str(uuid.uuid4()), 'model': model, 'effort': effort})
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix='byte-controller-fixture-')
         self.root = Path(self.tmp.name); self.state = self.root / 'private-state'
