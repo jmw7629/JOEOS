@@ -38,3 +38,11 @@ Reviewed the official usesynapse.dev feature page, Soarcer/synapse README and th
 
 ## Verification
 `test_observatory.py` validates Owner-readable evidence, Editor/Admin non-disclosure after Owner cache use, authorization before reads, credential redaction, hidden-reasoning exclusion, payload bounds, stable de-duplication, unknown metrics, recorded tokens/delegation, symlinks, malformed/truncated logs, bounded history, legacy-repository exclusion and absence of shell execution or file writes. `test_observatory_browser.mjs`, imported by the required Home browser gate, uses disposable log fixtures and tests API authorization, real parsing, all lenses, cross-selection, keyboard/zoom, focus exit, all tool grouping modes, search and mobile/desktop overflow. Production acceptance must use existing logs without seeding test data and must not claim physical iPhone/Safari certification.
+
+## Compact controls and symbol guide
+
+Common actions use original inline pictograms, with their accessible names, hover titles, selected states and disabled behavior preserved. The top-right workspace menu starts with **Symbol guide**, a searchable reference also available from the Observatory header in focus mode. Closing it returns keyboard focus to the invoking control and preserves focus mode. Project names, messages, metrics, filter options and approval/denial decisions remain visible text. No model call or new refresh loop supports this presentation layer.
+
+The Observatory header and copy rows are compact. Evidence headers explicitly opt out of the legacy page-wide sticky-header rule. Graph controls occupy a dedicated toolbar and never overlay events. Irrelevant zoom controls are hidden outside Tree. Explanatory lens notes live in **About this view**. Long evidence uses the inspector's single scrollbar. Focus mode allocates separate graph/detail panes, including phone landscape; closing details restores graph space.
+
+Browser acceptance verifies exact clipboard text, searchable guide navigation, focus return, all four lenses and 320px/390px/landscape/1440px layouts, including long evidence and panel boundaries. The full Home gate and native conversation/trace suites cover existing navigation, history, permissions and state changes. Physical Safari/phone testing remains distinct from Chromium viewport emulation.

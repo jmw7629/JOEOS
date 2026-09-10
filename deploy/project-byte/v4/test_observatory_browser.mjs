@@ -7,7 +7,7 @@ export async function prepareObservationFixtures(root){
   for(const slug of ['jmw7629__stickdeath-byte','jmw7629__vitros-web-dashboard']){
     const dir=path.join(root,'.local/state/joeos-opencode-bridge',slug,'logs');await fs.mkdir(dir,{recursive:true});
     const events=[];
-    for(let i=0;i<9;i++)events.push({type:'tool_use',timestamp:start+i*3500,sessionID:i<5?'fixture-main':'fixture-child',part:{id:'fixture-tool-'+i,tool:['read','bash','edit'][i%3],state:{status:i===7?'error':'completed',input:{command:'PRIVATE_BROWSER_SENTINEL',api_key:'ACTUAL_CREDENTIAL_SECRET_123456',filePath:'/private/project/file.ts'},output:'SENSITIVE_RESPONSE_BODY',time:{start:start+i*3500,end:start+i*3500+500+i*20}}}});
+    for(let i=0;i<9;i++)events.push({type:'tool_use',timestamp:start+i*3500,sessionID:i<5?'fixture-main':'fixture-child',part:{id:'fixture-tool-'+i,tool:['read','bash','edit'][i%3],state:{status:i===7?'error':'completed',input:{command:'PRIVATE_BROWSER_SENTINEL',api_key:'ACTUAL_CREDENTIAL_SECRET_123456',filePath:'/private/project/file.ts'},output:'SENSITIVE_RESPONSE_BODY'+(i===0?'\n'+Array.from({length:60},(_,n)=>'Recorded result '+n+': source inspected; validation complete.').join('\n'):''),time:{start:start+i*3500,end:start+i*3500+500+i*20}}}});
     events.push({type:'tool_use',timestamp:start+5000,sessionID:'fixture-main',part:{id:'fixture-task',tool:'task',state:{status:'completed',input:{subagent_type:'explore',prompt:'PRIVATE_PROMPT'},metadata:{sessionId:'fixture-child'},time:{start:start+2000,end:start+30000}}}});
     events.push({type:'step_finish',timestamp:start+40000,sessionID:'fixture-main',part:{id:'fixture-step',tokens:{total:500,input:420,output:80}}});
     await fs.writeFile(path.join(dir,'issue-901.log'),events.map(e=>JSON.stringify(e)).join('\n')+'\n');
@@ -43,9 +43,56 @@ export async function verifyObservatory({page,api,base,out}){
     await page.screenshot({path:path.join(out,`observatory-tree-${width}.png`),fullPage:false});
     await page.locator('[data-obs-mode="treemap"]').click();await page.screenshot({path:path.join(out,`observatory-map-${width}.png`),fullPage:false});await page.locator('[data-obs-mode="tree"]').click();
   }
+  await verifyCompactSymbols({page,api,out});
   await page.setViewportSize({width:390,height:844});
   await page.locator('#obsSearch').fill('NOT_A_REAL_TOOL');assert.equal(await page.locator('.obs-node').count(),0,'search filters graph');await page.locator('#obsSearch').fill('');
   assert.equal(await page.locator('main.wrap>.metrics').isVisible(),false,'legacy wall remains removed');
   console.log('OBSERVATORY_AUTH_PAYLOAD_REDACTION_REAL_LOG_ADAPTER=PASS');console.log('OBSERVATORY_TREE_TREEMAP_SANKEY_TIMELINE=PASS');console.log('OBSERVATORY_CROSS_SELECTION_KEYBOARD_ZOOM=PASS');console.log('OBSERVATORY_TOOL_PILLS_SWIMLANES_FREQUENCY_MATRIX=PASS');console.log('OBSERVATORY_MOBILE_DESKTOP_NO_OVERFLOW=PASS');
   await openDock(page);await page.locator('.home-nav [data-home-go="home"]').click();
+}
+
+async function verifyCompactSymbols({page,api,out}){
+  await page.context().grantPermissions(['clipboard-read','clipboard-write']);
+  await page.locator('[data-obs-mode="tree"]').click();
+  await page.locator('#obsTools [data-obs-event]').first().click();
+  const copy=page.locator('#obsInspector [data-obs-copy-field="arguments"]').first();
+  await copy.scrollIntoViewIfNeeded();
+  const eventId=await copy.getAttribute('data-obs-copy');
+  const data=await api('/api/observatory');
+  const event=data.traces.flatMap(t=>t.events).find(e=>e.id===eventId);
+  await copy.click();await page.waitForFunction(()=>document.querySelector('[data-obs-copy-field="arguments"]')?.dataset.pbSymbol==='check');
+  assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),event.evidence.arguments.text,'copy preserves exact evidence text');
+  assert.equal(await copy.locator('svg').count(),1);assert.equal(await copy.locator('.pb-symbol-label').count(),1);
+  await page.locator('#pbWorkspaceButton').click();await page.locator('#pbWorkspaces [data-symbol-guide]').click();
+  assert.equal(await page.locator('#pbSymbolGuide').evaluate(e=>e.open),true);
+  await page.locator('#pbSymbolSearch').fill('copy');
+  assert.ok(await page.locator('#pbSymbolList .pb-guide-item:visible').count()>0);
+  assert.equal(await page.locator('#pbSymbolList .pb-guide-item:visible').filter({hasText:'Treemap'}).count(),0);
+  await page.keyboard.press('Escape');await page.waitForFunction(()=>document.querySelector('#pbWorkspaces').open);assert.equal(await page.locator('#pbWorkspaces').evaluate(e=>e.open),true,'guide returns to menu');
+  assert.equal(await page.locator('#pbWorkspaces [data-symbol-guide]').evaluate(e=>e===document.activeElement),true);
+  await page.keyboard.press('Escape');
+  for(const [width,height] of [[320,740],[390,660],[844,390],[1440,1000]]){
+    await page.setViewportSize({width,height});
+    await page.locator('#obsFocus').click();
+    for(const mode of ['tree','treemap','flow','timeline']){
+      await page.locator('[data-obs-mode="'+mode+'"]').click();
+      const header=await page.locator('.obs-header').boundingBox(),lenses=await page.locator('.obs-lenses').boundingBox(),canvas=await page.locator('#obsCanvas').boundingBox(),inspector=await page.locator('#obsInspector').boundingBox(),studio=await page.locator('#pbObservatory').boundingBox();
+      assert.ok(header.height<=60,'compact header at '+width);
+      assert.ok(lenses.y+lenses.height<=canvas.y+1,'toolbar never overlays graph');
+      assert.ok(inspector.y+inspector.height<=studio.y+studio.height+1,'inspector fits focused workspace');
+      assert.ok(canvas.height>=95,'graph keeps useful height');
+      await page.locator('#obsInspector').evaluate(e=>e.scrollTop=e.scrollHeight);
+      const contentHeader=page.locator('.obs-readable-section>header').first();
+      assert.equal(await contentHeader.evaluate(e=>getComputedStyle(e).position),'static','evidence header must not inherit sticky page styling');
+      assert.ok((await contentHeader.boundingBox()).height<=46,'copy header remains one narrow row');
+      assert.ok(await page.locator('#obsInspector').evaluate(e=>e.scrollTop+e.clientHeight>=e.scrollHeight-2),'last detail is reachable');
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'no page overflow');
+      await page.screenshot({path:path.join(out,'symbols-focus-'+mode+'-'+width+'.png')});
+    }
+    await page.locator('#pbObservatory [data-symbol-guide]').click();await page.locator('#pbSymbolSearch').fill('Sankey');
+    await page.screenshot({path:path.join(out,'symbols-guide-'+width+'.png')});
+    await page.keyboard.press('Escape');assert.ok(await page.locator('#pbObservatory').evaluate(e=>e.classList.contains('obs-focused')),'closing guide preserves focus mode');
+    await page.locator('#obsFocus').click();
+  }
+  console.log('COMPACT_SYMBOLS_EXACT_COPY_GUIDE_KEYBOARD_FOUR_LENSES_FOUR_VIEWPORTS_NO_OVERLAP=PASS');
 }

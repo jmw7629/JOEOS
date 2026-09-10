@@ -282,7 +282,8 @@ try {
     assert.equal(await page.locator('#cwFollowOutput').getAttribute('aria-pressed'),'false','keyboard scrolling pauses follow');
     await page.locator('#cwFollowOutput').click();
     const log=await page.locator('#cwTerminalLog').boundingBox(),terminal=await page.locator('#cwTerminal').boundingBox();
-    assert.ok(log.height>=100&&log.y+log.height<=terminal.y+terminal.height+1,'terminal output has a bounded readable area');
+    if(!(log.height>=100&&log.y+log.height<=terminal.y+terminal.height+1))await page.screenshot({path:path.join(out,'terminal-bounds-failure-'+width+'.png')});
+    assert.ok(log.height>=100&&log.y+log.height<=terminal.y+terminal.height+1,'terminal output has a bounded readable area: '+JSON.stringify({width,height,log,terminal}));
     await page.locator('[data-cw-view="graph"]').click();
     await page.locator('#codexTraceCanvas [data-trace-node="tool:desktop-output"]').click();
     assert.match(await page.locator('#codexTraceInspector').innerText(),/fixture-check/);

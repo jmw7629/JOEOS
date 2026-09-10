@@ -38,3 +38,7 @@ The embedded original nebula background follows bounded phone orientation when s
 ## Direct interaction
 
 Kanban supports grab-and-drop status changes with server-confirmed Undo, keyboard/touch controls and edge scrolling. Card titles open details, and wide boards/Home scope chips support grab-to-pan. See [Direct interaction](DIRECT_INTERACTION.md) for behavior, permission boundaries and verification.
+
+## Shared action symbols
+
+The top-right workspace menu contains a searchable **Symbol guide**. Repeated actions across Home card headers, Projects, Chat, navigation and both graph workspaces share original vector symbols. Labels remain available to assistive technology and on hover; counts and consequential approval/denial choices keep readable text. The decorator only observes changed DOM controls and performs no network requests. The Home layout, data, authentication and settings are unchanged. See [Observatory controls](OBSERVATORY.md#compact-controls-and-symbol-guide) for the related compact header and panel-scroll fixes.

@@ -13,6 +13,26 @@
     team:'<circle cx="9" cy="7" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M17 4a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 6"/>',
     settings:'<path d="m9 3 1-1h4l1 3 3 1 3 1v4l-2 2-1 3-1 3h-4l-2-2-3-1-3-1v-4l2-2Z"/><circle cx="12" cy="11" r="3"/>',
     plus:'<path d="M12 5v14M5 12h14"/>',
+    copy:'<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
+    check:'<path d="m5 12 4 4L19 6"/>',
+    refresh:'<path d="M20 7v5h-5M4 17v-5h5M5 7a8 8 0 0 1 13-2l2 3M4 16l2 3a8 8 0 0 0 13-2"/>',
+    expand:'<path d="M8 3H3v5M16 3h5v5M3 16v5h5m13-5v5h-5"/>',
+    collapse:'<path d="M3 8h5V3m8 0v5h5M3 16h5v5m8 0v-5h5"/>',
+    fit:'<path d="M7 3H3v4m14-4h4v4M3 17v4h4m14-4v4h-4"/><rect x="7" y="7" width="10" height="10" rx="1"/>',
+    minus:'<path d="M5 12h14"/>',
+    treemap:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M11 3v18m0-11h10m-6 0v11"/>',
+    flow:'<path d="M3 5h3c7 0 5 5 12 5h3M3 9h3c7 0 5 7 12 7h3M3 19h3c7 0 5-15 12-15h3"/>',
+    timeline:'<path d="M5 4v16M3 7h4m-4 10h4M10 5h8v4h-8zm3 10h8v4h-8z"/>',
+    terminal:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m6 8 4 4-4 4m7 0h5"/>',
+    history:'<path d="M3 4v5h5M3 9a9 9 0 1 1 1 10M12 7v5l3 2"/>',
+    microphone:'<rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/>',
+    attach:'<path d="m8 13 7-7a3 3 0 0 1 4 4L9 20a5 5 0 0 1-7-7L13 2m-5 11a1 1 0 0 0 2 2l7-7"/>',
+    edit:'<path d="m14 4 6 6M3 21l2-7L16 3a2 2 0 0 1 3 0l2 2a2 2 0 0 1 0 3L10 19Z"/>',
+    external:'<path d="M14 3h7v7m0-7L10 14M10 3H3v18h18v-7"/>',
+    filter:'<path d="M3 5h18M6 12h12M9 19h6"/><circle cx="8" cy="5" r="2"/><circle cx="16" cy="12" r="2"/>',
+    follow:'<path d="M6 3v12m-4-4 4 4 4-4M13 5h8m-8 5h8m-8 5h8M3 21h18"/>',
+    stop:'<rect x="5" y="5" width="14" height="14" rx="2"/>',
+    guide:'<path d="M12 5C9 2 5 2 2 3v17c3-1 7-1 10 2 3-3 7-3 10-2V3c-3-1-7-1-10 2Zm0 0v17M5 7h4M5 11h4m6-4h4m-4 4h4"/>',
     tools:'<path d="M21 3a6 6 0 0 1-7 8L5 21l-3-3 10-9a6 6 0 0 1 8-7l-5 5 2 2Z"/>',
     sparkle:'<path d="m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3ZM20 2v4M18 4h4"/>',
     send:'<path d="m3 3 18 7-8 3-3 8Z M3 3l10 10"/>',
@@ -30,6 +50,7 @@
     arrow:'<path d="m9 5 7 7-7 7"/>', close:'<path d="m6 6 12 12M18 6 6 18"/>', menu:'<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/>', help:'<circle cx="12" cy="12" r="9"/><path d="M9 8a3 3 0 1 1 4 3c-1 1-1 2-1 3m0 3h.01"/>'
   };
   const icon = name => `<svg class="pb-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONS[name] || ICONS.agents}</svg>`;
+  window.PRFKT_ICONS=Object.freeze({icon});
 
 
   let homeApprovalState = [];
@@ -587,7 +608,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   const subtitle=document.querySelector('.brand p');if(subtitle)subtitle.textContent='People × Agents × Progress';
   const drawer=document.createElement('dialog');drawer.id='pbWorkspaces';drawer.className='pb-workspaces';drawer.setAttribute('aria-labelledby','pbWorkspacesTitle');
   const spaces=[['home','Home','home'],['portfolio','Projects','projects'],['board','Kanban board','open'],['intelligence','Work next','critical'],['agents','Agents','agents'],['ai','AI_BYTE chat','chat'],['terminalView','Execution logs','code'],['models','Model Hub','ai'],['team','Team access','team'],['activity','Activity','activity'],['settings','Settings','settings'],['help','Help / How-To','help']];
-  drawer.innerHTML=`<div class="pb-drawer-head"><h2 id="pbWorkspacesTitle">Your workspace</h2><button type="button" class="pb-drawer-close" aria-label="Close workspace menu">${icon('close')}</button></div><div class="pb-workspace-grid">${spaces.map(([view,label,ico])=>`<button type="button" data-home-go="${view}">${icon(ico)}${label}</button>`).join('')}</div>`;
+  drawer.innerHTML=`<div class="pb-drawer-head"><h2 id="pbWorkspacesTitle">Your workspace</h2><button type="button" class="pb-drawer-close" aria-label="Close workspace menu">${icon('close')}</button></div><button type="button" class="pb-guide-entry" data-symbol-guide>${icon('guide')}<span><b>Symbol guide</b><small>Quick reference for every control</small></span>${icon('arrow')}</button><div class="pb-workspace-grid">${spaces.map(([view,label,ico])=>`<button type="button" data-home-go="${view}">${icon(ico)}${label}</button>`).join('')}</div>`;
   document.body.appendChild(drawer);
   drawer.querySelector('.pb-drawer-close').onclick=()=>drawer.close();
   drawer.addEventListener('click',e=>{if(e.target===drawer){const r=drawer.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)drawer.close();}});
@@ -769,23 +790,32 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   .obs-tool-body{padding:12px 15px;max-height:300px;overflow:auto}.obs-pills{display:flex;flex-wrap:wrap;gap:7px}.obs-pills button{font-size:11px;min-height:38px}.obs-pills button.selected{outline:2px solid #83ceff}.obs-table{border-collapse:collapse;width:100%;font-size:11px}.obs-table td,.obs-table th{padding:7px 10px;text-align:left;border-bottom:1px solid #21374e;white-space:nowrap}.obs-table th{color:#9bb6d1}.obs-table button{font-size:11px;min-height:32px;padding:4px 8px}.obs-table tr.selected{background:#19436555}.obs-bar-track{height:12px;background:#142b40;border-radius:4px;width:200px;position:relative}.obs-bar{position:absolute;height:12px;min-width:3px;background:#5cb4cf;border-radius:3px}.obs-bar.error{background:#ce7387}.obs-matrix td button{background:rgba(68,131,178,var(--intensity,.1));min-width:42px}
   .obs-roles{padding:12px 0}.obs-roles>summary{cursor:pointer;min-height:44px;padding:12px;background:#0f2134;border:1px solid #2b435c;border-radius:12px;margin-bottom:12px;font-size:13px}.obs-approval-note{border:1px solid #4d4633;border-radius:11px;padding:11px;margin:12px 15px;font-size:11px;color:#d0ba95;line-height:1.6}.obs-zoom{margin-left:auto;display:flex;gap:5px}.obs-zoom button{min-width:38px}
   @media(max-width:800px){.obs-layout{grid-template-columns:1fr}.obs-inspector{border-left:0;border-top:1px solid #294762;max-height:350px}.obs-inspector[hidden]{display:none}.obs-canvas{height:400px}.obs-toolbar{display:grid;grid-template-columns:1fr 1fr}.obs-toolbar input{grid-column:1/-1;width:100%;font-size:16px}.obs-toolbar select{font-size:14px;width:100%}.obs-lenses{gap:6px;padding:9px}.obs-lenses button{font-size:11px;padding:7px 10px}.obs-header{padding:12px}.obs-header h2{font-size:16px}.obs-summary{gap:9px}.obs-zoom{margin-left:0}.obs-tool-body{max-height:250px}.obs-flow{min-width:650px}}
-.obs-toolbar[hidden]{display:none!important}.obs-stage>.obs-zoom{position:absolute;bottom:52px;left:10px;z-index:2;margin:0;padding:5px;border-radius:11px;background:#071321e8;box-shadow:0 4px 12px #0005}.obs-zoom button{min-width:32px;min-height:35px;font-size:10px;padding:5px 8px}.obs-canvas{scrollbar-width:thin;scrollbar-color:#315471 #0a1624}.obs-focused{position:fixed!important;inset:8px;z-index:1500;margin:0;display:flex;flex-direction:column;overflow:hidden;background:#07101b}.obs-focused>.obs-layout{flex:1;min-height:0}.obs-focused .obs-stage{min-height:0;display:flex;flex-direction:column}.obs-focused .obs-canvas{height:auto;flex:1;min-height:150px}.obs-focused>.obs-tools-switch,.obs-focused>.obs-tool-body,.obs-focused>.obs-approval-note{display:none}.obs-focused .obs-inspector{max-height:100%}.obs-focused>.obs-evidence{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:7px 12px}.obs-focused .obs-legend{font-size:9px;min-height:34px}.obs-focused .obs-stage>.obs-zoom{bottom:44px}@media(max-width:800px){.obs-focused .obs-layout{grid-template-rows:minmax(150px,1fr) auto}.obs-focused .obs-inspector{max-height:200px}.obs-focused .obs-summary{display:none}.obs-header button{min-height:37px;font-size:11px}.obs-evidence{font-size:10px}.obs-toolbar select{min-height:40px;font-size:12px}.obs-toolbar{padding:8px 10px}.obs-lenses{padding:7px 9px}}
+/* Controls occupy their own rows; only the graph and detail pane scroll. */
+.obs-toolbar[hidden],.obs-zoom[hidden]{display:none!important}.obs-header{padding:6px 10px;gap:6px;min-height:56px}.obs-header h2{font-size:16px;white-space:nowrap}.obs-header-actions{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.obs-studio .obs-lenses{flex-wrap:wrap;gap:4px;padding:5px 8px}.obs-zoom{margin-left:auto;gap:4px;flex-shrink:0}.obs-studio .obs-evidence{padding:6px 12px;font-size:10px;line-height:1.5;max-height:3.9em;overflow:auto}.obs-toolbar{padding:8px 10px}.obs-toolbar input{min-height:40px}.obs-toolbar .obs-sub{flex:1;min-width:0}.obs-summary{padding:7px 12px}
+.obs-stage{display:flex;flex-direction:column;min-height:0}.obs-canvas{scrollbar-width:thin;scrollbar-color:#315471 #0a1624}.obs-view-help{border-top:1px solid #20354b;flex:none;background:#0a1522}.obs-view-help>summary{font-size:11px;color:#a4bfd6;cursor:pointer;padding:8px 12px;min-height:34px}.obs-view-help .obs-legend{max-height:100px;overflow:auto;padding-top:0}
+/* The page's global header rule must never make evidence headers sticky. */
+.obs-readable-section>header{position:static;top:auto;z-index:auto;backdrop-filter:none;background:transparent;border:0;padding:0;margin:0;min-height:44px}.obs-readable-section header button{margin:0}.obs-readable-section{margin:10px 0;border:1px solid #2a4259;border-radius:10px;padding:0 8px 8px;background:#091623}.obs-readable-section h4{font-size:12px}.obs-event-text{max-height:none;overflow:visible;border:0;padding:4px 0;background:transparent}.obs-inspector{overscroll-behavior:contain;scrollbar-width:thin;scroll-padding-top:8px}.obs-inspector-close{margin-top:0!important}.obs-layout:has(>.obs-inspector[hidden]){grid-template-columns:minmax(0,1fr)}
+.obs-focused{position:fixed!important;inset:6px;margin:0;z-index:1500;display:flex;flex-direction:column;overflow:hidden;background:#07101b}.obs-focused>.obs-layout{flex:1;min-height:0;overflow:hidden}.obs-focused .obs-canvas{height:auto;flex:1;min-height:0}.obs-focused>.obs-tools-switch,.obs-focused>.obs-tool-body,.obs-focused>.obs-approval-note{display:none}.obs-focused .obs-inspector{max-height:none;height:100%;min-height:0}.obs-focused .obs-linked-lens{min-height:0}.obs-focused>.obs-evidence{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}.obs-focused>.obs-toolbar,.obs-focused>.obs-lenses,.obs-focused>.obs-header{flex-shrink:0}
+@media(min-width:1100px){.obs-layout:has(>.obs-inspector[hidden]){grid-template-columns:150px minmax(0,1fr)}}
+@media(max-width:800px){.obs-header{padding:5px 8px}.obs-header h2{font-size:14px}.obs-toolbar{grid-template-columns:1fr 1fr;gap:6px;padding:6px 8px}.obs-toolbar select{min-height:40px;font-size:12px}.obs-focused .obs-summary{display:none}.obs-focused .obs-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(100px,1fr)}.obs-focused .obs-layout:has(>.obs-inspector:not([hidden])){grid-template-rows:minmax(100px,1fr) minmax(120px,1fr)}.obs-focused .obs-inspector{padding:10px 12px}.obs-focused .obs-view-help .obs-legend{max-height:60px}.obs-focused .obs-toolbar input{min-height:36px;padding:6px 10px}.obs-focused .obs-evidence{max-height:30px}.obs-zoom{margin-left:auto}.obs-linked-lens{display:none}}
+@media(max-height:500px){.obs-focused>.obs-toolbar,.obs-focused>.obs-summary,.obs-focused>.obs-evidence{display:none}.obs-focused .obs-layout:has(>.obs-inspector:not([hidden])){grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr)}.obs-focused .obs-inspector{border-top:0;border-left:1px solid #294762}.obs-focused .obs-linked-lens{display:none}}
 .obs-linked-lens{padding:10px;min-width:0;border-right:1px solid #294359;background:#0b1624;display:none}.obs-linked-lens p{font-size:10px;color:#9eb8d2;margin:0 0 10px}.obs-linked-lens button{width:100%;font-size:10px;text-align:left;margin-bottom:5px;padding:6px;min-height:34px;border-color:#514984;background:#282449}.obs-linked-lens button.selected{outline:2px solid #7bcbff}.obs-linked-lens small{display:block;margin-top:3px;color:#a6bed5}@media(min-width:1100px){.obs-layout{grid-template-columns:150px minmax(0,1fr) 280px}.obs-linked-lens{display:block;max-height:530px;overflow:auto}.obs-focused .obs-linked-lens{max-height:100%}}
   `;document.head.appendChild(style);
   const legacy=document.createElement('details');legacy.className='obs-roles';legacy.innerHTML='<summary>Agent roles, existing runs &amp; memory</summary>';
   while(host.firstChild)legacy.appendChild(host.firstChild);
   const studio=document.createElement('section');studio.id='pbObservatory';studio.className='obs-studio';
-  studio.innerHTML=`<div class="obs-header"><div><h2>Agent Observatory</h2><p class="obs-sub">Runs, agents and tools · one linked view</p></div><div><button type="button" id="obsFocus">Focus</button> <button type="button" id="obsRefresh">Refresh</button></div></div>
+  studio.innerHTML=`<div class="obs-header"><h2>Observatory</h2><div class="obs-header-actions"><button type="button" id="obsPause">Pause live</button><button type="button" id="obsRefresh">Refresh</button><button type="button" id="obsFocus" aria-pressed="false">Focus</button><button type="button" data-symbol-guide aria-label="Symbol guide">Symbol guide</button></div></div>
   <div id="obsEvidence" class="obs-evidence">Connecting to recorded execution evidence…</div>
   <div class="obs-toolbar"><select id="obsProject" aria-label="Observation project"><option value="">All observed projects</option></select><select id="obsTrace" aria-label="Observed run"><option value="">All recorded runs</option></select><input id="obsSearch" type="search" placeholder="Find agent, tool or run…" aria-label="Search graph"></div>
-  <div class="obs-lenses" role="group" aria-label="Analysis lens"><button type="button" data-obs-mode="tree">Tree</button><button type="button" data-obs-mode="treemap">Treemap</button><button type="button" data-obs-mode="flow">Sankey</button><button type="button" data-obs-mode="timeline">Timeline</button><div class="obs-zoom"><button type="button" id="obsZoomOut" aria-label="Zoom out">−</button><button type="button" id="obsFit">Fit</button><button type="button" id="obsZoomIn" aria-label="Zoom in">+</button><button type="button" id="obsPause">Pause live</button></div></div>
+  <div class="obs-lenses" role="group" aria-label="Analysis lens"><button type="button" data-obs-mode="tree">Tree</button><button type="button" data-obs-mode="treemap">Treemap</button><button type="button" data-obs-mode="flow">Sankey</button><button type="button" data-obs-mode="timeline">Timeline</button><div class="obs-zoom"><button type="button" id="obsZoomOut" aria-label="Zoom out">−</button><button type="button" id="obsFit">Fit</button><button type="button" id="obsZoomIn" aria-label="Zoom in">+</button></div></div>
   <div class="obs-toolbar"><select id="obsMetric" aria-label="Analysis size metric"><option value="count">Event count</option><option value="duration">Recorded tool duration</option><option value="tokens">Recorded tokens</option></select><span class="obs-sub">Select a node to link graph, lens and tools.</span></div>
-  <div id="obsSummary" class="obs-summary"></div><div class="obs-layout"><aside id="obsLinkedLens" class="obs-linked-lens" aria-label="Cross-linked count lens"></aside><div class="obs-stage"><div id="obsCanvas" class="obs-canvas" tabindex="0" aria-label="Interactive execution graph"></div><div id="obsLegend" class="obs-legend"></div></div><aside id="obsInspector" class="obs-inspector" aria-label="Selected node details" hidden></aside></div>
+  <div id="obsSummary" class="obs-summary"></div><div class="obs-layout"><aside id="obsLinkedLens" class="obs-linked-lens" aria-label="Cross-linked count lens"></aside><div class="obs-stage"><div id="obsCanvas" class="obs-canvas" tabindex="0" aria-label="Interactive execution graph"></div><details class="obs-view-help"><summary>About this view</summary><div id="obsLegend" class="obs-legend"></div></details></div><aside id="obsInspector" class="obs-inspector" aria-label="Selected node details" hidden></aside></div>
   <section class="obs-recorded-activity" aria-label="Recorded activity"><h3>Recorded activity</h3><div id="obsEventFeed" class="obs-event-feed"></div></section>
   <div class="obs-tools-switch" role="group" aria-label="Tool grouping"><b class="obs-sub">Tool calls</b><button type="button" data-obs-tools="pills">Pill grid</button><button type="button" data-obs-tools="timeline">Swimlanes</button><button type="button" data-obs-tools="matrix">Frequency matrix</button></div><div id="obsTools" class="obs-tool-body"></div>
   <div class="obs-approval-note"><b>Execution permissions: not connected.</b> These traces are read-only. A code-review decision does not approve a tool, resume an agent or merge code. Live Approve / Deny requires a connected permission-capable runner; no such request is being fabricated here.</div>`;
   host.append(studio,legacy);
-  const zoom=studio.querySelector('.obs-zoom');studio.querySelector('.obs-stage').appendChild(zoom);
+
   const $=id=>document.getElementById(id),number=value=>value===null||value===undefined?'Not recorded':Number(value).toLocaleString([], {maximumFractionDigits:2});
   const stamp=value=>value?new Date(value*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}):'Not recorded';
   const traces=()=>((ui.data?.traces)||[]).filter(t=>!ui.project||t.project===ui.project).filter(t=>!ui.trace||t.id===ui.trace);
@@ -893,7 +923,7 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     if(!ui.data?.traces?.length)canvas.innerHTML='<div class="obs-empty">'+(ui.error?escape(ui.error):'No supported execution traces are available yet. Real runs populate this view; sample data is not inserted.')+'</div>';
     else if(ui.mode==='tree')drawTree();else if(ui.mode==='treemap')drawTreemap();else if(ui.mode==='flow')drawFlow();else drawTimeline();
     canvas.scrollLeft=sx;canvas.scrollTop=sy;
-    $('obsMetric').parentElement.hidden=ui.mode!=='treemap';$('obsMetric').disabled=!['treemap'].includes(ui.mode);for(const id of ['obsZoomOut','obsZoomIn','obsFit'])$(id).disabled=ui.mode!=='tree';
+    studio.querySelector('.obs-zoom').hidden=ui.mode!=='tree';$('obsMetric').parentElement.hidden=ui.mode!=='treemap';$('obsMetric').disabled=!['treemap'].includes(ui.mode);for(const id of ['obsZoomOut','obsZoomIn','obsFit'])$(id).disabled=ui.mode!=='tree';
     const linked=nodes.filter(n=>n.kind==='tool'&&nodeMatches(n)).slice(0,24);
     $('obsLinkedLens').innerHTML='<p>Linked tool groups<br>Click to inspect in any lens</p>'+linked.map(n=>`<button type="button" class="${ui.selected===n.id?'selected':''}" data-obs-node="${escape(n.id)}">${escape(n.label)}<small>${n.count} events</small></button>`).join('');
     renderTools();renderRecordedActivity();renderInspector();
@@ -923,14 +953,14 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
     }catch(error){if(identity===`${session?.subject||''}:${session?.level||0}`){ui.error=error.message||'Connection failed';renderEvidence();if(!ui.data)renderVisuals();}}
     finally{clearTimeout(timeout);ui.busy=false;ui.last=Date.now();}
   }
-  $('obsFocus').onclick=()=>{const on=studio.classList.toggle('obs-focused');$('obsFocus').textContent=on?'Exit focus':'Focus';$('obsFocus').setAttribute('aria-pressed',String(on));};
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&studio.classList.contains('obs-focused'))$('obsFocus').click();});
+  $('obsFocus').onclick=()=>{const on=studio.classList.toggle('obs-focused');document.body.classList.toggle('pb-observatory-focused',on);$('obsFocus').textContent=on?'Exit focus':'Focus';$('obsFocus').setAttribute('aria-pressed',String(on));};
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.querySelector('dialog[open]')&&studio.classList.contains('obs-focused'))$('obsFocus').click();});
   $('obsRefresh').onclick=()=>refresh(true);$('obsPause').onclick=()=>{ui.paused=!ui.paused;renderEvidence();if(!ui.paused)void refresh(true);};
   $('obsProject').onchange=e=>{ui.project=e.target.value;ui.trace='';ui.selected='';updateSelects();renderVisuals();};$('obsTrace').onchange=e=>{ui.trace=e.target.value;ui.selected='';ui.zoom=1;renderVisuals();};$('obsSearch').oninput=e=>{ui.search=e.target.value;renderVisuals();};$('obsMetric').onchange=e=>{ui.metric=e.target.value;renderVisuals();};
   $('obsZoomOut').onclick=()=>{ui.zoom=Math.max(.25,ui.zoom-.15);renderVisuals();};$('obsZoomIn').onclick=()=>{ui.zoom=Math.min(2.5,ui.zoom+.15);renderVisuals();};$('obsFit').onclick=()=>{const graph=$('obsCanvas').querySelector('.obs-graph');ui.zoom=graph?Math.max(.25,Math.min(1,$('obsCanvas').clientWidth/parseFloat(graph.style.width))):1;renderVisuals();$('obsCanvas').scrollTo(0,0);};
   studio.addEventListener('click',e=>{
     const copy=e.target.closest('[data-obs-copy]');
-    if(copy){const event=observedEvents().find(item=>item.id===copy.dataset.obsCopy),field=event?.evidence?.[copy.dataset.obsCopyField];if(field&&typeof field.text==='string')navigator.clipboard.writeText(field.text).then(()=>{copy.textContent='Copied';}).catch(()=>{copy.textContent='Copy unavailable';});return;}
+    if(copy){const event=observedEvents().find(item=>item.id===copy.dataset.obsCopy),field=event?.evidence?.[copy.dataset.obsCopyField];if(field&&typeof field.text==='string')navigator.clipboard.writeText(field.text).then(()=>{copy.textContent='Copied';window.PRFKT_SYMBOLS?.announce('Copied to clipboard');}).catch(()=>{copy.textContent='Copy unavailable';window.PRFKT_SYMBOLS?.announce('Clipboard unavailable. Select the text to copy it.');});return;}
     const b=e.target.closest('[data-obs-mode],[data-obs-node],[data-obs-tools],[data-obs-open-run]');if(!b)return;
     if(b.dataset.obsMode){ui.mode=b.dataset.obsMode;renderVisuals();}
     if(b.dataset.obsTools){ui.tools=b.dataset.obsTools;renderTools();}
@@ -1719,4 +1749,119 @@ body.reduced-motion .pb-crawl-track{animation:none!important;transform:none!impo
   window.PRFKT_OPEN_LEAD=lead=>{const list=projects.filter(p=>(p.lead||'')===lead);$('prfktLeadTitle').textContent=lead?lead+' · Lead view':'Projects without a lead';$('prfktLeadContent').innerHTML='<p>'+list.length+' projects. Review their status, then open the work you want to move forward.</p>'+list.map(p=>{const items=tasks.filter(t=>t.project===p.name&&t.status!=='Done'),review=items.filter(t=>t.status==='Review').length,blocked=items.filter(t=>t.status==='Blocked').length;return '<article><b>'+esc(p.name)+'</b><p>'+esc(p.health||'Status not recorded')+' · '+items.length+' open · '+review+' ready for review · '+blocked+' blocked</p><p>'+esc(p.goal||'No goal recorded')+'</p><button type="button" class="mini" data-lead-board="'+esc(p.name)+'">Open work queue</button> <button type="button" class="mini" data-lead-chat="'+esc(p.name)+'">Project chat</button></article>';}).join('');leadDialog.showModal();};
   leadDialog.onclick=e=>{const b=e.target.closest('[data-lead-board],[data-lead-chat]');if(!b)return;leadDialog.close();if(b.dataset.leadChat){void window.PRFKT_CODEX?.openWork({projectName:b.dataset.leadChat});return;}document.querySelector('[data-home-scope="all"]')?.click();$('projectFilter').value=b.dataset.leadBoard;renderAll();document.querySelector('[data-home-go="board"],[data-view="board"]')?.click();};
   renderAll();
+})();
+
+// Shared action pictograms. This changes presentation only, never requests data.
+(() => {
+  if(window.PRFKT_SYMBOLS||!window.PRFKT_ICONS)return;
+  const {icon}=window.PRFKT_ICONS;
+  const style=document.createElement('style');style.textContent=`
+.pb-symbol-label{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip-path:inset(50%)!important;white-space:nowrap!important;border:0!important}
+body .pb-symbol-button[hidden],body:not(.auth) .pb-symbol-button.authonly,.pb-symbol-guide [hidden]{display:none!important}
+body .pb-symbol-button{position:relative;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:44px;min-width:44px;max-width:44px;height:44px;min-height:44px;padding:10px!important;gap:0;vertical-align:middle;line-height:1;border-radius:10px;touch-action:manipulation}
+body .pb-symbol-button .pb-icon{width:20px;height:20px;margin:0;pointer-events:none}.pb-symbol-button:focus-visible{outline:2px solid #9cdaff;outline-offset:2px}.pb-symbol-button:disabled{opacity:.4}.pb-symbol-button[aria-pressed="true"]{color:#9ad9ff;border-color:#73b9eb;background:#193d5c}.pb-symbol-button[data-pb-count]:not([data-pb-count=""])::after{content:attr(data-pb-count);position:absolute;right:-2px;top:-3px;min-width:16px;border-radius:9px;padding:3px;background:#8bd2ff;color:#081828;font-size:10px}
+body .obs-readable-section .pb-symbol-button{margin:0;height:44px;min-height:44px;border:0;background:transparent}body .obs-header-actions .pb-symbol-button{border:0;background:transparent}body .obs-header-actions .pb-symbol-button[aria-pressed="true"]{background:#193d5c}
+body .home-nav .pb-symbol-button{width:100%;max-width:none;min-width:0;min-height:44px;height:44px}.home-nav{padding:5px!important}
+body .cw-mobile-dialog>header{position:static;top:auto;z-index:auto;backdrop-filter:none;background:transparent;padding:0 0 10px}
+body #cwTerminal .cw-terminal-head{padding:4px 12px;flex-shrink:0;min-height:48px}body #cwWorkWindows .cw-work-head{justify-content:flex-start}body #cwNewWork{margin-left:auto}body #ai #sendChat.pb-symbol-button::after{content:none}
+.pb-guide-entry{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 16px;padding:12px 14px;min-height:62px;text-align:left;border:1px solid #426588;border-radius:12px;background:#142b42;color:#e0efff}.pb-guide-entry>span{flex:1}.pb-guide-entry b{display:block;font-size:14px}.pb-guide-entry small{display:block;font-size:11px;color:#a8bfd5;margin-top:3px}.pb-guide-entry>.pb-icon{color:#9dd9ff}
+.pb-symbol-guide{width:min(700px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:0;color:#e1eefb;background:#0b1726;border:1px solid #365978;border-radius:18px;box-shadow:0 24px 90px #000b;overflow:auto;overscroll-behavior:contain}.pb-symbol-guide::backdrop{background:#020912c9;backdrop-filter:blur(6px)}
+.pb-symbol-guide .pb-guide-top{display:flex;align-items:center;gap:10px;position:sticky;top:0;background:#0b1726;z-index:1;padding:12px 16px;border-bottom:1px solid #293e55}.pb-guide-top h2{font-size:18px;margin:0;flex:1}.pb-guide-top button{background:transparent;border:0;color:inherit;width:44px;height:44px;border-radius:9px}.pb-guide-body{padding:0 16px 18px}.pb-guide-body>p{font-size:12px;color:#a9bfd3;line-height:1.6}.pb-guide-body input{width:100%;min-height:44px;font-size:16px;background:#0a1220;color:#dfedfa;border:1px solid #365570;border-radius:10px;padding:10px 12px}.pb-guide-group h3{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#9ab8d2;margin:20px 0 8px}.pb-guide-items{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px}.pb-guide-item{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid #203249}.pb-guide-item .pb-icon{color:#94d0fb}.pb-guide-item b{font-size:12px;display:block}.pb-guide-item small{display:block;color:#a6b9cd;font-size:11px;line-height:1.5;margin-top:3px}.pb-guide-feedback{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:1601;padding:10px 16px;border:1px solid #375d7d;border-radius:12px;background:#10273c;color:#e4f3ff;font-size:12px;max-width:calc(100vw - 24px);box-shadow:0 6px 24px #0008}.pb-guide-feedback:empty{display:none}
+@media(max-width:520px){.pb-guide-items{grid-template-columns:1fr}.pb-symbol-guide .pb-guide-top{padding:8px 12px}.pb-guide-body{padding:0 14px 14px}body .obs-lenses .pb-symbol-button{padding:8px!important}.obs-studio .obs-lenses{gap:2px}.obs-zoom{gap:2px}}
+@media(max-width:350px){body .obs-header-actions .pb-symbol-button{min-width:40px;max-width:40px;width:40px}.obs-studio .obs-header{gap:2px;padding:4px}.obs-header h2{font-size:13px}}
+`;document.head.append(style);
+  const groups=[
+    ['Everyday actions',[
+      ['copy','Copy','Copy the displayed message, arguments or result.'],['check','Copied / selected','Confirms a copy, or shows a selected option.'],
+      ['refresh','Refresh','Request a fresh snapshot once. Does not invoke an AI model.'],['plus','Add / zoom in','Create work or a chat; in a graph, increase its size.'],
+      ['minus','Zoom out','Make the graph smaller.'],['close','Close','Dismiss a panel or chat window. Saved history remains.'],
+      ['expand','Focus','Expand the current graph workspace.'],['collapse','Exit focus','Return to the normal workspace layout.'],
+      ['fit','Fit graph','Fit the tree to the available width.'],['blocked','Pause','Pause graph updates or media playback; does not stop an agent.'],
+      ['active','Resume / play','Resume graph updates or start media playback.'],['filter','Filter','Narrow the records shown.'],
+      ['edit','Edit','Open the existing record editor.'],['external','Open link','Open a project site or repository in a new tab.'],
+      ['guide','Symbol guide','Open this quick reference.'],['arrow','View more','Open the full list or related workspace.']]],
+    ['Work and conversations',[
+      ['chat','Chat','Open a conversation or its project context.'],['history','History','Find and reopen saved project conversations.'],
+      ['attach','Attach','Add a supported file to the current draft.'],['microphone','Microphone','Dictate when your browser and permissions allow.'],
+      ['settings','Options','Adjust context, model or reasoning settings.'],['ai','Model','Choose from models available to the connected runtime.'],
+      ['send','Send','Submit the current message.'],['terminal','Terminal','Read recorded command output for the selected conversation.'],
+      ['follow','Follow output','Keep the latest terminal output in view.'],['stop','Stop','Request that the selected run stop.'],
+      ['user','Lead view','Show the work owned by this project’s lead.'],['review','Review','Inspect work awaiting your decision. Approval and denial keep text labels.']]],
+    ['Graph views',[
+      ['agents','Tree / graph','Explore linked runs, agents and tools. Select a node for details.'],
+      ['treemap','Treemap','Compare recorded counts, durations or tokens by rectangle size.'],
+      ['flow','Sankey','Follow tool-call flow from runs through agents to tools.'],
+      ['timeline','Timeline / swimlanes','Read recorded events in time order.'],
+      ['menu','Grid / matrix','Group tool calls as pills or compare status frequencies.'],
+      ['activity','Usage / activity','Inspect measured usage or recent activity.']]],
+    ['Workspace navigation',[
+      ['home','Home','Open your portfolio overview.'],['projects','Projects','Open your project portfolio.'],
+      ['open','Kanban / open work','Open the board and review work by status.'],['team','Team','Manage workspace access.'],
+      ['critical','Attention needed','Find critical work or inspect an issue.'],['due','Due soon','Show upcoming work.'],
+      ['memory','Memory / details','Read stored notes or additional details.'],['help','Help','Open dashboard instructions.'],
+      ['menu','Workspace menu','Use the top-right four-square button for all destinations and this guide.']]]
+  ];
+  const guide=document.createElement('dialog');guide.id='pbSymbolGuide';guide.className='pb-symbol-guide';guide.setAttribute('aria-labelledby','pbSymbolGuideTitle');
+  guide.innerHTML='<div class="pb-guide-top">'+icon('guide')+'<h2 id="pbSymbolGuideTitle">Symbol guide</h2><button type="button" id="pbSymbolGuideClose" aria-label="Close symbol guide">'+icon('close')+'</button></div><div class="pb-guide-body"><p>A quick reference for the dashboard. Hover or focus a control to identify it. Highlighted controls are selected; dimmed controls are unavailable.</p><input id="pbSymbolSearch" type="search" placeholder="Find a symbol or action…" aria-label="Search symbols"><div id="pbSymbolList"></div><p id="pbSymbolEmpty" hidden>No matching symbols.</p></div>';
+  document.body.append(guide);
+  const list=guide.querySelector('#pbSymbolList');
+  for(const [name,items] of groups){
+    const section=document.createElement('section');section.className='pb-guide-group';const heading=document.createElement('h3');heading.textContent=name;
+    const rows=document.createElement('div');rows.className='pb-guide-items';
+    for(const [symbol,label,detail] of items){const row=document.createElement('div');row.className='pb-guide-item';row.dataset.search=(label+' '+detail).toLowerCase();row.innerHTML=icon(symbol)+'<span><b></b><small></small></span>';row.querySelector('b').textContent=label;row.querySelector('small').textContent=detail;rows.append(row);}
+    section.append(heading,rows);list.append(section);
+  }
+  guide.querySelector('#pbSymbolSearch').oninput=e=>{const q=e.target.value.trim().toLowerCase();let total=0;list.querySelectorAll('.pb-guide-group').forEach(section=>{let count=0;section.querySelectorAll('.pb-guide-item').forEach(row=>{row.hidden=!row.dataset.search.includes(q);if(!row.hidden)count++;});section.hidden=!count;total+=count;});guide.querySelector('#pbSymbolEmpty').hidden=!!total;};
+  const feedback=document.createElement('div');feedback.className='pb-guide-feedback';feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');document.body.append(feedback);let feedbackTimer;
+  function announce(message){feedback.textContent=message;clearTimeout(feedbackTimer);feedbackTimer=setTimeout(()=>{feedback.textContent='';},3000);}
+  let returnTo=null,returnMenu=false;
+  function openGuide(trigger){returnTo=trigger;const menu=document.getElementById('pbWorkspaces');returnMenu=!!menu?.open;if(returnMenu)menu.close();guide.querySelector('#pbSymbolSearch').value='';guide.querySelector('#pbSymbolSearch').dispatchEvent(new Event('input'));guide.showModal();guide.querySelector('#pbSymbolGuideClose').focus();}
+  guide.querySelector('#pbSymbolGuideClose').onclick=()=>guide.close();
+  guide.addEventListener('close',()=>{if(returnMenu){document.getElementById('pbWorkspaces').showModal();returnMenu=false;}returnTo?.focus({preventScroll:true});});
+  guide.addEventListener('click',e=>{if(e.target===guide){const r=guide.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)guide.close();}});
+  guide.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();guide.close();}});
+  document.addEventListener('click',e=>{const button=e.target.closest('[data-symbol-guide]');if(button)openGuide(button);});
+  // Explicit controls only. Content, values, choices and consequential decisions
+  // retain their visible text. Existing event handlers and accessible names stay.
+  const rules=[
+    ['[data-obs-copy],.cw-copy-message','copy'],['#obsRefresh,#codexRefresh,[data-cw-inbox-refresh]','refresh'],
+    ['#obsFocus,#codexTraceFocus','expand'],['#obsPause,#codexTracePause','blocked'],['#obsFit,#codexTraceFit','fit'],
+    ['#obsZoomOut,#codexTraceZoomOut','minus'],['#obsZoomIn,#codexTraceZoomIn','plus'],
+    ['[data-obs-mode="tree"],[data-cw-view="graph"],[data-codex-trace-tab="graph"]','agents'],
+    ['[data-obs-mode="treemap"]','treemap'],['[data-obs-mode="flow"]','flow'],
+    ['[data-obs-mode="timeline"],[data-obs-tools="timeline"]','timeline'],['[data-obs-tools="pills"],[data-obs-tools="matrix"]','menu'],
+    ['[data-obs-open-run]','external'],['#obsInspectorClose,#cwPopupDismiss,#cwCloseWork,.cw-mobile-dialog [data-close]','close'],
+    ['#pbObservatory [data-symbol-guide]','guide'],['#cwNewWork,#codexNewConversation','plus'],
+    ['#pbScopedFilters,#openFilters,[data-open-scope],[data-open-filters]','filter'],['.pb-filter-close,#prfktLeadClose','close'],
+    ['#cwHistoryButton','history'],['#cwWindowsMenu,#cwRemoteChat,#cwPopupOpen,[data-cw-view="chat"],[data-ai-project]','chat'],
+    ['#cwAttach','attach'],['#cwDictate','microphone'],['#cwModelOptions','ai'],
+    ['#cwContextToggle,#cwOptions','settings'],['#cwFollowOutput','follow'],['#codexStop','stop'],
+    ['#sendChat','send'],['[data-cw-view="terminal"],[data-terminal-run]','terminal'],
+    ['[data-codex-trace-tab="usage"]','activity'],['[data-codex-trace-tab="details"]','memory'],
+    ['[data-edit-project]','edit'],['[data-focus]','open'],['[data-lead]','user'],
+    ['.project .mini[target="_blank"]','external'],
+    ['.home-nav [data-home-go="home"]','home'],['.home-nav [data-home-go="portfolio"]','projects'],
+    ['.home-nav [data-home-go="agents"]','agents'],['.home-nav [data-home-go="ai"]','chat'],['.home-nav [data-home-go="settings"]','settings'],
+    ['.home-card-head [data-home-go]','arrow']
+  ];
+  const selector=rules.map(([s])=>s).join(',');
+  function decorate(button){
+    if(!button.isConnected)return;
+    const rule=rules.find(([s])=>button.matches(s));if(!rule)return;
+    const label=button.textContent.trim(),base=rule[1];
+    const symbol=base==='copy'?(/unavailable|Selected/.test(label)?'critical':label==='Copied'?'check':'copy'):base==='expand'&&/Exit/.test(label)?'collapse':base==='blocked'&&/Resume/.test(label)?'active':base==='microphone'&&/Stop/.test(label)?'stop':base;
+    if(button.dataset.pbSymbol===symbol&&button.dataset.pbSymbolLabel===label&&button.querySelector('.pb-symbol-label'))return;
+    // Keep original text in a visually hidden label for screen readers and the
+    // existing state handlers. New streamed text is decorated only once.
+    button.dataset.pbSymbol=symbol;button.dataset.pbSymbolLabel=label;button.classList.add('pb-symbol-button');
+    button.innerHTML=icon(symbol)+'<span class="pb-symbol-label"></span>';button.lastElementChild.textContent=label;
+    if(base==='filter')button.dataset.pbCount=label.match(/ · (\d+)$/)?.[1]||'';
+    button.title=label==='×'?(button.getAttribute('aria-label')||'Close'):(base==='copy'&&label==='Copy'?button.getAttribute('aria-label')||label:label);
+  }
+  const pending=new Set();let queued=false;
+  function collect(node,descendants=false){const element=node.nodeType===1?node:node.parentElement;if(!element)return;const control=element.closest(selector);if(control)pending.add(control);if(descendants&&node.nodeType===1)element.querySelectorAll(selector).forEach(b=>pending.add(b));}
+  function flush(){queued=false;const batch=[...pending];pending.clear();batch.forEach(decorate);}
+  const observer=new MutationObserver(records=>{for(const record of records){collect(record.target);for(const node of record.addedNodes)collect(node,true);}if(pending.size&&!queued){queued=true;queueMicrotask(flush);}});
+  document.querySelectorAll(selector).forEach(decorate);observer.observe(document.body,{childList:true,subtree:true,characterData:true});
+  window.PRFKT_SYMBOLS=Object.freeze({open:openGuide,announce});
 })();
