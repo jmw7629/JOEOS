@@ -237,7 +237,7 @@ class Access:
             self.sessions.pop(digest(token), None)
 
 
-def handler_for(access, origin, upstream=('127.0.0.1',8094), trusted_serve=False):
+def handler_for(access, origin, upstream=('127.0.0.1',8094), trusted_serve=False, connection_factory=None, authenticate_uploads=False):
     parsed = urlsplit(origin)
     if parsed.scheme not in ('http','https') or not parsed.netloc or parsed.path or parsed.query or parsed.fragment:
         raise ValueError('Invalid public origin')
@@ -404,7 +404,7 @@ def handler_for(access, origin, upstream=('127.0.0.1',8094), trusted_serve=False
             payload=self.body(CODEX_MAX_BODY if native_api else MAX_BODY) if mutation else None
             self.deadline.cancel()  # Request is complete; long model replies may proceed.
             headers={'Host':'127.0.0.1:8094','Accept-Encoding':'identity'}
-            if api:headers['X-Access-Key']=record['key']
+            if api or attachment and authenticate_uploads:headers['X-Access-Key']=record['key']
             if mutation:headers['Origin']='http://127.0.0.1:8094'
             for name in ('Content-Type','X-Task-ID','X-Filename'):
                 values=self.headers.get_all(name,[])
@@ -412,7 +412,8 @@ def handler_for(access, origin, upstream=('127.0.0.1',8094), trusted_serve=False
                 if values:headers[name]=values[0]
             current=access.check(self.cookie())
             if not current:return self.deny()
-            connection=http.client.HTTPConnection(upstream[0],upstream[1],timeout=180,source_address=access.source(record['fingerprint']))
+            connection=(connection_factory(record) if connection_factory else
+                        http.client.HTTPConnection(upstream[0],upstream[1],timeout=180,source_address=access.source(record['fingerprint'])))
             try:
                 connection.request(self.command,self.path,body=payload,headers=headers)
                 response=connection.getresponse()

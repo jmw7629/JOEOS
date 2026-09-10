@@ -1,0 +1,35 @@
+name: PRFKT Private Workspaces Verify
+on:
+  pull_request:
+    branches: [project-byte-deploy, feat/project-byte-ai-connections]
+  workflow_dispatch:
+jobs:
+  private-workspaces:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify gateway, private installations and tenant boundaries
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s deploy/project-byte/public-access -p 'test_*.py' -v
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s deploy/project-byte/private-install -p 'test_*.py' -v
+          PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s deploy/project-byte/enterprise -p 'test_*.py' -v
+      - name: Install isolated browser tooling
+        run: |
+          npm install --prefix "$RUNNER_TEMP/prfkt-enterprise-browser" --ignore-scripts --no-audit --no-fund playwright@1.57.0
+          node "$RUNNER_TEMP/prfkt-enterprise-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Verify invitation, project and chat workflows
+        run: |
+          PB_PLAYWRIGHT_MODULE="$RUNNER_TEMP/prfkt-enterprise-browser/node_modules/playwright/index.mjs" \
+          PB_EVIDENCE="$RUNNER_TEMP/prfkt-enterprise-evidence" \
+          node deploy/project-byte/enterprise/browser_review.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prfkt-enterprise-evidence
+          path: ${{ runner.temp }}/prfkt-enterprise-evidence
+          retention-days: 7
+          if-no-files-found: ignore

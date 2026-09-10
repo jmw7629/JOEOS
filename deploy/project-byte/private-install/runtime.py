@@ -33,7 +33,7 @@ def load_manifest():
     regular(ROOT / 'private' / 'owner.key')
     return manifest
 
-def serve(port):
+def serve(port, socket_path=None):
     os.umask(0o077)
     manifest = load_manifest()
     lock = os.open(ROOT / '.runtime.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
@@ -101,14 +101,32 @@ def serve(port):
         def do_DELETE(self):
             if self.gate(): return super().do_DELETE()
         def log_message(self, *_args): pass
+    if manifest.get('hosted'):
+        sys.path.insert(0, str(ROOT))
+        import enterprise_workspace
+        Handler = enterprise_workspace.install(app, Handler, runtime, ROOT)
     from http.server import ThreadingHTTPServer
-    server = ThreadingHTTPServer(('127.0.0.1', port), Handler)
-    print(json.dumps({'state': 'listening', 'url': f'http://127.0.0.1:{server.server_port}/', 'installation_id': manifest['installation_id']}), flush=True)
+    if socket_path:
+        import socketserver
+        class UnixHTTPServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
+            daemon_threads = True
+            def get_request(self):
+                request, _ = super().get_request()
+                return request, ('127.0.0.1', 0)
+        # Refuse occupied paths. RuntimeDirectory removes stale sockets on stop.
+        server = UnixHTTPServer(socket_path, Handler)
+        os.chmod(socket_path, 0o660)
+        endpoint = 'private-unix-socket'
+    else:
+        server = ThreadingHTTPServer(('127.0.0.1', port), Handler)
+        endpoint = f'http://127.0.0.1:{server.server_port}/'
+    print(json.dumps({'state': 'listening', 'url': endpoint, 'installation_id': manifest['installation_id']}), flush=True)
     try: server.serve_forever()
     finally: server.server_close(); os.close(lock)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, default=0)
+    parser.add_argument('--socket')
     args = parser.parse_args()
-    serve(args.port)
+    serve(args.port, args.socket)
