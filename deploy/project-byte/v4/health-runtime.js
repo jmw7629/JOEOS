@@ -46,7 +46,7 @@
     const el = document.getElementById('opsHealth');
     if (!el) return;
     if (!health || health.unavailable) {
-      el.textContent = 'PROJECT_BYTE health unavailable. Core and execution state are unknown.';
+      el.textContent = 'PRFKT_PROJECT health unavailable. Core and execution state are unknown.';
       return;
     }
     const components = health.components || {};
@@ -55,7 +55,7 @@
     const headline = health.operational ? ((health.warnings || []).length ? 'Operational · warnings' : 'Operational') : health.ok ? 'Core healthy · execution incomplete' : 'Degraded';
     const modelSummary = `${Number(modelsHealth.tested_ok || 0)} tested OK · ${Number(modelsHealth.failed || 0)} failed · ${Number(modelsHealth.unknown || 0)} unknown`;
     const pieces = [
-      `PROJECT_BYTE v${safeText(health.version || 4)} · ${safeText(headline)}`,
+      `PRFKT_PROJECT v${safeText(health.version || 4)} · ${safeText(headline)}`,
       `SQLite ${safeText(stateLabel(components.sqlite))}`,
       `Sync ${safeText(stateLabel(components.sync))}`,
       `StickDeath ${safeText(bridgeSummary(bridges.stickdeath))}`,
@@ -152,7 +152,9 @@
     if (typeof renderModels === 'function') renderModels();
     if (typeof setRefreshTimer === 'function') setRefreshTimer();
     poll();
-    window.setInterval(poll, 15000);
+    window.setInterval(() => {
+      if (!document.hidden && document.querySelector('#home.active,#agents.active,#settings.active')) void poll();
+    }, 60000);
   };
 
   window.__PROJECT_BYTE_HEALTH_REAPPLY__ = () => { if (lastHealth) render(lastHealth); };

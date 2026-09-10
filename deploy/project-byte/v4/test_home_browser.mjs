@@ -1,8 +1,15 @@
+import {verifyCollapsibleNavigation} from './test_collapsible_navigation_browser.mjs';
+import {verifyLiveUpdates} from './test_live_updates_browser.mjs';
+import {verifyDirectInteraction} from './test_direct_interaction_browser.mjs';
+import {verifySpotify} from './test_spotify_browser.mjs';
 // Executable browser acceptance for the actual reconstructed PROJECT_BYTE app.
 // Isolated database and credentials; GitHub execution is deliberately unavailable.
 import assert from 'node:assert/strict';
 import {verifyFocusedWorkspaces} from './test_focused_workspaces.mjs';
 import {prepareObservationFixtures,verifyObservatory} from './test_observatory_browser.mjs';
+import {verifyWorkspaceProfile} from './test_workspace_profile_browser.mjs';
+import {verifyExecutionPermissions} from './test_execution_permissions_browser.mjs';
+import {verifyExternalReviewLogout} from './test_external_reviews_browser.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -12,10 +19,15 @@ import {spawn} from 'node:child_process';
 const {chromium}=await import(process.env.PB_PLAYWRIGHT_MODULE||'playwright');
 const source=path.dirname(fileURLToPath(import.meta.url));
 const root=await fs.mkdtemp(path.join(os.tmpdir(),'pb-orbital-browser-'));
+// Provider credentials must remain outside the fixture's public application root.
+const privateState=await fs.mkdtemp(path.join(os.tmpdir(),'pb-orbital-private-state-'));
+const fixtureEnv=Object.fromEntries(Object.entries(process.env).filter(([name])=>!name.startsWith('PRFKT_CODEX_')));
 const key='TEST_ONLY_ORBITAL_UI_ACCESS_2026';
 async function concatenate(folder){const files=(await fs.readdir(path.join(source,folder))).filter(f=>f.endsWith('.part')).sort();return (await Promise.all(files.map(f=>fs.readFile(path.join(source,folder,f),'utf8')))).join('');}
 await fs.writeFile(path.join(root,'backend.py'),await concatenate('server'));
 await fs.copyFile(path.join(source,'runtime_server.py'),path.join(root,'server.py'));
+await fs.copyFile(path.join(source,'execution_permissions.py'),path.join(root,'execution_permissions.py'));
+for(const name of ['ai_runtime.py','ai_connections.py','codex_connection.py','ai-connections.js','codex_tasks.py','codex_tasks_runtime.py','codex_projects.py','codex_task_rpc.py','codex_sandbox.py','codex_publisher.py','codex-workspace.js'])await fs.copyFile(path.join(source,name),path.join(root,name));
 let html=await concatenate('index');
 for(const name of ['home.js','home-inspector.js','health-runtime.js']){await fs.copyFile(path.join(source,name),path.join(root,name));const tag=`<script src="/${name}"></script>`;if(!html.includes(tag))html=html.replace('</body>',tag+'</body>');}
 await fs.writeFile(path.join(root,'index.html'),html);
@@ -25,7 +37,7 @@ await fs.writeFile(path.join(root,'bin','gh'),'#!/bin/sh\necho "GitHub disabled 
 const port=await new Promise(resolve=>{const s=net.createServer();s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>resolve(p));});});
 const base=`http://127.0.0.1:${port}`;
 await prepareObservationFixtures(root);
-const server=spawn('python3',[path.join(root,'server.py')],{cwd:root,env:{...process.env,HOME:root,PATH:path.join(root,'bin')+path.delimiter+process.env.PATH,KANBAN_HOST:'127.0.0.1',KANBAN_PORT:String(port),PYTHONDONTWRITEBYTECODE:'1'},stdio:['ignore','pipe','pipe']});
+const server=spawn('python3',[path.join(root,'server.py')],{cwd:root,env:{...fixtureEnv,HOME:root,XDG_STATE_HOME:privateState,PATH:path.join(root,'bin')+path.delimiter+process.env.PATH,KANBAN_HOST:'127.0.0.1',KANBAN_PORT:String(port),PYTHONDONTWRITEBYTECODE:'1'},stdio:['ignore','pipe','pipe']});
 let serverLog='',browser;
 for(const stream of [server.stdout,server.stderr])stream.on('data',b=>{serverLog=(serverLog+b.toString()).slice(-6000);});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -38,6 +50,7 @@ try{
   const mike=await api('/api/tasks','POST',{title:'Mike integration — browser fixture',project:'Orbital QA',owner:'Mike',status:'Blocked',priority:'Critical',note:'TEST DATA ONLY'});
   browser=await chromium.launch({headless:true,...(process.env.PB_BROWSER_PATH?{executablePath:process.env.PB_BROWSER_PATH}:{})});
   const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,reducedMotion:'reduce'});
+  await context.addInitScript(()=>localStorage.setItem('prfkt.updates.popups','off')); // Popup behavior has its own isolated acceptance below.
   const page=await context.newPage(),errors=[],external=[];
   page.on('pageerror',e=>errors.push(e.message));
   page.on('request',r=>{if(!r.url().startsWith(base)&&!r.url().startsWith('data:'))external.push(r.url());});
@@ -62,6 +75,7 @@ try{
   assert.match(await page.locator('#homeWork').textContent(),/Mike integration/);
   assert.ok(!(await page.locator('#homeWork').textContent()).includes('Joe launch'));
   await page.locator('[data-home-kpi="blocked"]').click();
+  await page.locator('#homeKpiDialog').press('Escape');
   assert.equal(await page.locator('#ownerFilter').inputValue(),'Mike');
   assert.equal(await page.locator('#statusFilter').inputValue(),'Blocked');
   await page.locator('[data-home-scope="all"]').click();
@@ -86,23 +100,30 @@ try{
     await page.locator(`#pbWorkspaces [data-home-go="${view}"]`).click();
     await page.waitForSelector(`#${view}.active`);
     assert.equal(await page.locator('#pbWorkspaces').evaluate(e=>e.open),false,'workspace drawer closes');
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),`${view} has no page-level horizontal overflow`);
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),`${view} has no page-level horizontal overflow`);
   }
   const out=process.env.PB_SCREENSHOTS||path.join(root,'screenshots');await fs.mkdir(out,{recursive:true});
   await verifyFocusedWorkspaces({page,api,base,out});
   await verifyObservatory({page,api,base,out});
   for(const [width,height] of [[320,740],[390,844],[768,1024],[1440,1000]]){
     await page.setViewportSize({width,height});await page.evaluate(()=>renderAll());await sleep(200);
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),`Home fits ${width}px`);
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),`Home fits ${width}px`);
     assert.equal(await page.locator('.home-nav button').count(),5);
-    const b=await page.locator('.home-nav').boundingBox();assert.ok(b.x>=0&&b.x+b.width<=width+1,'dock fits viewport');
+    await page.locator('#prfktNavToggle').click();const b=await page.locator('.home-nav').boundingBox();assert.ok(b.x>=0&&b.x+b.width<=width+1,'dock fits viewport');await page.locator('#prfktNavToggle').click();
     await page.screenshot({path:path.join(out,`orbital-${width}.png`),fullPage:true});
   }
+  await verifyWorkspaceProfile({page,api,root});
+  await verifyExecutionPermissions({page,api,base,out});
+  await verifyExternalReviewLogout({page});
   await api('/api/settings','POST',{general:{default_view:'board'}});
   await page.goto(base,{waitUntil:'networkidle'});await page.waitForSelector('#board.active');
   assert.equal(errors.length,0,'no browser exceptions: '+errors.join('; '));
   assert.equal(external.length,0,'no external assets or trackers: '+external.join('; '));
+  await verifySpotify({browser,base,out,key});
+  await verifyDirectInteraction({browser,api,base,out,key});
+  await verifyLiveUpdates({browser,api,base,out,key});
+  await verifyCollapsibleNavigation({browser,base,out,key});
   console.log('BROWSER_HOME_LAYOUT_320_390_768_1440=PASS');console.log('MOBILE_NAV_ALL_12_WORKSPACES=PASS');
   console.log('COMPOSABLE_OWNER_PRIORITY_STATUS_FILTERS=PASS');console.log('LIVE_INSPECTOR_REFRESH=PASS');console.log('TASK_CREATE_PERSISTENCE_AND_MODAL_ESCAPE=PASS');console.log('DEFAULT_VIEW_PREFERENCE=PASS');console.log('NO_EXTERNAL_ASSET_REQUESTS=PASS');console.log('SCREENSHOTS='+out);
 } catch(error){console.error('BROWSER_ACCEPTANCE_FAILED',error);console.error(serverLog);process.exitCode=1;
-} finally {if(browser)await browser.close();server.kill('SIGTERM');await new Promise(resolve=>{if(server.exitCode!==null)resolve();else server.once('exit',resolve);});}
+} finally {if(browser)await browser.close();server.kill('SIGTERM');await new Promise(resolve=>{if(server.exitCode!==null)resolve();else server.once('exit',resolve);});await fs.rm(privateState,{recursive:true,force:true});}

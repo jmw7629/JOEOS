@@ -138,7 +138,7 @@
     const ownedHtml=owned.map(r => `
       <button type="button" class="home-run-pill" data-inspect-run="${escI(r.id)}" data-state="${escI(r.status)}">
         <b>${escI(r.agent_key || 'agent')} · ${escI(r.status || 'unknown')}</b>
-        <span>${escI(r.project || '—')} · #${Number(r.issue_number||0) || '—'} · PROJECT_BYTE</span>
+        <span>${escI(r.project || '—')} · #${Number(r.issue_number||0) || '—'} · PRFKT_PROJECT</span>
       </button>`).join('');
     lens.innerHTML = holdsHtml || externalHtml || ownedHtml ? holdsHtml+externalHtml+ownedHtml : '<span class="small">No observed agent runs.</span>';
   }
@@ -219,7 +219,7 @@
           <div class="home-inspector-stat"><span>Elapsed</span><b>${ageLabel(item.elapsed)}</b></div>
           <div class="home-inspector-stat"><span>Activity age</span><b>${ageLabel(item.activityAge)}</b></div>
         </div>
-        <div class="small">${escI(item.runRef||'External executor')} · evidence ${item.evidenceComplete?'complete':'not observable'}. External runs cannot be killed, restarted, merged or deployed from PROJECT_BYTE.</div>
+        <div class="small">${escI(item.runRef||'External executor')} · evidence ${item.evidenceComplete?'complete':'not observable'}. External runs cannot be killed, restarted, merged or deployed from PRFKT_PROJECT.</div>
         <div class="home-inspector-actions">
           <button type="button" data-inspector-agent-workspace="${escI(item.target.agent)}">Agent workspace</button>
           ${issueUrl?`<a href="${escI(issueUrl)}" target="_blank" rel="noopener">Issue #${item.issue}</a>`:''}

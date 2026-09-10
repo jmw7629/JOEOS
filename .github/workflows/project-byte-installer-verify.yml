@@ -6,6 +6,7 @@ on:
     paths:
       - 'deploy/project-byte/install.sh'
       - 'deploy/project-byte/v4/**'
+      - 'deploy/project-byte/private-install/**'
       - '.github/workflows/project-byte-installer-verify.yml'
   pull_request:
     branches: [project-byte-deploy]
@@ -29,12 +30,17 @@ jobs:
           cp deploy/project-byte/v4/home.js "$TMP/home.js"
           cp deploy/project-byte/v4/home-inspector.js "$TMP/home-inspector.js"
           cp deploy/project-byte/v4/health-runtime.js "$TMP/health-runtime.js"
+          cp deploy/project-byte/v4/execution_permissions.py "$TMP/execution_permissions.py"
+          python3 deploy/project-byte/v4/verify_ai_packaging.py
+          PERMISSIONS_SHA="$(sha256sum "$TMP/execution_permissions.py" | awk '{print $1}')"
           BACKEND_SHA="$(sha256sum "$TMP/backend.py" | awk '{print $1}')"
           SERVER_SHA="$(sha256sum "$TMP/server.py" | awk '{print $1}')"
           INDEX_SHA="$(sha256sum "$TMP/index.html" | awk '{print $1}')"
           HOME_SHA="$(sha256sum "$TMP/home.js" | awk '{print $1}')"
           INSPECTOR_SHA="$(sha256sum "$TMP/home-inspector.js" | awk '{print $1}')"
           HEALTH_SHA="$(sha256sum "$TMP/health-runtime.js" | awk '{print $1}')"
+          grep -q "EXPECTED_PERMISSIONS=\"$PERMISSIONS_SHA\"" deploy/project-byte/install.sh
+          python3 -m py_compile "$TMP/execution_permissions.py"
           grep -q "EXPECTED_BACKEND=\"$BACKEND_SHA\"" deploy/project-byte/install.sh
           grep -q "EXPECTED_SERVER=\"$SERVER_SHA\"" deploy/project-byte/install.sh
           grep -q "EXPECTED_INDEX=\"$INDEX_SHA\"" deploy/project-byte/install.sh
@@ -88,7 +94,7 @@ jobs:
           grep -q 'function renderMemory(scoped)' "$TMP/home.js"
           grep -Fq "chips.push(['self','My work',c.ownerFilter===selfName])" "$TMP/home.js"
           grep -q "a.agent_key!=='executive'" "$TMP/home.js"
-          grep -q 'No open work assigned to' "$TMP/home.js"
+          grep -q 'No matching work in this filter' "$TMP/home.js"
           grep -q 'data-home-agent="${key}"' "$TMP/home.js"
           grep -Fq "setHomeFilter(pair[0],control?.value===pair[1]?'':pair[1])" "$TMP/home.js"
           grep -q 'Verifying system health…' "$TMP/home.js"
@@ -139,3 +145,6 @@ jobs:
           node --check "$TMP/health-runtime.js"
           python3 -m py_compile "$TMP/backend.py" "$TMP/server.py"
           echo "INSTALLER_LOCK=PASS backend=$BACKEND_SHA runtime=$SERVER_SHA ui=$INDEX_SHA home=$HOME_SHA inspector=$INSPECTOR_SHA health=$HEALTH_SHA"
+
+      - name: Verify empty private installations and recovery
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s deploy/project-byte/private-install -v

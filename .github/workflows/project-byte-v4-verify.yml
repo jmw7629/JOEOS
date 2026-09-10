@@ -23,16 +23,19 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/project-byte-v4
           cat deploy/project-byte/v4/server/*.part > /tmp/project-byte-v4/backend.py
+          cp deploy/project-byte/v4/execution_permissions.py /tmp/project-byte-v4/execution_permissions.py
+          cp deploy/project-byte/v4/{ai_runtime.py,ai_connections.py,codex_connection.py,ai-connections.js} /tmp/project-byte-v4/
+          cp deploy/project-byte/v4/{codex_tasks.py,codex_tasks_runtime.py,codex_projects.py,codex_task_rpc.py,codex_sandbox.py,codex_publisher.py,codex-workspace.js} /tmp/project-byte-v4/
           cp deploy/project-byte/v4/runtime_server.py /tmp/project-byte-v4/server.py
           cat deploy/project-byte/v4/index/*.part > /tmp/project-byte-v4/index.html
           cp deploy/project-byte/v4/home.js /tmp/project-byte-v4/home.js
           cp deploy/project-byte/v4/home-inspector.js /tmp/project-byte-v4/home-inspector.js
           cp deploy/project-byte/v4/health-runtime.js /tmp/project-byte-v4/health-runtime.js
-          wc -c /tmp/project-byte-v4/backend.py /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js /tmp/project-byte-v4/home-inspector.js /tmp/project-byte-v4/health-runtime.js
-          sha256sum /tmp/project-byte-v4/backend.py /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js /tmp/project-byte-v4/home-inspector.js /tmp/project-byte-v4/health-runtime.js | tee /tmp/project-byte-v4/SHA256SUMS
+          wc -c /tmp/project-byte-v4/execution_permissions.py /tmp/project-byte-v4/backend.py /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js /tmp/project-byte-v4/home-inspector.js /tmp/project-byte-v4/health-runtime.js
+          sha256sum /tmp/project-byte-v4/{ai_runtime.py,ai_connections.py,codex_connection.py,ai-connections.js,codex_tasks.py,codex_tasks_runtime.py,codex_projects.py,codex_task_rpc.py,codex_sandbox.py,codex_publisher.py,codex-workspace.js} /tmp/project-byte-v4/execution_permissions.py /tmp/project-byte-v4/backend.py /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js /tmp/project-byte-v4/home-inspector.js /tmp/project-byte-v4/health-runtime.js | tee /tmp/project-byte-v4/SHA256SUMS
 
       - name: Compile backend and runtime boundary
-        run: python3 -m py_compile /tmp/project-byte-v4/backend.py /tmp/project-byte-v4/server.py
+        run: python3 -m py_compile /tmp/project-byte-v4/backend.py /tmp/project-byte-v4/server.py /tmp/project-byte-v4/execution_permissions.py
 
       - name: Parse browser JavaScript and required surfaces
         shell: bash
@@ -41,7 +44,7 @@ jobs:
           node <<'NODE'
           const fs = require('fs');
           const html = fs.readFileSync('/tmp/project-byte-v4/index.html','utf8');
-          const m = html.match(/<script>([\s\S]*)<\/script>/);
+          const m = html.match(/<script>([\s\S]*?)<\/script>/);
           if (!m) throw new Error('PROJECT_BYTE inline script missing');
           new Function(m[1]);
           const home = fs.readFileSync('/tmp/project-byte-v4/home.js','utf8');
@@ -56,10 +59,10 @@ jobs:
           for (const id of ['ownerFilter','leadFilter','statusFilter','healthFilter','stageFilter','executorFilter','agentFilter','modelFilter','aiStateFilter','dueFilter','completionFilter','dependencyFilter','activityFilter','milestoneFilter','repoFilter','runFilter','scopeFilter','savedView']) {
             if (!html.includes(`id="${id}"`)) throw new Error(`missing filter control: ${id}`);
           }
-          for (const required of ['Joe AI','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','New work','Approve review','Request changes','Live execution fabric','VITROS verifier','Model Hub','Portfolio pulse','homeCommandInput','home-nav']) {
+          for (const required of ['AI_BYTE','Live agents','Team / org map','Current activity','My work','Ready for review','Recent memories','New work','Approve review','Request changes','Live execution fabric','VITROS verifier','Model Hub','Portfolio pulse','homeKpiDialog','home-nav']) {
             if (!home.includes(required)) throw new Error(`missing Home command-center surface: ${required}`);
           }
-          for (const forbidden of ['All systems operational','AI READY','AI CONNECTED']) {
+          for (const forbidden of ['All systems operational','AI READY','AI CONNECTED','homeCommandInput']) {
             if (home.includes(forbidden)) throw new Error(`legacy false-green Home writer remains: ${forbidden}`);
           }
           if (!html.includes('STICKDEATH_BYTE (jmw7629/stickdeath-byte)')) throw new Error('Help missing STICKDEATH_BYTE execution target');
@@ -74,12 +77,21 @@ jobs:
           console.log('UI_JS_FILTERS_HOME_INSPECTOR_AND_HEALTH=PASS');
           NODE
 
+      - name: Compile AI modules
+        run: |
+          python3 -m py_compile /tmp/project-byte-v4/ai_runtime.py /tmp/project-byte-v4/ai_connections.py /tmp/project-byte-v4/codex_connection.py
+          python3 -m py_compile /tmp/project-byte-v4/codex_tasks.py /tmp/project-byte-v4/codex_tasks_runtime.py /tmp/project-byte-v4/codex_projects.py /tmp/project-byte-v4/codex_task_rpc.py /tmp/project-byte-v4/codex_sandbox.py /tmp/project-byte-v4/codex_publisher.py
+          node --check /tmp/project-byte-v4/ai-connections.js
+          node --check /tmp/project-byte-v4/codex-workspace.js
+
       - name: Smoke migration, health, auth, settings, notifications, queue, APIs and runtime boundary
         shell: bash
         run: |
           set -euo pipefail
           RUN=/tmp/project-byte-v4/runtime
           mkdir -p "$RUN/bin" "$RUN/backups" "$RUN/uploads"
+          cp /tmp/project-byte-v4/{ai_runtime.py,ai_connections.py,codex_connection.py,ai-connections.js,execution_permissions.py} "$RUN/"
+          cp /tmp/project-byte-v4/{codex_tasks.py,codex_tasks_runtime.py,codex_projects.py,codex_task_rpc.py,codex_sandbox.py,codex_publisher.py,codex-workspace.js} "$RUN/"
           cp /tmp/project-byte-v4/backend.py /tmp/project-byte-v4/server.py /tmp/project-byte-v4/index.html /tmp/project-byte-v4/home.js /tmp/project-byte-v4/home-inspector.js /tmp/project-byte-v4/health-runtime.js "$RUN/"
           python3 - "$RUN/index.html" <<'PY'
           from pathlib import Path
@@ -155,11 +167,13 @@ jobs:
           curl -fsS http://127.0.0.1:18094/ | grep '<script src="/home.js"></script>' >/dev/null
           curl -fsS http://127.0.0.1:18094/ | grep '<script src="/home-inspector.js"></script>' >/dev/null
           curl -fsS http://127.0.0.1:18094/ | grep '<script src="/health-runtime.js"></script>' >/dev/null
-          curl -fsS http://127.0.0.1:18094/home.js | grep 'Joe AI' >/dev/null
+          curl -fsS http://127.0.0.1:18094/home.js | grep 'AI_BYTE' >/dev/null
           curl -fsS http://127.0.0.1:18094/home-inspector.js | grep 'homeAgentInspector' >/dev/null
           curl -fsS http://127.0.0.1:18094/home-inspector.js | grep 'data-inspect-run' >/dev/null
           curl -fsS http://127.0.0.1:18094/health-runtime.js | grep 'Verifying system health' >/dev/null
           curl -fsS http://127.0.0.1:18094/health-runtime.js | grep 'Core healthy · execution health incomplete' >/dev/null
+          curl -fsS http://127.0.0.1:18094/codex-workspace.js > codex-workspace-asset.js
+          grep -q 'PRFKT_CODEX' codex-workspace-asset.js
 
           deny_runtime_path() {
             local path="$1"
@@ -190,6 +204,14 @@ jobs:
           test "$(curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18094/api/approvals)" = '403'
           curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/session | tee session.json
           grep -q '"role":"owner"' session.json
+          curl -fsS -H "X-Access-Key: $OWNER" http://127.0.0.1:18094/api/codex-workspace > codex-workspace-catalog.json
+          python3 - <<'PY'
+          import json
+          catalog=json.load(open('codex-workspace-catalog.json'))
+          assert catalog['configured'] is False and catalog['connected'] is False, catalog
+          assert catalog['projects'] == [] and catalog['conversations'] == [], catalog
+          print('UNCONFIGURED_CODEX_WORKSPACE_LOADS_WITHOUT_EXECUTION=PASS')
+          PY
 
           printf '%s' 'CONTROLLED_ATTACHMENT_OK' > controlled.txt
           UPLOAD_JSON="$(curl -fsS -X POST -H "X-Access-Key: $OWNER" -H 'X-Task-ID: legacy' -H 'X-Filename: controlled.txt' -H 'Content-Type: text/plain' --data-binary @controlled.txt http://127.0.0.1:18094/api/upload)"
@@ -262,6 +284,18 @@ jobs:
         with:
           name: project-byte-v4-verified
           path: |
+            /tmp/project-byte-v4/ai_runtime.py
+            /tmp/project-byte-v4/ai_connections.py
+            /tmp/project-byte-v4/codex_connection.py
+            /tmp/project-byte-v4/ai-connections.js
+            /tmp/project-byte-v4/codex_tasks.py
+            /tmp/project-byte-v4/codex_tasks_runtime.py
+            /tmp/project-byte-v4/codex_projects.py
+            /tmp/project-byte-v4/codex_task_rpc.py
+            /tmp/project-byte-v4/codex_sandbox.py
+            /tmp/project-byte-v4/codex_publisher.py
+            /tmp/project-byte-v4/codex-workspace.js
+            /tmp/project-byte-v4/execution_permissions.py
             /tmp/project-byte-v4/backend.py
             /tmp/project-byte-v4/server.py
             /tmp/project-byte-v4/index.html

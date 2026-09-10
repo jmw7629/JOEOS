@@ -1,0 +1,32 @@
+[Unit]
+Description=PROJECT_BYTE authenticated public workspace gateway
+After=network.target project-byte.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=joevps
+WorkingDirectory=/home/joevps/.local/share/project-byte-public-gateway/current
+ExecStart=/usr/bin/python3 -I /home/joevps/.local/share/project-byte-public-gateway/current/gateway.py --app-root /home/joevps/PROJECT_BYTE --state-dir /home/joevps/.local/share/project-byte-public-gateway/state --public-owner-key-file /home/joevps/.local/share/project-byte-public-gateway/credentials/public-owner.secret --origin https://mcso9tqzb9-1.tailb9395f.ts.net --port 8097
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/joevps/.local/share/project-byte-public-gateway/state
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=512M
+TasksMax=128
+LimitNOFILE=256
+
+[Install]
+WantedBy=multi-user.target
