@@ -86,16 +86,25 @@ try{
   await page.waitForSelector('#board.active');assert.equal(await page.locator('#projectFilter').inputValue(),'Alpha');
   await page.evaluate(()=>{clearFilters();document.querySelector('[data-view="portfolio"]').click();});
   await page.locator('#projects [data-lead="Ann"]').first().click();
-  assert.deepEqual(await page.locator('#projects .projecthead h2').allTextContents(),['Alpha','Gamma']);
-  assert.match(await page.locator('#pbWorkspaceScope').textContent(),/Lead: Ann/);assert.equal(await page.locator('#pbFilterDialog').evaluate(e=>e.open),false);
+  await page.locator('#prfktLeadDialog[open]').waitFor();
+  assert.deepEqual(await page.locator('#prfktLeadContent article>b').allTextContents(),['Alpha','Gamma']);
+  assert.deepEqual(await page.locator('#projects .projecthead h2').allTextContents(),['Alpha','Beta','Gamma','Delta','Epsilon'],'opening Lead view does not silently change the portfolio filter');
+  assert.equal(await page.locator('#leadFilter').inputValue(),'');
+  await page.locator('#prfktLeadClose').click();
   await page.evaluate(()=>{clearFilters();document.getElementById('ownerFilter').value='Bob';renderAll();});
-  await page.locator('#projects [data-lead="Ann"]').click();assert.equal(await page.locator('#ownerFilter').inputValue(),'Bob');
-  assert.deepEqual(await page.locator('#projects .projecthead h2').allTextContents(),['Alpha']);
+  const beforeLead=await page.locator('#projects .projecthead h2').allTextContents();
+  await page.locator('#projects [data-lead="Ann"]').click();
+  assert.equal(await page.locator('#ownerFilter').inputValue(),'Bob');
+  assert.deepEqual(await page.locator('#projects .projecthead h2').allTextContents(),beforeLead);
+  await page.locator('#prfktLeadClose').click();
   await page.evaluate(()=>clearFilters());await page.locator('#projects [data-lead=""]').first().click();
-  assert.deepEqual(await page.locator('#projects .projecthead h2').allTextContents(),['Delta','Epsilon']);
-  assert.match(await page.locator('#pbWorkspaceScope').textContent(),/Lead: Unassigned/);
-  await page.evaluate(()=>{syncSelectors();renderAll();});
-  assert.deepEqual(await page.locator('#projects .projecthead h2').allTextContents(),['Delta','Epsilon'],'unassigned lead survives data selector refresh');
+  assert.deepEqual(await page.locator('#prfktLeadContent article>b').allTextContents(),['Delta','Epsilon']);
+  await page.locator('[data-lead-board="Delta"]').click();
+  await page.locator('#board.active').waitFor();assert.equal(await page.locator('#projectFilter').inputValue(),'Delta');
+  assert.equal(await page.locator('#prfktLeadDialog').evaluate(e=>e.open),false);
+  // Named filtering remains available explicitly through the existing filter control.
+  await page.evaluate(()=>{clearFilters();document.getElementById('leadFilter').value='Ann';syncSelectors();renderAll();document.querySelector('[data-view="portfolio"]').click();});
+  assert.deepEqual(await page.locator('#projects .projecthead h2').allTextContents(),['Alpha','Gamma']);
   await page.evaluate(()=>{clearFilters();document.getElementById('ownerFilter').value='Ann';document.getElementById('statusFilter').value='Blocked';renderAll();document.querySelector('[data-view="home"]').click();});
   await page.locator('[data-home-kpi="blocked"]').click();assert.equal(await page.locator('#homeKpiDialog [data-home-record]').count(),0);
   assert.match(await page.locator('#homeKpiDialog').innerText(),/No matching records/);await page.keyboard.press('Escape');
@@ -130,5 +139,5 @@ try{
   console.log('OBSERVATORY_READABLE_PROMPT_UPDATE_ARGUMENTS_RESULT_METRICS=PASS');
   assert.equal(writes.length,0,'counter, lead, editor and navigation actions do not mutate records or queue work: '+JSON.stringify(writes));
   assert.equal(errors.length,0,'no browser exceptions: '+errors.join('; '));assert.equal(external.length,0,'no external requests');
-  console.log('HOME_EXACT_COUNTER_RECORDS_AND_ACTIONS=PASS');console.log('PROJECT_LEAD_AND_UNASSIGNED_SCOPE=PASS');console.log('NO_MUTATIONS_OR_AUTOQUEUE=PASS');console.log('SCREENSHOTS='+out);
+  console.log('HOME_EXACT_COUNTER_RECORDS_AND_ACTIONS=PASS');console.log('PROJECT_LEAD_DIALOG_UNASSIGNED_QUEUE_ACTION_AND_EXPLICIT_FILTER=PASS');console.log('NO_MUTATIONS_OR_AUTOQUEUE=PASS');console.log('SCREENSHOTS='+out);
 }catch(error){console.error(error);process.exitCode=1;}finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
