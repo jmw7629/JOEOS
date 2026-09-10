@@ -116,6 +116,7 @@ try {
   assert.doesNotMatch(await page.locator('#chatlog').innerText(),/Work context|fixture\/joeos/,'context has a dedicated disclosure, not a JSON chat bubble');
   await page.locator('#chatInput').fill('ALPHA_UNSENT_DRAFT');
   await go('home');
+  await page.locator('#cwWorkJump').waitFor({state:'visible'});
   assert.equal(await page.locator('#cwWorkJump').isVisible(),true);
   const b=await work({projectName:'Beta'});assert.notEqual(a,b);assert.equal(await page.locator('#chatInput').inputValue(),'');
   await submit('BETA_REQUEST');await page.waitForTimeout(300);assert.equal(submitted.size,1,'second window waits for single runner');
