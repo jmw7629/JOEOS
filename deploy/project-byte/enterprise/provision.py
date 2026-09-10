@@ -17,8 +17,14 @@ def run(*args):return subprocess.run(args,check=True,capture_output=True,text=Tr
 def write(path,value,mode=0o600,uid=0,gid=0):
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
     fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,mode)
-    with os.fdopen(fd,'w') as f:f.write(value)
+    with os.fdopen(fd,'w') as f:
+        f.write(value)
+        os.fchmod(f.fileno(),mode)
     os.chown(path,uid,gid)
+
+def mkdir_exact(path,mode):
+    path.mkdir(mode=mode)
+    path.chmod(mode)
 
 def user(name):
     try:pwd.getpwnam(name);raise RuntimeError('Refusing an existing service account: '+name)
@@ -72,7 +78,7 @@ def provision(source,count,publish=False):
     if os.geteuid()!=0:raise RuntimeError('Authorized root invocation required')
     if BASE.exists() or CODE.exists():raise RuntimeError('Deployment already exists; use a reviewed versioned update')
     if not 1<=count<=5:raise ValueError('Pilot capacity must be 1–5')
-    os.umask(0o077);BASE.mkdir(mode=0o711);CODE.mkdir(mode=0o755)
+    os.umask(0o077);mkdir_exact(BASE,0o711);mkdir_exact(CODE,0o755)
     sys.path.insert(0,str(source.resolve()/'enterprise'))
     import verify
     personal_before=verify.states(verify.PERSONAL)
@@ -81,9 +87,9 @@ def provision(source,count,publish=False):
     for directory in ('enterprise','public-access'):
         shutil.copytree(source/directory,CODE/directory)
     for p in CODE.rglob('*'):os.chmod(p,0o755 if p.is_dir() else 0o644)
-    (BASE/'workspaces').mkdir(mode=0o711);(BASE/'roots').mkdir(mode=0o711)
+    mkdir_exact(BASE/'workspaces',0o711);mkdir_exact(BASE/'roots',0o711)
     state=BASE/'portal-state';state.mkdir(mode=0o700);os.chown(state,portal_user.pw_uid,portal_user.pw_gid)
-    configdir=BASE/'portal-config';configdir.mkdir(mode=0o750);os.chown(configdir,0,portal_user.pw_gid)
+    configdir=BASE/'portal-config';mkdir_exact(configdir,0o750);os.chown(configdir,0,portal_user.pw_gid)
     spec=importlib.util.spec_from_file_location('private_prepare',source/'private-install/prepare.py');prepare=importlib.util.module_from_spec(spec);spec.loader.exec_module(prepare)
     slots=[];groups=[];units=[]
     for i in range(1,count+1):

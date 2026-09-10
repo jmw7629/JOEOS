@@ -8,7 +8,21 @@ BASE=Path('/var/lib/prfkt-enterprise')
 ORIGIN='https://mcso9tqzb9-1.tailb9395f.ts.net:10000'
 PERSONAL=('project-byte.service','project-byte-public-gateway.service','prfkt-codex-sandbox.service')
 
-def run(*args):return subprocess.run(args,check=True,capture_output=True,text=True,timeout=30).stdout
+class VerificationError(RuntimeError):
+    def __init__(self, command, returncode, stdout='', stderr=''):
+        self.returncode=returncode
+        self.stdout=stdout
+        self.stderr=stderr
+        super().__init__(f'{command} failed (exit {returncode})\n'+(stderr.strip() or stdout.strip() or 'No error output was recorded'))
+
+def run(*args):
+    try:result=subprocess.run(args,capture_output=True,text=True,timeout=30)
+    except subprocess.TimeoutExpired as error:
+        def decoded(value):return value.decode(errors='replace') if isinstance(value,bytes) else value or ''
+        raise VerificationError(args[0],124,decoded(error.stdout),decoded(error.stderr)+'\nVerification command timed out; inspect state before retrying.') from None
+    if result.returncode:
+        raise VerificationError(args[0],result.returncode,result.stdout,result.stderr)
+    return result.stdout
 
 def states(units):
     result={}
@@ -57,7 +71,10 @@ def verify(publish=False,before=None):
         observed=states(units)
         if all(v['ActiveState']=='active' and int(v['MainPID'])>0 for v in observed.values()):break
         time.sleep(1)
-    assert all(v['ActiveState']=='active' and int(v['MainPID'])>0 for v in observed.values()),observed
+    for unit,status in observed.items():
+        if status['ActiveState']!='active' or int(status['MainPID'])<=0:
+            detail=run('journalctl','-u',unit,'-n','15','--no-pager')
+            raise VerificationError(unit,1,stderr=detail)
     sys_before=before or states(PERSONAL)
     checks={u:isolation(u,s) for u,s in observed.items() if 'slot' in u}
     # Read every private socket directly with only that instance's credential.
@@ -83,8 +100,11 @@ def verify(publish=False,before=None):
     result={'state':'verified-private','isolation':checks,'empty_workspaces':inventories,'admin_signin':True,'anonymous_denied':True,'personal_services_unchanged':True}
     if publish:
         prior=json.loads(run('tailscale','serve','status','--json'))
-        assert '10000' not in prior.get('TCP',{}),'Port 10000 is already configured'
-        run('tailscale','funnel','--bg','--https=10000','--yes','http://127.0.0.1:8100')
+        host=urlsplit(ORIGIN).netloc
+        if '10000' in prior.get('TCP',{}):
+            assert prior['TCP']['10000']=={'HTTPS':True} and prior.get('Web',{}).get(host)=={'Handlers':{'/':{'Proxy':'http://127.0.0.1:8100'}}} and prior.get('AllowFunnel',{}).get(host) is True,'Port 10000 belongs to another configuration'
+        else:
+            run('tailscale','funnel','--bg','--https=10000','--yes','http://127.0.0.1:8100')
         after=json.loads(run('tailscale','serve','status','--json'))
         for key,value in prior.get('Web',{}).items():assert after['Web'].get(key)==value
         for key,value in prior.get('TCP',{}).items():assert after['TCP'].get(key)==value
