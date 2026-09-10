@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import {webcrypto} from 'node:crypto';
-const source=fs.readFileSync(new URL('./home.js',import.meta.url),'utf8').split('// PRFKT_SPOTIFY_PLAYER_BEGIN')[1];
+const home=fs.readFileSync(new URL('./home.js',import.meta.url),'utf8');
+const begin=home.indexOf('// PRFKT_SPOTIFY_PLAYER_BEGIN'),end=home.indexOf('\n})();',begin);
+assert.ok(begin>=0&&end>begin,'Spotify module boundaries exist');
+// Evaluate only the Spotify IIFE; later Home modules require a browser DOM.
+const source=home.slice(begin,end+7);
 const context={module:{exports:{}},crypto:webcrypto,TextEncoder,URL,URLSearchParams,AbortController,btoa,fetch,setTimeout,clearTimeout};
-vm.runInNewContext('// PRFKT_SPOTIFY_PLAYER_BEGIN'+source,context);
+vm.runInNewContext(source,context);
 const {SpotifySession,ARTIST,sha}=context.module.exports;
 const memory=()=>{const m=new Map();return {getItem:k=>m.get(k)||null,setItem:(k,v)=>m.set(k,v),removeItem:k=>m.delete(k)};};
 const response=(data,status=200,headers={})=>({ok:status>=200&&status<300,status,headers:new Headers(headers),json:async()=>data});
