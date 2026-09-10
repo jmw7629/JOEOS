@@ -533,7 +533,7 @@
   toolbar.innerHTML='<div class="cw-workspace-tabs" role="group" aria-label="Workspace view"><button type="button" data-cw-view="chat" aria-pressed="true">Chat</button><button type="button" data-cw-view="terminal" aria-pressed="false">Terminal</button><button type="button" data-cw-view="graph" aria-pressed="false">Graph</button></div><div class="cw-workspace-actions"><button type="button" id="cwContextToggle" class="mini" aria-controls="codexWorkspacePanel" aria-expanded="false">Context</button><button type="button" id="cwOptions" class="mini" aria-label="Chat and agent settings">Options</button></div>';
   box.querySelector('.between').after(toolbar);
   const terminal=document.createElement('section');terminal.id='cwTerminal';terminal.hidden=true;
-  terminal.innerHTML='<div class="cw-terminal-head"><span>Build output <span id="cwTerminalState"></span></span><button type="button" id="cwFollowOutput" class="mini" aria-pressed="true">Follow output</button></div><div id="cwTerminalLog" tabindex="0" aria-label="Recorded command output"></div>';
+  terminal.innerHTML='<div class="cw-terminal-head"><span>Build output <span id="cwTerminalState"></span></span><button type="button" id="cwFollowOutput" class="mini" aria-pressed="true">Following output</button></div><div id="cwTerminalLog" tabindex="0" aria-label="Recorded command output"></div>';
   $('chatlog').after(terminal);terminal.after(studio);
   const statusbar=document.createElement('div');statusbar.className='cw-statusbar';
   box.querySelector('.composer').before(statusbar);statusbar.append(progress,$('codexStop'));
@@ -602,8 +602,8 @@
   window.addEventListener('prfkt-permission-snapshot',event=>{if(popupMessage?.kind==='permission' && !event.detail?.ids?.includes(popupMessage.id)){popupMessage=null;popup.hidden=true;}});
   function renderTerminal() {
     const entries=[...traceNodes.values()].filter(n=>n.kind==='tool');
-    const signature=JSON.stringify(entries);if(signature===terminalSignature)return;terminalSignature=signature;
-    const log=$('cwTerminalLog'),scrollTop=log.scrollTop,nearBottom=log.scrollHeight-scrollTop-log.clientHeight<80;
+    const signature=JSON.stringify(entries);if(signature===terminalSignature){if(followOutput&&!terminal.hidden)$('cwTerminalLog').scrollTop=$('cwTerminalLog').scrollHeight;return;}terminalSignature=signature;
+    const log=$('cwTerminalLog'),scrollTop=log.scrollTop;
     const clean=v=>String(v || '').replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g,'');
     log.innerHTML=entries.slice(-100).map(n=>{
       const raw=n.arguments?.text || '',time=metricNumber(n.started_at)?new Date(n.started_at*1000).toLocaleTimeString():'';
@@ -685,7 +685,9 @@
   function roomScope(r){const t=tasks.find(t=>t.id===r.taskId);return {project:r.projectName||projectList().find(p=>p.key===r.projectKey)?.label||r.projectKey,repository:projectList().find(p=>p.key===r.projectKey)?.repo||'',task:t||r.taskSnapshot||null,kind:r.kind||'general'};}
   function roomStatus(r){if(r.pending)return r.pending.phase==='sending'?'Submitting…':r.pending.phase==='uncertain'?'Check submission':r.pending.phase==='paused'?'Waiting · resume needed':r.note||'Waiting for runner';return labels[r.status]||'Draft';}
   function roomRender(){
-    if(!roomSync())return;if(!roomReady)return;const r=roomCurrent();const main=document.querySelector('body > main.wrap');if(main&&host.classList.contains('active')){const h=Math.max(180,Math.floor(main.clientHeight-(host.getBoundingClientRect().top-main.getBoundingClientRect().top+main.scrollTop)-20))+'px';if(box.style.getPropertyValue('--cw-work-height')!==h)box.style.setProperty('--cw-work-height',h);}
+    if(!roomSync())return;if(!roomReady)return;const r=roomCurrent();sizeWorkspace();
+    const scope=$('cwWorkScope'),scopeParent=host.classList.contains('cw-remote')||!sidebar?roomUI:sidebar;
+    if(scope.parentElement!==scopeParent)scopeParent.insertBefore(scope,scopeParent===roomUI?$('cwWorkState'):scopeParent.firstChild);
     if(r&&renderedRoom===r.id&&run&&conversationId===r.conversationId){r.status=run.status;r.runId=run.id;r.seq=seq;}
     if(!r&&catalog){void roomNew({projectKey:projectList().some(p=>p.key==='joeos')?'joeos':'',title:'General chat',kind:'general'},false);return;}
     const sig=JSON.stringify([...workRooms.values()].map(x=>[x.id,x.title,x.projectKey,x.status,x.pending?.phase,x.note,x.unread]));
@@ -790,8 +792,8 @@
   document.addEventListener('click',event=>{if(event.target.closest('#login,#logoutAllLocal')){roomClear();roomIdentity='';}},true);
   setInterval(()=>{if(roomSync()){roomRender();void roomPump();}},1000);
 
-  // Mobile work surface: compact navigation, durable server history and honest input capabilities.
-  const mobileCSS=document.createElement('style');mobileCSS.textContent=`
+  // Shared work surface: durable history and input controls, with responsive context and viewport sizing.
+  const workspaceCSS=document.createElement('style');workspaceCSS.textContent=`
     #ai.cw-work-rooms #cwWorkWindows{max-height:none;padding:8px 12px;margin:0;overflow:visible;position:relative}
     #cwWorkWindows .cw-work-head{margin:0;align-items:center}#cwWorkWindows .cw-work-head p,#cwWorkScope{display:none}#cwWorkWindows .cw-work-head b{font-size:14px}#cwWorkWindows .cw-work-head{gap:6px}#cwWorkWindows .cw-work-head button{padding:5px 9px;font-size:12px}
     #cwWorkTabs.cw-tabs-open{display:flex;position:absolute;top:100%;left:0;right:0;max-height:210px;overflow:auto;z-index:50;padding:10px;background:#161a20;border:1px solid #455161;border-radius:12px;box-shadow:0 12px 40px #0008}
@@ -810,8 +812,12 @@
     #cwHistoryList{display:grid;gap:8px;margin-top:12px}#cwHistoryList button{display:grid;gap:7px;text-align:left;background:#222932;color:#e3e7ed;border:1px solid #3a495b;border-radius:10px;padding:12px;overflow-wrap:anywhere}#cwHistoryList small{color:#aeb9c7}
     body.cw-keyboard #ai .cw-work-head{display:none}body.cw-keyboard #ai .cw-workspace-bar{padding:0 6px}body.cw-keyboard #ai .cw-workspace-tabs button{min-height:34px;padding:3px 10px}body.cw-keyboard #ai #cwWorkWindows{padding:3px 8px}body.cw-keyboard #ai .cw-work-head button{min-height:34px}body.cw-keyboard #ai #cwWorkState{max-height:30px}
     body.cw-keyboard #ai #chatInput{min-height:62px;height:62px;max-height:95px}body.cw-keyboard #ai .cw-statusbar{display:none}body.cw-keyboard #ai #cwInputTools button{min-height:32px}body.cw-keyboard #ai .composer{margin-bottom:5px;padding:5px}
+    #ai.cw-work-rooms:not(.cw-remote) #cwWorkScope{display:block;max-height:30dvh;overflow:auto;padding:10px 14px;border:1px solid #304357;border-radius:14px;background:#111a24}
+    #ai.cw-work-rooms:not(.cw-remote) .ai-layout>aside{max-height:var(--cw-work-height,calc(100dvh - 180px));overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+    #ai.cw-work-rooms:not(.cw-remote) .cw-trace-canvas{height:clamp(220px,calc(var(--cw-work-height,600px) - 220px),480px)}
+    @media(min-width:761px){body.cw-chat-page #pbContextBar{margin-bottom:8px}body.cw-chat-page #pbContextBar h2{font-size:20px}#ai.cw-work-rooms:not(.cw-remote) .cw-workspace-bar{padding:4px 12px 6px}#ai.cw-work-rooms:not(.cw-remote) #chatlog{padding:20px clamp(18px,5vw,64px)}}
     @media(max-width:650px){body.cw-chat-page>main.wrap{padding:6px 8px 0}body.cw-chat-page #pbContextBar,body.cw-chat-page #pbLiveCrawl,body.cw-chat-page #status{display:none!important}body.cw-keyboard>header{display:none!important}#ai.cw-work-rooms #chatlog{padding:16px;gap:18px}#ai.cw-work-rooms .cw-workspace-bar{flex-wrap:nowrap;padding:4px 8px}.cw-workspace-actions #cwOptions{display:none}}
-  `;document.head.append(mobileCSS);
+  `;document.head.append(workspaceCSS);
   const roomHeading=roomUI.querySelector('.cw-work-head');const windows=document.createElement('button');windows.type='button';windows.id='cwWindowsMenu';windows.className='mini';windows.textContent='Chats ▾';windows.setAttribute('aria-expanded','false');roomHeading.firstElementChild.replaceWith(windows);
   windows.onclick=()=>{const expanded=$('cwWorkTabs').classList.toggle('cw-tabs-open');windows.setAttribute('aria-expanded',String(expanded));};
   $('cwWorkTabs').addEventListener('click',()=>{$('cwWorkTabs').classList.remove('cw-tabs-open');windows.setAttribute('aria-expanded','false');});
@@ -862,16 +868,33 @@
   const attachment=document.createElement('input');attachment.type='file';attachment.accept='.txt,.md,.csv,.json,.log';attachment.hidden=true;inputTools.append(attachment);
   $('cwAttach').onclick=()=>attachment.click();attachment.onchange=async()=>{const file=attachment.files?.[0],r=roomCurrent(),id=r?.id;if(!file||!r)return;try{if(!/\.(txt|md|csv|json|log)$/i.test(file.name)||file.size>16000)throw new Error('Choose a text, Markdown, CSV, JSON or log file up to 16 KB. Images, camera, PDF, Word and Excel uploads need the attachment service.');const content=await file.text();if(roomCurrent()?.id!==id)throw new Error('Chat changed. Select the file again in the intended chat.');if(r.pending)throw new Error('Wait for this pending message or open a new chat.');$('chatInput').value+=(r.draft?'\n\n':'')+'Attached reference file: '+file.name.replace(/[\r\n]/g,' ')+'\n```\n'+content+'\n```';$('chatInput').dispatchEvent(new Event('input',{bubbles:true}));r.note='File added to this draft. Review it before sending.';}catch(e){r.note=e.message;}attachment.value='';roomRender();};
   let recognition=null;const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;
-  $('cwDictate').onclick=()=>{const r=roomCurrent();if(!r||r.pending)return;if(!Speech){r.note='Use the microphone on your phone keyboard for dictation. This browser does not expose speech recognition.';roomRender();$('chatInput').focus();return;}if(recognition){recognition.stop();return;}const current=r.id,rec=new Speech();recognition=rec;rec.continuous=false;rec.interimResults=false;rec.lang=navigator.language||'en-US';rec.onresult=e=>{if(roomCurrent()?.id!==current||roomCurrent()?.pending)return;$('chatInput').value+=Array.from(e.results).map(v=>v[0].transcript).join(' ');$('chatInput').dispatchEvent(new Event('input',{bubbles:true}));};rec.onerror=()=>{r.note='Dictation unavailable. Check microphone permission or use keyboard dictation.';roomRender();};rec.onend=()=>{recognition=null;$('cwDictate').textContent='Mic';};$('cwDictate').textContent='Stop mic';try{rec.start();}catch{recognition=null;$('cwDictate').textContent='Mic';r.note='Microphone could not start. Use your keyboard dictation or check browser permission.';roomRender();}};
+  $('cwDictate').onclick=()=>{const r=roomCurrent();if(!r||r.pending)return;if(!Speech){r.note='Use your device’s keyboard dictation. This browser does not expose speech recognition.';roomRender();$('chatInput').focus();return;}if(recognition){recognition.stop();return;}const current=r.id,rec=new Speech();recognition=rec;rec.continuous=false;rec.interimResults=false;rec.lang=navigator.language||'en-US';rec.onresult=e=>{if(roomCurrent()?.id!==current||roomCurrent()?.pending)return;$('chatInput').value+=Array.from(e.results).map(v=>v[0].transcript).join(' ');$('chatInput').dispatchEvent(new Event('input',{bubbles:true}));};rec.onerror=()=>{r.note='Dictation unavailable. Check microphone permission or use keyboard dictation.';roomRender();};rec.onend=()=>{recognition=null;$('cwDictate').textContent='Mic';};$('cwDictate').textContent='Stop mic';try{rec.start();}catch{recognition=null;$('cwDictate').textContent='Mic';r.note='Microphone could not start. Use your keyboard dictation or check browser permission.';roomRender();}};
   const modelDialog=document.createElement('dialog');modelDialog.id='cwModelDialog';modelDialog.className='cw-mobile-dialog';modelDialog.innerHTML='<header><h2>Model & reasoning</h2><button type="button" class="mini" data-close>Close</button></header><p class="small">Codex chooses tools and specialist roles. These optional settings apply to your next message.</p><label>Model<select id="cwModelSelect" class="field"></select></label><label>Reasoning<select id="cwEffortSelect" class="field"></select></label><p class="small">Lower reasoning usually responds sooner. This is not a guaranteed speed or a priority-service setting.</p><p id="cwModelAvailability" class="small"></p><button type="button" class="btn primary" id="cwSaveModel">Use for this chat</button>';document.body.append(modelDialog);modelDialog.querySelector('[data-close]').onclick=()=>modelDialog.close();
   function effortOptions(){const option=catalog?.runtime_options?.models?.find(m=>m.id===$('cwModelSelect').value);$('cwEffortSelect').replaceChildren(...(option?.efforts||[catalog?.effort||'ultra']).map(e=>new Option(e,e)));$('cwEffortSelect').value=roomCurrent()?.effort||catalog?.effort||'ultra';if(!$('cwEffortSelect').value)$('cwEffortSelect').selectedIndex=0;}
   $('cwModelOptions').onclick=()=>{const available=catalog?.runtime_options?.models?.length?catalog.runtime_options.models:[{id:catalog?.model||'gpt-6-astra',name:catalog?.model||'gpt-6-astra'}];$('cwModelSelect').replaceChildren(...available.map(m=>new Option(m.name||m.id,m.id)));$('cwModelSelect').value=roomCurrent()?.model||catalog?.model;effortOptions();const supported=!!catalog?.runtime_options?.per_message;$('cwSaveModel').disabled=!supported;$('cwModelSelect').disabled=!supported;$('cwEffortSelect').disabled=!supported;$('cwModelAvailability').textContent=supported?'Only models advertised by this connected runtime are listed.':'This running server pins Astra / ultra. Per-chat model selection becomes available with the reviewed backend update.';modelDialog.showModal();};$('cwModelSelect').onchange=effortOptions;
   $('cwSaveModel').onclick=()=>{const r=roomCurrent();if(!r||r.pending||!catalog?.runtime_options?.per_message)return;r.model=$('cwModelSelect').value;r.effort=$('cwEffortSelect').value;roomPersist();modelDialog.close();};
-  function fitMobile(){const inChat=host.classList.contains('active')&&owner();document.body.classList.toggle('cw-chat-page',inChat);const editing=$('chatInput')===document.activeElement;document.body.classList.toggle('cw-keyboard',inChat&&phone.matches&&editing&&(window.visualViewport?.height||innerHeight)<600);if(inChat)requestAnimationFrame(()=>{const main=document.querySelector('body > main.wrap');main.scrollTop=0;const h=Math.max(180,Math.floor(main.clientHeight-(host.getBoundingClientRect().top-main.getBoundingClientRect().top)-12))+'px';if(box.style.getPropertyValue('--cw-work-height')!==h)box.style.setProperty('--cw-work-height',h);});}
-  window.visualViewport?.addEventListener('resize',fitMobile);window.visualViewport?.addEventListener('scroll',fitMobile);window.addEventListener('resize',fitMobile);window.addEventListener('hashchange',fitMobile);document.addEventListener('focusin',fitMobile);document.addEventListener('focusout',()=>setTimeout(fitMobile,0));
-  document.addEventListener('click',e=>{if(e.target.closest('[data-home-go],[data-view],[data-cw-view],#cwWorkJump'))requestAnimationFrame(fitMobile);});
-  new MutationObserver(fitMobile).observe(host,{attributes:true,attributeFilter:['class']});
-  $('cwTerminalLog').addEventListener('wheel',()=>{if($('cwTerminalLog').scrollHeight-$('cwTerminalLog').scrollTop-$('cwTerminalLog').clientHeight>80){followOutput=false;$('cwFollowOutput').textContent='Follow output';$('cwFollowOutput').setAttribute('aria-pressed','false');}},{passive:true});
+  function sizeWorkspace(){
+    const main=document.querySelector('body > main.wrap');if(!main||!host.classList.contains('active'))return;
+    const offset=host.getBoundingClientRect().top-main.getBoundingClientRect().top+main.scrollTop;
+    const h=Math.max(180,Math.floor(main.clientHeight-offset-12))+'px';
+    if(host.style.getPropertyValue('--cw-work-height')!==h)host.style.setProperty('--cw-work-height',h);
+  }
+  let fitFrame=0;
+  function fitWorkspace(){
+    const inChat=host.classList.contains('active')&&owner();document.body.classList.toggle('cw-chat-page',inChat);
+    const editing=$('chatInput')===document.activeElement;
+    document.body.classList.toggle('cw-keyboard',inChat&&phone.matches&&editing&&(window.visualViewport?.height||innerHeight)<600);
+    if(inChat&&!fitFrame)fitFrame=requestAnimationFrame(()=>{fitFrame=0;const main=document.querySelector('body > main.wrap');if(phone.matches)main.scrollTop=0;sizeWorkspace();});
+  }
+  window.visualViewport?.addEventListener('resize',fitWorkspace);window.visualViewport?.addEventListener('scroll',fitWorkspace);window.addEventListener('resize',fitWorkspace);window.addEventListener('hashchange',fitWorkspace);document.addEventListener('focusin',fitWorkspace);document.addEventListener('focusout',()=>setTimeout(fitWorkspace,0));
+  document.addEventListener('click',e=>{if(e.target.closest('[data-home-go],[data-view],[data-cw-view],#cwWorkJump'))fitWorkspace();});
+  new MutationObserver(fitWorkspace).observe(host,{attributes:true,attributeFilter:['class']});
+  new ResizeObserver(fitWorkspace).observe(document.querySelector('body > main.wrap'));
+  function pauseOutputFollow(){followOutput=false;$('cwFollowOutput').textContent='Follow output';$('cwFollowOutput').setAttribute('aria-pressed','false');}
+  // A user reading earlier output must not be pulled back down by the next stream event.
+  $('cwTerminalLog').addEventListener('wheel',e=>{if(e.deltaY<0)pauseOutputFollow();},{passive:true});
+  $('cwTerminalLog').addEventListener('keydown',e=>{if(['ArrowUp','PageUp','Home'].includes(e.key))pauseOutputFollow();});
+  $('cwTerminalLog').addEventListener('scroll',()=>{const log=$('cwTerminalLog');if(!terminal.hidden&&log.scrollHeight-log.scrollTop-log.clientHeight>80)pauseOutputFollow();},{passive:true});
   const beforeRoomClear=roomClear;roomClear=function(){recognition?.abort();recognition=null;historyDialog.close();modelDialog.close();beforeRoomClear();};
 
   window.PRFKT_CODEX = Object.freeze({open,send,openWork:roomOpenWork,openConversation:roomOpenConversation,isViewingConversation:id=>!!id&&id===conversationId&&visible()&&workspaceView==='chat'});

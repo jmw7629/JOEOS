@@ -1,5 +1,7 @@
 # Mobile workflow audit — 10 September 2026
 
+The same workflow is covered on desktop by [DESKTOP_WORKFLOW_AUDIT.md](DESKTOP_WORKFLOW_AUDIT.md), including subsequent context, viewport and Terminal Follow corrections.
+
 The mobile defects are reproducible. This change fixes the existing workspace rather than rebuilding it. It is a review candidate; it has not been installed on JoeVPS. Production databases, project registries, credentials, recovery copies, services and worker ownership were not changed. The incoming-project Codex automation remains paused. No additional agents were launched.
 
 Repository: `jmw7629/JOEOS`. Review branch: `feat/project-byte-ai-connections`, with `project-byte-deploy` as the release base. The starting local commit was `61cee74b5edad9ca90c043a621d115070787d477`; its tree matched remote `cf490b6c90568145bb43321bc2d33dbfb8913147`. Existing draft PR: https://github.com/jmw7629/JOEOS/pull/59. Handoff: https://github.com/jmw7629/JOEOS/issues/49.

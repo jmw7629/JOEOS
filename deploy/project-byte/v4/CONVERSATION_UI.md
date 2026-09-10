@@ -2,6 +2,8 @@
 
 The existing desktop layout now opens on readable messages. Chat, Terminal and Graph share the selected native conversation. The Terminal view displays recorded tool commands, output and results; it is not an interactive shell. Commentary and final messages remain in chronological order, with separate records for delegated agents.
 
+Desktop and mobile use the same project history, copy, attachment, model/reasoning and review controls. Desktop keeps task context and dependencies in the side column; mobile exposes them through Context. The composer adapts when navigation expands, and desktop focus preserves scroll position. Scrolling upward in Terminal pauses Follow; enabling it returns to the newest recorded output. See [DESKTOP_WORKFLOW_AUDIT.md](DESKTOP_WORKFLOW_AUDIT.md) for screen-size verification and shared capability limits.
+
 Settings → Chat & agents provides automatic, desktop and mobile layouts plus optional agent-message popups. Mobile prioritizes agent text and real permission requests. Historical activity remains available through Show recorded activity. Dismissing a popup does not answer or deny a request.
 
 Observatory owner sessions can inspect recorded visible prompts, tool arguments, responses, errors and agent messages. Credentials are redacted and content is bounded. Hidden reasoning is excluded. Missing historical tokens and timings remain null and display Not recorded; no estimates are presented as measurements. See OBSERVATORY.md for the audience and evidence contract.
